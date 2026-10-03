@@ -24,7 +24,7 @@ local AnimationIds = require(Shared.Data.AnimationIds)
 local AnimationController = {}
 local C
 local player = Players.LocalPlayer
-local walkMode = false -- Ctrl: cammina invece di correre
+local walkMode = false -- Bloc Maiusc: cammina invece di correre
 local savedWalkSpeed: number? = nil
 local rigs: { [Model]: any } = {}
 local loadedTracks: { [Model]: { [string]: AnimationTrack } } = {}
@@ -252,7 +252,8 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 			local relative = root.CFrame:VectorToObjectSpace(dir)
 			-- angolo dal verticale: 0 = verso l'alto, 90 = orizzontale
 			local pitch = math.deg(math.acos(math.clamp(dir.Y, -1, 1)))
-			ctx.Pitch = math.clamp(pitch, 10, 120)
+			-- mai a testa in giù: in picchiata il corpo si inclina al massimo di poco oltre l'orizzontale
+			ctx.Pitch = math.clamp(pitch, 10, 100)
 			ctx.Roll = math.clamp(-relative.X * 40, -40, 40)
 		end
 		rig.Animator:SetLayerWeight("Fly", if flying and not rig.Hanging then 1 else 0)
@@ -266,11 +267,45 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		end
 		local hstate = humanoid:GetState()
 		local airborne = hstate == Enum.HumanoidStateType.Freefall or hstate == Enum.HumanoidStateType.Jumping
-		ctx.Air = (ctx.Air or 0) + ((if airborne then 1 else 0) - (ctx.Air or 0)) * math.min(1, dt * 10)
-		ctx.Flat = if airborne then (ctx.Flat or 0) else flat
+		local k = math.min(1, dt * 10)
+		ctx.Air = (ctx.Air or 0) + ((if airborne then 1 else 0) - (ctx.Air or 0)) * k
+		if not airborne then
+			ctx.Flat = (ctx.Flat or 0) + (flat - (ctx.Flat or 0)) * k
+		end
 		ctx.Blades = hasBlades(model)
+		-- direzione del movimento rispetto al corpo (avanti / indietro / di lato)
+		local rel = root.CFrame:VectorToObjectSpace(Vector3.new(velocity.X, 0, velocity.Z))
+		local fwd, side = 1, 0
+		if flat > 1.5 then
+			fwd = -rel.Z / flat
+			side = rel.X / flat
+		end
+		local kd = math.min(1, dt * 8)
+		ctx.Forward = (ctx.Forward or 1) + (fwd - (ctx.Forward or 1)) * kd
+		ctx.Side = (ctx.Side or 0) + (side - (ctx.Side or 0)) * kd
+		-- velocità di rotazione (per inclinarsi nelle curve)
+		local look = root.CFrame.LookVector
+		local yaw = math.atan2(-look.X, -look.Z)
+		local dyaw = (yaw - (rig.LastYaw or yaw) + math.pi) % (2 * math.pi) - math.pi
+		rig.LastYaw = yaw
+		local turnRate = math.deg(dyaw) / math.max(dt, 1 / 240)
+		ctx.Turn = (ctx.Turn or 0) + (turnRate - (ctx.Turn or 0)) * math.min(1, dt * 6)
+		-- atterraggio: più forte è la caduta, più ci si piega
+		if rig.WasAir and not airborne and (rig.FallSpeed or 0) > 28 then
+			ctx.Land = math.clamp((rig.FallSpeed or 0) / 90, 0.3, 1)
+			if model == player.Character and C and C.CameraController then
+				C.CameraController.Land(ctx.Land)
+			end
+		end
+		ctx.Land = math.max(0, (ctx.Land or 0) - dt * 2.8)
+		rig.WasAir = airborne
+		if airborne then
+			rig.FallSpeed = math.max(0, -velocity.Y)
+		end
+		-- il passo avanza con la velocità (all'indietro il ciclo gira al contrario)
 		local runK = math.clamp((flat - 13) / 6, 0, 1)
-		ctx.Phase = (ctx.Phase or 0) + dt * flat * (1.05 - 0.4 * runK)
+		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
+		ctx.Phase = (ctx.Phase or 0) + dt * flat * (1.05 - 0.4 * runK) * dir
 		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
 	elseif rig.Kind == "NPC" then
 		if localRoot then
@@ -312,7 +347,7 @@ end
 -- Spegne lo script Animate di Roblox: camminata e corsa le facciamo noi
 local function disableDefaultAnimate(character: Model)
 	local animate = character:WaitForChild("Animate", 5)
-	if animate and animate:IsA("LocalScript") then
+	if animate and animate:IsA("BaseScript") then
 		animate.Enabled = false
 	end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -346,7 +381,7 @@ function AnimationController.Init(c)
 	C = c
 end
 
--- Ctrl: alterna camminata tattica e corsa d'assalto
+-- Bloc Maiusc: alterna camminata tattica e corsa d'assalto
 local function toggleWalk()
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
@@ -361,7 +396,7 @@ local function toggleWalk()
 		savedWalkSpeed = nil
 	end
 	if C and C.Notifications then
-		C.Notifications.Toast(if walkMode then "🚶 Camminata (Ctrl per correre)" else "🏃 Corsa", "Info", 1.5)
+		C.Notifications.Toast(if walkMode then "🚶 Camminata (Bloc Maiusc per correre)" else "🏃 Corsa", "Info", 1.5)
 	end
 end
 

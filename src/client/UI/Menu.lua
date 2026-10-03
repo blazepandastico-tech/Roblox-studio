@@ -499,7 +499,7 @@ local function showSettings()
 	local help = Theme.Panel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.38, 0, 1, 0), Parent = content })
 	Theme.Padding(help, 12)
 	Theme.Label("Comandi", { Size = UDim2.new(1, 0, 0, 24), Font = Theme.Fonts.Header, TextSize = 18, TextColor3 = Colors.Gold, Parent = help })
-	Theme.Label("Q / E — rampino sinistro / destro (tieni premuto)\nSpazio — salto / getto di gas\nWASD — muoviti e correggi il volo\nShift — schivata\nClic sinistro — fendente\nClic destro — arma a distanza\nZ X C V — abilità\nR — sostituisci le lame\nT — trasformazione in gigante\nG — Risveglio Valkar\nF — interagisci\nM — menu\nAlt — sblocca il cursore", {
+	Theme.Label("Q / E — rampino sinistro / destro (tieni premuto)\nSpazio — salto / getto di gas\nWASD — muoviti e correggi il volo\nShift — attiva/disattiva lo shift lock\nCtrl — schivata\nBloc Maiusc — cammina / corri\nClic sinistro — fendente\nClic destro — arma a distanza\nZ X C V — abilità\nR — sostituisci le lame\nT — trasformazione in gigante\nG — Risveglio Valkar\nF — interagisci\nM — menu\nAlt — sblocca il cursore", {
 		Position = UDim2.fromOffset(0, 30),
 		Size = UDim2.new(1, 0, 1, -30),
 		Font = Theme.Fonts.UI,

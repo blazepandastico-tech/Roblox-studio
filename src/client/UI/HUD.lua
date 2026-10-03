@@ -688,6 +688,9 @@ function HUD.Start()
 			end
 		end
 		refs.Crosshair.Visible = not C.UIController.CursorActive() or isMobile
+		-- senza shift lock il mirino segue il cursore del mouse
+		local aim = C.CameraController.AimScreenPoint()
+		refs.Crosshair.Position = UDim2.fromOffset(aim.X, aim.Y)
 	end)
 	local function onCharacter(character: Model)
 		refs.Death.Visible = false

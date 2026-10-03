@@ -34,8 +34,9 @@ poi salva il luogo: all'avvio il server non rigenera una mappa che esiste già.
 | **Q / E** (tieni premuto) | rampino sinistro / destro |
 | **Spazio** | salto, getto di gas in volo |
 | **W A S D** in volo | sterzare attorno ai rampini |
-| **Shift** | schivata |
-| **Ctrl sinistro** | alterna camminata tattica / corsa d'assalto |
+| **Shift** | attiva/disattiva lo shift lock (senza: mouse libero, mira col cursore) |
+| **Ctrl sinistro** | schivata |
+| **Bloc Maiusc** | alterna camminata tattica / corsa d'assalto |
 | **Clic sinistro** | fendente (combo da 4 colpi) — mira alla **nuca**! |
 | **Clic destro** | arma a distanza (lance dirompenti, pistole, fucili...) |
 | **Z X C V** | abilità delle lame |

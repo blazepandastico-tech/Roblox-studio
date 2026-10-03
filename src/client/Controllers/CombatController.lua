@@ -344,8 +344,8 @@ end
 -- ARMI A DISTANZA ---------------------------------------------------------------------------
 
 function CombatController.AimPoint(range: number): Vector3
-	local size = camera.ViewportSize
-	local ray = camera:ViewportPointToRay(size.X / 2, size.Y / 2)
+	local aim = C.CameraController.AimScreenPoint()
+	local ray = camera:ViewportPointToRay(aim.X, aim.Y)
 	local list = { player.Character }
 	local fx = workspace:FindFirstChild("EffettiLocali")
 	if fx then
@@ -376,8 +376,8 @@ local function fireRanged()
 		return
 	end
 	lastRanged = now
-	local size = camera.ViewportSize
-	local ray = camera:ViewportPointToRay(size.X / 2, size.Y / 2)
+	local aim = C.CameraController.AimScreenPoint()
+	local ray = camera:ViewportPointToRay(aim.X, aim.Y)
 	local list = { player.Character }
 	local fx = workspace:FindFirstChild("EffettiLocali")
 	if fx then

@@ -2,7 +2,7 @@
 	ODMController - Rampini a Gas
 	Q / E: lancia il rampino sinistro / destro verso il mirino (tieni premuto per restare agganciato).
 	Il verricello ti tira verso il punto d'aggancio; il cavo fa da pendolo per le oscillazioni.
-	Spazio in volo: getto di gas. WASD: correggi la traiettoria. Shift: schivata.
+	Spazio in volo: getto di gas. WASD: correggi la traiettoria. Ctrl: schivata.
 	Il gas si consuma: ricaricalo ai Depositi di Rifornimento.
 	I rampini si agganciano a edifici, alberi, mura, terreno... e ai giganti!
 ]]
@@ -106,13 +106,14 @@ end
 
 local function aimRay(side: string?): (Vector3, Vector3)
 	local size = camera.ViewportSize
-	local x = size.X / 2
+	local aim = if C.CameraController then C.CameraController.AimScreenPoint() else Vector2.new(size.X / 2, size.Y / 2)
+	local x = aim.X
 	if side == "Left" then
 		x -= size.X * 0.012
 	elseif side == "Right" then
 		x += size.X * 0.012
 	end
-	local ray = camera:ViewportPointToRay(x, size.Y / 2)
+	local ray = camera:ViewportPointToRay(x, aim.Y)
 	return ray.Origin, ray.Direction
 end
 

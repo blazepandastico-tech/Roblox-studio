@@ -497,7 +497,14 @@ local function trackZones()
 		for _, player in Players:GetPlayers() do
 			local root = Util.GetRoot(player.Character)
 			local profile = S.DataService.Get(player)
-			if root and profile then
+			if root and profile and root.Position.Y < -520 then
+				-- caduto nel vuoto (sotto anche alle grotte): torna al punto di rinascita
+				root.AssemblyLinearVelocity = Vector3.zero
+				PlayerService.Teleport(player, spawnPositionFor(player))
+				if S.EventService then
+					S.EventService.Notify(player, "Sei caduto nel vuoto: ti abbiamo riportato alla base.", "Info", 3)
+				end
+			elseif root and profile then
 				local zone = Zones.Find(root.Position)
 				local id = zone and zone.Id or ""
 				local state = PlayerService.GetState(player)

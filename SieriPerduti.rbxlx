@@ -301,10 +301,55 @@ function Poses.Human.BattleLoco(t, ctx)
 	local walk = math.clamp(speed / 5, 0, 1)
 	local run = math.clamp((speed - (ctx.RunThreshold or 13)) / 6, 0, 1)
 	local p = ctx.Phase or 0
+	local fwd = ctx.Forward or 1 -- 1 avanti, -1 indietro
+	local side = ctx.Side or 0 -- -1 sinistra, 1 destra
+	local back = math.clamp(-fwd, 0, 1)
+	local strafe = math.clamp(abs(side) - 0.2, 0, 1) * (1 - back * 0.5)
+	-- all'indietro e di lato non si corre mai a testa bassa
+	run *= 1 - math.max(back, strafe * 0.6)
 	local pose = guardPose(t, blades)
 	pose = blendPose(pose, walkPose(p, blades), walk)
 	pose = blendPose(pose, runPose(p, blades), run)
+
+	-- DIREZIONE: indietro (busto dritto, passo più corto), di lato (passo laterale incrociato)
+	local s = sin(p)
+	local moving = walk
+	if moving > 0 then
+		local root = pose.Root
+		root[1] = root[1] * (1 - back * 1.2) + back * 6 * moving
+		root[2] += side * 32 * strafe * moving
+		pose.Waist[2] -= side * 22 * strafe * moving
+		pose.Neck[2] -= side * 12 * strafe * moving
+		local swing = 1 - 0.55 * strafe
+		for _, j in { "RightHip", "LeftHip" } do
+			pose[j][1] = 5 + (pose[j][1] - 5) * swing
+		end
+		pose.RightHip[3] += s * 20 * strafe * moving * (if side > 0 then 1 else -1)
+		pose.LeftHip[3] += s * 20 * strafe * moving * (if side > 0 then 1 else -1)
+	end
+
+	-- CURVE: ci si inclina dentro la curva, tanto più quanto più si corre
+	local turn = math.clamp((ctx.Turn or 0) * 0.06, -14, 14) * (0.35 + 0.65 * run) * walk
+	pose.Root[3] -= turn
+	pose.Waist[3] -= turn * 0.4
+
+	-- ATTERRAGGIO: piegamento sulle ginocchia che assorbe l'impatto
+	local land = ctx.Land or 0
+	if land > 0 then
+		pose.Root[4] = (pose.Root[4] or 0) - land * 0.7
+		pose.Root[1] -= land * 8
+		pose.Waist[1] -= land * 12
+		pose.RightKnee[1] -= land * 45
+		pose.LeftKnee[1] -= land * 45
+		pose.RightHip[1] += land * 28
+		pose.LeftHip[1] += land * 28
+		pose.RightAnkle[1] += land * 15
+		pose.LeftAnkle[1] += land * 15
+	end
+
+	-- ARIA: gambe raccolte, braccia larghe
 	pose = blendPose(pose, airPose(t, blades), math.clamp(ctx.Air or 0, 0, 1))
+
 	local out = {}
 	for joint, v in pose do
 		if joint == "Root" then
@@ -7604,7 +7649,7 @@ local TEMPLATE = {
 	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0 },
 	BossKills = {},
 	Codes = {},
-	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1 },
+	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true },
 	Buffs = {},
 	Gems = 0,
 	Passes = {},
@@ -10644,7 +10689,14 @@ local function trackZones()
 		for _, player in Players:GetPlayers() do
 			local root = Util.GetRoot(player.Character)
 			local profile = S.DataService.Get(player)
-			if root and profile then
+			if root and profile and root.Position.Y < -520 then
+				-- caduto nel vuoto (sotto anche alle grotte): torna al punto di rinascita
+				root.AssemblyLinearVelocity = Vector3.zero
+				PlayerService.Teleport(player, spawnPositionFor(player))
+				if S.EventService then
+					S.EventService.Notify(player, "Sei caduto nel vuoto: ti abbiamo riportato alla base.", "Info", 3)
+				end
+			elseif root and profile then
 				local zone = Zones.Find(root.Position)
 				local id = zone and zone.Id or ""
 				local state = PlayerService.GetState(player)
@@ -16270,7 +16322,7 @@ local AnimationIds = require(Shared.Data.AnimationIds)
 local AnimationController = {}
 local C
 local player = Players.LocalPlayer
-local walkMode = false -- Ctrl: cammina invece di correre
+local walkMode = false -- Bloc Maiusc: cammina invece di correre
 local savedWalkSpeed: number? = nil
 local rigs: { [Model]: any } = {}
 local loadedTracks: { [Model]: { [string]: AnimationTrack } } = {}
@@ -16498,7 +16550,8 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 			local relative = root.CFrame:VectorToObjectSpace(dir)
 			-- angolo dal verticale: 0 = verso l'alto, 90 = orizzontale
 			local pitch = math.deg(math.acos(math.clamp(dir.Y, -1, 1)))
-			ctx.Pitch = math.clamp(pitch, 10, 120)
+			-- mai a testa in giù: in picchiata il corpo si inclina al massimo di poco oltre l'orizzontale
+			ctx.Pitch = math.clamp(pitch, 10, 100)
 			ctx.Roll = math.clamp(-relative.X * 40, -40, 40)
 		end
 		rig.Animator:SetLayerWeight("Fly", if flying and not rig.Hanging then 1 else 0)
@@ -16512,11 +16565,45 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		end
 		local hstate = humanoid:GetState()
 		local airborne = hstate == Enum.HumanoidStateType.Freefall or hstate == Enum.HumanoidStateType.Jumping
-		ctx.Air = (ctx.Air or 0) + ((if airborne then 1 else 0) - (ctx.Air or 0)) * math.min(1, dt * 10)
-		ctx.Flat = if airborne then (ctx.Flat or 0) else flat
+		local k = math.min(1, dt * 10)
+		ctx.Air = (ctx.Air or 0) + ((if airborne then 1 else 0) - (ctx.Air or 0)) * k
+		if not airborne then
+			ctx.Flat = (ctx.Flat or 0) + (flat - (ctx.Flat or 0)) * k
+		end
 		ctx.Blades = hasBlades(model)
+		-- direzione del movimento rispetto al corpo (avanti / indietro / di lato)
+		local rel = root.CFrame:VectorToObjectSpace(Vector3.new(velocity.X, 0, velocity.Z))
+		local fwd, side = 1, 0
+		if flat > 1.5 then
+			fwd = -rel.Z / flat
+			side = rel.X / flat
+		end
+		local kd = math.min(1, dt * 8)
+		ctx.Forward = (ctx.Forward or 1) + (fwd - (ctx.Forward or 1)) * kd
+		ctx.Side = (ctx.Side or 0) + (side - (ctx.Side or 0)) * kd
+		-- velocità di rotazione (per inclinarsi nelle curve)
+		local look = root.CFrame.LookVector
+		local yaw = math.atan2(-look.X, -look.Z)
+		local dyaw = (yaw - (rig.LastYaw or yaw) + math.pi) % (2 * math.pi) - math.pi
+		rig.LastYaw = yaw
+		local turnRate = math.deg(dyaw) / math.max(dt, 1 / 240)
+		ctx.Turn = (ctx.Turn or 0) + (turnRate - (ctx.Turn or 0)) * math.min(1, dt * 6)
+		-- atterraggio: più forte è la caduta, più ci si piega
+		if rig.WasAir and not airborne and (rig.FallSpeed or 0) > 28 then
+			ctx.Land = math.clamp((rig.FallSpeed or 0) / 90, 0.3, 1)
+			if model == player.Character and C and C.CameraController then
+				C.CameraController.Land(ctx.Land)
+			end
+		end
+		ctx.Land = math.max(0, (ctx.Land or 0) - dt * 2.8)
+		rig.WasAir = airborne
+		if airborne then
+			rig.FallSpeed = math.max(0, -velocity.Y)
+		end
+		-- il passo avanza con la velocità (all'indietro il ciclo gira al contrario)
 		local runK = math.clamp((flat - 13) / 6, 0, 1)
-		ctx.Phase = (ctx.Phase or 0) + dt * flat * (1.05 - 0.4 * runK)
+		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
+		ctx.Phase = (ctx.Phase or 0) + dt * flat * (1.05 - 0.4 * runK) * dir
 		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
 	elseif rig.Kind == "NPC" then
 		if localRoot then
@@ -16558,7 +16645,7 @@ end
 -- Spegne lo script Animate di Roblox: camminata e corsa le facciamo noi
 local function disableDefaultAnimate(character: Model)
 	local animate = character:WaitForChild("Animate", 5)
-	if animate and animate:IsA("LocalScript") then
+	if animate and animate:IsA("BaseScript") then
 		animate.Enabled = false
 	end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -16592,7 +16679,7 @@ function AnimationController.Init(c)
 	C = c
 end
 
--- Ctrl: alterna camminata tattica e corsa d'assalto
+-- Bloc Maiusc: alterna camminata tattica e corsa d'assalto
 local function toggleWalk()
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
@@ -16607,7 +16694,7 @@ local function toggleWalk()
 		savedWalkSpeed = nil
 	end
 	if C and C.Notifications then
-		C.Notifications.Toast(if walkMode then "🚶 Camminata (Ctrl per correre)" else "🏃 Corsa", "Info", 1.5)
+		C.Notifications.Toast(if walkMode then "🚶 Camminata (Bloc Maiusc per correre)" else "🏃 Corsa", "Info", 1.5)
 	end
 end
 
@@ -16672,9 +16759,14 @@ return AnimationController
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
 	CameraController
-	Telecamera "da azione": mouse bloccato al centro (mirino), visuale da sopra la spalla,
-	campo visivo che si allarga con la velocità, inclinazione nelle virate coi Rampini,
-	scosse per impatti ed esplosioni. Modalità cursore per i menu e modalità cinematica.
+	Telecamera "da battaglia":
+	  - SHIFT attiva/disattiva lo shift lock (mouse al centro, visuale da sopra la spalla,
+	    il personaggio guarda dove guardi). Senza shift lock il mouse è libero e si mira col cursore.
+	  - la visuale ha "peso": ruotandola in fretta resta un po' indietro, si inclina nella
+	    direzione della rotazione e poi si riassesta con un leggero rimbalzo
+	  - oscillazione dei passi quando cammini e corri, respiro quando sei fermo,
+	    contraccolpo all'atterraggio, campo visivo più largo in corsa e in volo
+	  - scosse per impatti ed esplosioni, modalità cursore per i menu e modalità cinematica
 ]]
 
 local Players = game:GetService("Players")
@@ -16699,6 +16791,18 @@ local rollTarget = 0
 local fovBoost = 0
 local appliedOffset: CFrame? = nil
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- shift lock e dinamica "da battaglia"
+local shiftLock = true
+local lastMouseMode = ""
+local lastLook: Vector3? = nil
+local swayYaw, swayYawVel = 0, 0
+local swayPitch, swayPitchVel = 0, 0
+local swayRoll, swayRollVel = 0, 0
+local bobPhase = 0
+local bobAmount = 0
+local landDip = 0
+local runFov = 0
 
 CameraController.BaseFov = 70
 CameraController.SpeedFov = 0
@@ -16726,6 +16830,37 @@ end
 
 function CameraController.IsCinematic(): boolean
 	return cinematic
+end
+
+function CameraController.IsShiftLock(): boolean
+	return shiftLock and not isMobile
+end
+
+function CameraController.SetShiftLock(on: boolean, silent: boolean?)
+	shiftLock = on
+	if C.ClientData then
+		C.ClientData.SetSetting("ShiftLock", on)
+	end
+	if not silent and C.Notifications then
+		C.Notifications.Toast(if on then "🎯 Shift lock ATTIVO" else "🖱️ Shift lock DISATTIVATO (mira col mouse)", "Info", 1.6)
+	end
+end
+
+-- Punto dello schermo da cui partono mira, rampini e colpi a distanza
+function CameraController.AimScreenPoint(): Vector2
+	local size = camera.ViewportSize
+	if CameraController.IsShiftLock() or cursorMode or cinematic then
+		return Vector2.new(size.X / 2, size.Y / 2)
+	end
+	return UserInputService:GetMouseLocation()
+end
+
+-- Contraccolpo all'atterraggio (0..1)
+function CameraController.Land(strength: number)
+	landDip = math.max(landDip, math.clamp(strength, 0, 1))
+	if strength > 0.55 then
+		CameraController.Shake(0.12 * strength, 0.3)
+	end
 end
 
 -- intensity 0..1 (si somma); duration regola quanto dura
@@ -16785,41 +16920,58 @@ function CameraController.CinematicShake(): CFrame
 	return cinematicShake
 end
 
+-- molla smorzata: la visuale "pesa" e si riassesta con un leggero rimbalzo
+local function spring(x: number, v: number, target: number, dt: number, stiffness: number, damping: number): (number, number)
+	v += (target - x) * stiffness * dt
+	v *= math.exp(-damping * dt)
+	return x + v * dt, v
+end
+
 local function update(dt: number)
-	-- mouse: libero con un menu aperto o durante i filmati, bloccato al centro in gioco
+	dt = math.min(dt, 1 / 20)
+	local locked = shiftLock and not isMobile
+	-- mouse: libero con un menu aperto, nei filmati o senza shift lock; bloccato al centro con lo shift lock
 	if not isMobile then
-		if cursorMode or cinematic then
-			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-			UserInputService.MouseIconEnabled = cursorMode
-		else
+		local mode = if cursorMode or cinematic then "free" elseif locked then "lock" else "roblox"
+		if mode == "lock" then
 			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
 			UserInputService.MouseIconEnabled = false
+		elseif mode == "free" then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			UserInputService.MouseIconEnabled = cursorMode
+		elseif lastMouseMode ~= "roblox" then
+			-- senza shift lock lasciamo il mouse a Roblox (tasto destro per ruotare la visuale);
+			-- la freccia è sostituita dal mirino, che segue il cursore
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			UserInputService.MouseIconEnabled = false
 		end
+		lastMouseMode = mode
 	end
 	if cinematic then
 		cinematicShake = computeShake(dt)
+		lastLook = nil
 		return
 	end
 	cinematicShake = CFrame.identity
 	local humanoid = humanoidOf()
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 
-	-- rotazione del personaggio
+	-- rotazione del personaggio: con lo shift lock guarda dove guarda la telecamera
 	local flying = C.ODMController and C.ODMController.IsFlying()
 	pcall(function()
-		if cursorMode or flying or isMobile then
+		if cursorMode or flying or not locked then
 			gameSettings.RotationType = Enum.RotationType.MovementRelative
 		else
 			gameSettings.RotationType = Enum.RotationType.CameraRelative
 		end
 	end)
 
-	-- visuale da sopra la spalla
+	-- visuale da sopra la spalla (solo con lo shift lock)
 	if humanoid then
 		local target
 		if titanHeight > 0 then
 			target = Vector3.new(0, 0, 0)
-		elseif cursorMode then
+		elseif cursorMode or not locked then
 			target = Vector3.new(0, 0.5, 0)
 		else
 			target = Vector3.new(1.7, 0.6, 0)
@@ -16827,27 +16979,72 @@ local function update(dt: number)
 		humanoid.CameraOffset = humanoid.CameraOffset:Lerp(target, math.min(1, dt * 8))
 	end
 
-	-- campo visivo in base alla velocità
-	local speed = if root then root.AssemblyLinearVelocity.Magnitude else 0
+	-- velocità e stato del personaggio
+	local velocity = if root then root.AssemblyLinearVelocity else Vector3.zero
+	local speed = velocity.Magnitude
+	local flat = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	local state = humanoid and humanoid:GetState()
+	local grounded = humanoid ~= nil and not flying and state ~= Enum.HumanoidStateType.Freefall and state ~= Enum.HumanoidStateType.Jumping and humanoid.FloorMaterial ~= Enum.Material.Air
+
+	-- campo visivo: più largo in corsa e in volo
 	local speedFov = math.clamp((speed - 45) / 120, 0, 1) * 24
 	if titanHeight > 0 then
 		speedFov = 6
 	end
+	local runTarget = if grounded and flat > 16 then 6 else 0
+	runFov += (runTarget - runFov) * math.min(1, dt * 4)
 	fovBoost = math.max(0, fovBoost - dt * 30)
-	local targetFov = CameraController.BaseFov + speedFov + fovBoost
+	local targetFov = CameraController.BaseFov + speedFov + runFov + fovBoost
 	currentFov += (targetFov - currentFov) * math.min(1, dt * 5)
 	camera.FieldOfView = currentFov
 	CameraController.SpeedFov = speedFov
 
-	-- inclinazione e scossa
-	roll += (rollTarget - roll) * math.min(1, dt * 6)
-	local shaking = trauma > 0
-	local shakeCF = computeShake(dt)
-	if math.abs(roll) > 0.001 or shaking then
-		local offset = CFrame.Angles(0, 0, roll) * shakeCF
-		camera.CFrame = camera.CFrame * offset
-		appliedOffset = offset
+	-- PESO DELLA VISUALE: misuriamo quanto in fretta ruota la telecamera
+	local look = camera.CFrame.LookVector
+	local yawRate, pitchRate = 0, 0
+	if lastLook then
+		local yaw0 = math.atan2(-lastLook.X, -lastLook.Z)
+		local yaw1 = math.atan2(-look.X, -look.Z)
+		local dyaw = (yaw1 - yaw0 + math.pi) % (2 * math.pi) - math.pi
+		local dpitch = math.asin(math.clamp(look.Y, -1, 1)) - math.asin(math.clamp(lastLook.Y, -1, 1))
+		yawRate = dyaw / dt
+		pitchRate = dpitch / dt
 	end
+	lastLook = look
+	local sway = if C.ClientData and C.ClientData.Setting("Shake", true) == false then 0.35 else 1
+	local intensity = (if titanHeight > 0 then 0.4 else 1) * sway
+	-- la visuale resta un po' indietro rispetto alla rotazione e si inclina verso la curva
+	local yawTarget = math.clamp(-yawRate * 0.022, -0.07, 0.07) * intensity
+	local pitchTarget = math.clamp(-pitchRate * 0.018, -0.05, 0.05) * intensity
+	local rollTarget2 = math.clamp(-yawRate * 0.035, -0.11, 0.11) * intensity
+	swayYaw, swayYawVel = spring(swayYaw, swayYawVel, yawTarget, dt, 160, 13)
+	swayPitch, swayPitchVel = spring(swayPitch, swayPitchVel, pitchTarget, dt, 160, 13)
+	swayRoll, swayRollVel = spring(swayRoll, swayRollVel, rollTarget2, dt, 110, 10)
+
+	-- PASSI E RESPIRO
+	local moveK = if grounded then math.clamp(flat / 22, 0, 1) else 0
+	bobAmount += (moveK - bobAmount) * math.min(1, dt * 6)
+	local running = math.clamp((flat - 13) / 6, 0, 1)
+	bobPhase += dt * flat * (0.5 - 0.12 * running)
+	local now = os.clock()
+	local bobY = (math.abs(math.sin(bobPhase)) - 0.5) * (0.1 + 0.16 * running) * bobAmount
+	local bobX = math.sin(bobPhase) * (0.05 + 0.08 * running) * bobAmount
+	local bobRoll = math.sin(bobPhase) * (0.004 + 0.008 * running) * bobAmount
+	local breathe = math.sin(now * 1.3) * 0.025 * (1 - bobAmount)
+	local breathePitch = math.sin(now * 1.3 + 0.6) * 0.0035 * (1 - bobAmount)
+
+	-- contraccolpo dell'atterraggio
+	landDip = math.max(0, landDip - dt * 2.4)
+	local dip = landDip * landDip
+
+	-- inclinazione dei rampini e scossa
+	roll += (rollTarget - roll) * math.min(1, dt * 6)
+	local shakeCF = computeShake(dt)
+	local motion = CFrame.new(bobX * intensity, (bobY + breathe - dip * 0.7) * intensity, 0)
+		* CFrame.Angles(swayPitch + breathePitch - dip * 0.07, swayYaw, swayRoll + bobRoll * intensity)
+	local offset = motion * CFrame.Angles(0, 0, roll) * shakeCF
+	camera.CFrame = camera.CFrame * offset
+	appliedOffset = offset
 end
 
 -- Prima che la telecamera di Roblox si aggiorni, togliamo la scossa del frame
@@ -16865,6 +17062,18 @@ end
 
 function CameraController.Start()
 	camera.FieldOfView = 70
+	-- SHIFT: attiva/disattiva lo shift lock (la scelta viene salvata)
+	C.InputController.On("ShiftLock", function(began)
+		if began and not cursorMode and not cinematic then
+			CameraController.SetShiftLock(not shiftLock)
+		end
+	end)
+	task.spawn(function()
+		local profile = C.ClientData.WaitReady()
+		if profile and profile.Settings and profile.Settings.ShiftLock ~= nil then
+			shiftLock = profile.Settings.ShiftLock
+		end
+	end)
 	RunService:BindToRenderStep("CameraSieriPerdutiPre", Enum.RenderPriority.Camera.Value - 1, undoOffset)
 	RunService:BindToRenderStep("CameraSieriPerduti", Enum.RenderPriority.Camera.Value + 1, update)
 	player.CharacterAdded:Connect(function()
@@ -17288,8 +17497,8 @@ end
 -- ARMI A DISTANZA ---------------------------------------------------------------------------
 
 function CombatController.AimPoint(range: number): Vector3
-	local size = camera.ViewportSize
-	local ray = camera:ViewportPointToRay(size.X / 2, size.Y / 2)
+	local aim = C.CameraController.AimScreenPoint()
+	local ray = camera:ViewportPointToRay(aim.X, aim.Y)
 	local list = { player.Character }
 	local fx = workspace:FindFirstChild("EffettiLocali")
 	if fx then
@@ -17320,8 +17529,8 @@ local function fireRanged()
 		return
 	end
 	lastRanged = now
-	local size = camera.ViewportSize
-	local ray = camera:ViewportPointToRay(size.X / 2, size.Y / 2)
+	local aim = C.CameraController.AimScreenPoint()
+	local ray = camera:ViewportPointToRay(aim.X, aim.Y)
 	local list = { player.Character }
 	local fx = workspace:FindFirstChild("EffettiLocali")
 	if fx then
@@ -19109,7 +19318,8 @@ return EffectsController
 	Comandi (PC):
 	  Q / E          rampino sinistro / destro (tieni premuto)
 	  Spazio         salto / getto di gas in volo
-	  Shift          schivata
+	  Shift          attiva/disattiva lo shift lock
+	  Ctrl sinistro  schivata
 	  Clic sinistro  fendente (combo da 4 colpi)
 	  Clic destro    arma a distanza (Lancia Dirompente, pistole...)
 	  Z X C V        abilità delle lame (o del gigante)
@@ -19118,7 +19328,7 @@ return EffectsController
 	  G              Risveglio Valkar
 	  M              menu
 	  N              negozio premium (gemme, monete, pass)
-	  Ctrl sinistro  cammina / corri
+	  Bloc Maiusc    cammina / corri
 	  Alt sinistro   sblocca il cursore
 ]]
 
@@ -19134,7 +19344,9 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.Q] = "HookLeft",
 	[Enum.KeyCode.E] = "HookRight",
 	[Enum.KeyCode.Space] = "Boost",
-	[Enum.KeyCode.LeftShift] = "Dodge",
+	[Enum.KeyCode.LeftShift] = "ShiftLock",
+	[Enum.KeyCode.RightShift] = "ShiftLock",
+	[Enum.KeyCode.LeftControl] = "Dodge",
 	[Enum.KeyCode.R] = "Reload",
 	[Enum.KeyCode.Z] = "SkillZ",
 	[Enum.KeyCode.X] = "SkillX",
@@ -19144,7 +19356,7 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.G] = "Awaken",
 	[Enum.KeyCode.M] = "Menu",
 	[Enum.KeyCode.N] = "Premium",
-	[Enum.KeyCode.LeftControl] = "WalkToggle",
+	[Enum.KeyCode.CapsLock] = "WalkToggle",
 	[Enum.KeyCode.LeftAlt] = "ToggleCursor",
 	[Enum.KeyCode.ButtonR2] = "Attack",
 	[Enum.KeyCode.ButtonL2] = "Ranged",
@@ -19249,7 +19461,7 @@ return InputController
 	ODMController - Rampini a Gas
 	Q / E: lancia il rampino sinistro / destro verso il mirino (tieni premuto per restare agganciato).
 	Il verricello ti tira verso il punto d'aggancio; il cavo fa da pendolo per le oscillazioni.
-	Spazio in volo: getto di gas. WASD: correggi la traiettoria. Shift: schivata.
+	Spazio in volo: getto di gas. WASD: correggi la traiettoria. Ctrl: schivata.
 	Il gas si consuma: ricaricalo ai Depositi di Rifornimento.
 	I rampini si agganciano a edifici, alberi, mura, terreno... e ai giganti!
 ]]
@@ -19353,13 +19565,14 @@ end
 
 local function aimRay(side: string?): (Vector3, Vector3)
 	local size = camera.ViewportSize
-	local x = size.X / 2
+	local aim = if C.CameraController then C.CameraController.AimScreenPoint() else Vector2.new(size.X / 2, size.Y / 2)
+	local x = aim.X
 	if side == "Left" then
 		x -= size.X * 0.012
 	elseif side == "Right" then
 		x += size.X * 0.012
 	end
-	local ray = camera:ViewportPointToRay(x, size.Y / 2)
+	local ray = camera:ViewportPointToRay(x, aim.Y)
 	return ray.Origin, ray.Direction
 end
 
@@ -22227,6 +22440,9 @@ function HUD.Start()
 			end
 		end
 		refs.Crosshair.Visible = not C.UIController.CursorActive() or isMobile
+		-- senza shift lock il mirino segue il cursore del mouse
+		local aim = C.CameraController.AimScreenPoint()
+		refs.Crosshair.Position = UDim2.fromOffset(aim.X, aim.Y)
 	end)
 	local function onCharacter(character: Model)
 		refs.Death.Visible = false
@@ -22311,8 +22527,9 @@ local CONTROLS = {
 	{ "Q / E (tieni premuto)", "Rampino sinistro / destro" },
 	{ "Spazio", "Salto • getto di gas in volo" },
 	{ "W A S D in volo", "Sterzare attorno ai rampini" },
-	{ "Shift", "Schivata" },
-	{ "Ctrl sinistro", "Cammina / corri" },
+	{ "Shift", "Attiva/disattiva lo shift lock" },
+	{ "Ctrl sinistro", "Schivata" },
+	{ "Bloc Maiusc", "Cammina / corri" },
 	{ "Clic sinistro", "Fendente (combo da 4 colpi)" },
 	{ "Clic destro", "Arma a distanza" },
 	{ "Z  X  C  V", "Abilità delle lame o del gigante" },
@@ -23251,7 +23468,7 @@ local function showSettings()
 	local help = Theme.Panel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.38, 0, 1, 0), Parent = content })
 	Theme.Padding(help, 12)
 	Theme.Label("Comandi", { Size = UDim2.new(1, 0, 0, 24), Font = Theme.Fonts.Header, TextSize = 18, TextColor3 = Colors.Gold, Parent = help })
-	Theme.Label("Q / E — rampino sinistro / destro (tieni premuto)\nSpazio — salto / getto di gas\nWASD — muoviti e correggi il volo\nShift — schivata\nClic sinistro — fendente\nClic destro — arma a distanza\nZ X C V — abilità\nR — sostituisci le lame\nT — trasformazione in gigante\nG — Risveglio Valkar\nF — interagisci\nM — menu\nAlt — sblocca il cursore", {
+	Theme.Label("Q / E — rampino sinistro / destro (tieni premuto)\nSpazio — salto / getto di gas\nWASD — muoviti e correggi il volo\nShift — attiva/disattiva lo shift lock\nCtrl — schivata\nBloc Maiusc — cammina / corri\nClic sinistro — fendente\nClic destro — arma a distanza\nZ X C V — abilità\nR — sostituisci le lame\nT — trasformazione in gigante\nG — Risveglio Valkar\nF — interagisci\nM — menu\nAlt — sblocca il cursore", {
 		Position = UDim2.fromOffset(0, 30),
 		Size = UDim2.new(1, 0, 1, -30),
 		Font = Theme.Fonts.UI,

@@ -5,7 +5,8 @@
 	Comandi (PC):
 	  Q / E          rampino sinistro / destro (tieni premuto)
 	  Spazio         salto / getto di gas in volo
-	  Shift          schivata
+	  Shift          attiva/disattiva lo shift lock
+	  Ctrl sinistro  schivata
 	  Clic sinistro  fendente (combo da 4 colpi)
 	  Clic destro    arma a distanza (Lancia Dirompente, pistole...)
 	  Z X C V        abilità delle lame (o del gigante)
@@ -14,7 +15,7 @@
 	  G              Risveglio Valkar
 	  M              menu
 	  N              negozio premium (gemme, monete, pass)
-	  Ctrl sinistro  cammina / corri
+	  Bloc Maiusc    cammina / corri
 	  Alt sinistro   sblocca il cursore
 ]]
 
@@ -30,7 +31,9 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.Q] = "HookLeft",
 	[Enum.KeyCode.E] = "HookRight",
 	[Enum.KeyCode.Space] = "Boost",
-	[Enum.KeyCode.LeftShift] = "Dodge",
+	[Enum.KeyCode.LeftShift] = "ShiftLock",
+	[Enum.KeyCode.RightShift] = "ShiftLock",
+	[Enum.KeyCode.LeftControl] = "Dodge",
 	[Enum.KeyCode.R] = "Reload",
 	[Enum.KeyCode.Z] = "SkillZ",
 	[Enum.KeyCode.X] = "SkillX",
@@ -40,7 +43,7 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.G] = "Awaken",
 	[Enum.KeyCode.M] = "Menu",
 	[Enum.KeyCode.N] = "Premium",
-	[Enum.KeyCode.LeftControl] = "WalkToggle",
+	[Enum.KeyCode.CapsLock] = "WalkToggle",
 	[Enum.KeyCode.LeftAlt] = "ToggleCursor",
 	[Enum.KeyCode.ButtonR2] = "Attack",
 	[Enum.KeyCode.ButtonL2] = "Ranged",

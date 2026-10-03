@@ -254,10 +254,55 @@ function Poses.Human.BattleLoco(t, ctx)
 	local walk = math.clamp(speed / 5, 0, 1)
 	local run = math.clamp((speed - (ctx.RunThreshold or 13)) / 6, 0, 1)
 	local p = ctx.Phase or 0
+	local fwd = ctx.Forward or 1 -- 1 avanti, -1 indietro
+	local side = ctx.Side or 0 -- -1 sinistra, 1 destra
+	local back = math.clamp(-fwd, 0, 1)
+	local strafe = math.clamp(abs(side) - 0.2, 0, 1) * (1 - back * 0.5)
+	-- all'indietro e di lato non si corre mai a testa bassa
+	run *= 1 - math.max(back, strafe * 0.6)
 	local pose = guardPose(t, blades)
 	pose = blendPose(pose, walkPose(p, blades), walk)
 	pose = blendPose(pose, runPose(p, blades), run)
+
+	-- DIREZIONE: indietro (busto dritto, passo più corto), di lato (passo laterale incrociato)
+	local s = sin(p)
+	local moving = walk
+	if moving > 0 then
+		local root = pose.Root
+		root[1] = root[1] * (1 - back * 1.2) + back * 6 * moving
+		root[2] += side * 32 * strafe * moving
+		pose.Waist[2] -= side * 22 * strafe * moving
+		pose.Neck[2] -= side * 12 * strafe * moving
+		local swing = 1 - 0.55 * strafe
+		for _, j in { "RightHip", "LeftHip" } do
+			pose[j][1] = 5 + (pose[j][1] - 5) * swing
+		end
+		pose.RightHip[3] += s * 20 * strafe * moving * (if side > 0 then 1 else -1)
+		pose.LeftHip[3] += s * 20 * strafe * moving * (if side > 0 then 1 else -1)
+	end
+
+	-- CURVE: ci si inclina dentro la curva, tanto più quanto più si corre
+	local turn = math.clamp((ctx.Turn or 0) * 0.06, -14, 14) * (0.35 + 0.65 * run) * walk
+	pose.Root[3] -= turn
+	pose.Waist[3] -= turn * 0.4
+
+	-- ATTERRAGGIO: piegamento sulle ginocchia che assorbe l'impatto
+	local land = ctx.Land or 0
+	if land > 0 then
+		pose.Root[4] = (pose.Root[4] or 0) - land * 0.7
+		pose.Root[1] -= land * 8
+		pose.Waist[1] -= land * 12
+		pose.RightKnee[1] -= land * 45
+		pose.LeftKnee[1] -= land * 45
+		pose.RightHip[1] += land * 28
+		pose.LeftHip[1] += land * 28
+		pose.RightAnkle[1] += land * 15
+		pose.LeftAnkle[1] += land * 15
+	end
+
+	-- ARIA: gambe raccolte, braccia larghe
 	pose = blendPose(pose, airPose(t, blades), math.clamp(ctx.Air or 0, 0, 1))
+
 	local out = {}
 	for joint, v in pose do
 		if joint == "Root" then
