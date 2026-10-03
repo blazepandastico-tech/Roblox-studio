@@ -168,29 +168,29 @@ local function guardPose(t: number, blades: boolean)
 	return pose
 end
 
--- CAMMINATA: passo deciso, busto dritto, lame basse che oscillano col passo
+-- CAMMINATA: busto dritto, braccia già un po' aperte e indietro, passo deciso
 local function walkPose(p: number, blades: boolean)
 	local s = sin(p)
-	local kneeR = -(10 + 38 * math.max(0, sin(p + 1.6)))
-	local kneeL = -(10 + 38 * math.max(0, sin(p + 1.6 + math.pi)))
+	local kneeR = -(10 + 40 * math.max(0, sin(p + 1.6)))
+	local kneeL = -(10 + 40 * math.max(0, sin(p + 1.6 + math.pi)))
 	local pose = {
-		Root = { -5, 0, s * 2.5, -0.12 - abs(cos(p)) * 0.1 },
-		Waist = { -3, -s * 9, 0 },
-		Neck = { 3, s * 5, 0 },
-		RightHip = { s * 32, 0, 3 },
-		LeftHip = { -s * 32, 0, -3 },
+		Root = { -6, 0, s * 2, -0.08 - abs(cos(p)) * 0.07 },
+		Waist = { -3, -s * 6, 0 },
+		Neck = { 5, s * 3, 0 },
+		RightHip = { s * 34, 0, 3 },
+		LeftHip = { -s * 34, 0, -3 },
 		RightKnee = { kneeR, 0, 0 },
 		LeftKnee = { kneeL, 0, 0 },
 		RightAnkle = { sin(p + 0.6) * 14, 0, 0 },
 		LeftAnkle = { -sin(p + 0.6) * 14, 0, 0 },
 	}
 	if blades then
-		pose.RightShoulder = { -s * 22 - 6, 0, 16 }
-		pose.RightElbow = { 22 + math.max(0, -s) * 14, 0, 0 }
-		pose.RightWrist = { 18, 0, 0 }
-		pose.LeftShoulder = { s * 22 - 6, 0, -16 }
-		pose.LeftElbow = { 22 + math.max(0, s) * 14, 0, 0 }
-		pose.LeftWrist = { 18, 0, 0 }
+		pose.RightShoulder = { -22 - s * 4, 0, 24 }
+		pose.RightElbow = { 10, 0, 0 }
+		pose.RightWrist = { 12, 0, 0 }
+		pose.LeftShoulder = { -22 + s * 4, 0, -24 }
+		pose.LeftElbow = { 10, 0, 0 }
+		pose.LeftWrist = { 12, 0, 0 }
 	else
 		pose.RightShoulder = { -s * 30, 0, 6 }
 		pose.RightElbow = { 25, 0, 0 }
@@ -200,35 +200,35 @@ local function walkPose(p: number, blades: boolean)
 	return pose
 end
 
--- CORSA (stile anime): busto molto inclinato in avanti, testa alta,
--- braccia tese all'indietro con le lame che seguono, falcate lunghe e ginocchia alte
+-- CORSA (come nel riferimento): busto poco inclinato, braccia TESE e FERME,
+-- aperte ai lati e spinte all'indietro, gambe con passi corti e rapidi
 local function runPose(p: number, blades: boolean)
 	local s = sin(p)
-	local kneeR = -(20 + 85 * math.max(0, sin(p + 1.35)))
-	local kneeL = -(20 + 85 * math.max(0, sin(p + 1.35 + math.pi)))
+	local kneeR = -(15 + 70 * math.max(0, sin(p + 1.4)))
+	local kneeL = -(15 + 70 * math.max(0, sin(p + 1.4 + math.pi)))
 	local pose = {
-		Root = { -36, 0, s * 4, -0.25 - abs(cos(p)) * 0.28 },
-		Waist = { -10, -s * 11, 0 },
-		Neck = { 34, s * 5, 0 },
-		RightHip = { s * 62 + 16, 0, 3 },
-		LeftHip = { -s * 62 + 16, 0, -3 },
+		Root = { -15, 0, s * 2, -0.1 - abs(cos(p)) * 0.1 },
+		Waist = { -6, -s * 5, 0 },
+		Neck = { 12, s * 2, 0 },
+		RightHip = { s * 50 + 8, 0, 2 },
+		LeftHip = { -s * 50 + 8, 0, -2 },
 		RightKnee = { kneeR, 0, 0 },
 		LeftKnee = { kneeL, 0, 0 },
-		RightAnkle = { sin(p + 0.35) * 26, 0, 0 },
-		LeftAnkle = { -sin(p + 0.35) * 26, 0, 0 },
+		RightAnkle = { sin(p + 0.35) * 22, 0, 0 },
+		LeftAnkle = { -sin(p + 0.35) * 22, 0, 0 },
 	}
 	if blades then
-		pose.RightShoulder = { -82 + s * 5, 0, 34 }
+		pose.RightShoulder = { -40 + s * 2, 0, 40 }
 		pose.RightElbow = { 6, 0, 0 }
-		pose.RightWrist = { 24, 0, 0 }
-		pose.LeftShoulder = { -82 - s * 5, 0, -34 }
+		pose.RightWrist = { 10, 0, 0 }
+		pose.LeftShoulder = { -40 - s * 2, 0, -40 }
 		pose.LeftElbow = { 6, 0, 0 }
-		pose.LeftWrist = { 24, 0, 0 }
+		pose.LeftWrist = { 10, 0, 0 }
 	else
-		pose.RightShoulder = { -s * 65, 0, 10 }
-		pose.RightElbow = { 85, 0, 0 }
-		pose.LeftShoulder = { s * 65, 0, -10 }
-		pose.LeftElbow = { 85, 0, 0 }
+		pose.RightShoulder = { -38, 0, 38 }
+		pose.RightElbow = { 6, 0, 0 }
+		pose.LeftShoulder = { -38, 0, -38 }
+		pose.LeftElbow = { 6, 0, 0 }
 	end
 	return pose
 end

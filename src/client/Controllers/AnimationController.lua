@@ -305,7 +305,7 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		-- il passo avanza con la velocità (all'indietro il ciclo gira al contrario)
 		local runK = math.clamp((flat - 13) / 6, 0, 1)
 		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
-		ctx.Phase = (ctx.Phase or 0) + dt * flat * (0.95 - 0.3 * runK) * dir
+		ctx.Phase = (ctx.Phase or 0) + dt * flat * (0.95 - 0.12 * runK) * dir
 		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
 	elseif rig.Kind == "NPC" then
 		if localRoot then
