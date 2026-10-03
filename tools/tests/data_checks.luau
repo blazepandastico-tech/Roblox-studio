@@ -21,6 +21,9 @@ local Shops = require(Shared.Data.Shops)
 local Story = require(Shared.Data.Story)
 local Skills = require(Shared.Data.Skills)
 local Poses = require(Shared.Anim.Poses)
+local W = require(Shared.Data.WorldLayout)
+local Raids = require(Shared.Data.Raids)
+local Monetization = require(Shared.Data.Monetization)
 
 local errors: { string } = {}
 local checks = 0
@@ -412,7 +415,7 @@ local function fakeProfile(level: number, equipped, bloodline: string)
 	}
 end
 local starter = { Blade = Items.Starter.Blade, Gear = Items.Starter.Gear, Armor = Items.Starter.Armor, Ranged = "", Accessory = "" }
-local best = { Blade = "LameAurora", Gear = "DMTValkar", Armor = "ArmaturaCristallo", Ranged = "CannoneAntigigante", Accessory = "MantelloFalco" }
+local best = { Blade = "LameAurora", Gear = "DMTValkar", Armor = "ArmaturaCristallo", Ranged = "CannoneAntigigante", Accessory = "MedagliaComandante" }
 for slot, id in best do
 	check(Items.Get(id) ~= nil and Items.SlotOf(id) == slot, "Test statistiche: '%s' non è un oggetto %s", id, slot)
 end
@@ -426,6 +429,100 @@ for _, case in { { 1, starter, "Isolano" }, { 500, starter, "Valkar" }, { Config
 	end
 	check(isNumber(stats.MaxHealth) and stats.MaxHealth > 0, "StatsCalc: MaxHealth non valido al livello %d", case[1])
 end
+
+-- ISOLE --------------------------------------------------------------------------------------
+for _, id in W.IslandOrder do
+	local island = W.Islands[id]
+	check(island ~= nil and island.Id == id, "W.Islands.%s non valida", id)
+	if island then
+		local hub = Zones.Get(island.Hub)
+		check(hub ~= nil, "Isola %s: zona principale '%s' inesistente", id, island.Hub)
+		if hub then
+			check(hub.Island == id, "Isola %s: la zona principale %s sta su un'altra isola (%s)", id, island.Hub, hub.Island)
+			check(island.Raid or (hub.Safe and hub.Spawn), "Isola %s: la zona principale deve essere sicura e di rinascita", id)
+		end
+	end
+end
+for _, a in W.IslandOrder do
+	for _, b in W.IslandOrder do
+		if a < b then
+			local ia, ib = W.Islands[a], W.Islands[b]
+			check(Util.FlatDistance(ia.Center, ib.Center) > ia.Water + ib.Water - 100, "Isole %s e %s troppo vicine", a, b)
+		end
+	end
+end
+for _, zone in Zones.List do
+	check(zone.Island ~= nil, "Zones.%s: non sta su nessuna isola", zone.Id)
+	local island = zone.Island and W.Islands[zone.Island]
+	if island and not zone.Underground then
+		check(Util.FlatDistance(zone.Center, island.Center) + zone.Radius <= island.Land + 10, "Zones.%s: esce dalla terraferma di %s", zone.Id, zone.Island)
+	end
+end
+for i, a in Zones.List do
+	for j, b in Zones.List do
+		if i < j and (a.Underground == true) == (b.Underground == true) then
+			local d = Util.FlatDistance(a.Center, b.Center)
+			local nested = d + math.min(a.Radius, b.Radius) <= math.max(a.Radius, b.Radius)
+			check(nested or d >= a.Radius + b.Radius - 5, "Zone %s e %s si sovrappongono", a.Id, b.Id)
+		end
+	end
+end
+for id, wall in W.Walls do
+	check(W.Islands[wall.Island] ~= nil, "Mura %s: isola inesistente", id)
+end
+for id, d in W.Districts do
+	check(W.Walls[d.Wall] ~= nil, "Distretto %s: mura inesistenti", id)
+end
+-- livelli delle isole coerenti con la storia
+for _, chapter in Story.Chapters do
+	for _, step in chapter.Steps do
+		local zone = step.Zone and Zones.Get(step.Zone)
+		if zone and zone.Island and W.Islands[zone.Island] then
+			check(W.Islands[zone.Island].LevelReq <= math.max(chapter.Level, 1), "Storia %s: la zona %s è su un'isola che richiede Lv.%d", chapter.Id, step.Zone, W.Islands[zone.Island].LevelReq)
+		end
+	end
+end
+for _, npc in NPCs.List do
+	if npc.Role == "Ferry" then
+		local zone = Zones.Get(npc.Zone)
+		check(zone ~= nil and zone.Safe, "Traghetto %s fuori da una zona sicura", npc.Id)
+	end
+end
+
+-- RAID ---------------------------------------------------------------------------------------
+check(Zones.Get("ArenaRaid") ~= nil, "Manca la zona ArenaRaid")
+for _, raid in Raids.List do
+	check(Titans.Bosses[raid.Boss.Id] ~= nil, "Raid %s: boss '%s' inesistente", raid.Id, raid.Boss.Id)
+	check(#raid.Waves > 0, "Raid %s: nessuna ondata", raid.Id)
+	for _, wave in raid.Waves do
+		check(Titans.Classes[wave.Class] ~= nil and not Titans.Classes[wave.Class].Dummy, "Raid %s: classe '%s' non valida", raid.Id, wave.Class)
+	end
+	for _, drop in raid.Rewards.Drops or {} do
+		check(Items.Get(drop.Id) ~= nil, "Raid %s: bottino '%s' inesistente", raid.Id, drop.Id)
+	end
+	check(raid.Level >= raid.LevelReq, "Raid %s: livello minore del requisito", raid.Id)
+end
+
+-- NEGOZIO PREMIUM ------------------------------------------------------------------------------
+local seen = {}
+for _, p in Monetization.Products do
+	check(not seen[p.Id], "Prodotto duplicato %s", p.Id)
+	seen[p.Id] = true
+	check(p.Kind == "Gems" or p.Kind == "Gold", "Prodotto %s: tipo non valido", p.Id)
+	check(isNumber(p.Amount) and p.Amount > 0 and isNumber(p.Robux), "Prodotto %s: valori non validi", p.Id)
+end
+for _, pass in Monetization.GamePasses do
+	check(type(pass.Bonuses) == "table", "Pass %s senza Bonuses", pass.Id)
+	if pass.GiftItem then
+		check(Items.Get(pass.GiftItem) ~= nil, "Pass %s: regalo '%s' inesistente", pass.Id, pass.GiftItem)
+	end
+end
+for _, entry in Monetization.GemShop do
+	check(entry.Item == nil or Items.Get(entry.Item) ~= nil, "Negozio gemme %s: oggetto '%s' inesistente", entry.Id, entry.Item)
+	check(entry.Item ~= nil or entry.Action ~= nil, "Negozio gemme %s: né oggetto né azione", entry.Id)
+end
+check(#Serums.Order == 8, "I sieri devono essere esattamente 8 (ora %d)", #Serums.Order)
+check(Config.Serums.Available == false, "I sieri devono restare bloccati fino al prossimo aggiornamento")
 
 -- RISULTATO ----------------------------------------------------------------------------------
 local cutsceneList = {}

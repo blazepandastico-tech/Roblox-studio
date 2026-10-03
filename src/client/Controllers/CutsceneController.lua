@@ -277,7 +277,7 @@ local function buildPrologueSet(base: Vector3)
 	end
 	api.Part({ Name = "Cancello", Size = Vector3.new(36, 62, 30), CFrame = CFrame.new(base + Vector3.new(0, 31, 300)), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(80, 56, 40) })
 	-- case del distretto
-	local rng = Random.new(845)
+	local rng = Random.new(312)
 	for gx = -4, 4 do
 		for gz = -3, 4 do
 			if gx ~= 0 and rng:NextNumber() < 0.8 then
@@ -311,8 +311,8 @@ Scenes.Prologo = function()
 	letterbox(true)
 	api.FadeIn(1.5)
 	api.ShotAsync(api.Look(base + Vector3.new(-160, 120, -160), base + Vector3.new(0, 40, 200)), api.Look(base + Vector3.new(-60, 70, -120), base + Vector3.new(0, 60, 300)), 7)
-	api.Say("Narratore", "Anno 845. Distretto di Halvar, il confine più a sud del Muro di Cenere.", 3.5)
-	api.Say("Narratore", "Per cento anni le Mura ci hanno protetti. Per cento anni abbiamo dimenticato la paura.", 3.5)
+	api.Say("Narratore", "Anno 312 del Calendario delle Isole. Distretto di Halvar, sull'Isola di Cenere.", 3.5)
+	api.Say("Narratore", "Per generazioni le Mura ci hanno protetti. E noi avevamo dimenticato la paura.", 3.5)
 	-- il Vulcano si alza oltre il Muro
 	fx().Lightning(base + Vector3.new(0, 700, 400), base + Vector3.new(0, 150, 380), Color3.fromRGB(255, 236, 130), 4)
 	fx().Flash(Color3.fromRGB(255, 240, 200), 0.45, 0.6)
@@ -348,7 +348,7 @@ Scenes.Prologo = function()
 	api.Say("Narratore", "Tra le macerie e il vapore, qualcuno perse una fiala spezzata... con un simbolo che nessuno aveva mai visto.", 5)
 	api.FadeOut(1.2)
 	letterbox(false)
-	api.Title("CINQUE ANNI DOPO", 2.5)
+	api.Title("ANNI DOPO...", 2.5)
 end
 
 Scenes.Calaneth = function()
@@ -365,7 +365,7 @@ Scenes.Calaneth = function()
 	fx().Flash(Color3.fromRGB(255, 240, 200), 0.4, 0.6)
 	local standing = outer + outward * 60 + Vector3.new(0, W.GroundY + (colossal:GetAttribute("HipHeight") :: number), 0)
 	api.Move(colossal, CFrame.lookAt(standing, standing - outward), 3)
-	api.Say("Narratore", "Cinque anni dopo, la stessa testa senza pelle si affacciò sopra il Muro Vermiglio.", 3.5)
+	api.Say("Narratore", "Anni dopo, lo stesso gigante di fuoco tornò ad affacciarsi, questa volta sul Muro Vermiglio.", 3.5)
 	api.Animate(colossal, "Kick")
 	api.Wait(0.6)
 	fx().Explosion(outer + Vector3.new(0, 30, 0), 40, true)

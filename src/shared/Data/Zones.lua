@@ -151,7 +151,7 @@ Zones.List = {
 			{ Class = "T7", Level = 210, Count = 7 },
 			{ Class = "T10", Level = 250, Count = 6 },
 		},
-		Description = "Un villaggio dentro il Muro Vermiglio avvolto da una strana nebbia verde.",
+		Description = "Un villaggio di Edenia avvolto da una strana nebbia verde.",
 	},
 	{
 		Id = "Ostrava",
@@ -286,7 +286,7 @@ Zones.List = {
 	},
 	{
 		Id = "LandeCenere",
-		Name = "Lande Oltre il Muro",
+		Name = "Lande di Cenere",
 		Season = 3,
 		Center = W.At("Cenere", 200, 640, G),
 		Radius = 165,
@@ -334,7 +334,7 @@ Zones.List = {
 		Radius = 110,
 		Level = { 1000, 2000 },
 		Ambience = "Valdoria",
-		Description = "Il porto di Valdoria dove sbarcano i volontari di Edenia.",
+		Description = "Il porto di Valdoria dove sbarcano i volontari delle Isole.",
 	},
 	{
 		Id = "Trincee",

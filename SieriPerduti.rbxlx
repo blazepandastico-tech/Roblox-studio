@@ -1688,7 +1688,7 @@ local Config = {
 	AutosaveInterval = 120,
 
 	-- Generazione del mondo (stesso seme = stessa mappa)
-	WorldSeed = 845,
+	WorldSeed = 312,
 
 	-- Progressione
 	MaxLevel = 2000,
@@ -3349,7 +3349,7 @@ local NPCList = {
 	{ Id = "CorrierePorto", Zone = "PortoOrientale", Offset = Vector3.new(-24, 0, -4), Facing = 90, Role = "Travel",
 		Name = "Corriere", Title = "Viaggio Rapido",
 		Look = { Skin = Color3.fromRGB(210, 165, 130), Hair = Color3.fromRGB(60, 45, 35), HairStyle = "Corto", Uniform = "Civile", Hat = true },
-		Greeting = { "Ti riporto dentro le Mura in un attimo." } },
+		Greeting = { "Ti riporto alle Isole in un attimo." } },
 	{ Id = "CapitanoHaskelM", Zone = "PortoRevelia", Offset = Vector3.new(-62, 0, 0), Facing = 90, Role = "Ship", Destination = "PortoOrientale",
 		Name = "Haskel", Title = "Capitano di Nave",
 		Look = { Skin = Color3.fromRGB(196, 146, 112), Hair = Color3.fromRGB(110, 110, 110), HairStyle = "Lungo", Uniform = "Civile", Beard = true, Hat = true },
@@ -4600,14 +4600,14 @@ Story.Chapters = {
 		Season = 2,
 		Title = "Capitolo 6 - Nebbia su Brenn",
 		Level = 200,
-		Summary = "Giganti dentro il Muro Vermiglio senza nessuna breccia. A Brenn c'è stata una nebbia verde.",
+		Summary = "Giganti nel cuore di Edenia, dove non ne erano mai nati. A Brenn c'è stata una nebbia verde.",
 		Steps = {
 			{
 				Type = "Talk",
 				Npc = "Falkner",
 				Objective = "Parla con il Capitano Falkner",
 				Dialogue = {
-					L("Falkner", "Giganti dentro il Muro Vermiglio. Nessuna breccia, nessun cancello aperto. Sono semplicemente... apparsi."),
+					L("Falkner", "Giganti in mezzo a Edenia. Nessuna nave, nessuna spiaggia violata. Sono semplicemente... apparsi."),
 					L("Falkner", "I superstiti del villaggio di Brenn parlano di una nebbia verde, la notte prima. Vai a vedere."),
 				},
 				Reward = { XP = 0.5 },
@@ -4817,7 +4817,7 @@ Story.Chapters = {
 				Objective = "Torna da Elise a Aurion",
 				Dialogue = {
 					L("Elise", "Mio padre ha scelto il siero. Io scelgo le persone."),
-					L("Elise", "Da oggi sono la Regina di Edenia. E la Regina ordina al Corpo dei Falchi di riprendersi Halvar."),
+					L("Elise", "Da oggi sono la Regina delle Isole. E la Regina ordina al Corpo dei Falchi di riprendersi Halvar."),
 					L("Elise", "Prendi questi cristalli: venivano dalla caverna. Che servano a qualcosa di buono, almeno una volta."),
 				},
 				Reward = { XP = 2, Gold = 200000, Items = { CristalloIndurito = 10 } },
@@ -4884,7 +4884,7 @@ Story.Chapters = {
 				Objective = "Raggiungi il Porto Orientale e parla con il Capitano Falkner",
 				Dialogue = {
 					L("Falkner", "Quattro anni. Nuove uniformi, Lance Dirompenti, e una nave. Chi l'avrebbe detto?"),
-					L("Falkner", "Valdoria prepara la guerra contro Edenia, e Vael è laggiù, protetto dai loro generali."),
+					L("Falkner", "Valdoria prepara la guerra contro le Isole, e Vael è laggiù, protetto dai loro generali."),
 					L("Falkner", "Parla con il capitano Haskel quando sei pronto. Si salpa."),
 				},
 				Reward = { XP = 0.6 },
@@ -5654,7 +5654,7 @@ Zones.List = {
 			{ Class = "T7", Level = 210, Count = 7 },
 			{ Class = "T10", Level = 250, Count = 6 },
 		},
-		Description = "Un villaggio dentro il Muro Vermiglio avvolto da una strana nebbia verde.",
+		Description = "Un villaggio di Edenia avvolto da una strana nebbia verde.",
 	},
 	{
 		Id = "Ostrava",
@@ -5789,7 +5789,7 @@ Zones.List = {
 	},
 	{
 		Id = "LandeCenere",
-		Name = "Lande Oltre il Muro",
+		Name = "Lande di Cenere",
 		Season = 3,
 		Center = W.At("Cenere", 200, 640, G),
 		Radius = 165,
@@ -5837,7 +5837,7 @@ Zones.List = {
 		Radius = 110,
 		Level = { 1000, 2000 },
 		Ambience = "Valdoria",
-		Description = "Il porto di Valdoria dove sbarcano i volontari di Edenia.",
+		Description = "Il porto di Valdoria dove sbarcano i volontari delle Isole.",
 	},
 	{
 		Id = "Trincee",
@@ -11541,10 +11541,6 @@ local function decorate(character: Model, serum)
 			weldPart(folder, torso, "Cristallo", Vector3.new(t.X * 0.15, t.Y * 0.45, t.X * 0.15), crystal, CFrame.new((i - 2) * t.X * 0.3, t.Y * 0.2, t.Z * 0.55) * CFrame.Angles(0, 0, math.rad((i - 2) * 25)), { Block = true, Material = Enum.Material.Glass, Transparency = 0.2 })
 		end
 	end
-		for i = -2, 2 do
-			weldPart(folder, head, "Corona", Vector3.new(h.X * 0.08, h.Y * 0.6, h.X * 0.08), bone, CFrame.new(i * h.X * 0.18, h.Y * 0.62, 0) * CFrame.Angles(0, 0, math.rad(i * 12)), { Block = true, Material = Enum.Material.Marble })
-		end
-	end
 	if look == "Vulcano" then
 		local emitter = Instance.new("ParticleEmitter")
 		emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
@@ -14460,7 +14456,7 @@ local function buildTerrain()
 		minZ = math.min(minZ, isl.Center.Z - isl.Water - 600)
 		maxZ = math.max(maxZ, isl.Center.Z + isl.Water + 600)
 	end
-	local tile = 2048
+	local tile = 1024
 	for x = minX, maxX, tile do
 		for z = minZ, maxZ, tile do
 			local sx = math.min(tile, maxX - x)
@@ -17461,7 +17457,7 @@ local function buildPrologueSet(base: Vector3)
 	end
 	api.Part({ Name = "Cancello", Size = Vector3.new(36, 62, 30), CFrame = CFrame.new(base + Vector3.new(0, 31, 300)), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(80, 56, 40) })
 	-- case del distretto
-	local rng = Random.new(845)
+	local rng = Random.new(312)
 	for gx = -4, 4 do
 		for gz = -3, 4 do
 			if gx ~= 0 and rng:NextNumber() < 0.8 then
@@ -17495,8 +17491,8 @@ Scenes.Prologo = function()
 	letterbox(true)
 	api.FadeIn(1.5)
 	api.ShotAsync(api.Look(base + Vector3.new(-160, 120, -160), base + Vector3.new(0, 40, 200)), api.Look(base + Vector3.new(-60, 70, -120), base + Vector3.new(0, 60, 300)), 7)
-	api.Say("Narratore", "Anno 845. Distretto di Halvar, il confine più a sud del Muro di Cenere.", 3.5)
-	api.Say("Narratore", "Per cento anni le Mura ci hanno protetti. Per cento anni abbiamo dimenticato la paura.", 3.5)
+	api.Say("Narratore", "Anno 312 del Calendario delle Isole. Distretto di Halvar, sull'Isola di Cenere.", 3.5)
+	api.Say("Narratore", "Per generazioni le Mura ci hanno protetti. E noi avevamo dimenticato la paura.", 3.5)
 	-- il Vulcano si alza oltre il Muro
 	fx().Lightning(base + Vector3.new(0, 700, 400), base + Vector3.new(0, 150, 380), Color3.fromRGB(255, 236, 130), 4)
 	fx().Flash(Color3.fromRGB(255, 240, 200), 0.45, 0.6)
@@ -17532,7 +17528,7 @@ Scenes.Prologo = function()
 	api.Say("Narratore", "Tra le macerie e il vapore, qualcuno perse una fiala spezzata... con un simbolo che nessuno aveva mai visto.", 5)
 	api.FadeOut(1.2)
 	letterbox(false)
-	api.Title("CINQUE ANNI DOPO", 2.5)
+	api.Title("ANNI DOPO...", 2.5)
 end
 
 Scenes.Calaneth = function()
@@ -17549,7 +17545,7 @@ Scenes.Calaneth = function()
 	fx().Flash(Color3.fromRGB(255, 240, 200), 0.4, 0.6)
 	local standing = outer + outward * 60 + Vector3.new(0, W.GroundY + (colossal:GetAttribute("HipHeight") :: number), 0)
 	api.Move(colossal, CFrame.lookAt(standing, standing - outward), 3)
-	api.Say("Narratore", "Cinque anni dopo, la stessa testa senza pelle si affacciò sopra il Muro Vermiglio.", 3.5)
+	api.Say("Narratore", "Anni dopo, lo stesso gigante di fuoco tornò ad affacciarsi, questa volta sul Muro Vermiglio.", 3.5)
 	api.Animate(colossal, "Kick")
 	api.Wait(0.6)
 	fx().Explosion(outer + Vector3.new(0, 30, 0), 40, true)
@@ -23490,7 +23486,6 @@ local Net = require(Shared.Lib.Net)
 local Util = require(Shared.Lib.Util)
 
 local Theme = require(script.Parent.Theme)
-local New = Theme.New
 local Colors = Theme.Colors
 
 local Raid = {}

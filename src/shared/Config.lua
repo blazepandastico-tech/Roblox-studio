@@ -14,7 +14,7 @@ local Config = {
 	AutosaveInterval = 120,
 
 	-- Generazione del mondo (stesso seme = stessa mappa)
-	WorldSeed = 845,
+	WorldSeed = 312,
 
 	-- Progressione
 	MaxLevel = 2000,

@@ -12,7 +12,6 @@ local Net = require(Shared.Lib.Net)
 local Util = require(Shared.Lib.Util)
 
 local Theme = require(script.Parent.Theme)
-local New = Theme.New
 local Colors = Theme.Colors
 
 local Raid = {}

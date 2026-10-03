@@ -186,10 +186,6 @@ local function decorate(character: Model, serum)
 			weldPart(folder, torso, "Cristallo", Vector3.new(t.X * 0.15, t.Y * 0.45, t.X * 0.15), crystal, CFrame.new((i - 2) * t.X * 0.3, t.Y * 0.2, t.Z * 0.55) * CFrame.Angles(0, 0, math.rad((i - 2) * 25)), { Block = true, Material = Enum.Material.Glass, Transparency = 0.2 })
 		end
 	end
-		for i = -2, 2 do
-			weldPart(folder, head, "Corona", Vector3.new(h.X * 0.08, h.Y * 0.6, h.X * 0.08), bone, CFrame.new(i * h.X * 0.18, h.Y * 0.62, 0) * CFrame.Angles(0, 0, math.rad(i * 12)), { Block = true, Material = Enum.Material.Marble })
-		end
-	end
 	if look == "Vulcano" then
 		local emitter = Instance.new("ParticleEmitter")
 		emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"

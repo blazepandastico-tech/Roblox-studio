@@ -250,14 +250,14 @@ Story.Chapters = {
 		Season = 2,
 		Title = "Capitolo 6 - Nebbia su Brenn",
 		Level = 200,
-		Summary = "Giganti dentro il Muro Vermiglio senza nessuna breccia. A Brenn c'è stata una nebbia verde.",
+		Summary = "Giganti nel cuore di Edenia, dove non ne erano mai nati. A Brenn c'è stata una nebbia verde.",
 		Steps = {
 			{
 				Type = "Talk",
 				Npc = "Falkner",
 				Objective = "Parla con il Capitano Falkner",
 				Dialogue = {
-					L("Falkner", "Giganti dentro il Muro Vermiglio. Nessuna breccia, nessun cancello aperto. Sono semplicemente... apparsi."),
+					L("Falkner", "Giganti in mezzo a Edenia. Nessuna nave, nessuna spiaggia violata. Sono semplicemente... apparsi."),
 					L("Falkner", "I superstiti del villaggio di Brenn parlano di una nebbia verde, la notte prima. Vai a vedere."),
 				},
 				Reward = { XP = 0.5 },
@@ -467,7 +467,7 @@ Story.Chapters = {
 				Objective = "Torna da Elise a Aurion",
 				Dialogue = {
 					L("Elise", "Mio padre ha scelto il siero. Io scelgo le persone."),
-					L("Elise", "Da oggi sono la Regina di Edenia. E la Regina ordina al Corpo dei Falchi di riprendersi Halvar."),
+					L("Elise", "Da oggi sono la Regina delle Isole. E la Regina ordina al Corpo dei Falchi di riprendersi Halvar."),
 					L("Elise", "Prendi questi cristalli: venivano dalla caverna. Che servano a qualcosa di buono, almeno una volta."),
 				},
 				Reward = { XP = 2, Gold = 200000, Items = { CristalloIndurito = 10 } },
@@ -534,7 +534,7 @@ Story.Chapters = {
 				Objective = "Raggiungi il Porto Orientale e parla con il Capitano Falkner",
 				Dialogue = {
 					L("Falkner", "Quattro anni. Nuove uniformi, Lance Dirompenti, e una nave. Chi l'avrebbe detto?"),
-					L("Falkner", "Valdoria prepara la guerra contro Edenia, e Vael è laggiù, protetto dai loro generali."),
+					L("Falkner", "Valdoria prepara la guerra contro le Isole, e Vael è laggiù, protetto dai loro generali."),
 					L("Falkner", "Parla con il capitano Haskel quando sei pronto. Si salpa."),
 				},
 				Reward = { XP = 0.6 },

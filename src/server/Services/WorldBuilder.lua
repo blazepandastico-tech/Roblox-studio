@@ -144,7 +144,7 @@ local function buildTerrain()
 		minZ = math.min(minZ, isl.Center.Z - isl.Water - 600)
 		maxZ = math.max(maxZ, isl.Center.Z + isl.Water + 600)
 	end
-	local tile = 2048
+	local tile = 1024
 	for x = minX, maxX, tile do
 		for z = minZ, maxZ, tile do
 			local sx = math.min(tile, maxX - x)

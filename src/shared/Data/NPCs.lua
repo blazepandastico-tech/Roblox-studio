@@ -232,7 +232,7 @@ local NPCList = {
 	{ Id = "CorrierePorto", Zone = "PortoOrientale", Offset = Vector3.new(-24, 0, -4), Facing = 90, Role = "Travel",
 		Name = "Corriere", Title = "Viaggio Rapido",
 		Look = { Skin = Color3.fromRGB(210, 165, 130), Hair = Color3.fromRGB(60, 45, 35), HairStyle = "Corto", Uniform = "Civile", Hat = true },
-		Greeting = { "Ti riporto dentro le Mura in un attimo." } },
+		Greeting = { "Ti riporto alle Isole in un attimo." } },
 	{ Id = "CapitanoHaskelM", Zone = "PortoRevelia", Offset = Vector3.new(-62, 0, 0), Facing = 90, Role = "Ship", Destination = "PortoOrientale",
 		Name = "Haskel", Title = "Capitano di Nave",
 		Look = { Skin = Color3.fromRGB(196, 146, 112), Hair = Color3.fromRGB(110, 110, 110), HairStyle = "Lungo", Uniform = "Civile", Beard = true, Hat = true },
