@@ -387,6 +387,12 @@ for _, key in Skills.Order do
 	end
 end
 
+-- LOCOMOZIONE DA BATTAGLIA ---------------------------------------------------------------------
+for _, case in { { 0, 0, true }, { 8, 0, true }, { 24, 0, true }, { 24, 1, false }, { 3, 0.5, false } } do
+	local ok, pose = pcall(Poses.Human.BattleLoco, 1.3, { Flat = case[1], Air = case[2], Blades = case[3], Phase = 2.1 })
+	check(ok and type(pose) == "table" and pose.Root ~= nil and pose.RightHip ~= nil and pose.LeftShoulder ~= nil, "BattleLoco non valida (velocità %s): %s", case[1], if ok then "" else pose)
+end
+
 -- LIVELLI E STATISTICHE ----------------------------------------------------------------------
 local totalXP = 0
 local prev = 0

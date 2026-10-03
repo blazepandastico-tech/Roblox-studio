@@ -60,6 +60,7 @@ local CONTROLS = {
 	{ "Spazio", "Salto • getto di gas in volo" },
 	{ "W A S D in volo", "Sterzare attorno ai rampini" },
 	{ "Shift", "Schivata" },
+	{ "Ctrl sinistro", "Cammina / corri" },
 	{ "Clic sinistro", "Fendente (combo da 4 colpi)" },
 	{ "Clic destro", "Arma a distanza" },
 	{ "Z  X  C  V", "Abilità delle lame o del gigante" },

@@ -14,6 +14,7 @@
 	  G              Risveglio Valkar
 	  M              menu
 	  N              negozio premium (gemme, monete, pass)
+	  Ctrl sinistro  cammina / corri
 	  Alt sinistro   sblocca il cursore
 ]]
 
@@ -39,6 +40,7 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.G] = "Awaken",
 	[Enum.KeyCode.M] = "Menu",
 	[Enum.KeyCode.N] = "Premium",
+	[Enum.KeyCode.LeftControl] = "WalkToggle",
 	[Enum.KeyCode.LeftAlt] = "ToggleCursor",
 	[Enum.KeyCode.ButtonR2] = "Attack",
 	[Enum.KeyCode.ButtonL2] = "Ranged",

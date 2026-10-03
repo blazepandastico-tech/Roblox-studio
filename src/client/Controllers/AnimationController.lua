@@ -22,7 +22,10 @@ local ProceduralAnimator = require(Shared.Anim.ProceduralAnimator)
 local AnimationIds = require(Shared.Data.AnimationIds)
 
 local AnimationController = {}
+local C
 local player = Players.LocalPlayer
+local walkMode = false -- Ctrl: cammina invece di correre
+local savedWalkSpeed: number? = nil
 local rigs: { [Model]: any } = {}
 local loadedTracks: { [Model]: { [string]: AnimationTrack } } = {}
 
@@ -99,7 +102,10 @@ local function register(model: Model, kind: string)
 	animator.Context.Seed = rig.Seed
 	rigs[model] = rig
 	if kind == "Player" then
-		animator:SetLayer("Stance", Poses.Human.BladeStance, 0, 1, 6)
+		-- camminata e corsa da battaglia al posto di quelle standard di Roblox
+		animator:SetLayer("Loco", Poses.Human.BattleLoco, 1, 0, 8)
+		animator.Context.Phase = 0
+		animator.Context.Air = 0
 		animator:SetLayer("Fly", Poses.Human.ODMFly, 0, 2, 5)
 		animator:SetLayer("Hang", Poses.Human.Hang, 0, 3, 6)
 		animator:SetLayer("Struggle", Poses.Human.Struggle, 0, 4, 8)
@@ -251,8 +257,21 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		end
 		rig.Animator:SetLayerWeight("Fly", if flying and not rig.Hanging then 1 else 0)
 		rig.Animator:SetLayerWeight("Hang", if flying and rig.Hanging then 1 else 0)
-		local stance = hasBlades(model) and not flying and not transformed
-		rig.Animator:SetLayerWeight("Stance", if stance then 1 else 0)
+		-- locomozione da battaglia: passo che avanza con la velocità, salto e caduta
+		local humanoid = rig.Humanoid
+		if model == player.Character and walkMode and humanoid.WalkSpeed > 9 then
+			-- il server ha aggiornato la velocità: restiamo in camminata
+			savedWalkSpeed = humanoid.WalkSpeed
+			humanoid.WalkSpeed = 9
+		end
+		local hstate = humanoid:GetState()
+		local airborne = hstate == Enum.HumanoidStateType.Freefall or hstate == Enum.HumanoidStateType.Jumping
+		ctx.Air = (ctx.Air or 0) + ((if airborne then 1 else 0) - (ctx.Air or 0)) * math.min(1, dt * 10)
+		ctx.Flat = if airborne then (ctx.Flat or 0) else flat
+		ctx.Blades = hasBlades(model)
+		local runK = math.clamp((flat - 13) / 6, 0, 1)
+		ctx.Phase = (ctx.Phase or 0) + dt * flat * (1.05 - 0.4 * runK)
+		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
 	elseif rig.Kind == "NPC" then
 		if localRoot then
 			local offset = root.CFrame:PointToObjectSpace(localRoot.Position)
@@ -290,10 +309,30 @@ local function onTagged(tag: string, kind: string)
 	end)
 end
 
+-- Spegne lo script Animate di Roblox: camminata e corsa le facciamo noi
+local function disableDefaultAnimate(character: Model)
+	local animate = character:WaitForChild("Animate", 5)
+	if animate and animate:IsA("LocalScript") then
+		animate.Enabled = false
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local animatorObj = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if animatorObj then
+		for _, track in animatorObj:GetPlayingAnimationTracks() do
+			track:Stop(0.1)
+		end
+	end
+end
+
 local function hookCharacter(plr: Player)
 	local function onCharacter(character: Model)
 		character:WaitForChild("HumanoidRootPart", 10)
 		character:WaitForChild("Humanoid", 10)
+		if plr == player then
+			disableDefaultAnimate(character)
+			walkMode = false
+			savedWalkSpeed = nil
+		end
 		task.wait(0.2)
 		register(character, "Player")
 	end
@@ -303,13 +342,41 @@ local function hookCharacter(plr: Player)
 	plr.CharacterAdded:Connect(onCharacter)
 end
 
-function AnimationController.Init(_c) end
+function AnimationController.Init(c)
+	C = c
+end
+
+-- Ctrl: alterna camminata tattica e corsa d'assalto
+local function toggleWalk()
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+	walkMode = not walkMode
+	if walkMode then
+		savedWalkSpeed = humanoid.WalkSpeed
+		humanoid.WalkSpeed = math.min(humanoid.WalkSpeed, 9)
+	elseif savedWalkSpeed then
+		humanoid.WalkSpeed = savedWalkSpeed
+		savedWalkSpeed = nil
+	end
+	if C and C.Notifications then
+		C.Notifications.Toast(if walkMode then "🚶 Camminata (Ctrl per correre)" else "🏃 Corsa", "Info", 1.5)
+	end
+end
 
 function AnimationController.Start()
 	for _, plr in Players:GetPlayers() do
 		hookCharacter(plr)
 	end
 	Players.PlayerAdded:Connect(hookCharacter)
+	if C and C.InputController then
+		C.InputController.On("WalkToggle", function(began)
+			if began then
+				toggleWalk()
+			end
+		end)
+	end
 	onTagged(Config.Tags.NPC, "NPC")
 	onTagged(Config.Tags.Enemy, "Enemy")
 

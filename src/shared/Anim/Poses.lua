@@ -105,6 +105,170 @@ function Poses.Human.BladeStance(_t, ctx)
 	}
 end
 
+-- LOCOMOZIONE DA BATTAGLIA DEL GIOCATORE -------------------------------------------------------
+-- Sostituisce camminata e corsa standard di Roblox (lo script Animate viene disattivato):
+--   fermo  = guardia con le ginocchia piegate e le lame pronte
+--   cammina = passo tattico, basso e corto, lame in avanti
+--   corre   = corsa d'assalto piegato in avanti con le lame portate indietro
+--   in aria = gambe raccolte e braccia aperte per l'equilibrio
+-- ctx: Flat (velocità orizzontale), Phase (ciclo del passo), Air (0..1), Blades (bool)
+
+-- angoli: { X, Y, Z } in gradi; Root può avere anche la quota (P)
+local function lerpN(a: number, b: number, k: number): number
+	return a + (b - a) * k
+end
+
+local function blendPose(a, b, k: number)
+	if k <= 0 then
+		return a
+	elseif k >= 1 then
+		return b
+	end
+	local out = {}
+	for joint, va in a do
+		local vb = b[joint] or { 0, 0, 0, 0 }
+		out[joint] = { lerpN(va[1], vb[1], k), lerpN(va[2], vb[2], k), lerpN(va[3], vb[3], k), lerpN(va[4] or 0, vb[4] or 0, k) }
+	end
+	for joint, vb in b do
+		if not out[joint] then
+			out[joint] = { vb[1] * k, vb[2] * k, vb[3] * k, (vb[4] or 0) * k }
+		end
+	end
+	return out
+end
+
+local function guardPose(t: number, blades: boolean)
+	local br = sin(t * 2.2)
+	local pose = {
+		Root = { -5, 18, 0, -0.32 + br * 0.03 },
+		Waist = { -8 + br * 1.5, -12, 0 },
+		Neck = { 5, -9, 0 },
+		RightHip = { 20, 0, 8 },
+		RightKnee = { -30, 0, 0 },
+		RightAnkle = { 10, 0, 0 },
+		LeftHip = { -8, 0, -12 },
+		LeftKnee = { -22, 0, 0 },
+		LeftAnkle = { 14, 0, 0 },
+	}
+	if blades then
+		pose.RightShoulder = { 38 + br * 2, 0, 24 }
+		pose.RightElbow = { 58, 0, 0 }
+		pose.RightWrist = { -28, 0, 0 }
+		pose.LeftShoulder = { 56 + br * 2, 0, -14 }
+		pose.LeftElbow = { 72, 0, 0 }
+		pose.LeftWrist = { -32, 0, 0 }
+	else
+		pose.RightShoulder = { 25, 0, 14 }
+		pose.RightElbow = { 80, 0, 0 }
+		pose.LeftShoulder = { 40, 0, -10 }
+		pose.LeftElbow = { 95, 0, 0 }
+	end
+	return pose
+end
+
+local function walkPose(p: number, blades: boolean)
+	local s = sin(p)
+	local kneeR = -(18 + 32 * math.max(0, sin(p + 1.6)))
+	local kneeL = -(18 + 32 * math.max(0, sin(p + 1.6 + math.pi)))
+	local pose = {
+		Root = { -10, 8, s * 3, -0.38 - abs(s) * 0.08 },
+		Waist = { -6, -s * 8, 0 },
+		Neck = { 7, s * 4, 0 },
+		RightHip = { s * 30 + 5, 0, 4 },
+		LeftHip = { -s * 30 + 5, 0, -4 },
+		RightKnee = { kneeR, 0, 0 },
+		LeftKnee = { kneeL, 0, 0 },
+		RightAnkle = { sin(p + 0.6) * 12, 0, 0 },
+		LeftAnkle = { -sin(p + 0.6) * 12, 0, 0 },
+	}
+	if blades then
+		pose.RightShoulder = { 42 - s * 8, 0, 18 }
+		pose.RightElbow = { 60, 0, 0 }
+		pose.RightWrist = { -26, 0, 0 }
+		pose.LeftShoulder = { 50 + s * 8, 0, -16 }
+		pose.LeftElbow = { 66, 0, 0 }
+		pose.LeftWrist = { -30, 0, 0 }
+	else
+		pose.RightShoulder = { -s * 28, 0, 8 }
+		pose.RightElbow = { 35, 0, 0 }
+		pose.LeftShoulder = { s * 28, 0, -8 }
+		pose.LeftElbow = { 35, 0, 0 }
+	end
+	return pose
+end
+
+local function runPose(p: number, blades: boolean)
+	local s = sin(p)
+	local kneeR = -(25 + 75 * math.max(0, sin(p + 1.4)))
+	local kneeL = -(25 + 75 * math.max(0, sin(p + 1.4 + math.pi)))
+	local pose = {
+		Root = { -26, 0, s * 5, -0.15 - abs(s) * 0.25 },
+		Waist = { -8, -s * 12, 0 },
+		Neck = { 26, s * 6, 0 },
+		RightHip = { s * 58 + 12, 0, 3 },
+		LeftHip = { -s * 58 + 12, 0, -3 },
+		RightKnee = { kneeR, 0, 0 },
+		LeftKnee = { kneeL, 0, 0 },
+		RightAnkle = { sin(p + 0.4) * 22, 0, 0 },
+		LeftAnkle = { -sin(p + 0.4) * 22, 0, 0 },
+	}
+	if blades then
+		-- lame portate indietro, come una lama pronta a scattare
+		pose.RightShoulder = { -58 + s * 6, 0, 30 }
+		pose.RightElbow = { 14, 0, 0 }
+		pose.RightWrist = { 12, 0, 0 }
+		pose.LeftShoulder = { -58 - s * 6, 0, -30 }
+		pose.LeftElbow = { 14, 0, 0 }
+		pose.LeftWrist = { 12, 0, 0 }
+	else
+		pose.RightShoulder = { -s * 60, 0, 10 }
+		pose.RightElbow = { 80, 0, 0 }
+		pose.LeftShoulder = { s * 60, 0, -10 }
+		pose.LeftElbow = { 80, 0, 0 }
+	end
+	return pose
+end
+
+local function airPose(t: number, blades: boolean)
+	local f = sin(t * 6) * 3
+	return {
+		Root = { -10, 0, 0, 0 },
+		Waist = { -4, 0, 0 },
+		Neck = { 8, 0, 0 },
+		RightHip = { 45 + f, 0, 6 },
+		LeftHip = { 25 - f, 0, -6 },
+		RightKnee = { -70, 0, 0 },
+		LeftKnee = { -40, 0, 0 },
+		RightAnkle = { 15, 0, 0 },
+		LeftAnkle = { 10, 0, 0 },
+		RightShoulder = { if blades then 20 else 40, 0, 55 + f },
+		RightElbow = { 30, 0, 0 },
+		LeftShoulder = { if blades then 20 else 40, 0, -55 - f },
+		LeftElbow = { 30, 0, 0 },
+	}
+end
+
+function Poses.Human.BattleLoco(t, ctx)
+	local speed = ctx.Flat or 0
+	local blades = ctx.Blades == true
+	local walk = math.clamp(speed / 5, 0, 1)
+	local run = math.clamp((speed - (ctx.RunThreshold or 13)) / 6, 0, 1)
+	local p = ctx.Phase or 0
+	local pose = guardPose(t, blades)
+	pose = blendPose(pose, walkPose(p, blades), walk)
+	pose = blendPose(pose, runPose(p, blades), run)
+	pose = blendPose(pose, airPose(t, blades), math.clamp(ctx.Air or 0, 0, 1))
+	local out = {}
+	for joint, v in pose do
+		if joint == "Root" then
+			out.Root = TA(0, v[4] or 0, 0, v[1], v[2], v[3])
+		else
+			out[joint] = A(v[1], v[2], v[3])
+		end
+	end
+	return out
+end
+
 -- Volo con i Rampini: il corpo si allinea alla direzione del movimento
 function Poses.Human.ODMFly(t, ctx)
 	local speed = ctx.Speed or 0
