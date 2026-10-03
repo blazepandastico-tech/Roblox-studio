@@ -145,6 +145,7 @@ local function buildTerrain()
 		maxZ = math.max(maxZ, isl.Center.Z + isl.Water + 600)
 	end
 	local tile = 1024
+	local oceanOk, oceanErr = pcall(function()
 	for x = minX, maxX, tile do
 		for z = minZ, maxZ, tile do
 			local sx = math.min(tile, maxX - x)
@@ -155,6 +156,10 @@ local function buildTerrain()
 				pause()
 			end
 		end
+	end
+	end)
+	if not oceanOk then
+		warn("[WorldBuilder] Oceano non generato: " .. tostring(oceanErr))
 	end
 
 	local function island(center: Vector3, land: number, beach: number)
@@ -1204,6 +1209,35 @@ end
 
 -- COSTRUZIONE COMPLETA --------------------------------------------------------------------
 
+-- Pavimento solido sotto ogni isola: se il terreno non si genera, nessuno cade nel vuoto
+local function buildIslandBases()
+	currentGroup = group("Basi delle Isole")
+	for _, id in W.IslandOrder do
+		local isl = W.Islands[id]
+		local diameter = math.min(2040, isl.Land * 2)
+		part({
+			Name = "Base_" .. id,
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(6, diameter, diameter),
+			CFrame = CFrame.new(isl.Center.X, G - 4, isl.Center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+			Material = Enum.Material.Grass,
+			Color = Color3.fromRGB(96, 140, 72),
+			CastShadow = false,
+		})
+	end
+end
+
+-- Esegue un passo della costruzione: se fallisce, lo segnala e continua con gli altri
+local function step(name: string, fn: () -> ())
+	local t = os.clock()
+	local ok, err = xpcall(fn, debug.traceback)
+	if ok then
+		print(("[WorldBuilder] %s ✓ (%.1fs)"):format(name, os.clock() - t))
+	else
+		warn(("[WorldBuilder] ERRORE in '%s': %s"):format(name, tostring(err)))
+	end
+end
+
 function WorldBuilder.Build()
 	local existing = workspace:FindFirstChild(Config.Folders.Map)
 	if existing then
@@ -1215,90 +1249,98 @@ function WorldBuilder.Build()
 	setupCollisionGroups()
 	reserveAreas()
 
+	-- la cartella va subito nel mondo: la mappa compare man mano che viene costruita
 	mapFolder = Instance.new("Folder")
 	mapFolder.Name = Config.Folders.Map
-
-	buildTerrain()
-	print(("[WorldBuilder] Terreno pronto (%.1fs)"):format(os.clock() - t0))
-
-	for _, id in W.WallOrder do
-		buildRingWall(W.Walls[id], W.Districts)
-	end
-	for _, d in W.Districts do
-		buildDistrictWall(d)
-	end
-
-	-- Città e distretti
-	buildTown("Aurion", W.IslandCenter("Aurea") + Vector3.new(0, G, 0), W.Walls.Aurea.Radius - 20, { Cell = 36, Skip = 0.12, MinFloors = 2, MaxFloors = 4, Max = 110 })
-	for id, d in W.Districts do
-		local gate = W.DistrictGatePoint(id)
-		local outward = W.DistrictOutward(id)
-		buildTown(d.Name, gate, d.Radius, {
-			Forward = outward,
-			HalfPlaneOrigin = gate,
-			HalfPlaneNormal = outward,
-			Cell = 32,
-			Skip = if d.Ruined then 0.3 else 0.12,
-			Ruined = d.Ruined,
-			MinFloors = 2,
-			MaxFloors = 3,
-			Max = 60,
-		})
-		currentGroup = group(d.Name .. " - Rifornimento")
-		if not d.Ruined then
-			supplyStation(gate + outward * 24 + Vector3.new(-outward.Z, 0, outward.X) * 22 + Vector3.new(0, G, 0))
-		end
-	end
-	buildPalace()
-	buildTrainingCamp()
-	buildHQ()
-	buildRecinto()
-	buildCastle()
-	buildVillage("Brenn", 14)
-	buildForest()
-
-	currentGroup = group("Accampamenti")
-	buildTents(zoneCenter("Avamposto"), 8, 34)
-	buildTents(zoneCenter("AccampamentoEdenia"), 7, 30)
-	supplyStation(zoneCenter("Avamposto") + Vector3.new(24, 0, -14))
-	supplyStation(zoneCenter("AccampamentoEdenia") + Vector3.new(-26, 0, -12))
-	local halvarZone = Zones.Get("Halvar")
-	if halvarZone then
-		supplyStation(halvarZone.Center + Vector3.new(30, 0, -70))
-	end
-	supplyStation(zoneCenter("PianaOrvel") + Vector3.new(24, 0, 120))
-
-	-- ingresso della caverna
-	currentGroup = group("Ingresso Caverna")
-	local caveMouth = W.Landmarks.IngressoCaverna
-	for i = 0, 5 do
-		local a = math.rad(-60 + i * 24)
-		part({ Name = "RocciaIngresso", Size = Vector3.new(16, 22 + i % 2 * 8, 14), CFrame = CFrame.new(caveMouth + Vector3.new(math.sin(a) * 20, 8, math.cos(a) * 12)) * CFrame.Angles(0, a, 0.2), Material = Enum.Material.Slate, Color = Color3.fromRGB(80, 84, 92) })
-	end
-
-	buildLift("AscensoreAurion")
-	buildLift("AscensoreSotto")
-	buildLift("UscitaCaverna")
-
-	buildUnderground()
-
-	-- Valdoria
-	buildPort("PortoOrientale", W.IslandCenter("Valdoria"), true)
-	buildPort("PortoRevelia", W.IslandCenter("Vermiglia"), true)
-	buildFerryDocks()
-	buildArena()
-	local revelia = Zones.Get("Revelia")
-	if revelia then
-		buildTown("Distretto di Revelia", revelia.Center, revelia.Radius, { Cell = 34, Skip = 0.15, Style = "Valdoria", MinFloors = 3, MaxFloors = 5, Max = 70 })
-	end
-	buildTrenches()
-	buildFortress()
-	buildRumbleFront()
-
-	scatterTrees()
-	buildBoundaries()
-
 	mapFolder.Parent = workspace
+
+	step("Basi delle isole", buildIslandBases)
+	step("Terreno", buildTerrain)
+	step("Mura", function()
+		for _, id in W.WallOrder do
+			buildRingWall(W.Walls[id], W.Districts)
+		end
+		for _, d in W.Districts do
+			buildDistrictWall(d)
+		end
+	end)
+	step("Città di Aurion", function()
+		buildTown("Aurion", W.IslandCenter("Aurea") + Vector3.new(0, G, 0), W.Walls.Aurea.Radius - 20, { Cell = 36, Skip = 0.12, MinFloors = 2, MaxFloors = 4, Max = 110 })
+	end)
+	step("Distretti", function()
+		for id, d in W.Districts do
+			local gate = W.DistrictGatePoint(id)
+			local outward = W.DistrictOutward(id)
+			buildTown(d.Name, gate, d.Radius, {
+				Forward = outward,
+				HalfPlaneOrigin = gate,
+				HalfPlaneNormal = outward,
+				Cell = 32,
+				Skip = if d.Ruined then 0.3 else 0.12,
+				Ruined = d.Ruined,
+				MinFloors = 2,
+				MaxFloors = 3,
+				Max = 60,
+			})
+			currentGroup = group(d.Name .. " - Rifornimento")
+			if not d.Ruined then
+				supplyStation(gate + outward * 24 + Vector3.new(-outward.Z, 0, outward.X) * 22 + Vector3.new(0, G, 0))
+			end
+		end
+	end)
+	step("Palazzo Reale", buildPalace)
+	step("Campo di Addestramento", buildTrainingCamp)
+	step("Quartier Generale", buildHQ)
+	step("Recinto", buildRecinto)
+	step("Castello di Ostrava", buildCastle)
+	step("Villaggio di Brenn", function()
+		buildVillage("Brenn", 14)
+	end)
+	step("Foresta", buildForest)
+	step("Accampamenti", function()
+		currentGroup = group("Accampamenti")
+		buildTents(zoneCenter("Avamposto"), 8, 34)
+		buildTents(zoneCenter("AccampamentoEdenia"), 7, 30)
+		supplyStation(zoneCenter("Avamposto") + Vector3.new(24, 0, -14))
+		supplyStation(zoneCenter("AccampamentoEdenia") + Vector3.new(-26, 0, -12))
+		local halvarZone = Zones.Get("Halvar")
+		if halvarZone then
+			supplyStation(halvarZone.Center + Vector3.new(30, 0, -70))
+		end
+		supplyStation(zoneCenter("PianaOrvel") + Vector3.new(24, 0, 120))
+	end)
+	step("Ingresso della caverna", function()
+		currentGroup = group("Ingresso Caverna")
+		local caveMouth = W.Landmarks.IngressoCaverna
+		for i = 0, 5 do
+			local a = math.rad(-60 + i * 24)
+			part({ Name = "RocciaIngresso", Size = Vector3.new(16, 22 + i % 2 * 8, 14), CFrame = CFrame.new(caveMouth + Vector3.new(math.sin(a) * 20, 8, math.cos(a) * 12)) * CFrame.Angles(0, a, 0.2), Material = Enum.Material.Slate, Color = Color3.fromRGB(80, 84, 92) })
+		end
+	end)
+	step("Ascensori", function()
+		buildLift("AscensoreAurion")
+		buildLift("AscensoreSotto")
+		buildLift("UscitaCaverna")
+	end)
+	step("Sottosuolo", buildUnderground)
+	step("Porti", function()
+		buildPort("PortoOrientale", W.IslandCenter("Valdoria"), true)
+		buildPort("PortoRevelia", W.IslandCenter("Vermiglia"), true)
+	end)
+	step("Traghetti", buildFerryDocks)
+	step("Arena dei raid", buildArena)
+	step("Revelia", function()
+		local revelia = Zones.Get("Revelia")
+		if revelia then
+			buildTown("Distretto di Revelia", revelia.Center, revelia.Radius, { Cell = 34, Skip = 0.15, Style = "Valdoria", MinFloors = 3, MaxFloors = 5, Max = 70 })
+		end
+	end)
+	step("Trincee", buildTrenches)
+	step("Fortezza", buildFortress)
+	step("Fronte della Grande Marcia", buildRumbleFront)
+	step("Alberi", scatterTrees)
+	step("Confini", buildBoundaries)
+
 	print(("[WorldBuilder] Mappa generata: %d parti in %.1fs"):format(partCount, os.clock() - t0))
 	return mapFolder
 end
