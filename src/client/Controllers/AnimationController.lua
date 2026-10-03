@@ -346,7 +346,7 @@ end
 
 -- Spegne lo script Animate di Roblox: camminata e corsa le facciamo noi
 local function disableDefaultAnimate(character: Model)
-	local animate = character:WaitForChild("Animate", 5)
+	local animate = character:WaitForChild("Animate", 1)
 	if animate and animate:IsA("BaseScript") then
 		animate.Enabled = false
 	end
@@ -370,6 +370,10 @@ local function hookCharacter(plr: Player)
 		end
 		task.wait(0.2)
 		local rig = register(character, "Player")
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if plr == player and humanoid and humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+			warn("[Animazioni] Il personaggio non è R15: animazioni e uniforme funzionano solo con R15 (Impostazioni del gioco → Avatar → R15).")
+		end
 		if plr == player then
 			print(if rig then "[Animazioni] Camminata e corsa da battaglia attive" else "[Animazioni] ATTENZIONE: personaggio senza Humanoid, animazioni non attive")
 		end

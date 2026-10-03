@@ -378,6 +378,35 @@ local function spawnPositionFor(player: Player): Vector3
 	return Zones.SpawnPoint(zone)
 end
 
+-- Aspetto del giocatore (preso una volta sola dal suo avatar Roblox)
+local descriptions: { [Player]: HumanoidDescription } = {}
+
+local function descriptionFor(player: Player): HumanoidDescription
+	local cached = descriptions[player]
+	if cached then
+		return cached
+	end
+	local ok, desc = pcall(function()
+		return Players:GetHumanoidDescriptionFromUserId(player.UserId)
+	end)
+	local result = if ok and desc then desc else Instance.new("HumanoidDescription")
+	descriptions[player] = result
+	return result
+end
+
+-- Il gioco è fatto per personaggi R15 (gomiti, ginocchia, busto snodato): lo creiamo sempre
+-- in R15, anche se nelle impostazioni del gioco l'avatar è R6.
+local function buildR15Character(player: Player, position: Vector3): Model
+	local model = Players:CreateHumanoidModelFromDescription(descriptionFor(player), Enum.HumanoidRigType.R15)
+	model.Name = player.Name
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayName = player.DisplayName
+	end
+	model:PivotTo(CFrame.new(position + Vector3.new(0, 4, 0)))
+	return model
+end
+
 local function spawnCharacter(player: Player)
 	if not player.Parent then
 		return
@@ -387,10 +416,26 @@ local function spawnCharacter(player: Player)
 		player:RequestStreamAroundAsync(position, 6)
 	end)
 	local ok, err = pcall(function()
-		player:LoadCharacter()
+		local model = buildR15Character(player, position)
+		local old = player.Character
+		player.Character = model
+		model.Parent = workspace
+		local root = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			root:SetNetworkOwner(player)
+		end
+		if old and old ~= model then
+			old:Destroy()
+		end
 	end)
 	if not ok then
-		warn("[PlayerService] LoadCharacter fallito: " .. tostring(err))
+		warn("[PlayerService] Creazione del personaggio R15 fallita, uso quello standard: " .. tostring(err))
+		local ok2, err2 = pcall(function()
+			player:LoadCharacter()
+		end)
+		if not ok2 then
+			warn("[PlayerService] LoadCharacter fallito: " .. tostring(err2))
+		end
 	end
 end
 
@@ -585,6 +630,7 @@ end
 function PlayerService.Start()
 	S.DataService.Loaded:Connect(onProfileLoaded)
 	Players.PlayerRemoving:Connect(function(player)
+		descriptions[player] = nil
 		states[player] = nil
 		statsCache[player] = nil
 	end)

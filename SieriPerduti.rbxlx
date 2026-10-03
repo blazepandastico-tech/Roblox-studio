@@ -10579,6 +10579,35 @@ local function spawnPositionFor(player: Player): Vector3
 	return Zones.SpawnPoint(zone)
 end
 
+-- Aspetto del giocatore (preso una volta sola dal suo avatar Roblox)
+local descriptions: { [Player]: HumanoidDescription } = {}
+
+local function descriptionFor(player: Player): HumanoidDescription
+	local cached = descriptions[player]
+	if cached then
+		return cached
+	end
+	local ok, desc = pcall(function()
+		return Players:GetHumanoidDescriptionFromUserId(player.UserId)
+	end)
+	local result = if ok and desc then desc else Instance.new("HumanoidDescription")
+	descriptions[player] = result
+	return result
+end
+
+-- Il gioco è fatto per personaggi R15 (gomiti, ginocchia, busto snodato): lo creiamo sempre
+-- in R15, anche se nelle impostazioni del gioco l'avatar è R6.
+local function buildR15Character(player: Player, position: Vector3): Model
+	local model = Players:CreateHumanoidModelFromDescription(descriptionFor(player), Enum.HumanoidRigType.R15)
+	model.Name = player.Name
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.DisplayName = player.DisplayName
+	end
+	model:PivotTo(CFrame.new(position + Vector3.new(0, 4, 0)))
+	return model
+end
+
 local function spawnCharacter(player: Player)
 	if not player.Parent then
 		return
@@ -10588,10 +10617,26 @@ local function spawnCharacter(player: Player)
 		player:RequestStreamAroundAsync(position, 6)
 	end)
 	local ok, err = pcall(function()
-		player:LoadCharacter()
+		local model = buildR15Character(player, position)
+		local old = player.Character
+		player.Character = model
+		model.Parent = workspace
+		local root = model:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			root:SetNetworkOwner(player)
+		end
+		if old and old ~= model then
+			old:Destroy()
+		end
 	end)
 	if not ok then
-		warn("[PlayerService] LoadCharacter fallito: " .. tostring(err))
+		warn("[PlayerService] Creazione del personaggio R15 fallita, uso quello standard: " .. tostring(err))
+		local ok2, err2 = pcall(function()
+			player:LoadCharacter()
+		end)
+		if not ok2 then
+			warn("[PlayerService] LoadCharacter fallito: " .. tostring(err2))
+		end
 	end
 end
 
@@ -10786,6 +10831,7 @@ end
 function PlayerService.Start()
 	S.DataService.Loaded:Connect(onProfileLoaded)
 	Players.PlayerRemoving:Connect(function(player)
+		descriptions[player] = nil
 		states[player] = nil
 		statsCache[player] = nil
 	end)
@@ -16665,7 +16711,7 @@ end
 
 -- Spegne lo script Animate di Roblox: camminata e corsa le facciamo noi
 local function disableDefaultAnimate(character: Model)
-	local animate = character:WaitForChild("Animate", 5)
+	local animate = character:WaitForChild("Animate", 1)
 	if animate and animate:IsA("BaseScript") then
 		animate.Enabled = false
 	end
@@ -16689,6 +16735,10 @@ local function hookCharacter(plr: Player)
 		end
 		task.wait(0.2)
 		local rig = register(character, "Player")
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if plr == player and humanoid and humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+			warn("[Animazioni] Il personaggio non è R15: animazioni e uniforme funzionano solo con R15 (Impostazioni del gioco → Avatar → R15).")
+		end
 		if plr == player then
 			print(if rig then "[Animazioni] Camminata e corsa da battaglia attive" else "[Animazioni] ATTENZIONE: personaggio senza Humanoid, animazioni non attive")
 		end
