@@ -757,8 +757,16 @@ end
 
 -- SCELTA DEL BERSAGLIO E DELL'ATTACCO -------------------------------------------------------
 
-local function isTargetable(t, _entry): boolean
-	return t.Kind ~= "Ally"
+local function isTargetable(t, entry): boolean
+	if t.Kind == "Ally" then
+		return false
+	end
+	-- nelle zone sicure (basi, città, porti) i giganti non attaccano: lì si rinasce
+	local zone = entry.Position and Zones.Find(entry.Position)
+	if zone and zone.Safe then
+		return false
+	end
+	return true
 end
 
 local function chooseTarget(t, roots, now: number)

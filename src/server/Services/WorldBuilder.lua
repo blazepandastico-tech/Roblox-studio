@@ -120,12 +120,19 @@ end
 
 local function buildTerrain()
 	local terrain = workspace.Terrain
-	terrain.Decoration = true
-	terrain.WaterColor = Color3.fromRGB(32, 84, 110)
-	terrain.WaterReflectance = 0.6
-	terrain.WaterTransparency = 0.35
-	terrain.WaterWaveSize = 0.18
-	terrain.WaterWaveSpeed = 9
+	-- aspetto del terreno: ogni proprietà è protetta, alcune versioni di Studio non le permettono tutte
+	for prop, value in {
+		Decoration = true,
+		WaterColor = Color3.fromRGB(32, 84, 110),
+		WaterReflectance = 0.6,
+		WaterTransparency = 0.35,
+		WaterWaveSize = 0.18,
+		WaterWaveSpeed = 9,
+	} :: { [string]: any } do
+		pcall(function()
+			(terrain :: any)[prop] = value
+		end)
+	end
 	pcall(function()
 		terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(96, 140, 72))
 		terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(78, 120, 60))

@@ -13916,8 +13916,16 @@ end
 
 -- SCELTA DEL BERSAGLIO E DELL'ATTACCO -------------------------------------------------------
 
-local function isTargetable(t, _entry): boolean
-	return t.Kind ~= "Ally"
+local function isTargetable(t, entry): boolean
+	if t.Kind == "Ally" then
+		return false
+	end
+	-- nelle zone sicure (basi, città, porti) i giganti non attaccano: lì si rinasce
+	local zone = entry.Position and Zones.Find(entry.Position)
+	if zone and zone.Safe then
+		return false
+	end
+	return true
 end
 
 local function chooseTarget(t, roots, now: number)
@@ -14863,12 +14871,19 @@ end
 
 local function buildTerrain()
 	local terrain = workspace.Terrain
-	terrain.Decoration = true
-	terrain.WaterColor = Color3.fromRGB(32, 84, 110)
-	terrain.WaterReflectance = 0.6
-	terrain.WaterTransparency = 0.35
-	terrain.WaterWaveSize = 0.18
-	terrain.WaterWaveSpeed = 9
+	-- aspetto del terreno: ogni proprietà è protetta, alcune versioni di Studio non le permettono tutte
+	for prop, value in {
+		Decoration = true,
+		WaterColor = Color3.fromRGB(32, 84, 110),
+		WaterReflectance = 0.6,
+		WaterTransparency = 0.35,
+		WaterWaveSize = 0.18,
+		WaterWaveSpeed = 9,
+	} :: { [string]: any } do
+		pcall(function()
+			(terrain :: any)[prop] = value
+		end)
+	end
 	pcall(function()
 		terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(96, 140, 72))
 		terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(78, 120, 60))
