@@ -387,8 +387,9 @@ function T.Locomotion(t, ctx)
 	local lean = -(4 + run * 26) * move
 	return {
 		Root = TA(0, bob, 0, lean, 0, s * (3 + run * 4) * move),
-		Waist = A(breathe + creep * 8, s * 7 * move, 0),
-		Neck = A(-6 * creep + breathe * 0.5, 0, (ctx.HeadTilt or 0)),
+		-- i giganti "curvi" camminano piegati in avanti con la testa sollevata
+		Waist = A(breathe + creep * 8 - (if ctx.Hunch then 22 else 0), s * 7 * move, 0),
+		Neck = A(-6 * creep + breathe * 0.5 + (if ctx.Hunch then 16 else 0), 0, (ctx.HeadTilt or 0)),
 		Jaw = A(4 + (ctx.JawIdle or 0) + abs(sin(t * 0.8)) * 6, 0, 0),
 		RightHip = A(s * hipAmp, 0, 2),
 		LeftHip = A(-s * hipAmp, 0, -2),

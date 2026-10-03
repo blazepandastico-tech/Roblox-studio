@@ -434,8 +434,9 @@ function T.Locomotion(t, ctx)
 	local lean = -(4 + run * 26) * move
 	return {
 		Root = TA(0, bob, 0, lean, 0, s * (3 + run * 4) * move),
-		Waist = A(breathe + creep * 8, s * 7 * move, 0),
-		Neck = A(-6 * creep + breathe * 0.5, 0, (ctx.HeadTilt or 0)),
+		-- i giganti "curvi" camminano piegati in avanti con la testa sollevata
+		Waist = A(breathe + creep * 8 - (if ctx.Hunch then 22 else 0), s * 7 * move, 0),
+		Neck = A(-6 * creep + breathe * 0.5 + (if ctx.Hunch then 16 else 0), 0, (ctx.HeadTilt or 0)),
 		Jaw = A(4 + (ctx.JawIdle or 0) + abs(sin(t * 0.8)) * 6, 0, 0),
 		RightHip = A(s * hipAmp, 0, 2),
 		LeftHip = A(-s * hipAmp, 0, -2),
@@ -1109,15 +1110,26 @@ local function motor(name: string, part0: BasePart, part1: BasePart, c0: CFrame,
 	return m
 end
 
--- Corporature dei giganti puri: umanoidi nudi e grotteschi, ognuno diverso ---------------
--- (forme originali: teste sproporzionate, sorrisi fissi, occhi sbarrati, corpi goffi)
+-- Corporature dei giganti puri, riprese dai giganti dell'immagine di riferimento ----------------
+-- (escluso quello grande e peloso in alto). Ogni gigante puro ne riceve una a caso.
 local ARCHETYPES = {
-	{ Name = "Testone", Weight = 2 },
-	{ Name = "Ghigno", Weight = 3 },
-	{ Name = "Spilungone", Weight = 2 },
-	{ Name = "Panciuto", Weight = 2 },
-	{ Name = "Barbuto", Weight = 1 },
-	{ Name = "Comune", Weight = 3 },
+	{ Name = "Occhione", Weight = 2 }, -- piccolo e tozzo, testa enorme, occhioni azzurri, ghigno di denti, ciuffo
+	{ Name = "Scodella", Weight = 3 }, -- striscia a quattro zampe, frangetta a scodella, denti digrignati
+	{ Name = "Riga", Weight = 3 }, -- alto e normale, capelli corti con la riga, sorrisetto
+	{ Name = "Calvo", Weight = 2 }, -- spilungone calvo e curvo, bocca spalancata
+	{ Name = "Barbuto", Weight = 1 }, -- barba e capelli lunghi chiari
+	{ Name = "Urlatore", Weight = 2 }, -- accucciato, capelli scuri, urla a bocca aperta
+	{ Name = "Cresta", Weight = 2 }, -- bambinone paffuto con la cresta
+	{ Name = "Occhietti", Weight = 2 }, -- calvo, occhi piccoli e denti scoperti, braccia tese
+}
+
+local PURE_SKIN = {
+	Color3.fromRGB(214, 150, 120),
+	Color3.fromRGB(198, 132, 104),
+	Color3.fromRGB(226, 164, 136),
+	Color3.fromRGB(184, 118, 92),
+	Color3.fromRGB(232, 176, 150),
+	Color3.fromRGB(206, 140, 116),
 }
 
 local function applyArchetype(p, rng: Random)
@@ -1126,7 +1138,7 @@ local function applyArchetype(p, rng: Random)
 		total += a.Weight
 	end
 	local roll = rng:NextNumber() * total
-	local kind = "Comune"
+	local kind = ARCHETYPES[#ARCHETYPES].Name
 	for _, a in ARCHETYPES do
 		roll -= a.Weight
 		if roll <= 0 then
@@ -1135,64 +1147,94 @@ local function applyArchetype(p, rng: Random)
 		end
 	end
 	p.Archetype = kind
+	p.Skin = PURE_SKIN[rng:NextInteger(1, #PURE_SKIN)]
 	p.Sockets = true
-	p.Lips = rng:NextNumber() < 0.35
-	if kind == "Testone" then
-		-- testa enorme su un corpo piccolo e tozzo, occhi tondi sbarrati
-		p.HeadMul = rng:NextNumber(1.75, 2.1)
-		p.LegMul = rng:NextNumber(0.55, 0.68)
-		p.ArmMul = rng:NextNumber(0.68, 0.8)
-		p.TorsoMul = rng:NextNumber(0.8, 0.9)
-		p.WidthMul = rng:NextNumber(1.05, 1.2)
-		p.Belly = rng:NextNumber(0.8, 1.2)
-		p.EyeSize = rng:NextNumber(2.0, 2.5)
-		p.Pupil = 0.3
-		p.MouthWidth = rng:NextNumber(0.7, 0.85)
+	p.Lips = false
+	p.Belly = 0
+	if kind == "Occhione" then
+		p.HeadMul = rng:NextNumber(2.0, 2.25)
+		p.LegMul = rng:NextNumber(0.5, 0.6)
+		p.ArmMul = rng:NextNumber(0.62, 0.72)
+		p.TorsoMul = rng:NextNumber(0.75, 0.85)
+		p.WidthMul = rng:NextNumber(1.1, 1.22)
+		p.Belly = rng:NextNumber(1.0, 1.3)
+		p.EyeSize = rng:NextNumber(2.6, 3.0)
+		p.Iris = Color3.fromRGB(90, 150, 210)
+		p.Pupil = 0.22
+		p.MouthWidth = 0.9
 		p.Grin = true
-		p.Lips = false
-		p.HairStyle = if rng:NextNumber() < 0.6 then "Calvo" else "Ciuffo"
-	elseif kind == "Ghigno" then
-		-- magro e scattante, frangetta a scodella e sorriso larghissimo pieno di denti
-		p.HeadMul = rng:NextNumber(1.1, 1.3)
-		p.ThickMul = rng:NextNumber(0.68, 0.82)
-		p.WidthMul = rng:NextNumber(0.82, 0.95)
-		p.ArmMul = rng:NextNumber(1.05, 1.2)
-		p.Belly = 0
-		p.EyeSize = rng:NextNumber(0.8, 1.05)
-		p.MouthWidth = rng:NextNumber(0.88, 1.0)
+		p.BigTeeth = true
+		p.Ears = 1.4
+		p.HairStyle = "Ciuffo"
+		p.Hair = Color3.fromRGB(60, 40, 28)
+		p.Skin = Color3.fromRGB(232, 160, 150)
+	elseif kind == "Scodella" then
+		p.HeadMul = rng:NextNumber(1.15, 1.3)
+		p.ThickMul = rng:NextNumber(0.7, 0.82)
+		p.WidthMul = rng:NextNumber(0.85, 0.95)
+		p.ArmMul = rng:NextNumber(1.1, 1.22)
+		p.EyeSize = rng:NextNumber(0.75, 0.9)
+		p.MouthWidth = rng:NextNumber(0.9, 1.0)
 		p.Grin = true
-		p.Lips = false
 		p.BigTeeth = true
 		p.HairStyle = "Caschetto"
-	elseif kind == "Spilungone" then
-		-- lungo e secco, faccia allungata e occhi piccoli
-		p.LegMul = rng:NextNumber(1.05, 1.18)
-		p.ArmMul = rng:NextNumber(1.1, 1.25)
-		p.ThickMul = rng:NextNumber(0.62, 0.75)
-		p.WidthMul = rng:NextNumber(0.75, 0.88)
-		p.HeadMul = rng:NextNumber(0.95, 1.1)
+		p.Hair = Color3.fromRGB(78, 52, 34)
+		p.Crawl = true
+	elseif kind == "Riga" then
+		p.HeadMul = rng:NextNumber(1.0, 1.1)
+		p.LegMul = rng:NextNumber(0.95, 1.05)
+		p.EyeSize = rng:NextNumber(0.85, 1.0)
+		p.MouthWidth = rng:NextNumber(0.4, 0.5)
+		p.Grin = true
+		p.Lips = true
+		p.HairStyle = "Riga"
+		p.Hair = Color3.fromRGB(40, 30, 24)
+	elseif kind == "Calvo" then
+		p.LegMul = rng:NextNumber(1.05, 1.15)
+		p.ArmMul = rng:NextNumber(1.15, 1.28)
+		p.ThickMul = rng:NextNumber(0.65, 0.75)
+		p.WidthMul = rng:NextNumber(0.78, 0.88)
 		p.LongFace = true
-		p.EyeSize = rng:NextNumber(0.65, 0.85)
-		p.Belly = 0
-		p.HairStyle = if rng:NextNumber() < 0.5 then "Calvo" else "Corto"
-	elseif kind == "Panciuto" then
-		-- grosso, pancia enorme e testa tonda e pelata
-		p.Belly = rng:NextNumber(1.2, 1.6)
-		p.WidthMul = rng:NextNumber(1.15, 1.3)
-		p.ThickMul = rng:NextNumber(1.25, 1.45)
-		p.LegMul = rng:NextNumber(0.72, 0.85)
-		p.HeadMul = rng:NextNumber(1.05, 1.2)
-		p.EyeSize = rng:NextNumber(1.0, 1.3)
-		p.Grin = rng:NextNumber() < 0.7
+		p.EyeSize = rng:NextNumber(0.7, 0.85)
+		p.MouthWidth = 0.6
+		p.Gape = 22
 		p.HairStyle = "Calvo"
+		p.Hunch = true
 	elseif kind == "Barbuto" then
 		p.Beard = true
-		p.HairStyle = if rng:NextNumber() < 0.5 then "Lungo" else "Corto"
-		p.EyeSize = rng:NextNumber(0.9, 1.2)
+		p.HairStyle = "Lungo"
+		p.Hair = Color3.fromRGB(196, 186, 170)
+		p.EyeSize = rng:NextNumber(0.85, 1.0)
+		p.MouthWidth = 0.5
+	elseif kind == "Urlatore" then
+		p.HeadMul = rng:NextNumber(1.05, 1.2)
+		p.EyeSize = rng:NextNumber(0.9, 1.1)
+		p.MouthWidth = 0.7
+		p.Gape = 30
+		p.HairStyle = "Spettinato"
+		p.Hair = Color3.fromRGB(34, 26, 22)
+		p.Hunch = true
+	elseif kind == "Cresta" then
+		p.HeadMul = rng:NextNumber(1.5, 1.7)
+		p.LegMul = rng:NextNumber(0.55, 0.65)
+		p.ArmMul = rng:NextNumber(0.7, 0.8)
+		p.WidthMul = rng:NextNumber(1.1, 1.25)
+		p.ThickMul = rng:NextNumber(1.2, 1.35)
+		p.Belly = rng:NextNumber(1.1, 1.4)
+		p.EyeSize = rng:NextNumber(1.1, 1.3)
+		p.MouthWidth = 0.55
+		p.Grin = true
+		p.HairStyle = "Cresta"
+		p.Hair = Color3.fromRGB(50, 36, 28)
+	else -- Occhietti
+		p.HeadMul = rng:NextNumber(1.1, 1.25)
+		p.EyeSize = rng:NextNumber(0.55, 0.7)
+		p.Pupil = 0.6
+		p.MouthWidth = 0.75
+		p.Grin = true
+		p.BigTeeth = true
+		p.HairStyle = "Calvo"
 	end
-	-- pelle più "carnosa" e leggermente arrossata
-	local tone = p.Skin
-	p.Skin = Color3.new(math.min(1, tone.R * 1.02), tone.G * 0.93, tone.B * 0.88)
 end
 
 -- Profilo dell'aspetto in base al "Look" -----------------------------------------------
@@ -1655,6 +1697,9 @@ function TitanBuilder.Build(params): Model
 		local eye = decor(model, head, name, Vector3.new(eyeSize, eyeSize * 0.85, eyeSize * 0.7), eyeColor, CFrame.new(side * headW * 0.2, headH * 0.08, front + eyeSize * 0.15), { Material = if p.EyeGlow then Enum.Material.Neon else Enum.Material.SmoothPlastic, Query = true, Zone = "Eye" })
 		if not p.EyeGlow then
 			local pupil = eyeSize * (p.Pupil or 0.42)
+			if p.Iris then
+				decor(model, eye, name .. "Iride", Vector3.new(eyeSize * 0.55, eyeSize * 0.55, eyeSize * 0.28), p.Iris, CFrame.new(0, 0, -eyeSize * 0.28))
+			end
 			decor(model, eye, name .. "Pupilla", Vector3.new(pupil, pupil, eyeSize * 0.3), Color3.fromRGB(28, 22, 20), CFrame.new(rng:NextNumber(-0.08, 0.08) * eyeSize, 0, -eyeSize * 0.3))
 		end
 		if p.Sockets then
@@ -1677,7 +1722,7 @@ function TitanBuilder.Build(params): Model
 	-- bocca: interno scuro + denti
 	local mouthW = headW * p.MouthWidth
 	local mouthY = -headH * 0.22
-	decor(model, jaw, "Bocca", Vector3.new(mouthW, headH * 0.16, headD * 0.12), Color3.fromRGB(70, 22, 24), CFrame.new(0, headH * 0.06, -headD * 0.3))
+	decor(model, jaw, "Bocca", Vector3.new(mouthW, headH * (if p.Gape then 0.3 else 0.16), headD * 0.12), Color3.fromRGB(70, 22, 24), CFrame.new(0, headH * (if p.Gape then 0.12 else 0.06), -headD * 0.3))
 	local teeth = Color3.fromRGB(244, 238, 222)
 	decor(model, head, "DentiSu", Vector3.new(mouthW * 0.96, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, mouthY + headH * 0.04, front + headD * 0.03), { Shape = "Block" })
 	decor(model, jaw, "DentiGiu", Vector3.new(mouthW * 0.92, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, headH * 0.1, -headD * 0.33), { Shape = "Block" })
@@ -1724,6 +1769,20 @@ function TitanBuilder.Build(params): Model
 			local s = headW * rng:NextNumber(0.32, 0.45)
 			decor(model, head, "Riccio" .. i, Vector3.new(s, s, s), hair, CFrame.new(rng:NextNumber(-0.32, 0.32) * headW, headH * rng:NextNumber(0.3, 0.45), rng:NextNumber(-0.2, 0.3) * headD), { Shape = "Ball", Material = Enum.Material.Fabric })
 		end
+	elseif style == "Riga" then
+		-- capelli corti con la riga di lato
+		decor(model, head, "Capelli", Vector3.new(headW * 1.07, headH * 0.55, headD * 1.07), hair, CFrame.new(0, headH * 0.28, headD * 0.04))
+		decor(model, head, "Frangia", Vector3.new(headW * 0.7, headH * 0.22, headD * 0.3), hair, CFrame.new(headW * 0.15, headH * 0.36, -headD * 0.38) * CFrame.Angles(0, 0, rad(-12)))
+	elseif style == "Spettinato" then
+		decor(model, head, "Capelli", Vector3.new(headW * 1.1, headH * 0.62, headD * 1.08), hair, CFrame.new(0, headH * 0.27, headD * 0.05))
+		for i = 1, 6 do
+			local s0 = headW * rng:NextNumber(0.22, 0.32)
+			decor(model, head, "Ciocca" .. i, Vector3.new(s0, s0 * 1.6, s0), hair, CFrame.new(rng:NextNumber(-0.45, 0.45) * headW, headH * rng:NextNumber(0.25, 0.5), rng:NextNumber(-0.3, 0.4) * headD) * CFrame.Angles(rad(rng:NextNumber(-40, 40)), 0, rad(rng:NextNumber(-40, 40))))
+		end
+	elseif style == "Cresta" then
+		for i = -2, 2 do
+			decor(model, head, "Cresta" .. i, Vector3.new(headW * 0.14, headH * 0.28, headD * 0.2), hair, CFrame.new(0, headH * 0.46 - math.abs(i) * headH * 0.04, i * headD * 0.17))
+		end
 	elseif style == "Pelo" then
 		decor(model, head, "Criniera", Vector3.new(headW * 1.25, headH * 1.0, headD * 0.9), hair, CFrame.new(0, headH * 0.05, headD * 0.22), { Shape = "Ball", Material = Enum.Material.Fabric })
 	end
@@ -1766,6 +1825,10 @@ function TitanBuilder.Build(params): Model
 	model:SetAttribute("Look", look)
 	model:SetAttribute("Seed", seed)
 	model:SetAttribute("HeadTilt", rng:NextNumber(-12, 12))
+	model:SetAttribute("Archetype", p.Archetype or "")
+	model:SetAttribute("CrawlPreferred", p.Crawl == true)
+	model:SetAttribute("JawIdle", p.Gape or 0)
+	model:SetAttribute("Hunch", p.Hunch == true)
 	return model
 end
 
@@ -13088,7 +13151,7 @@ function TitanService.Spawn(spec)
 	model:SetAttribute("Abnormal", abnormal)
 	model:SetAttribute("Ally", kind == "Ally")
 	model:SetAttribute("Dummy", kind == "Dummy")
-	model:SetAttribute("Crawl", (def.Crawl or def.Quadruped) == true)
+	model:SetAttribute("Crawl", (def.Crawl or def.Quadruped or (kind == "Pure" and model:GetAttribute("CrawlPreferred"))) == true)
 	model:SetAttribute("Armored", t.ArmorMax > 0)
 	setAttr(t, "State", "Idle")
 	setAttr(t, "Action", "")
@@ -20110,6 +20173,8 @@ local function register(model: Model)
 	local ctx = animator.Context
 	ctx.Seed = model:GetAttribute("Seed") or 0
 	ctx.HeadTilt = model:GetAttribute("HeadTilt") or 0
+	ctx.JawIdle = model:GetAttribute("JawIdle") or 0
+	ctx.Hunch = model:GetAttribute("Hunch") == true
 	ctx.Phase = math.random() * 6
 	local look = model:GetAttribute("Look")
 	if model:GetAttribute("Dummy") then

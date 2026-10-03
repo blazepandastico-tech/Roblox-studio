@@ -239,6 +239,8 @@ local function register(model: Model)
 	local ctx = animator.Context
 	ctx.Seed = model:GetAttribute("Seed") or 0
 	ctx.HeadTilt = model:GetAttribute("HeadTilt") or 0
+	ctx.JawIdle = model:GetAttribute("JawIdle") or 0
+	ctx.Hunch = model:GetAttribute("Hunch") == true
 	ctx.Phase = math.random() * 6
 	local look = model:GetAttribute("Look")
 	if model:GetAttribute("Dummy") then
