@@ -305,7 +305,7 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		-- il passo avanza con la velocità (all'indietro il ciclo gira al contrario)
 		local runK = math.clamp((flat - 13) / 6, 0, 1)
 		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
-		ctx.Phase = (ctx.Phase or 0) + dt * flat * (1.05 - 0.4 * runK) * dir
+		ctx.Phase = (ctx.Phase or 0) + dt * flat * (0.95 - 0.3 * runK) * dir
 		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
 	elseif rig.Kind == "NPC" then
 		if localRoot then
@@ -369,7 +369,10 @@ local function hookCharacter(plr: Player)
 			savedWalkSpeed = nil
 		end
 		task.wait(0.2)
-		register(character, "Player")
+		local rig = register(character, "Player")
+		if plr == player then
+			print(if rig then "[Animazioni] Camminata e corsa da battaglia attive" else "[Animazioni] ATTENZIONE: personaggio senza Humanoid, animazioni non attive")
+		end
 	end
 	if plr.Character then
 		task.spawn(onCharacter, plr.Character)

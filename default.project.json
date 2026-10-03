@@ -2,21 +2,18 @@
   "name": "SieriPerduti",
   "tree": {
     "$className": "DataModel",
-
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
       "Shared": {
         "$path": "src/shared"
       }
     },
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "Server": {
         "$path": "src/server"
       }
     },
-
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "$properties": {
@@ -35,10 +32,10 @@
         }
       },
       "StarterCharacterScripts": {
-        "$className": "StarterCharacterScripts"
+        "$className": "StarterCharacterScripts",
+        "$path": "src/character"
       }
     },
-
     "Players": {
       "$className": "Players",
       "$properties": {
@@ -46,7 +43,6 @@
         "RespawnTime": 4
       }
     },
-
     "Lighting": {
       "$className": "Lighting",
       "$properties": {
@@ -58,12 +54,19 @@
         "ShadowSoftness": 0.25,
         "EnvironmentDiffuseScale": 1,
         "EnvironmentSpecularScale": 1,
-        "Ambient": [0.27, 0.25, 0.23],
-        "OutdoorAmbient": [0.52, 0.5, 0.47],
+        "Ambient": [
+          0.27,
+          0.25,
+          0.23
+        ],
+        "OutdoorAmbient": [
+          0.52,
+          0.5,
+          0.47
+        ],
         "ExposureCompensation": 0.1
       }
     },
-
     "Workspace": {
       "$className": "Workspace",
       "$properties": {
@@ -72,14 +75,12 @@
         "Gravity": 196.2
       }
     },
-
     "SoundService": {
       "$className": "SoundService",
       "$properties": {
         "RespectFilteringEnabled": true
       }
     },
-
     "StarterGui": {
       "$className": "StarterGui",
       "$properties": {

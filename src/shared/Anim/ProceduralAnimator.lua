@@ -220,6 +220,11 @@ function Animator:Step(dt: number)
 		end
 		if layer.Weight > 0.001 then
 			local ok, pose = pcall(layer.Fn, self.Time, self.Context, dt)
+			if not ok and not layer.Warned then
+				-- segnala l'errore una sola volta nella finestra Output
+				layer.Warned = true
+				warn(("[Animazioni] Errore nel layer '%s' di %s: %s"):format(layer.Name, self.Model.Name, tostring(pose)))
+			end
 			if ok and pose then
 				local w = layer.Weight
 				for joint, cf in pose do
