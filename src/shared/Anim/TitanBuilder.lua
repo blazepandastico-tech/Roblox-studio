@@ -105,6 +105,92 @@ local function motor(name: string, part0: BasePart, part1: BasePart, c0: CFrame,
 	return m
 end
 
+-- Corporature dei giganti puri: umanoidi nudi e grotteschi, ognuno diverso ---------------
+-- (forme originali: teste sproporzionate, sorrisi fissi, occhi sbarrati, corpi goffi)
+local ARCHETYPES = {
+	{ Name = "Testone", Weight = 2 },
+	{ Name = "Ghigno", Weight = 3 },
+	{ Name = "Spilungone", Weight = 2 },
+	{ Name = "Panciuto", Weight = 2 },
+	{ Name = "Barbuto", Weight = 1 },
+	{ Name = "Comune", Weight = 3 },
+}
+
+local function applyArchetype(p, rng: Random)
+	local total = 0
+	for _, a in ARCHETYPES do
+		total += a.Weight
+	end
+	local roll = rng:NextNumber() * total
+	local kind = "Comune"
+	for _, a in ARCHETYPES do
+		roll -= a.Weight
+		if roll <= 0 then
+			kind = a.Name
+			break
+		end
+	end
+	p.Archetype = kind
+	p.Sockets = true
+	p.Lips = rng:NextNumber() < 0.35
+	if kind == "Testone" then
+		-- testa enorme su un corpo piccolo e tozzo, occhi tondi sbarrati
+		p.HeadMul = rng:NextNumber(1.75, 2.1)
+		p.LegMul = rng:NextNumber(0.55, 0.68)
+		p.ArmMul = rng:NextNumber(0.68, 0.8)
+		p.TorsoMul = rng:NextNumber(0.8, 0.9)
+		p.WidthMul = rng:NextNumber(1.05, 1.2)
+		p.Belly = rng:NextNumber(0.8, 1.2)
+		p.EyeSize = rng:NextNumber(2.0, 2.5)
+		p.Pupil = 0.3
+		p.MouthWidth = rng:NextNumber(0.7, 0.85)
+		p.Grin = true
+		p.Lips = false
+		p.HairStyle = if rng:NextNumber() < 0.6 then "Calvo" else "Ciuffo"
+	elseif kind == "Ghigno" then
+		-- magro e scattante, frangetta a scodella e sorriso larghissimo pieno di denti
+		p.HeadMul = rng:NextNumber(1.1, 1.3)
+		p.ThickMul = rng:NextNumber(0.68, 0.82)
+		p.WidthMul = rng:NextNumber(0.82, 0.95)
+		p.ArmMul = rng:NextNumber(1.05, 1.2)
+		p.Belly = 0
+		p.EyeSize = rng:NextNumber(0.8, 1.05)
+		p.MouthWidth = rng:NextNumber(0.88, 1.0)
+		p.Grin = true
+		p.Lips = false
+		p.BigTeeth = true
+		p.HairStyle = "Caschetto"
+	elseif kind == "Spilungone" then
+		-- lungo e secco, faccia allungata e occhi piccoli
+		p.LegMul = rng:NextNumber(1.05, 1.18)
+		p.ArmMul = rng:NextNumber(1.1, 1.25)
+		p.ThickMul = rng:NextNumber(0.62, 0.75)
+		p.WidthMul = rng:NextNumber(0.75, 0.88)
+		p.HeadMul = rng:NextNumber(0.95, 1.1)
+		p.LongFace = true
+		p.EyeSize = rng:NextNumber(0.65, 0.85)
+		p.Belly = 0
+		p.HairStyle = if rng:NextNumber() < 0.5 then "Calvo" else "Corto"
+	elseif kind == "Panciuto" then
+		-- grosso, pancia enorme e testa tonda e pelata
+		p.Belly = rng:NextNumber(1.2, 1.6)
+		p.WidthMul = rng:NextNumber(1.15, 1.3)
+		p.ThickMul = rng:NextNumber(1.25, 1.45)
+		p.LegMul = rng:NextNumber(0.72, 0.85)
+		p.HeadMul = rng:NextNumber(1.05, 1.2)
+		p.EyeSize = rng:NextNumber(1.0, 1.3)
+		p.Grin = rng:NextNumber() < 0.7
+		p.HairStyle = "Calvo"
+	elseif kind == "Barbuto" then
+		p.Beard = true
+		p.HairStyle = if rng:NextNumber() < 0.5 then "Lungo" else "Corto"
+		p.EyeSize = rng:NextNumber(0.9, 1.2)
+	end
+	-- pelle più "carnosa" e leggermente arrossata
+	local tone = p.Skin
+	p.Skin = Color3.new(math.min(1, tone.R * 1.02), tone.G * 0.93, tone.B * 0.88)
+end
+
 -- Profilo dell'aspetto in base al "Look" -----------------------------------------------
 
 local function makeProfile(look: string, rng: Random)
@@ -267,6 +353,9 @@ local function makeProfile(look: string, rng: Random)
 		p.Crystal = true
 		p.EyeGlow = Color3.fromRGB(140, 230, 255)
 	end
+	if look == "Puro" or look == "Cristallo" then
+		applyArchetype(p, rng)
+	end
 	return p
 end
 
@@ -336,8 +425,8 @@ function TitanBuilder.Build(params): Model
 	local torsoH = 0.3 * H * p.TorsoMul
 	local torsoW = 0.33 * H * p.WidthMul
 	local torsoD = 0.2 * H * p.WidthMul
-	local headH = 0.17 * H * p.HeadMul
-	local headW = headH * 0.86
+	local headH = 0.17 * H * p.HeadMul * (if p.LongFace then 1.15 else 1)
+	local headW = headH * (if p.LongFace then 0.72 else 0.86)
 	local headD = headH * 0.95
 	local armLen = 0.43 * H * p.ArmMul
 	local upperArm = armLen * 0.46
@@ -561,7 +650,12 @@ function TitanBuilder.Build(params): Model
 		local name = if side < 0 then "LeftEye" else "RightEye"
 		local eye = decor(model, head, name, Vector3.new(eyeSize, eyeSize * 0.85, eyeSize * 0.7), eyeColor, CFrame.new(side * headW * 0.2, headH * 0.08, front + eyeSize * 0.15), { Material = if p.EyeGlow then Enum.Material.Neon else Enum.Material.SmoothPlastic, Query = true, Zone = "Eye" })
 		if not p.EyeGlow then
-			decor(model, eye, name .. "Pupilla", Vector3.new(eyeSize * 0.42, eyeSize * 0.42, eyeSize * 0.3), Color3.fromRGB(28, 22, 20), CFrame.new(rng:NextNumber(-0.08, 0.08) * eyeSize, 0, -eyeSize * 0.3))
+			local pupil = eyeSize * (p.Pupil or 0.42)
+			decor(model, eye, name .. "Pupilla", Vector3.new(pupil, pupil, eyeSize * 0.3), Color3.fromRGB(28, 22, 20), CFrame.new(rng:NextNumber(-0.08, 0.08) * eyeSize, 0, -eyeSize * 0.3))
+		end
+		if p.Sockets then
+			-- occhiaie scure: lo sguardo vuoto e inquietante dei giganti
+			decor(model, head, name .. "Occhiaia", Vector3.new(eyeSize * 1.35, eyeSize * 1.2, eyeSize * 0.45), darker(skin, 0.72), CFrame.new(side * headW * 0.2, headH * 0.06, front + eyeSize * 0.05))
 		end
 		decor(model, head, name .. "Sopracciglio", Vector3.new(eyeSize * 1.3, eyeSize * 0.22, eyeSize * 0.4), darker(p.Hair, 0.9), CFrame.new(side * headW * 0.2, headH * 0.08 + eyeSize * 0.62, front + eyeSize * 0.05) * CFrame.Angles(0, 0, rad(side * rng:NextNumber(-12, 18))))
 		-- orecchie
@@ -583,6 +677,17 @@ function TitanBuilder.Build(params): Model
 	local teeth = Color3.fromRGB(244, 238, 222)
 	decor(model, head, "DentiSu", Vector3.new(mouthW * 0.96, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, mouthY + headH * 0.04, front + headD * 0.03), { Shape = "Block" })
 	decor(model, jaw, "DentiGiu", Vector3.new(mouthW * 0.92, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, headH * 0.1, -headD * 0.33), { Shape = "Block" })
+	if p.BigTeeth then
+		-- fila di denti squadrati ben visibili
+		local n = 7
+		for i = 1, n do
+			local x = (i - (n + 1) / 2) * mouthW / n
+			decor(model, head, "Dente" .. i, Vector3.new(mouthW / n * 0.85, headH * 0.11, headD * 0.06), teeth, CFrame.new(x, mouthY + headH * 0.02, front + headD * 0.01), { Shape = "Block" })
+		end
+	end
+	if p.Beard then
+		decor(model, jaw, "Barba", Vector3.new(headW * 0.85, headH * 0.55, headD * 0.6), darker(p.Hair, 0.95), CFrame.new(0, -headH * 0.12, -headD * 0.18), { Shape = "Ball", Material = Enum.Material.Fabric })
+	end
 	if p.Lips then
 		decor(model, head, "Labbro", Vector3.new(mouthW * 1.05, headH * 0.05, headD * 0.08), darker(skin, 0.8), CFrame.new(0, mouthY + headH * 0.085, front + headD * 0.02))
 	end
