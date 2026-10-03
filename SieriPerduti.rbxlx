@@ -875,11 +875,12 @@ return Poses
 	- "Layer": pose continue calcolate da una funzione (camminata, volo coi Rampini...)
 	- "Clip":  animazioni a fotogrammi chiave (fendenti, schivate, attacchi dei giganti)
 
-	Modalità:
-	  Absolute = false  (personaggi R15): la posa si SOMMA alle animazioni di Roblox
-	  Absolute = true   (giganti): la posa sostituisce completamente il Transform
+	La posa viene applicata modificando Motor6D.C0 (posa di riposo * posa calcolata):
+	così è sempre visibile, qualunque cosa faccia il sistema di animazione di Roblox
+	(che scrive solo Motor6D.Transform). La posa di riposo di ogni articolazione viene
+	memorizzata la prima volta e ripristinata quando l'animatore viene distrutto.
 
-	Va chiamato in RunService.PreSimulation (dopo che Roblox ha aggiornato le sue animazioni).
+	Va chiamato ogni frame (RunService.PreSimulation).
 ]]
 
 local Util = require(script.Parent.Parent.Lib.Util)
@@ -896,8 +897,7 @@ function Animator.new(model: Model, absolute: boolean?)
 	self.Model = model
 	self.Absolute = absolute == true
 	self.Motors = {} :: { [string]: Motor6D }
-	self.LastWritten = {} :: { [Motor6D]: CFrame }
-	self.LastBase = {} :: { [Motor6D]: CFrame }
+	self.BaseC0 = {} :: { [Motor6D]: CFrame }
 	self.Layers = {} -- array ordinato
 	self.Clips = {} -- clip attive
 	self.Time = 0
@@ -914,6 +914,14 @@ function Animator:Refresh()
 	for _, d in self.Model:GetDescendants() do
 		if d:IsA("Motor6D") and self.Motors[d.Name] == nil then
 			self.Motors[d.Name] = d
+			if self.BaseC0[d] == nil then
+				self.BaseC0[d] = d.C0
+			end
+		end
+	end
+	for motor in self.BaseC0 do
+		if not motor.Parent then
+			self.BaseC0[motor] = nil
 		end
 	end
 end
@@ -1169,28 +1177,15 @@ end
 function Animator:Apply()
 	local result = self.Result
 	for name, motor in self.Motors do
+		local base = self.BaseC0[motor]
+		if base == nil then
+			base = motor.C0
+			self.BaseC0[motor] = base
+		end
 		local offset = result[name]
-		if self.Absolute then
-			motor.Transform = offset or IDENTITY
-		else
-			local current = motor.Transform
-			local last = self.LastWritten[motor]
-			local base = current
-			if last and current == last then
-				base = self.LastBase[motor] or IDENTITY
-			end
-			if offset then
-				local written = base * offset
-				motor.Transform = written
-				self.LastWritten[motor] = written
-				self.LastBase[motor] = base
-			elseif last then
-				if current == last then
-					motor.Transform = base
-				end
-				self.LastWritten[motor] = nil
-				self.LastBase[motor] = nil
-			end
+		local target = if offset then base * offset else base
+		if motor.C0 ~= target then
+			motor.C0 = target
 		end
 	end
 end
@@ -1203,15 +1198,12 @@ end
 function Animator:Destroy()
 	table.clear(self.Clips)
 	table.clear(self.Layers)
-	if not self.Absolute then
-		for motor, base in self.LastBase do
-			if motor.Parent then
-				motor.Transform = base
-			end
+	for motor, base in self.BaseC0 do
+		if motor.Parent then
+			motor.C0 = base
 		end
 	end
-	table.clear(self.LastWritten)
-	table.clear(self.LastBase)
+	table.clear(self.BaseC0)
 end
 
 return Animator
