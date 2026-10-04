@@ -110,8 +110,10 @@ end
 --   fermo  = guardia con le ginocchia piegate e le lame pronte
 --   cammina = passo tattico, basso e corto, lame in avanti
 --   corre   = corsa d'assalto piegato in avanti con le lame portate indietro
---   in aria = gambe raccolte e braccia aperte per l'equilibrio
--- ctx: Flat (velocità orizzontale), Phase (ciclo del passo), Air (0..1), Blades (bool)
+--   salto   = ginocchio alto e braccia slanciate
+--   caduta  = braccia alzate che si agitano, gambe a penzoloni (più agitate se la caduta è lunga)
+-- ctx: Flat (velocità orizzontale), Phase (ciclo del passo), Air (0..1), VY (velocità verticale),
+--      FallT (secondi di caduta), Land (0..1 atterraggio), Blades (bool)
 
 -- angoli: { X, Y, Z } in gradi; Root può avere anche la quota (P)
 local function lerpN(a: number, b: number, k: number): number
@@ -233,22 +235,55 @@ local function runPose(p: number, blades: boolean)
 	return pose
 end
 
-local function airPose(t: number, blades: boolean)
-	local f = sin(t * 6) * 3
+-- SALTO (in salita): un ginocchio alto, l'altra gamba distesa sotto, braccia slanciate verso l'alto
+local function jumpPose(t: number, blades: boolean)
+	local f = sin(t * 5) * 3
 	return {
-		Root = { -10, 0, 0, 0 },
-		Waist = { -4, 0, 0 },
-		Neck = { 8, 0, 0 },
-		RightHip = { 45 + f, 0, 6 },
-		LeftHip = { 25 - f, 0, -6 },
-		RightKnee = { -70, 0, 0 },
-		LeftKnee = { -40, 0, 0 },
-		RightAnkle = { 15, 0, 0 },
-		LeftAnkle = { 10, 0, 0 },
-		RightShoulder = { if blades then 20 else 40, 0, 55 + f },
-		RightElbow = { 30, 0, 0 },
-		LeftShoulder = { if blades then 20 else 40, 0, -55 - f },
+		Root = { -6, 0, 0, 0 },
+		Waist = { -8, 6, 0 },
+		Neck = { 10, -4, 0 },
+		RightHip = { 75 + f, 0, 8 },
+		RightKnee = { -100, 0, 0 },
+		RightAnkle = { 25, 0, 0 },
+		LeftHip = { -12 - f, 0, -6 },
+		LeftKnee = { -38, 0, 0 },
+		LeftAnkle = { 30, 0, 0 },
+		RightShoulder = { if blades then 55 else 75, 0, 38 + f },
+		RightElbow = { 40, 0, 0 },
+		RightWrist = { 10, 0, 0 },
+		LeftShoulder = { if blades then -25 else -35, 0, -42 - f },
 		LeftElbow = { 30, 0, 0 },
+		LeftWrist = { 10, 0, 0 },
+	}
+end
+
+-- CADUTA (in discesa): busto all'indietro, braccia ALZATE e larghe che si agitano per l'equilibrio,
+-- gambe a penzoloni che scalciano; più dura la caduta, più i movimenti diventano ampi e disperati
+local function fallPose(t: number, blades: boolean, panic: number)
+	local w = t * (6 + 7 * panic)
+	local a = sin(w)
+	local b = sin(w * 1.35 + 1.2)
+	local c = cos(w)
+	local wide = 0.35 + 0.65 * panic
+	local arm = if blades then 0.8 else 1
+	return {
+		Root = { 12 + 8 * panic, sin(t * 1.9) * 6 * panic, sin(t * 2.6) * 5 * panic, 0 },
+		Waist = { 8 + 4 * panic, a * 5 * panic, b * 4 * panic },
+		Neck = { -20 - 6 * panic, b * 6 * panic, 0 },
+		-- braccia: alte e aperte, mulinello quando la caduta si fa lunga
+		RightShoulder = { (115 + a * 40 * wide) * arm, c * 18 * panic, 55 + b * 22 * wide },
+		RightElbow = { 30 + (b + 1) * 18 * wide, 0, 0 },
+		RightWrist = { a * 15, 0, 0 },
+		LeftShoulder = { (115 - a * 40 * wide) * arm, -c * 18 * panic, -55 - b * 22 * wide },
+		LeftElbow = { 30 + (1 - b) * 18 * wide, 0, 0 },
+		LeftWrist = { -a * 15, 0, 0 },
+		-- gambe: penzolano e pedalano nel vuoto
+		RightHip = { 22 + a * 28 * wide, 0, 12 + panic * 8 },
+		RightKnee = { -35 - math.max(0, a) * 55 * wide, 0, 0 },
+		RightAnkle = { -15 + a * 10, 0, 0 },
+		LeftHip = { 2 - a * 28 * wide, 0, -12 - panic * 8 },
+		LeftKnee = { -20 - math.max(0, -a) * 55 * wide, 0, 0 },
+		LeftAnkle = { -15 - a * 10, 0, 0 },
 	}
 end
 
@@ -304,8 +339,14 @@ function Poses.Human.BattleLoco(t, ctx)
 		pose.LeftAnkle[1] += land * 15
 	end
 
-	-- ARIA: gambe raccolte, braccia larghe
-	pose = blendPose(pose, airPose(t, blades), math.clamp(ctx.Air or 0, 0, 1))
+	-- ARIA: in salita ginocchio alto e braccia slanciate, in discesa braccia alzate che si agitano
+	local air = math.clamp(ctx.Air or 0, 0, 1)
+	if air > 0 then
+		local falling = math.clamp((-(ctx.VY or 0) - 4) / 22, 0, 1)
+		local panic = math.clamp((ctx.FallT or 0) / 1.1, 0, 1)
+		local airP = blendPose(jumpPose(t, blades), fallPose(t, blades, panic), falling)
+		pose = blendPose(pose, airP, air)
+	end
 
 	local out = {}
 	for joint, v in pose do

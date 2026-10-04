@@ -183,6 +183,9 @@ function AnimationController.Play(model: Model?, clipName: string, speed: number
 		return
 	end
 	local s = speed or 1
+	if clipName == "LandRoll" then
+		rig.LastRoll = os.clock()
+	end
 	if not playUploaded(model, clipName, s) then
 		local clip = Poses.Human.Clips[clipName]
 		if clip then
@@ -213,12 +216,14 @@ function AnimationController.Freeze(model: Model?, duration: number)
 end
 
 -- Stato dei Rampini di un personaggio (dal controller dei Rampini o dagli altri giocatori)
-function AnimationController.SetFlightState(model: Model?, flying: boolean, hanging: boolean?, side: number?)
+-- propelled = agganciato a un rampino o spinto dal gas (altrimenti in volo si sta solo cadendo)
+function AnimationController.SetFlightState(model: Model?, flying: boolean, hanging: boolean?, side: number?, propelled: boolean?)
 	local rig = model and rigs[model]
 	if not rig then
 		return
 	end
 	rig.Flying = flying
+	rig.Propelled = if propelled == nil then flying else propelled
 	rig.Hanging = hanging == true
 	rig.Animator.Context.HangSide = side or 1
 end
@@ -247,6 +252,11 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 			end
 		end
 		local flying = rig.Flying == true and not transformed
+		-- in volo ma senza rampini né gas e in discesa: è una caduta, non un volo
+		local dropping = flying and not rig.Propelled and not rig.Hanging and velocity.Y < -16
+		if dropping then
+			flying = false
+		end
 		if flying and speed > 1 then
 			local dir = velocity.Unit
 			local relative = root.CFrame:VectorToObjectSpace(dir)
@@ -266,9 +276,19 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 			humanoid.WalkSpeed = 9
 		end
 		local hstate = humanoid:GetState()
-		local airborne = hstate == Enum.HumanoidStateType.Freefall or hstate == Enum.HumanoidStateType.Jumping
+		local airborne = hstate == Enum.HumanoidStateType.Freefall
+			or hstate == Enum.HumanoidStateType.Jumping
+			or dropping
+			-- stati senza fisica del passo (es. dopo il volo) ma chiaramente in caduta
+			or (velocity.Y < -14 and (hstate == Enum.HumanoidStateType.PlatformStanding or hstate == Enum.HumanoidStateType.Physics or hstate == Enum.HumanoidStateType.FallingDown))
 		local k = math.min(1, dt * 10)
 		ctx.Air = (ctx.Air or 0) + ((if airborne then 1 else 0) - (ctx.Air or 0)) * k
+		ctx.VY = (ctx.VY or 0) + (velocity.Y - (ctx.VY or 0)) * math.min(1, dt * 12)
+		if airborne and velocity.Y < -6 then
+			ctx.FallT = (ctx.FallT or 0) + dt
+		elseif not airborne or velocity.Y > 4 then
+			ctx.FallT = 0
+		end
 		if not airborne then
 			ctx.Flat = (ctx.Flat or 0) + (flat - (ctx.Flat or 0)) * k
 		end
@@ -292,12 +312,23 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		ctx.Turn = (ctx.Turn or 0) + (turnRate - (ctx.Turn or 0)) * math.min(1, dt * 6)
 		-- atterraggio: più forte è la caduta, più ci si piega
 		if rig.WasAir and not airborne and (rig.FallSpeed or 0) > 28 then
-			ctx.Land = math.clamp((rig.FallSpeed or 0) / 90, 0.3, 1)
+			local fall = rig.FallSpeed or 0
+			ctx.Land = math.clamp(fall / 90, 0.3, 1)
+			-- caduta altissima: per un attimo resta accucciato a terra
+			rig.LandHold = if fall > 75 then os.clock() + 0.28 else 0
 			if model == player.Character and C and C.CameraController then
 				C.CameraController.Land(ctx.Land)
 			end
+			-- caduta forte mentre si corre: capriola in avanti per assorbire l'urto
+			local now = os.clock()
+			if fall > 70 and flat > 14 and now - (rig.LastRoll or 0) > 0.8 then
+				-- ogni client lo calcola da sé per tutti i giocatori: niente ritrasmissione
+				AnimationController.Play(model, "LandRoll", 1, true)
+			end
 		end
-		ctx.Land = math.max(0, (ctx.Land or 0) - dt * 2.8)
+		if os.clock() > (rig.LandHold or 0) then
+			ctx.Land = math.max(0, (ctx.Land or 0) - dt * 2.8)
+		end
 		rig.WasAir = airborne
 		if airborne then
 			rig.FallSpeed = math.max(0, -velocity.Y)

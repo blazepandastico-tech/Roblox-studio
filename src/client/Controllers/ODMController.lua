@@ -600,7 +600,7 @@ local function physics(dt: number)
 		end
 		if C.AnimationController then
 			local hangSide = if hooks.Right then 1 else -1
-			C.AnimationController.SetFlightState(character(), true, hanging, hangSide)
+			C.AnimationController.SetFlightState(character(), true, hanging, hangSide, #attached > 0 or (boostHeld and gas > 0))
 		end
 
 		-- atterraggio
@@ -717,7 +717,7 @@ local function updateRemoteFlight()
 			local attached = next(info.Hooks) ~= nil
 			local isFlying = attached or (now - info.LastRelease < 1.2 and speed > 25)
 			if C.AnimationController then
-				C.AnimationController.SetFlightState(model, isFlying)
+				C.AnimationController.SetFlightState(model, isFlying, nil, nil, attached)
 			end
 		end
 	end

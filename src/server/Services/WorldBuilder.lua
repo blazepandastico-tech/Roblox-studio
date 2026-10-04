@@ -71,12 +71,15 @@ end
 
 local function part(props: { [string]: any }): Part
 	local p = Instance.new("Part")
+	if props.Shape then
+		p.Shape = props.Shape
+	end
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.CastShadow = true
 	for k, v in props do
-		if k ~= "Parent" then
+		if k ~= "Parent" and k ~= "Shape" then
 			(p :: any)[k] = v
 		end
 	end
@@ -333,31 +336,241 @@ local function angleInGate(angleDeg: number, gates: { number }, halfWidthDeg: nu
 	return false
 end
 
-local function wallSegment(center: Vector3, faceTowards: Vector3, length: number, height: number, thickness: number, battlements: boolean)
-	local pos = Vector3.new(center.X, G + height / 2, center.Z)
-	local cf = CFrame.lookAt(pos, Vector3.new(faceTowards.X, pos.Y, faceTowards.Z))
-	part({ Name = "Muro", Size = Vector3.new(length, height, thickness), CFrame = cf, Material = Enum.Material.Concrete, Color = PALETTE.Wall })
-	part({ Name = "Base", Size = Vector3.new(length + 0.2, 26, thickness + 3), CFrame = cf * CFrame.new(0, -height / 2 + 13, 0), Material = Enum.Material.Cobblestone, Color = PALETTE.WallDark, CastShadow = false })
-	part({ Name = "Camminamento", Size = Vector3.new(length + 0.2, 3, thickness + 2), CFrame = cf * CFrame.new(0, height / 2 + 1.5, 0), Material = Enum.Material.Slate, Color = Color3.fromRGB(120, 116, 108) })
-	if battlements then
-		for i = -1, 1, 2 do
-			part({ Name = "Merlo", Size = Vector3.new(length * 0.22, 6, 3), CFrame = cf * CFrame.new(i * length * 0.25, height / 2 + 6, thickness / 2), Material = Enum.Material.Concrete, Color = PALETTE.Wall, CastShadow = false })
-		end
+-- Le mura sono fatte di enormi blocchi di pietra chiara: zoccolo a scarpa sporco di terra,
+-- corsi orizzontali che segnano i blocchi, lesene sui giunti, camminamento con parapetto
+-- merlato, binari e cannoni in cima, torri di guardia e grandi porte con stendardi.
+local WALL_STONE = {
+	Color3.fromRGB(202, 194, 176),
+	Color3.fromRGB(193, 186, 169),
+	Color3.fromRGB(208, 200, 184),
+	Color3.fromRGB(187, 179, 161),
+}
+local WALL_COURSE = Color3.fromRGB(156, 148, 132)
+local WALL_DIRT = Color3.fromRGB(112, 106, 90)
+local WALL_TOP = Color3.fromRGB(124, 120, 112)
+local IRON = Color3.fromRGB(52, 50, 50)
+local BANNER = {
+	Vermiglia = Color3.fromRGB(142, 30, 34),
+	Aurea = Color3.fromRGB(190, 146, 46),
+	Cenere = Color3.fromRGB(68, 64, 62),
+}
+
+local function tint(c: Color3, f: number): Color3
+	return Color3.new(math.clamp(c.R * f, 0, 1), math.clamp(c.G * f, 0, 1), math.clamp(c.B * f, 0, 1))
+end
+
+-- Cannone su affusto di legno: cf a livello del camminamento, la canna punta verso +Z (fuori)
+local function cannon(cf: CFrame)
+	part({ Name = "Affusto", Size = Vector3.new(3.6, 1.6, 6), CFrame = cf * CFrame.new(0, 1.6, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(92, 64, 42) })
+	for _, s in { -1, 1 } do
+		part({ Name = "Ruota", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 3.2, 3.2), CFrame = cf * CFrame.new(s * 2.2, 1.6, 1), Material = Enum.Material.Wood, Color = Color3.fromRGB(66, 46, 30), CastShadow = false })
+	end
+	part({ Name = "Cannone", Shape = Enum.PartType.Cylinder, Size = Vector3.new(8.5, 1.9, 1.9), CFrame = cf * CFrame.new(0, 3.3, 2.2) * CFrame.Angles(0, math.pi / 2, 0) * CFrame.Angles(0, 0, math.rad(5)), Material = Enum.Material.Metal, Color = Color3.fromRGB(44, 44, 48) })
+	part({ Name = "Culatta", Shape = Enum.PartType.Ball, Size = Vector3.new(2.4, 2.4, 2.4), CFrame = cf * CFrame.new(0, 3.1, -2), Material = Enum.Material.Metal, Color = Color3.fromRGB(44, 44, 48), CastShadow = false })
+	-- palle di cannone accatastate
+	for i = 0, 2 do
+		part({ Name = "Palla", Shape = Enum.PartType.Ball, Size = Vector3.new(1.3, 1.3, 1.3), CFrame = cf * CFrame.new(3.6 + i * 1.3, 0.65, -2), Material = Enum.Material.Metal, Color = IRON, CastShadow = false, CanCollide = false })
 	end
 end
 
-local function buildGate(center: Vector3, outward: Vector3, height: number, thickness: number, kind: string)
+-- Torcia a muro (fuoco e luce calda)
+local function torch(cf: CFrame)
+	part({ Name = "Torcia", Size = Vector3.new(0.6, 3, 0.6), CFrame = cf * CFrame.Angles(math.rad(-20), 0, 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(60, 40, 26), CastShadow = false, CanCollide = false })
+	local flame = part({ Name = "Fiamma", Size = Vector3.new(0.8, 0.8, 0.8), CFrame = cf * CFrame.new(0, 1.7, 0.6), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 160, 70), Transparency = 0.2, CastShadow = false, CanCollide = false })
+	local fire = Instance.new("Fire")
+	fire.Size = 3
+	fire.Heat = 6
+	fire.Color = Color3.fromRGB(255, 150, 60)
+	fire.SecondaryColor = Color3.fromRGB(255, 70, 20)
+	fire.Parent = flame
+	local light = Instance.new("PointLight")
+	light.Range = 22
+	light.Brightness = 1.8
+	light.Color = Color3.fromRGB(255, 170, 90)
+	light.Shadows = false
+	light.Parent = flame
+	CollectionService:AddTag(flame, Config.Tags.Lamp)
+end
+
+-- Bandiera su asta (in cima a torri e porte)
+local function flag(base: CFrame, poleH: number, color: Color3)
+	part({ Name = "Asta", Size = Vector3.new(0.5, poleH, 0.5), CFrame = base * CFrame.new(0, poleH / 2, 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(70, 50, 34), CastShadow = false })
+	part({ Name = "Bandiera", Size = Vector3.new(0.15, 5, 8), CFrame = base * CFrame.new(0, poleH - 3, 4.2), Material = Enum.Material.Fabric, Color = color, CastShadow = false, CanCollide = false })
+end
+
+-- Stemma: anello di pietra, disco colorato e una spada d'argento (disegno originale)
+local function emblem(cf: CFrame, diameter: number, color: Color3)
+	local face = cf * CFrame.Angles(0, math.pi / 2, 0) -- l'asse del cilindro guarda verso +Z
+	part({ Name = "Stemma", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, diameter, diameter), CFrame = face, Material = Enum.Material.Limestone, Color = Color3.fromRGB(176, 168, 150), CastShadow = false })
+	part({ Name = "StemmaColore", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.4, diameter * 0.78, diameter * 0.78), CFrame = face, Material = Enum.Material.SmoothPlastic, Color = color, CastShadow = false })
+	part({ Name = "StemmaSpada", Size = Vector3.new(diameter * 0.09, diameter * 0.62, 0.6), CFrame = cf * CFrame.new(0, -diameter * 0.04, 0.9), Material = Enum.Material.Metal, Color = Color3.fromRGB(214, 214, 220), CastShadow = false })
+	part({ Name = "StemmaElsa", Size = Vector3.new(diameter * 0.34, diameter * 0.07, 0.6), CFrame = cf * CFrame.new(0, diameter * 0.16, 0.95), Material = Enum.Material.Metal, Color = Color3.fromRGB(222, 182, 82), CastShadow = false })
+end
+
+-- Tratto di muro. -Z locale = verso l'interno, +Z = faccia esterna
+local function wallSegment(center: Vector3, faceTowards: Vector3, length: number, height: number, thickness: number, opts: { [string]: any }?)
+	local o = opts or {}
+	local ruined = o.Ruined == true
+	local pos = Vector3.new(center.X, G + height / 2, center.Z)
+	local cf = CFrame.lookAt(pos, Vector3.new(faceTowards.X, pos.Y, faceTowards.Z))
+	local stone = pick(WALL_STONE)
+	if ruined then
+		stone = tint(stone, 0.8)
+	end
+	local half = height / 2
+	part({ Name = "Muro", Size = Vector3.new(length, height, thickness), CFrame = cf, Material = Enum.Material.Limestone, Color = stone })
+
+	-- zoccolo a scarpa (più largo alla base) e terra/muschio che risale la pietra
+	local talusH = math.min(34, height * 0.24)
+	local talusD = 7
+	wedge({ Name = "Scarpa", Size = Vector3.new(length, talusH, talusD), CFrame = cf * CFrame.new(0, -half + talusH / 2, thickness / 2 + talusD / 2) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.Cobblestone, Color = tint(stone, 0.8) })
+	wedge({ Name = "Scarpa", Size = Vector3.new(length, talusH * 0.6, talusD * 0.6), CFrame = cf * CFrame.new(0, -half + talusH * 0.3, -thickness / 2 - talusD * 0.3), Material = Enum.Material.Cobblestone, Color = tint(stone, 0.8) })
+	part({ Name = "Sporco", Size = Vector3.new(length + 0.1, 4, thickness + talusD * 2 + 0.6), CFrame = cf * CFrame.new(0, -half + 2, talusD * 0.2), Material = Enum.Material.Ground, Color = WALL_DIRT, CastShadow = false })
+
+	-- corsi di pietra: fasce orizzontali che dividono i grandi blocchi
+	local courses = math.max(2, math.floor(height / 24))
+	for i = 1, courses - 1 do
+		local y = -half + i * (height / courses)
+		part({ Name = "Corso", Size = Vector3.new(length, 1.1, thickness + 0.7), CFrame = cf * CFrame.new(0, y, 0), Material = Enum.Material.Slate, Color = WALL_COURSE, CastShadow = false })
+	end
+	-- lesena sul giunto esterno (nasconde lo spigolo tra due tratti)
+	if not ruined or rng:NextNumber() < 0.6 then
+		local ph = height - 6
+		part({ Name = "Lesena", Size = Vector3.new(9, ph, 3.6), CFrame = cf * CFrame.new(length / 2, -half + ph / 2, thickness / 2 + 1.8), Material = Enum.Material.Limestone, Color = tint(stone, 0.92) })
+	end
+	-- crepe e macchie scure di umidità
+	if rng:NextNumber() < 0.35 then
+		local ch = rng:NextNumber(12, 30)
+		part({ Name = "Crepa", Size = Vector3.new(0.6, ch, 0.3), CFrame = cf * CFrame.new(rng:NextNumber(-length * 0.4, length * 0.4), rng:NextNumber(-half * 0.3, half * 0.6), thickness / 2 + 0.12) * CFrame.Angles(0, 0, rng:NextNumber(-0.25, 0.25)), Material = Enum.Material.Slate, Color = tint(stone, 0.55), CastShadow = false, CanCollide = false })
+	end
+	if rng:NextNumber() < 0.5 then
+		local mh = rng:NextNumber(20, 50)
+		part({ Name = "Macchia", Size = Vector3.new(rng:NextNumber(6, 14), mh, 0.2), CFrame = cf * CFrame.new(rng:NextNumber(-length * 0.35, length * 0.35), half - mh / 2 - 2, thickness / 2 + 0.1), Material = Enum.Material.Limestone, Color = tint(stone, 0.86), CastShadow = false, CanCollide = false })
+	end
+
+	-- camminamento in cima
+	part({ Name = "Camminamento", Size = Vector3.new(length + 0.2, 2, thickness + 1), CFrame = cf * CFrame.new(0, half + 1, 0), Material = Enum.Material.Slate, Color = WALL_TOP })
+	if ruined then
+		-- parapetto spezzato
+		for i = 1, 3 do
+			if rng:NextNumber() < 0.55 then
+				local h = rng:NextNumber(2, 6)
+				part({ Name = "MerloRotto", Size = Vector3.new(rng:NextNumber(4, 9), h, 3), CFrame = cf * CFrame.new(-length / 2 + i * length / 4, half + 2 + h / 2, thickness / 2 - 1.5) * CFrame.Angles(0, 0, rng:NextNumber(-0.2, 0.2)), Material = Enum.Material.Limestone, Color = stone })
+			end
+		end
+		return
+	end
+	-- parapetto esterno con merli, parapetto basso interno
+	part({ Name = "Parapetto", Size = Vector3.new(length + 0.2, 4, 3), CFrame = cf * CFrame.new(0, half + 4, thickness / 2 - 1.5), Material = Enum.Material.Limestone, Color = stone })
+	local merlons = math.max(2, math.floor(length / 11))
+	for i = 1, merlons do
+		local x = -length / 2 + (i - 0.5) * length / merlons
+		part({ Name = "Merlo", Size = Vector3.new(length / merlons * 0.55, 5, 3), CFrame = cf * CFrame.new(x, half + 8.5, thickness / 2 - 1.5), Material = Enum.Material.Limestone, Color = stone, CastShadow = false })
+	end
+	part({ Name = "ParapettoInterno", Size = Vector3.new(length + 0.2, 2.6, 1.6), CFrame = cf * CFrame.new(0, half + 3.3, -thickness / 2 + 0.8), Material = Enum.Material.Limestone, Color = tint(stone, 0.95) })
+	-- binari su cui scorrono i cannoni
+	for _, rz in { -2.5, 2.5 } do
+		part({ Name = "Binario", Size = Vector3.new(length + 0.2, 0.4, 0.6), CFrame = cf * CFrame.new(0, half + 2.2, rz), Material = Enum.Material.Metal, Color = IRON, CastShadow = false, CanCollide = false })
+	end
+	if o.Cannon then
+		cannon(cf * CFrame.new(rng:NextNumber(-length * 0.25, length * 0.25), half + 2, thickness / 2 - 9))
+	end
+end
+
+-- Torre di guardia addossata alla faccia esterna. cf alla base del muro, +Z verso l'esterno
+local function wallTower(cf: CFrame, height: number, thickness: number, bannerColor: Color3)
+	local stone = tint(pick(WALL_STONE), 0.96)
+	local w, d = 26, 20
+	local h = height + 18
+	local zc = thickness / 2 + d / 2 - 2
+	part({ Name = "Torre", Size = Vector3.new(w, h, d), CFrame = cf * CFrame.new(0, h / 2, zc), Material = Enum.Material.Limestone, Color = stone })
+	wedge({ Name = "Scarpa", Size = Vector3.new(w + 6, 30, 7), CFrame = cf * CFrame.new(0, 15, zc + d / 2 + 3.5) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.Cobblestone, Color = tint(stone, 0.8) })
+	for _, side in { -1, 1 } do
+		wedge({ Name = "Scarpa", Size = Vector3.new(d, 30, 5), CFrame = cf * CFrame.new(side * (w / 2 + 2.5), 15, zc) * CFrame.Angles(0, -side * math.pi / 2, 0), Material = Enum.Material.Cobblestone, Color = tint(stone, 0.8) })
+	end
+	local courses = math.floor(h / 24)
+	for i = 1, courses - 1 do
+		part({ Name = "Corso", Size = Vector3.new(w + 0.7, 1.1, d + 0.7), CFrame = cf * CFrame.new(0, i * h / courses, zc), Material = Enum.Material.Slate, Color = WALL_COURSE, CastShadow = false })
+	end
+	-- feritoie sulla faccia esterna
+	for i = 1, 3 do
+		part({ Name = "Feritoia", Size = Vector3.new(1.6, 7, 0.4), CFrame = cf * CFrame.new(0, h * (0.3 + i * 0.17), zc + d / 2 + 0.1), Material = Enum.Material.Slate, Color = Color3.fromRGB(30, 28, 28), CastShadow = false })
+	end
+	-- terrazza merlata
+	part({ Name = "Terrazza", Size = Vector3.new(w + 2, 2, d + 2), CFrame = cf * CFrame.new(0, h + 1, zc), Material = Enum.Material.Slate, Color = WALL_TOP })
+	for _, side in { -1, 1 } do
+		for i = 0, 2 do
+			local x = -w / 2 + 3 + i * (w - 6) / 2
+			part({ Name = "Merlo", Size = Vector3.new(4.4, 5, 2.4), CFrame = cf * CFrame.new(x, h + 4.5, zc + side * (d / 2 + 1 - 1.2)), Material = Enum.Material.Limestone, Color = stone, CastShadow = false })
+			local z = -d / 2 + 3 + i * (d - 6) / 2
+			part({ Name = "Merlo", Size = Vector3.new(2.4, 5, 4.4), CFrame = cf * CFrame.new(side * (w / 2 + 1 - 1.2), h + 4.5, zc + z), Material = Enum.Material.Limestone, Color = stone, CastShadow = false })
+		end
+	end
+	flag(cf * CFrame.new(0, h + 2, zc), 14, bannerColor)
+end
+
+local function buildGate(center: Vector3, outward: Vector3, height: number, thickness: number, kind: string, bannerColor: Color3?)
+	local color = bannerColor or BANNER.Vermiglia
 	local width = W.GateWidth
 	local pos = Vector3.new(center.X, G, center.Z)
+	-- +Z locale = verso l'esterno
 	local cf = CFrame.lookAt(pos, pos - outward)
-	local pillarW = 16
+	local intact = kind ~= "Broken"
+	local stone = pick(WALL_STONE)
+	if not intact then
+		stone = tint(stone, 0.78)
+	end
+	local pillarW = 22
+	local towerH = height + 22
+	local towerD = thickness + 16
 	for _, side in { -1, 1 } do
-		part({ Name = "Pilastro", Size = Vector3.new(pillarW, height + 8, thickness + 8), CFrame = cf * CFrame.new(side * (width / 2 + pillarW / 2), (height + 8) / 2, 0), Material = Enum.Material.Concrete, Color = PALETTE.WallDark })
+		local x = side * (width / 2 + pillarW / 2)
+		part({ Name = "Pilastro", Size = Vector3.new(pillarW, towerH, towerD), CFrame = cf * CFrame.new(x, towerH / 2, 0), Material = Enum.Material.Limestone, Color = tint(stone, 0.94) })
+		wedge({ Name = "Scarpa", Size = Vector3.new(pillarW + 4, 34, 8), CFrame = cf * CFrame.new(x, 17, towerD / 2 + 4) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.Cobblestone, Color = tint(stone, 0.8) })
+		local courses = math.floor(towerH / 24)
+		for i = 1, courses - 1 do
+			part({ Name = "Corso", Size = Vector3.new(pillarW + 0.7, 1.1, towerD + 0.7), CFrame = cf * CFrame.new(x, i * towerH / courses, 0), Material = Enum.Material.Slate, Color = WALL_COURSE, CastShadow = false })
+		end
+		-- merli in cima alle torri della porta
+		for i = 0, 2 do
+			for _, sz in { -1, 1 } do
+				part({ Name = "Merlo", Size = Vector3.new(4.6, 5, 2.4), CFrame = cf * CFrame.new(x - pillarW / 2 + 3.5 + i * (pillarW - 7) / 2, towerH + 2.5, sz * (towerD / 2 - 1.2)), Material = Enum.Material.Limestone, Color = stone, CastShadow = false })
+			end
+		end
+		if not intact then
+			continue
+		end
+		flag(cf * CFrame.new(x, towerH, 0), 16, color)
+		-- stendardo appeso alla faccia esterna
+		local bannerH = height * 0.42
+		part({ Name = "Stendardo", Size = Vector3.new(11, bannerH, 0.3), CFrame = cf * CFrame.new(x, height - bannerH / 2 - 6, towerD / 2 + 0.3), Material = Enum.Material.Fabric, Color = color, CastShadow = false, CanCollide = false })
+		part({ Name = "BordoStendardo", Size = Vector3.new(12, 1, 0.5), CFrame = cf * CFrame.new(x, height - 5.5, towerD / 2 + 0.4), Material = Enum.Material.Metal, Color = Color3.fromRGB(196, 160, 72), CastShadow = false, CanCollide = false })
+		emblem(cf * CFrame.new(x, height - bannerH * 0.35 - 6, towerD / 2 + 0.6), 7, Color3.fromRGB(236, 228, 210))
+		-- torce ai lati del passaggio (dentro e fuori)
+		for _, sz in { -1, 1 } do
+			torch(cf * CFrame.new(side * (width / 2 + 1.2), 16, sz * (towerD / 2 + 0.6)) * CFrame.Angles(0, if sz > 0 then 0 else math.pi, 0))
+		end
 	end
 	local archBottom = 62
-	part({ Name = "Architrave", Size = Vector3.new(width + 2, height - archBottom, thickness), CFrame = cf * CFrame.new(0, archBottom + (height - archBottom) / 2, 0), Material = Enum.Material.Concrete, Color = PALETTE.Wall })
-	part({ Name = "Camminamento", Size = Vector3.new(width + pillarW * 2, 3, thickness + 2), CFrame = cf * CFrame.new(0, height + 1.5, 0), Material = Enum.Material.Slate, Color = Color3.fromRGB(120, 116, 108) })
-	if kind == "Closed" then
+	part({ Name = "Architrave", Size = Vector3.new(width + 2, height - archBottom, thickness + 4), CFrame = cf * CFrame.new(0, archBottom + (height - archBottom) / 2, 0), Material = Enum.Material.Limestone, Color = stone })
+	-- angoli smussati dell'arco
+	local ch = 9
+	for _, side in { -1, 1 } do
+		wedge({ Name = "Arco", Size = Vector3.new(thickness + 4, ch, ch), CFrame = cf * CFrame.new(side * (width / 2 - ch / 2), archBottom - ch / 2, 0) * CFrame.Angles(0, side * math.pi / 2, 0) * CFrame.Angles(0, 0, math.pi), Material = Enum.Material.Limestone, Color = stone })
+	end
+	part({ Name = "Chiave", Size = Vector3.new(7, 10, thickness + 5), CFrame = cf * CFrame.new(0, archBottom + 4, 0), Material = Enum.Material.Limestone, Color = tint(stone, 0.9) })
+	part({ Name = "Camminamento", Size = Vector3.new(width + pillarW * 2, 3, thickness + 2), CFrame = cf * CFrame.new(0, height + 1.5, 0), Material = Enum.Material.Slate, Color = WALL_TOP })
+	-- grande stemma sopra la porta, sulla faccia esterna
+	if intact then
+		emblem(cf * CFrame.new(0, archBottom + (height - archBottom) * 0.5, thickness / 2 + 2.6), 26, color)
+	end
+	if kind == "Open" then
+		-- saracinesca sollevata: si vedono solo le punte sotto l'arco
+		part({ Name = "Saracinesca", Size = Vector3.new(width - 2, 3, 1.6), CFrame = cf * CFrame.new(0, archBottom - 1.5, thickness / 2 - 3), Material = Enum.Material.CorrodedMetal, Color = IRON, CastShadow = false })
+		for i = -3, 3 do
+			part({ Name = "Punta", Size = Vector3.new(1.3, 4, 1.3), CFrame = cf * CFrame.new(i * (width / 7.5), archBottom - 4.5, thickness / 2 - 3), Material = Enum.Material.CorrodedMetal, Color = IRON, CastShadow = false })
+		end
+	elseif kind == "Closed" then
 		for i = -3, 3 do
 			part({ Name = "Grata", Size = Vector3.new(1.6, archBottom, 1.6), CFrame = cf * CFrame.new(i * (width / 7), archBottom / 2, -thickness / 2 + 2), Material = Enum.Material.CorrodedMetal, Color = Color3.fromRGB(70, 66, 60), CastShadow = false })
 		end
@@ -365,12 +578,16 @@ local function buildGate(center: Vector3, outward: Vector3, height: number, thic
 			part({ Name = "GrataOrizzontale", Size = Vector3.new(width, 1.4, 1.4), CFrame = cf * CFrame.new(0, j * archBottom / 4, -thickness / 2 + 2), Material = Enum.Material.CorrodedMetal, Color = Color3.fromRGB(70, 66, 60), CastShadow = false })
 		end
 	elseif kind == "Boulder" then
-		-- il masso con cui il gigante di Tobias ha sigillato il cancello
+		-- il masso che sigilla il cancello
 		part({ Name = "Masso", Shape = Enum.PartType.Ball, Size = Vector3.new(66, 66, 66), CFrame = cf * CFrame.new(0, 30, -thickness / 2 - 14), Material = Enum.Material.Rock, Color = Color3.fromRGB(130, 120, 106) })
+		for _ = 1, 5 do
+			local s = rng:NextNumber(4, 9)
+			part({ Name = "Frammento", Size = Vector3.new(s, s * 0.7, s), CFrame = cf * CFrame.new(rng:NextNumber(-width, width), s * 0.3, -thickness / 2 - rng:NextNumber(30, 55)) * CFrame.Angles(rng:NextNumber(-0.6, 0.6), rng:NextNumber(0, 6), rng:NextNumber(-0.6, 0.6)), Material = Enum.Material.Rock, Color = Color3.fromRGB(122, 112, 98) })
+		end
 	elseif kind == "Broken" then
 		for _ = 1, 9 do
 			local s = rng:NextNumber(6, 16)
-			part({ Name = "Macerie", Size = Vector3.new(s, s * 0.7, s), CFrame = cf * CFrame.new(rng:NextNumber(-width, width), s * 0.3, rng:NextNumber(-thickness * 2, thickness * 2)) * CFrame.Angles(rng:NextNumber(-0.6, 0.6), rng:NextNumber(0, 6), rng:NextNumber(-0.6, 0.6)), Material = Enum.Material.Concrete, Color = PALETTE.WallDark })
+			part({ Name = "Macerie", Size = Vector3.new(s, s * 0.7, s), CFrame = cf * CFrame.new(rng:NextNumber(-width, width), s * 0.3, rng:NextNumber(-thickness * 2, thickness * 2)) * CFrame.Angles(rng:NextNumber(-0.6, 0.6), rng:NextNumber(0, 6), rng:NextNumber(-0.6, 0.6)), Material = Enum.Material.Limestone, Color = tint(stone, 0.75) })
 		end
 	end
 end
@@ -384,6 +601,7 @@ local function buildRingWall(wall, districts)
 	local step = 360 / n
 	local halfGate = math.deg((W.GateWidth / 2 + 16) / radius)
 	local length = 2 * (radius + wall.Thickness / 2) * math.tan(math.rad(step / 2)) + 1
+	local color = BANNER[wall.Id] or BANNER.Vermiglia
 	for i = 0, n - 1 do
 		local angle = (i + 0.5) * step
 		if not angleInGate(angle, wall.Gates, halfGate + step * 0.5) then
@@ -396,10 +614,20 @@ local function buildRingWall(wall, districts)
 			-- mura in rovina: alcuni tratti crollati
 			local broken = wall.Ruined and rng:NextNumber() < 0.12
 			if broken then
-				local s0 = rng:NextNumber(10, 22)
-				part({ Name = "Macerie", Size = Vector3.new(s0 * 1.4, s0, s0), CFrame = CFrame.new(center0 + Util.Polar(angle, radius, G + s0 * 0.3)) * CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, 6), rng:NextNumber(-0.4, 0.4)), Material = Enum.Material.Concrete, Color = PALETTE.WallDark })
+				for _ = 1, 3 do
+					local s0 = rng:NextNumber(10, 22)
+					part({ Name = "Macerie", Size = Vector3.new(s0 * 1.4, s0, s0), CFrame = CFrame.new(center0 + Util.Polar(angle + rng:NextNumber(-step * 0.4, step * 0.4), radius + rng:NextNumber(-20, 30), G + s0 * 0.3)) * CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(0, 6), rng:NextNumber(-0.4, 0.4)), Material = Enum.Material.Limestone, Color = tint(pick(WALL_STONE), 0.72) })
+				end
 			else
-				wallSegment(center0 + Util.Polar(angle, radius), center0, length, wall.Height * (if wall.Ruined then rng:NextNumber(0.55, 1) else 1), wall.Thickness, nearDistrict)
+				local segCenter = center0 + Util.Polar(angle, radius)
+				local h = wall.Height * (if wall.Ruined then rng:NextNumber(0.55, 1) else 1)
+				wallSegment(segCenter, center0, length, h, wall.Thickness, { Ruined = wall.Ruined, Cannon = i % 3 == 1 })
+				-- una torre di guardia ogni tanto (non vicino a porte e distretti)
+				if not wall.Ruined and not nearDistrict and i % 8 == 4 then
+					local base = Vector3.new(segCenter.X, G, segCenter.Z)
+					local outward = Util.SafeUnit(Util.Flat(segCenter - center0))
+					wallTower(CFrame.lookAt(base, base - outward), wall.Height, wall.Thickness, color)
+				end
 			end
 		end
 	end
@@ -409,9 +637,9 @@ local function buildRingWall(wall, districts)
 		-- riempi lo spazio tra il cancello e i segmenti vicini
 		for _, side in { -1, 1 } do
 			local a = gateAngle + side * (halfGate + step * 0.5)
-			wallSegment(center0 + Util.Polar(a, radius), center0, segLen, wall.Height, wall.Thickness, false)
+			wallSegment(center0 + Util.Polar(a, radius), center0, segLen, wall.Height, wall.Thickness)
 		end
-		buildGate(center, outward, wall.Height, wall.Thickness, "Open")
+		buildGate(center, outward, wall.Height, wall.Thickness, "Open", color)
 	end
 end
 
@@ -432,17 +660,18 @@ local function buildDistrictWall(d)
 			local a = math.rad(theta)
 			local dir = outward * math.cos(a) + right * math.sin(a)
 			local pos = gate + dir * rb
-			wallSegment(pos, gate, length, wall.Height, wall.Thickness, true)
+			local h = wall.Height * (if d.Ruined then rng:NextNumber(0.6, 1) else 1)
+			wallSegment(pos, gate, length, h, wall.Thickness, { Ruined = d.Ruined, Cannon = i % 2 == 0 })
 		end
 	end
 	for _, side in { -1, 1 } do
 		local a = math.rad(side * (halfGate + step * 0.25))
 		local dir = outward * math.cos(a) + right * math.sin(a)
-		wallSegment(gate + dir * rb, gate, 40, wall.Height, wall.Thickness, false)
+		wallSegment(gate + dir * rb, gate, 40, wall.Height, wall.Thickness, { Ruined = d.Ruined })
 	end
 	local outerGate = gate + outward * rb
 	local kind = if d.OuterGate == "Boulder" then "Boulder" elseif d.OuterGate == "Broken" then "Broken" else "Open"
-	buildGate(outerGate, outward, wall.Height, wall.Thickness, kind)
+	buildGate(outerGate, outward, wall.Height, wall.Thickness, kind, BANNER[d.Wall])
 	if d.OuterGate == "Broken" then
 		-- breccia nel muro, come il giorno della caduta
 		for _ = 1, 5 do
