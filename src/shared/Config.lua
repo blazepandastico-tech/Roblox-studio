@@ -13,6 +13,10 @@ local Config = {
 	DataStoreName = "SieriPerduti_Dati_v1",
 	AutosaveInterval = 120,
 
+	-- Amministratori: UserId di chi può aprire il Pannello Admin (tasto P) anche nel gioco pubblicato.
+	-- Il proprietario del gioco e Roblox Studio sono sempre amministratori.
+	Admins = {},
+
 	-- Community: crea un Gruppo Roblox per il gioco e metti qui il suo ID (0 = disattivato).
 	-- Chi entra nel gruppo riceve +10% oro per sempre e un regalo di benvenuto.
 	GroupId = 0,

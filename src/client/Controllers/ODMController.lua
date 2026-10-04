@@ -665,7 +665,7 @@ local function physics(dt: number)
 			startFlying()
 		end
 	end
-	gas = math.clamp(gas - used, 0, maxGas)
+	gas = if player:GetAttribute("AdminGas") == true then maxGas else math.clamp(gas - used, 0, maxGas)
 end
 
 local function renderVisuals()

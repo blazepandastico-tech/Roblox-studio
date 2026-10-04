@@ -2106,6 +2106,10 @@ local Config = {
 	DataStoreName = "SieriPerduti_Dati_v1",
 	AutosaveInterval = 120,
 
+	-- Amministratori: UserId di chi può aprire il Pannello Admin (tasto P) anche nel gioco pubblicato.
+	-- Il proprietario del gioco e Roblox Studio sono sempre amministratori.
+	Admins = {},
+
 	-- Community: crea un Gruppo Roblox per il gioco e metti qui il suo ID (0 = disattivato).
 	-- Chi entra nel gruppo riceve +10% oro per sempre e un regalo di benvenuto.
 	GroupId = 0,
@@ -6699,6 +6703,7 @@ Net.EventNames = {
 	"ClaimReward",
 	"SpinWheel",
 	"CommunityAction",
+	"AdminAction",
 	-- server -> client
 	"RaidState",
 	"WheelResult",
@@ -7464,6 +7469,7 @@ local ORDER = {
 	"CommunityService",
 	"AchievementService",
 	"LeaderboardService",
+	"AdminService",
 	"DevCommandsService",
 }
 
@@ -7606,6 +7612,552 @@ return AchievementService
         </Item>
         <Item class="ModuleScript" referent="41">
           <Properties>
+            <string name="Name">AdminService</string>
+            <string name="Source"><![CDATA[--[[
+	AdminService - Pannello Admin (tasto P)
+	Solo gli amministratori possono usarlo: Roblox Studio, il proprietario del gioco
+	(o il capo del gruppo proprietario) e gli UserId in Config.Admins.
+	Ogni azione è controllata QUI sul server: un giocatore normale non può usarla
+	nemmeno modificando il proprio client.
+
+	I Sieri Perduti (poteri dei giganti) per ora si ottengono SOLO da questo pannello.
+]]
+
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Net = require(Shared.Lib.Net)
+local Util = require(Shared.Lib.Util)
+local Items = require(Shared.Data.Items)
+local Serums = require(Shared.Data.Serums)
+local Titans = require(Shared.Data.Titans)
+local Zones = require(Shared.Data.Zones)
+local Leveling = require(Shared.Data.Leveling)
+local Story = require(Shared.Data.Story)
+local Monetization = require(Shared.Data.Monetization)
+local W = require(Shared.Data.WorldLayout)
+
+local AdminService = {}
+local S
+
+local lastAction: { [Player]: number } = {}
+
+function AdminService.IsAdmin(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	for _, id in Config.Admins do
+		if id == player.UserId then
+			return true
+		end
+	end
+	if game.CreatorType == Enum.CreatorType.User then
+		return player.UserId == game.CreatorId
+	end
+	local ok, rank = pcall(function()
+		return player:GetRankInGroup(game.CreatorId)
+	end)
+	return ok and rank == 255
+end
+
+local function tell(admin: Player, text: string)
+	S.EventService.Notify(admin, "🛠️ " .. text, "Successo", 4)
+	print(("[Admin] %s: %s"):format(admin.Name, text))
+end
+
+local function refresh(player: Player)
+	S.PlayerService.Refresh(player, true)
+	S.DataService.SyncNow(player)
+end
+
+local function setLevel(player: Player, target: number)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	target = math.clamp(math.floor(target), 1, Config.MaxLevel)
+	local before = profile.Level
+	if target > before then
+		local need = -profile.XP
+		for level = before, target - 1 do
+			need += Leveling.XPToNext(level)
+		end
+		Leveling.AddXP(profile, need)
+	else
+		profile.Level = target
+		profile.XP = 0
+	end
+	local leaderstats = player:FindFirstChild("leaderstats")
+	local levelValue = leaderstats and leaderstats:FindFirstChild("Livello") :: IntValue?
+	if levelValue then
+		levelValue.Value = profile.Level
+	end
+	refresh(player)
+	if profile.Level > before then
+		S.PlayerService.LevelUp:Fire(player, profile.Level, before)
+		local root = Util.GetRoot(player.Character)
+		if root then
+			S.EventService.Effect("LevelUp", { Character = player.Character }, root.Position, 300)
+		end
+	end
+end
+
+local function groundBelow(position: Vector3): Vector3
+	local zone = Zones.Find(position)
+	local y = if zone then zone.Center.Y else W.GroundY
+	return Vector3.new(position.X, y, position.Z)
+end
+
+local function nearbyTitans(position: Vector3, radius: number)
+	local list = {}
+	for _, t in S.TitanService.All() do
+		if t.Root and t.Root.Parent and t.Kind ~= "Ally" and (t.Root.Position - position).Magnitude < radius then
+			table.insert(list, t)
+		end
+	end
+	return list
+end
+
+-- Ogni azione riceve (admin, bersaglio, valore) e restituisce il messaggio da mostrare
+local ACTIONS: { [string]: (Player, Player, any) -> string? } = {}
+
+-- PROGRESSIONE ---------------------------------------------------------------------------------
+ACTIONS.LevelMax = function(_, target)
+	setLevel(target, Config.MaxLevel)
+	return ("%s è al livello massimo (%d)"):format(target.DisplayName, Config.MaxLevel)
+end
+ACTIONS.LevelAdd = function(_, target, value)
+	local profile = S.DataService.Get(target)
+	local amount = tonumber(value) or 100
+	if profile then
+		setLevel(target, profile.Level + amount)
+		return ("%s: livello %d"):format(target.DisplayName, profile.Level)
+	end
+	return nil
+end
+ACTIONS.LevelSet = function(_, target, value)
+	local level = tonumber(value)
+	if not level then
+		return "Scrivi un numero di livello"
+	end
+	setLevel(target, level)
+	return ("%s: livello %d"):format(target.DisplayName, math.clamp(math.floor(level), 1, Config.MaxLevel))
+end
+ACTIONS.StatsMax = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		for name in profile.Stats do
+			profile.Stats[name] = Config.StatCap
+		end
+		refresh(target)
+	end
+	return target.DisplayName .. ": tutte le statistiche al massimo"
+end
+ACTIONS.StatsReset = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		for name in profile.Stats do
+			profile.Stats[name] = 0
+		end
+		profile.StatPoints = (profile.Level - 1) * Config.StatPointsPerLevel
+		refresh(target)
+	end
+	return target.DisplayName .. ": statistiche azzerate, punti restituiti"
+end
+ACTIONS.Gold = function(_, target, value)
+	local profile = S.DataService.Get(target)
+	local amount = math.floor(tonumber(value) or 1000000)
+	if profile then
+		profile.Gold += amount
+		refresh(target)
+	end
+	return ("+%s oro a %s"):format(Util.FormatNumber(amount), target.DisplayName)
+end
+ACTIONS.Gems = function(_, target, value)
+	local profile = S.DataService.Get(target)
+	local amount = math.floor(tonumber(value) or 10000)
+	if profile then
+		profile.Gems += amount
+		refresh(target)
+	end
+	return ("+%s gemme a %s"):format(Util.FormatNumber(amount), target.DisplayName)
+end
+ACTIONS.Spins = function(_, target, value)
+	local profile = S.DataService.Get(target)
+	local amount = math.floor(tonumber(value) or 50)
+	if profile then
+		profile.Spins = (profile.Spins or 0) + amount
+		refresh(target)
+	end
+	return ("+%d giri della Ruota a %s"):format(amount, target.DisplayName)
+end
+ACTIONS.ResetRewards = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		profile.Streak.Last = 0
+		profile.Streak.Day = 0
+		profile.PlayToday.Claimed = {}
+		profile.PlayToday.Seconds = math.max(profile.PlayToday.Seconds, 90 * 60)
+		target:SetAttribute("PlayToday", profile.PlayToday.Seconds)
+		profile.FreeSpinAt = 0
+		refresh(target)
+	end
+	return target.DisplayName .. ": calendario, regali a tempo e giro gratis di nuovo disponibili"
+end
+
+-- OGGETTI E PASS --------------------------------------------------------------------------------
+ACTIONS.AllItems = function(_, target)
+	local count = 0
+	for id in Items.List do
+		S.InventoryService.Give(target, id, if Items.IsEquipment(id) then 1 else 99)
+		count += 1
+	end
+	refresh(target)
+	return ("%s ha ricevuto tutti i %d oggetti del gioco"):format(target.DisplayName, count)
+end
+ACTIONS.Item = function(_, target, value)
+	local def = Items.Get(value)
+	if not def then
+		return "Oggetto sconosciuto"
+	end
+	S.InventoryService.Give(target, def.Id, if Items.IsEquipment(def.Id) then 1 else 10)
+	refresh(target)
+	return ("%s ha ricevuto: %s"):format(target.DisplayName, def.Name)
+end
+ACTIONS.AllPasses = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		for _, pass in Monetization.GamePasses do
+			profile.Passes[pass.Id] = true
+			if pass.GiftItem then
+				S.InventoryService.Give(target, pass.GiftItem, 1)
+			end
+		end
+		target:SetAttribute("VIP", true)
+		refresh(target)
+	end
+	return target.DisplayName .. ": tutti i game pass attivi (solo su questo profilo)"
+end
+ACTIONS.RemovePasses = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		profile.Passes = {}
+		target:SetAttribute("VIP", nil)
+		refresh(target)
+	end
+	return target.DisplayName .. ": game pass rimossi"
+end
+
+-- SIERI (si ottengono solo qui) ------------------------------------------------------------------
+ACTIONS.Serum = function(_, target, value)
+	local serum = Serums.Get(value)
+	if not serum then
+		return "Siero sconosciuto"
+	end
+	local state = S.PlayerService.GetState(target)
+	if state.Transformed then
+		S.ShifterService.Revert(target, "Admin")
+		task.wait(0.5)
+	end
+	local ok, err = S.SerumService.ApplySerum(target, serum.Id)
+	if not ok then
+		return err or "Impossibile iniettare il siero ora"
+	end
+	return ("%s ha il potere del %s: premi T per trasformarti"):format(target.DisplayName, serum.TitanName)
+end
+ACTIONS.SerumMastery = function(_, target)
+	local profile = S.DataService.Get(target)
+	if not profile or profile.Serum == "" then
+		return "Prima dai un siero"
+	end
+	profile.SerumMastery[profile.Serum] = Config.Serums.MaxMastery
+	S.ShifterService.ResetEnergy(target)
+	refresh(target)
+	return target.DisplayName .. ": maestria del siero al massimo (tutte le abilità sbloccate)"
+end
+ACTIONS.AllSerums = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		for _, id in Serums.Order do
+			profile.StoredSerums[id] = (profile.StoredSerums[id] or 0) + 1
+			profile.SerumMastery[id] = Config.Serums.MaxMastery
+		end
+		refresh(target)
+	end
+	return target.DisplayName .. ": tutti gli 8 sieri in valigetta, maestria massima"
+end
+ACTIONS.RemoveSerum = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		local state = S.PlayerService.GetState(target)
+		if state.Transformed then
+			S.ShifterService.Revert(target, "Admin")
+		end
+		profile.Serum = ""
+		refresh(target)
+	end
+	return target.DisplayName .. ": siero rimosso"
+end
+ACTIONS.Transform = function(_, target)
+	local ok, err = S.ShifterService.Transform(target)
+	return if ok then target.DisplayName .. ": trasformazione" else (err or "Impossibile trasformarsi")
+end
+
+-- POTERI ----------------------------------------------------------------------------------------
+local TOGGLES = {
+	God = { Attribute = "AdminGod", Name = "Immortalità" },
+	Gas = { Attribute = "AdminGas", Name = "Gas infinito" },
+	OneShot = { Attribute = "AdminOneShot", Name = "Colpo unico" },
+}
+for key, toggle in TOGGLES do
+	ACTIONS["Toggle" .. key] = function(_, target)
+		local on = target:GetAttribute(toggle.Attribute) ~= true
+		target:SetAttribute(toggle.Attribute, if on then true else nil)
+		return ("%s: %s %s"):format(target.DisplayName, toggle.Name, if on then "ATTIVA" else "disattivata")
+	end
+end
+ACTIONS.Speed = function(_, target, value)
+	local mult = math.clamp(tonumber(value) or 1, 0.5, 4)
+	target:SetAttribute("AdminSpeed", if mult == 1 then nil else mult)
+	S.PlayerService.Refresh(target, true)
+	return ("%s: velocità x%.1f"):format(target.DisplayName, mult)
+end
+ACTIONS.Heal = function(_, target)
+	S.PlayerService.Heal(target, 1)
+	pcall(S.PlayerService.RefillWeapons, target)
+	if S.ShifterService then
+		S.ShifterService.ResetEnergy(target)
+	end
+	return target.DisplayName .. ": vita, lame, gas ed energia al massimo"
+end
+ACTIONS.Respawn = function(_, target)
+	S.PlayerService.Respawn(target)
+	return target.DisplayName .. ": rinato"
+end
+
+-- MONDO -----------------------------------------------------------------------------------------
+ACTIONS.Teleport = function(_, target, value)
+	local zone = Zones.Get(value)
+	if not zone then
+		return "Zona sconosciuta"
+	end
+	S.PlayerService.Teleport(target, Zones.SpawnPoint(zone))
+	return ("%s → %s"):format(target.DisplayName, zone.Name or zone.Id)
+end
+ACTIONS.BringTo = function(admin, target)
+	local root = Util.GetRoot(admin.Character)
+	if not root or target == admin then
+		return "Scegli un altro giocatore come bersaglio"
+	end
+	S.PlayerService.Teleport(target, root.Position + root.CFrame.LookVector * 6)
+	return target.DisplayName .. " portato da te"
+end
+ACTIONS.GoTo = function(admin, target)
+	local root = Util.GetRoot(target.Character)
+	if not root or target == admin then
+		return "Scegli un altro giocatore come bersaglio"
+	end
+	S.PlayerService.Teleport(admin, root.Position + root.CFrame.LookVector * 6)
+	return "Sei andato da " .. target.DisplayName
+end
+ACTIONS.SpawnTitan = function(admin, _, value)
+	local class = Titans.Classes[value]
+	local root = Util.GetRoot(admin.Character)
+	local profile = S.DataService.Get(admin)
+	if not class or not root or not profile then
+		return "Classe di gigante sconosciuta"
+	end
+	local zoneId = admin:GetAttribute("Zone") or "PianureSud"
+	local flat = Util.SafeUnit(Util.Flat(root.CFrame.LookVector))
+	local pos = groundBelow(root.Position + flat * (40 + class.Height))
+	S.TitanService.Spawn({ Class = class.Id, Level = profile.Level, Zone = zoneId, Position = pos, Duration = 600 })
+	return class.Name .. " evocato davanti a te"
+end
+ACTIONS.SpawnBoss = function(admin, _, value)
+	local def = Titans.Bosses[value]
+	if not def then
+		return "Boss sconosciuto"
+	end
+	local t = S.TitanService.SpawnBoss(value)
+	if not t then
+		return def.Name .. " è già in giro"
+	end
+	local zone = Zones.Get(def.Zone)
+	if zone then
+		S.PlayerService.Teleport(admin, Zones.SpawnPoint(zone))
+	end
+	return def.Name .. " evocato: ti ho portato nella sua zona"
+end
+ACTIONS.ClearTitans = function(admin)
+	local root = Util.GetRoot(admin.Character)
+	if not root then
+		return nil
+	end
+	local list = nearbyTitans(root.Position, 400)
+	for _, t in list do
+		S.TitanService.Despawn(t)
+	end
+	return ("%d giganti rimossi qui intorno"):format(#list)
+end
+ACTIONS.KillTitans = function(admin)
+	local root = Util.GetRoot(admin.Character)
+	if not root then
+		return nil
+	end
+	local list = nearbyTitans(root.Position, 400)
+	for _, t in list do
+		S.TitanService.ApplyDamage(t, admin, 1e9, "Nape", { Admin = true })
+	end
+	return ("%d giganti abbattuti (ricompense comprese)"):format(#list)
+end
+ACTIONS.Invasion = function(admin)
+	local zoneId = admin:GetAttribute("Zone")
+	if not zoneId or not Zones.Get(zoneId) then
+		return "Entra in una zona con i giganti"
+	end
+	S.TitanService.StartInvasion(zoneId, 300)
+	S.EventService.Announce("⚠️ INVASIONE!", "I giganti attaccano: " .. (Zones.Get(zoneId).Name or zoneId), "Boss")
+	return "Invasione avviata"
+end
+ACTIONS.Time = function(_, _, value)
+	local hour = tonumber(value) or 12
+	Lighting.ClockTime = hour % 24
+	return ("Ora del giorno: %02d:00"):format(math.floor(hour % 24))
+end
+
+-- STORIA ----------------------------------------------------------------------------------------
+ACTIONS.Chapter = function(_, target, value)
+	local profile = S.DataService.Get(target)
+	local index = math.floor(tonumber(value) or 1)
+	local chapter = Story.Chapters[index]
+	if not profile or not chapter then
+		return ("Capitolo da 1 a %d"):format(#Story.Chapters)
+	end
+	profile.Story.Chapter = index
+	profile.Story.Step = 1
+	profile.Story.Progress = 0
+	profile.Story.Done = false
+	S.DataService.MarkDirty(target)
+	S.StoryService.RestartStep(target)
+	return ("%s → %s"):format(target.DisplayName, chapter.Title)
+end
+ACTIONS.StoryStep = function(_, target)
+	local _, step = S.StoryService.Current(target)
+	if not step then
+		return "Storia già completata"
+	end
+	S.StoryService.Advance(target)
+	return "Obiettivo completato: " .. step.Objective
+end
+ACTIONS.StoryDone = function(_, target)
+	local profile = S.DataService.Get(target)
+	if profile then
+		profile.Story.Chapter = #Story.Chapters
+		profile.Story.Step = 1
+		profile.Story.Done = true
+		refresh(target)
+	end
+	return target.DisplayName .. ": storia completata"
+end
+
+-- SERVER ----------------------------------------------------------------------------------------
+ACTIONS.Announce = function(admin, _, value)
+	local text = if type(value) == "string" then string.sub(value, 1, 150) else ""
+	if text == "" then
+		return "Scrivi il messaggio"
+	end
+	-- il testo passa dal filtro di Roblox prima di essere mostrato a tutti
+	local ok, filtered = pcall(function()
+		local result = game:GetService("TextService"):FilterStringAsync(text, admin.UserId)
+		return result:GetNonChatStringForBroadcastAsync()
+	end)
+	if not ok then
+		return "Messaggio non inviato (filtro non disponibile)"
+	end
+	S.EventService.Announce("📢 " .. filtered, "— " .. admin.DisplayName, "Raro")
+	return "Annuncio inviato"
+end
+ACTIONS.Kick = function(admin, target)
+	if target == admin then
+		return "Non puoi espellere te stesso"
+	end
+	if AdminService.IsAdmin(target) and not RunService:IsStudio() then
+		return "Non puoi espellere un altro amministratore"
+	end
+	target:Kick("Sei stato espulso da un amministratore.")
+	return target.Name .. " espulso"
+end
+ACTIONS.DoubleXP = function()
+	local on = ReplicatedStorage:GetAttribute("EventoXP") ~= true
+	ReplicatedStorage:SetAttribute("EventoXP", if on then true else nil)
+	for _, player in Players:GetPlayers() do
+		player:SetAttribute("BonusXPEvento", if on then 1 else nil)
+	end
+	S.EventService.Announce(if on then "⭐ ESPERIENZA DOPPIA!" else "Evento terminato", if on then "Evento attivato da un amministratore" else "Esperienza tornata normale", "Raro")
+	return if on then "Esperienza doppia per tutti ATTIVA" else "Esperienza doppia disattivata"
+end
+
+local function onAction(admin: Player, action: any, targetId: any, value: any)
+	if type(action) ~= "string" or not AdminService.IsAdmin(admin) then
+		return
+	end
+	local now = os.clock()
+	if now - (lastAction[admin] or 0) < 0.25 then
+		return
+	end
+	lastAction[admin] = now
+	local fn = ACTIONS[action]
+	if not fn then
+		return
+	end
+	local target = admin
+	if type(targetId) == "number" then
+		target = Players:GetPlayerByUserId(targetId) or admin
+	end
+	local ok, result = pcall(fn, admin, target, value)
+	if ok then
+		if result then
+			tell(admin, result)
+		end
+	else
+		warn("[Admin] Errore in " .. action .. ": " .. tostring(result))
+		tell(admin, "Errore: " .. tostring(result))
+	end
+end
+
+function AdminService.Init(services)
+	S = services
+end
+
+function AdminService.Start()
+	local function setup(player: Player)
+		if AdminService.IsAdmin(player) then
+			player:SetAttribute("Admin", true)
+		end
+		if ReplicatedStorage:GetAttribute("EventoXP") then
+			player:SetAttribute("BonusXPEvento", 1)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		task.spawn(setup, player)
+	end
+	Players.PlayerAdded:Connect(setup)
+	Players.PlayerRemoving:Connect(function(player)
+		lastAction[player] = nil
+	end)
+	Net.Event("AdminAction").OnServerEvent:Connect(onAction)
+end
+
+return AdminService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="42">
+          <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
 	CodesService
@@ -7666,7 +8218,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -8189,7 +8741,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">CommunityService</string>
             <string name="Source"><![CDATA[--[[
@@ -8325,7 +8877,7 @@ return CommunityService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -8674,7 +9226,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -8713,7 +9265,7 @@ local S
 local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N"
 
 local function allowed(player: Player): boolean
-	if RunService:IsStudio() then
+	if player:GetAttribute("Admin") == true or RunService:IsStudio() then
 		return true
 	end
 	if game.CreatorType == Enum.CreatorType.User then
@@ -8945,7 +9497,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -9407,7 +9959,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -9520,7 +10072,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -9704,7 +10256,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">LeaderboardService</string>
             <string name="Source"><![CDATA[--[[
@@ -9936,7 +10488,7 @@ return LeaderboardService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -10064,7 +10616,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -10475,7 +11027,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -10940,7 +11492,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -11341,7 +11893,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -11878,7 +12430,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -12063,7 +12615,7 @@ function PlayerService.Refresh(player: Player, keepResources: boolean?)
 		local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 		humanoid.MaxHealth = stats.MaxHealth
 		humanoid.Health = math.clamp(fraction, 0.05, 1) * stats.MaxHealth
-		humanoid.WalkSpeed = stats.WalkSpeed
+		humanoid.WalkSpeed = stats.WalkSpeed * (player:GetAttribute("AdminSpeed") or 1)
 		humanoid.UseJumpPower = false
 		humanoid.JumpHeight = Config.Player.JumpHeight
 	end
@@ -12101,7 +12653,7 @@ function PlayerService.AddXP(player: Player, amount: number, silent: boolean?): 
 	end
 	local stats = PlayerService.Stats(player)
 	-- bonus della community (amici nel server, gruppo): vedi CommunityService
-	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0)
+	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0) + (player:GetAttribute("BonusXPEvento") or 0)
 	if (profile.Buffs.XPUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -12184,6 +12736,9 @@ end
 -- DANNI -------------------------------------------------------------------------------
 
 function PlayerService.IsInvulnerable(player: Player): boolean
+	if player:GetAttribute("AdminGod") == true then
+		return true
+	end
 	local state = PlayerService.GetState(player)
 	if os.clock() < state.IFramesUntil then
 		return true
@@ -12560,7 +13115,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -12682,7 +13237,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -13165,7 +13720,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">RewardsService</string>
             <string name="Source"><![CDATA[--[[
@@ -13429,7 +13984,7 @@ return RewardsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -13539,6 +14094,17 @@ function SerumService.Inject(player: Player, serumId: string): (boolean, string?
 	profile.StoredSerums[serumId] -= 1
 	if profile.StoredSerums[serumId] <= 0 then
 		profile.StoredSerums[serumId] = nil
+	end
+	return SerumService.ApplySerum(player, serumId)
+end
+
+-- Inietta subito un siero, senza controlli (usato dal Pannello Admin)
+function SerumService.ApplySerum(player: Player, serumId: string): (boolean, string?)
+	local profile = S.DataService.Get(player)
+	local serum = Serums.Get(serumId)
+	local root = Util.GetRoot(player.Character)
+	if not profile or not serum or not root then
+		return false, "Siero sconosciuto."
 	end
 	local old = Serums.Get(profile.Serum)
 	profile.Serum = serumId
@@ -13743,7 +14309,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -13966,7 +14532,7 @@ end
 
 function ShifterService.Transform(player: Player): (boolean, string?)
 	local state0 = S.PlayerService.GetState(player)
-	if not Config.Serums.Available and not state0.Transformed then
+	if not Config.Serums.Available and not state0.Transformed and player:GetAttribute("Admin") ~= true then
 		return false, Config.Serums.ComingSoonText
 	end
 	local serum, profile = serumOf(player)
@@ -14486,7 +15052,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -14703,7 +15269,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -15047,7 +15613,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -15122,7 +15688,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -16396,6 +16962,9 @@ function TitanService.ApplyDamage(t, attacker: Player?, amount: number, zone: st
 		return nil
 	end
 	info = info or {}
+	if attacker and attacker:GetAttribute("AdminOneShot") == true then
+		amount *= 100000
+	end
 	local now = os.clock()
 	local mult = 1
 	local blocked = false
@@ -16714,7 +17283,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -18412,11 +18981,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="66">
+  <Item class="ServerStorage" referent="67">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="67">
+    <Item class="ModuleScript" referent="68">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -18643,19 +19212,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="68">
+  <Item class="SoundService" referent="69">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="69">
+  <Item class="StarterGui" referent="70">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="70">
+  <Item class="StarterPlayer" referent="71">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -18666,11 +19235,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="71">
+    <Item class="StarterCharacterScripts" referent="72">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="72">
+      <Item class="LocalScript" referent="73">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -18683,19 +19252,19 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="73">
+    <Item class="StarterPlayerScripts" referent="74">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="74">
+      <Item class="Folder" referent="75">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="75">
+        <Item class="Folder" referent="76">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="76">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -18867,7 +19436,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="77">
+          <Item class="ModuleScript" referent="78">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -19366,7 +19935,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="79">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -19701,7 +20270,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -19760,7 +20329,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -20437,7 +21006,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -21066,7 +21635,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -21993,7 +22562,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -22041,6 +22610,7 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.G] = "Awaken",
 	[Enum.KeyCode.M] = "Menu",
 	[Enum.KeyCode.N] = "Premium",
+	[Enum.KeyCode.P] = "Admin",
 	[Enum.KeyCode.CapsLock] = "WalkToggle",
 	[Enum.KeyCode.LeftAlt] = "ToggleCursor",
 	[Enum.KeyCode.ButtonR2] = "Attack",
@@ -22062,6 +22632,7 @@ local MOUSE: { [Enum.UserInputType]: string } = {
 local ALWAYS = {
 	Menu = true,
 	Premium = true,
+	Admin = true,
 	ToggleCursor = true,
 }
 
@@ -22139,7 +22710,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -22809,7 +23380,7 @@ local function physics(dt: number)
 			startFlying()
 		end
 	end
-	gas = math.clamp(gas - used, 0, maxGas)
+	gas = if player:GetAttribute("AdminGas") == true then maxGas else math.clamp(gas - used, 0, maxGas)
 end
 
 local function renderVisuals()
@@ -23021,7 +23592,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -23111,7 +23682,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -23585,7 +24156,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="88">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -23696,7 +24267,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="88">
+        <Item class="LocalScript" referent="89">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -23734,6 +24305,7 @@ local ORDER = {
 	{ UI, "Premium" },
 	{ UI, "Raid" },
 	{ UI, "RewardsPanel" },
+	{ UI, "AdminPanel" },
 	{ Controllers, "WaypointController" },
 	{ UI, "Intro" },
 }
@@ -23779,11 +24351,506 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="89">
+        <Item class="Folder" referent="90">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="91">
+            <Properties>
+              <string name="Name">AdminPanel</string>
+              <string name="Source"><![CDATA[--[[
+	AdminPanel - Pannello Admin (tasto P o pulsante 🛠️, visibile solo agli amministratori)
+	Categorie: Progressione • Oggetti • Sieri • Poteri • Mondo • Storia • Server
+	In alto si sceglie il BERSAGLIO (tu o un altro giocatore) e si può scrivere un VALORE
+	(numero o testo) usato dai pulsanti che lo richiedono.
+	Tutte le azioni vengono controllate dal server (AdminService).
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Net = require(Shared.Lib.Net)
+local Items = require(Shared.Data.Items)
+local Serums = require(Shared.Data.Serums)
+local Titans = require(Shared.Data.Titans)
+local Zones = require(Shared.Data.Zones)
+local Story = require(Shared.Data.Story)
+
+local Theme = require(script.Parent.Theme)
+local New = Theme.New
+local Colors = Theme.Colors
+
+local AdminPanel = {}
+local C
+
+local player = Players.LocalPlayer
+
+local panel: Frame
+local content: ScrollingFrame
+local valueBox: TextBox
+local targetButton: TextButton
+local categoryButtons: { [string]: TextButton } = {}
+local currentCategory = "Progressione"
+local targetUserId = player.UserId
+
+local CATEGORIES = {
+	{ Id = "Progressione", Icon = "⭐" },
+	{ Id = "Oggetti", Icon = "🎒" },
+	{ Id = "Sieri", Icon = "💉" },
+	{ Id = "Poteri", Icon = "⚡" },
+	{ Id = "Mondo", Icon = "🌍" },
+	{ Id = "Storia", Icon = "📜" },
+	{ Id = "Server", Icon = "📢" },
+}
+
+local function isAdmin(): boolean
+	return player:GetAttribute("Admin") == true
+end
+
+local function target(): Player
+	return Players:GetPlayerByUserId(targetUserId) or player
+end
+
+local function send(action: string, value: any?)
+	C.SoundController.Play("UI")
+	Net.Event("AdminAction"):FireServer(action, targetUserId, value)
+end
+
+local function typedValue(): string
+	return valueBox and valueBox.Text or ""
+end
+
+-- ELEMENTI ---------------------------------------------------------------------------------------
+
+local order = 0
+local function nextOrder(): number
+	order += 1
+	return order
+end
+
+local function section(title: string, hint: string?)
+	Theme.Label(title, { Size = UDim2.new(1, -10, 0, 26), LayoutOrder = nextOrder(), Font = Theme.Fonts.Header, TextSize = 18, TextColor3 = Colors.GoldBright, Parent = content })
+	if hint then
+		Theme.Label(hint, { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = nextOrder(), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = content })
+	end
+end
+
+local function row(cellWidth: number?, cellHeight: number?): Frame
+	local frame = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = nextOrder(), Parent = content })
+	New("UIGridLayout", { CellSize = UDim2.fromOffset(cellWidth or 168, cellHeight or 40), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = frame })
+	return frame
+end
+
+local function button(parent: Instance, text: string, color: Color3?, onClick: () -> ())
+	return Theme.Button(text, { TextSize = 13, BackgroundColor3 = color or Colors.PanelLight, Parent = parent }, onClick)
+end
+
+local GREEN = Color3.fromRGB(46, 120, 66)
+local BLUE = Color3.fromRGB(46, 96, 150)
+local RED = Color3.fromRGB(150, 46, 46)
+local PURPLE = Color3.fromRGB(110, 60, 150)
+
+-- CATEGORIE --------------------------------------------------------------------------------------
+
+local function showProgression()
+	section("Livello", "Il VALORE in alto serve per \"Imposta livello\".")
+	local r = row()
+	button(r, "👑 Livello MASSIMO", GREEN, function()
+		send("LevelMax")
+	end)
+	button(r, "+100 livelli", nil, function()
+		send("LevelAdd", 100)
+	end)
+	button(r, "+10 livelli", nil, function()
+		send("LevelAdd", 10)
+	end)
+	button(r, "Imposta livello (valore)", BLUE, function()
+		send("LevelSet", tonumber(typedValue()))
+	end)
+	section("Statistiche")
+	r = row()
+	button(r, "💪 Statistiche al MASSIMO", GREEN, function()
+		send("StatsMax")
+	end)
+	button(r, "Azzera statistiche", nil, function()
+		send("StatsReset")
+	end)
+	section("Valute", "Con un numero nel VALORE, i pulsanti \"(valore)\" danno quella quantità.")
+	r = row()
+	button(r, "💰 +1.000.000 oro", GREEN, function()
+		send("Gold", 1000000)
+	end)
+	button(r, "💰 +100.000.000 oro", GREEN, function()
+		send("Gold", 100000000)
+	end)
+	button(r, "💰 Oro (valore)", BLUE, function()
+		send("Gold", tonumber(typedValue()))
+	end)
+	button(r, "💎 +10.000 gemme", GREEN, function()
+		send("Gems", 10000)
+	end)
+	button(r, "💎 Gemme (valore)", BLUE, function()
+		send("Gems", tonumber(typedValue()))
+	end)
+	button(r, "🎡 +50 giri Ruota", GREEN, function()
+		send("Spins", 50)
+	end)
+	button(r, "🎁 Azzera premi", nil, function()
+		send("ResetRewards")
+	end)
+end
+
+local function showItems()
+	section("Tutto in un clic")
+	local r = row()
+	button(r, "🎒 TUTTI gli oggetti", GREEN, function()
+		send("AllItems")
+	end)
+	button(r, "🎟️ Tutti i game pass", PURPLE, function()
+		send("AllPasses")
+	end)
+	button(r, "Rimuovi game pass", RED, function()
+		send("RemovePasses")
+	end)
+	for _, category in Items.CategoryOrder do
+		local list = {}
+		for _, def in Items.List do
+			if def.Category == category then
+				table.insert(list, def)
+			end
+		end
+		table.sort(list, function(a, b)
+			return (a.LevelReq or 0) < (b.LevelReq or 0)
+		end)
+		if #list > 0 then
+			section(category)
+			r = row(168, 46)
+			for _, def in list do
+				local b = button(r, def.Name, nil, function()
+					send("Item", def.Id)
+				end)
+				b.TextColor3 = Items.RarityColor(def.Rarity)
+			end
+		end
+	end
+end
+
+local function showSerums()
+	section("Sieri Perduti (solo admin)", "Per ora i sieri si ottengono SOLO da qui. Inietta un siero e premi T per trasformarti nel gigante.")
+	local r = row()
+	button(r, "⭐ Maestria MASSIMA", GREEN, function()
+		send("SerumMastery")
+	end)
+	button(r, "🧳 Tutti e 8 in valigetta", BLUE, function()
+		send("AllSerums")
+	end)
+	button(r, "🔁 Trasformati (T)", PURPLE, function()
+		send("Transform")
+	end)
+	button(r, "Rimuovi siero", RED, function()
+		send("RemoveSerum")
+	end)
+	local grid = row(220, 120)
+	local current = C.ClientData.Profile and C.ClientData.Profile.Serum or ""
+	for _, id in Serums.Order do
+		local serum = Serums.Get(id)
+		if serum then
+			local card = Theme.Panel({ BackgroundColor3 = if current == id then Color3.fromRGB(60, 50, 24) else Colors.Background, Parent = grid })
+			Theme.Padding(card, 8)
+			Theme.Label(serum.TitanName, { Size = UDim2.new(1, 0, 0, 20), Font = Theme.Fonts.Bold, TextSize = 15, TextColor3 = Items.RarityColor(serum.Rarity), Parent = card })
+			Theme.Label(serum.Passive or "", { Position = UDim2.fromOffset(0, 22), Size = UDim2.new(1, 0, 0, 44), Font = Theme.Fonts.UI, TextSize = 11, TextColor3 = Colors.TextDim, Parent = card })
+			Theme.Button(if current == id then "✔ Attivo" else "💉 Inietta", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 32), TextSize = 14, BackgroundColor3 = GREEN, Parent = card }, function()
+				send("Serum", id)
+			end)
+		end
+	end
+end
+
+local function toggleText(attribute: string, name: string): string
+	local on = target():GetAttribute(attribute) == true
+	return ("%s: %s"):format(name, if on then "ON" else "OFF")
+end
+
+local function showPowers()
+	section("Poteri", "Valgono per il bersaglio scelto in alto e durano finché resta nel server.")
+	local r = row(220, 44)
+	local function toggle(action: string, attribute: string, name: string)
+		local b
+		b = button(r, toggleText(attribute, name), if target():GetAttribute(attribute) then GREEN else nil, function()
+			send(action)
+			task.delay(0.3, function()
+				if b.Parent then
+					b.Text = toggleText(attribute, name)
+					b.BackgroundColor3 = if target():GetAttribute(attribute) then GREEN else Colors.PanelLight
+				end
+			end)
+		end)
+	end
+	toggle("ToggleGod", "AdminGod", "🛡️ Immortalità")
+	toggle("ToggleGas", "AdminGas", "💨 Gas infinito")
+	toggle("ToggleOneShot", "AdminOneShot", "⚔️ Colpo unico")
+	section("Velocità")
+	r = row()
+	for _, mult in { 1, 1.5, 2, 3 } do
+		button(r, ("🏃 Velocità x%s"):format(tostring(mult)), if mult == 1 then nil else BLUE, function()
+			send("Speed", mult)
+		end)
+	end
+	section("Vita")
+	r = row()
+	button(r, "❤️ Cura completa", GREEN, function()
+		send("Heal")
+	end)
+	button(r, "Rinasci", nil, function()
+		send("Respawn")
+	end)
+end
+
+local function showWorld()
+	section("Giocatori", "Scegli un altro giocatore come BERSAGLIO in alto.")
+	local r = row()
+	button(r, "📍 Vai dal bersaglio", BLUE, function()
+		send("GoTo")
+	end)
+	button(r, "🧲 Porta il bersaglio da te", BLUE, function()
+		send("BringTo")
+	end)
+	section("Giganti", "I giganti evocati compaiono davanti a te e spariscono dopo 10 minuti.")
+	r = row(130, 40)
+	for _, id in { "Sagoma", "T3", "T4", "T5", "T7", "T10", "T12", "T15", "TB" } do
+		local class = Titans.Classes[id]
+		if class then
+			button(r, class.Name:gsub("Gigante da ", ""), nil, function()
+				send("SpawnTitan", id)
+			end)
+		end
+	end
+	r = row()
+	button(r, "☠️ Abbatti giganti vicini", RED, function()
+		send("KillTitans")
+	end)
+	button(r, "🧹 Rimuovi giganti vicini", nil, function()
+		send("ClearTitans")
+	end)
+	button(r, "⚠️ Invasione qui", RED, function()
+		send("Invasion")
+	end)
+	section("Boss", "Evoca il boss e ti porta nella sua zona.")
+	r = row()
+	local bosses = {}
+	for id, def in Titans.Bosses do
+		table.insert(bosses, { Id = id, Def = def })
+	end
+	table.sort(bosses, function(a, b)
+		return (a.Def.Level or 0) < (b.Def.Level or 0)
+	end)
+	for _, entry in bosses do
+		button(r, ("👹 %s (Lv %d)"):format(entry.Def.Name, entry.Def.Level or 0), PURPLE, function()
+			send("SpawnBoss", entry.Id)
+		end)
+	end
+	section("Teletrasporto")
+	r = row()
+	for _, zone in Zones.List do
+		button(r, zone.Name or zone.Id, nil, function()
+			send("Teleport", zone.Id)
+		end)
+	end
+	section("Ora del giorno")
+	r = row(120, 40)
+	for _, hour in { 6, 9, 12, 15, 18, 21, 0 } do
+		button(r, ("🕐 %02d:00"):format(hour), nil, function()
+			send("Time", hour)
+		end)
+	end
+end
+
+local function showStory()
+	section("Storia")
+	local r = row()
+	button(r, "✔ Completa obiettivo", GREEN, function()
+		send("StoryStep")
+	end)
+	button(r, "🏆 Storia completata", PURPLE, function()
+		send("StoryDone")
+	end)
+	section("Salta a un capitolo")
+	r = row(300, 40)
+	for i, chapter in Story.Chapters do
+		button(r, ("%d. %s (Lv %d)"):format(i, chapter.Title:gsub("^Capitolo %d+ %- ", ""), chapter.Level), nil, function()
+			send("Chapter", i)
+		end)
+	end
+end
+
+local function showServer()
+	section("Annuncio a tutti", "Scrivi il messaggio nel VALORE in alto, poi premi il pulsante (passa dal filtro di Roblox).")
+	local r = row(220, 44)
+	button(r, "📢 Invia annuncio", BLUE, function()
+		send("Announce", typedValue())
+	end)
+	button(r, "⭐ Esperienza doppia (tutti)", GREEN, function()
+		send("DoubleXP")
+	end)
+	section("Moderazione", "Scegli il giocatore come BERSAGLIO in alto.")
+	r = row(220, 44)
+	button(r, "🚫 Espelli il bersaglio", RED, function()
+		if target() ~= player then
+			send("Kick")
+		end
+	end)
+	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro UserId in Config.lua → Admins. Ora ci sono %d admin extra."):format(#Config.Admins))
+end
+
+local RENDER = {
+	Progressione = showProgression,
+	Oggetti = showItems,
+	Sieri = showSerums,
+	Poteri = showPowers,
+	Mondo = showWorld,
+	Storia = showStory,
+	Server = showServer,
+}
+
+local function updateTarget()
+	local t = target()
+	targetUserId = t.UserId
+	targetButton.Text = "🎯 Bersaglio: " .. (if t == player then "TU" else t.DisplayName) .. "  ▸"
+end
+
+local function render()
+	if not panel then
+		return
+	end
+	for id, b in categoryButtons do
+		b.BackgroundColor3 = if id == currentCategory then Colors.Green else Colors.PanelLight
+	end
+	for _, child in content:GetChildren() do
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+	order = 0
+	updateTarget()
+	local ok, err = pcall(RENDER[currentCategory])
+	if not ok then
+		warn("[Admin] " .. tostring(err))
+	end
+end
+
+local function toggle()
+	if not isAdmin() then
+		return
+	end
+	C.UIController.Toggle("Admin")
+end
+
+function AdminPanel.Init(c)
+	C = c
+end
+
+function AdminPanel.Start()
+	panel = Theme.Panel({ Name = "Admin", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(1000, 640), Parent = C.UIController.Layers.Panels })
+	Theme.Padding(panel, 14)
+	local stroke = panel:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = Colors.RedBright
+	end
+	Theme.Label("🛠️ Pannello Admin", { Size = UDim2.new(0, 300, 0, 34), Font = Theme.Fonts.Title, TextSize = 30, TextColor3 = Colors.RedBright, Parent = panel })
+	Theme.Button("✕", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(36, 32), TextSize = 18, Parent = panel }, function()
+		C.UIController.Close("Admin")
+	end)
+	-- bersaglio: clic per passare al giocatore successivo
+	targetButton = Theme.Button("", { Position = UDim2.fromOffset(310, 0), Size = UDim2.fromOffset(280, 34), TextSize = 14, BackgroundColor3 = Color3.fromRGB(90, 40, 40), Parent = panel }, function()
+		local list = Players:GetPlayers()
+		local index = 1
+		for i, p in list do
+			if p.UserId == targetUserId then
+				index = i
+			end
+		end
+		targetUserId = list[(index % #list) + 1].UserId
+		render()
+	end)
+	valueBox = New("TextBox", {
+		Position = UDim2.fromOffset(600, 0),
+		Size = UDim2.fromOffset(340, 34),
+		BackgroundColor3 = Colors.Background,
+		TextColor3 = Colors.Text,
+		PlaceholderText = "VALORE (numero o messaggio)...",
+		PlaceholderColor3 = Colors.TextDim,
+		Font = Theme.Fonts.Bold,
+		TextSize = 15,
+		ClearTextOnFocus = false,
+		Text = "",
+		Parent = panel,
+	})
+	Theme.Corner(valueBox, 8)
+	Theme.Stroke(valueBox, Colors.Border, 1, 0.3)
+	local nav = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 46), Size = UDim2.new(0, 170, 1, -46), Parent = panel })
+	New("UIListLayout", { Padding = UDim.new(0, 6), Parent = nav })
+	for i, category in CATEGORIES do
+		categoryButtons[category.Id] = Theme.Button(category.Icon .. " " .. category.Id, { Size = UDim2.new(1, 0, 0, 44), TextSize = 15, LayoutOrder = i, Parent = nav }, function()
+			currentCategory = category.Id
+			render()
+		end)
+	end
+	content = New("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.fromOffset(184, 46),
+		Size = UDim2.new(1, -184, 1, -46),
+		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = Colors.Gold,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		Parent = panel,
+	})
+	New("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = content })
+	C.UIController.RegisterPanel("Admin", panel, render)
+	C.InputController.On("Admin", function(began)
+		if began then
+			toggle()
+		end
+	end)
+
+	-- pulsante laterale, visibile solo agli admin
+	local adminButton = Theme.Button("🛠️", { Name = "PulsanteAdmin", AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, 16, 0.5, 150), Size = UDim2.fromOffset(60, 60), TextSize = 28, BackgroundColor3 = Color3.fromRGB(110, 34, 34), Visible = isAdmin(), Parent = C.UIController.Layers.HUD }, toggle)
+	C.UIController.AttachScale(adminButton)
+	New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -1), Size = UDim2.new(1, 0, 0, 12), Font = Theme.Fonts.Bold, TextSize = 9, TextColor3 = Colors.GoldBright, Text = "ADMIN (P)", Parent = adminButton })
+	player:GetAttributeChangedSignal("Admin"):Connect(function()
+		adminButton.Visible = isAdmin()
+		if isAdmin() then
+			C.Notifications.Toast("🛠️ Sei amministratore: premi P per il Pannello Admin", "Successo", 5)
+		end
+	end)
+	if isAdmin() then
+		task.delay(6, function()
+			C.Notifications.Toast("🛠️ Sei amministratore: premi P per il Pannello Admin", "Successo", 5)
+		end)
+	end
+	C.ClientData.Changed:Connect(function()
+		if C.UIController.IsOpen("Admin") and currentCategory == "Sieri" then
+			render()
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(p)
+		if p.UserId == targetUserId then
+			targetUserId = player.UserId
+			if C.UIController.IsOpen("Admin") then
+				render()
+			end
+		end
+	end)
+end
+
+return AdminPanel
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -23939,7 +25006,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -24595,7 +25662,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -25316,7 +26383,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -25817,7 +26884,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -26486,7 +27553,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -26766,7 +27833,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -27090,7 +28157,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -27218,7 +28285,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -27890,7 +28957,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -28573,7 +29640,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -28818,7 +29885,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -29020,7 +30087,7 @@ return UIController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="102">
+  <Item class="Workspace" referent="104">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>

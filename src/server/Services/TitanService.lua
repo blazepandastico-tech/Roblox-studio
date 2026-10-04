@@ -1269,6 +1269,9 @@ function TitanService.ApplyDamage(t, attacker: Player?, amount: number, zone: st
 		return nil
 	end
 	info = info or {}
+	if attacker and attacker:GetAttribute("AdminOneShot") == true then
+		amount *= 100000
+	end
 	local now = os.clock()
 	local mult = 1
 	local blocked = false

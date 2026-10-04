@@ -34,7 +34,7 @@ local S
 local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N"
 
 local function allowed(player: Player): boolean
-	if RunService:IsStudio() then
+	if player:GetAttribute("Admin") == true or RunService:IsStudio() then
 		return true
 	end
 	if game.CreatorType == Enum.CreatorType.User then

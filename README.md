@@ -44,7 +44,8 @@ poi salva il luogo: all'avvio il server non rigenera una mappa che esiste già.
 | **F** | parla con i personaggi, usa, raccogli |
 | **M** | menu (equipaggiamento, statistiche, sieri, storia, codici, impostazioni) |
 | **N** | negozio premium |
-| **T** | trasformazione in gigante (prossimo aggiornamento) |
+| **T** | trasformazione in gigante (per ora solo per gli admin) |
+| **P** | Pannello Admin (solo amministratori) |
 | **G** | Risveglio della stirpe Valkar |
 | **Alt sinistro** | sblocca il cursore |
 
@@ -132,6 +133,22 @@ Tutti i passi per pubblicare e far crescere il gioco sono in [`docs/LANCIO.md`](
 
 `SIERIPERDUTI`, `ARCIPELAGO`, `CORPODEIFALCHI`, `BENVENUTORECLUTA`, `OLTREILMARE`, `PRIMORAID`
 (Menu → Codici). Aggiungine altri in `src/server/Services/CodesService.lua`.
+
+## 7a. Pannello Admin (tasto P)
+
+Visibile solo agli amministratori: **Roblox Studio**, il **proprietario del gioco** e gli UserId in
+`Config.lua → Admins`. Ogni azione è controllata dal server, quindi i giocatori normali non possono usarlo.
+
+- **Progressione**: livello massimo, +10/+100 livelli, statistiche al massimo, oro, gemme, giri della ruota, azzera premi.
+- **Oggetti**: tutti gli oggetti con un clic o uno alla volta, tutti i game pass.
+- **Sieri**: gli 8 Sieri Perduti (**per ora si ottengono SOLO da qui**), maestria massima, trasformazione (T).
+- **Poteri**: immortalità, gas infinito, colpo unico, velocità x1.5/x2/x3, cura completa.
+- **Mondo**: evoca giganti e boss, abbatti o rimuovi i giganti vicini, invasione, teletrasporto, ora del giorno,
+  vai da un giocatore o portalo da te.
+- **Storia**: completa l'obiettivo, salta a qualsiasi capitolo, storia completata.
+- **Server**: annuncio a tutti (filtrato da Roblox), esperienza doppia per tutti, espelli un giocatore.
+
+In alto scegli il **bersaglio** (tu o un altro giocatore) e scrivi un **valore** per i pulsanti che lo usano.
 
 ## 7b. Verificare la storia (comandi di prova)
 

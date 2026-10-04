@@ -40,6 +40,7 @@ Net.EventNames = {
 	"ClaimReward",
 	"SpinWheel",
 	"CommunityAction",
+	"AdminAction",
 	-- server -> client
 	"RaidState",
 	"WheelResult",

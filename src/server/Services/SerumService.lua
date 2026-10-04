@@ -106,6 +106,17 @@ function SerumService.Inject(player: Player, serumId: string): (boolean, string?
 	if profile.StoredSerums[serumId] <= 0 then
 		profile.StoredSerums[serumId] = nil
 	end
+	return SerumService.ApplySerum(player, serumId)
+end
+
+-- Inietta subito un siero, senza controlli (usato dal Pannello Admin)
+function SerumService.ApplySerum(player: Player, serumId: string): (boolean, string?)
+	local profile = S.DataService.Get(player)
+	local serum = Serums.Get(serumId)
+	local root = Util.GetRoot(player.Character)
+	if not profile or not serum or not root then
+		return false, "Siero sconosciuto."
+	end
 	local old = Serums.Get(profile.Serum)
 	profile.Serum = serumId
 	profile.SerumMastery[serumId] = profile.SerumMastery[serumId] or 0

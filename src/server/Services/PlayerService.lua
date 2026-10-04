@@ -180,7 +180,7 @@ function PlayerService.Refresh(player: Player, keepResources: boolean?)
 		local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 		humanoid.MaxHealth = stats.MaxHealth
 		humanoid.Health = math.clamp(fraction, 0.05, 1) * stats.MaxHealth
-		humanoid.WalkSpeed = stats.WalkSpeed
+		humanoid.WalkSpeed = stats.WalkSpeed * (player:GetAttribute("AdminSpeed") or 1)
 		humanoid.UseJumpPower = false
 		humanoid.JumpHeight = Config.Player.JumpHeight
 	end
@@ -218,7 +218,7 @@ function PlayerService.AddXP(player: Player, amount: number, silent: boolean?): 
 	end
 	local stats = PlayerService.Stats(player)
 	-- bonus della community (amici nel server, gruppo): vedi CommunityService
-	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0)
+	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0) + (player:GetAttribute("BonusXPEvento") or 0)
 	if (profile.Buffs.XPUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -301,6 +301,9 @@ end
 -- DANNI -------------------------------------------------------------------------------
 
 function PlayerService.IsInvulnerable(player: Player): boolean
+	if player:GetAttribute("AdminGod") == true then
+		return true
+	end
 	local state = PlayerService.GetState(player)
 	if os.clock() < state.IFramesUntil then
 		return true

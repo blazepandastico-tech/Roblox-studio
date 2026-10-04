@@ -43,6 +43,7 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.G] = "Awaken",
 	[Enum.KeyCode.M] = "Menu",
 	[Enum.KeyCode.N] = "Premium",
+	[Enum.KeyCode.P] = "Admin",
 	[Enum.KeyCode.CapsLock] = "WalkToggle",
 	[Enum.KeyCode.LeftAlt] = "ToggleCursor",
 	[Enum.KeyCode.ButtonR2] = "Attack",
@@ -64,6 +65,7 @@ local MOUSE: { [Enum.UserInputType]: string } = {
 local ALWAYS = {
 	Menu = true,
 	Premium = true,
+	Admin = true,
 	ToggleCursor = true,
 }
 

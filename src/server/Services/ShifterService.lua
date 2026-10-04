@@ -218,7 +218,7 @@ end
 
 function ShifterService.Transform(player: Player): (boolean, string?)
 	local state0 = S.PlayerService.GetState(player)
-	if not Config.Serums.Available and not state0.Transformed then
+	if not Config.Serums.Available and not state0.Transformed and player:GetAttribute("Admin") ~= true then
 		return false, Config.Serums.ComingSoonText
 	end
 	local serum, profile = serumOf(player)
