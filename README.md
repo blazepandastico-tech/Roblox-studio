@@ -118,6 +118,12 @@ pubblicato quella voce risulta "non disponibile". Gli acquisti sono gestiti in m
 `SIERIPERDUTI`, `ARCIPELAGO`, `CORPODEIFALCHI`, `BENVENUTORECLUTA`, `OLTREILMARE`, `PRIMORAID`
 (Menu → Codici). Aggiungine altri in `src/server/Services/CodesService.lua`.
 
+## 7b. Verificare la storia (comandi di prova)
+
+In **Roblox Studio** (o se sei il proprietario del gioco) scrivi in chat: `/aiuto`, `/capitolo N`, `/passo`,
+`/livello N`, `/oro N`, `/gemme N`, `/vai Zona`, `/zone`, `/cura`.
+La guida completa, capitolo per capitolo, è in [`docs/GUIDA_STORIA.md`](docs/GUIDA_STORIA.md).
+
 ## 8. Personalizzare
 
 | Cosa | Dove |

@@ -702,8 +702,38 @@ end
 
 -- EDIFICI ------------------------------------------------------------------------------
 
-local function window(parentCF: CFrame, offset: Vector3, faceSize: Vector2)
-	part({ Name = "Finestra", Size = Vector3.new(faceSize.X, faceSize.Y, 0.3), CFrame = parentCF * CFrame.new(offset), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+local SHUTTERS = { Color3.fromRGB(62, 92, 64), Color3.fromRGB(58, 76, 104), Color3.fromRGB(110, 62, 44), Color3.fromRGB(86, 64, 46) }
+local FLOWERS = { Color3.fromRGB(196, 52, 60), Color3.fromRGB(230, 190, 60), Color3.fromRGB(176, 90, 190), Color3.fromRGB(236, 236, 236) }
+
+-- Finestra di facciata: cornice, vetro, davanzale e (a volte) persiane aperte e fiori.
+-- side = -1 facciata (-Z), +1 retro (+Z)
+local function facadeWindow(cf: CFrame, x: number, y: number, side: number, depth: number, valdoria: boolean, rich: boolean)
+	local z = side * (depth / 2)
+	local w, h = 3.2, if valdoria then 5.6 else 4.4
+	local frameColor = if valdoria then Color3.fromRGB(214, 206, 190) else PALETTE.Timber
+	if rich then
+		part({ Name = "Cornice", Size = Vector3.new(w + 0.9, h + 0.9, 0.25), CFrame = cf * CFrame.new(x, y, z + side * 0.08), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor, CastShadow = false, CanCollide = false })
+	end
+	part({ Name = "Finestra", Size = Vector3.new(w, h, 0.3), CFrame = cf * CFrame.new(x, y, z + side * 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+	if not rich then
+		return
+	end
+	part({ Name = "Davanzale", Size = Vector3.new(w + 1.4, 0.4, 0.9), CFrame = cf * CFrame.new(x, y - h / 2 - 0.4, z + side * 0.45), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor, CastShadow = false, CanCollide = false })
+	if valdoria then
+		-- architrave di pietra sopra la finestra
+		part({ Name = "Architrave", Size = Vector3.new(w + 1.6, 0.8, 0.6), CFrame = cf * CFrame.new(x, y + h / 2 + 0.7, z + side * 0.3), Material = Enum.Material.Limestone, Color = frameColor, CastShadow = false, CanCollide = false })
+		return
+	end
+	local roll = rng:NextNumber()
+	if roll < 0.45 then
+		local color = pick(SHUTTERS)
+		for _, s in { -1, 1 } do
+			part({ Name = "Persiana", Size = Vector3.new(w / 2 + 0.2, h + 0.4, 0.2), CFrame = cf * CFrame.new(x + s * (w * 0.75 + 0.55), y, z + side * 0.2), Material = Enum.Material.WoodPlanks, Color = color, CastShadow = false, CanCollide = false })
+		end
+	elseif roll < 0.65 then
+		part({ Name = "Fioriera", Size = Vector3.new(w + 0.6, 0.9, 0.9), CFrame = cf * CFrame.new(x, y - h / 2 - 0.1, z + side * 0.8), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 66, 44), CastShadow = false, CanCollide = false })
+		part({ Name = "Fiori", Size = Vector3.new(w + 0.4, 0.8, 0.8), CFrame = cf * CFrame.new(x, y - h / 2 + 0.6, z + side * 0.8), Material = Enum.Material.Grass, Color = pick(FLOWERS), CastShadow = false, CanCollide = false })
+	end
 end
 
 local function buildHouse(cf: CFrame, width: number, depth: number, floors: number, style: string, ruined: boolean?)
@@ -720,21 +750,44 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 	CollectionService:AddTag(body, "Edificio")
 	body.CollisionGroup = Config.CollisionGroups.Buildings
 
-	-- travi a vista (stile medievale delle Mura)
+	-- zoccolo di pietra alla base
+	local plinthH = if isValdoria then 4 else 2.4
+	part({ Name = "Zoccolo", Size = Vector3.new(width + 0.8, plinthH, depth + 0.8), CFrame = cf * CFrame.new(0, plinthH / 2, 0), Material = Enum.Material.Cobblestone, Color = if isValdoria then Color3.fromRGB(150, 144, 134) else Color3.fromRGB(132, 126, 116), CastShadow = false })
+
 	if not isValdoria then
+		-- travi a vista: montanti agli angoli, fasce ai piani e croci di Sant'Andrea in facciata
 		for _, sx in { -1, 1 } do
 			for _, sz in { -1, 1 } do
 				part({ Name = "Trave", Size = Vector3.new(1.2, height, 1.2), CFrame = cf * CFrame.new(sx * width / 2, height / 2, sz * depth / 2), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
 			end
 		end
 		for f = 1, floors - 1 do
-			part({ Name = "Fascia", Size = Vector3.new(width + 0.6, 1, depth + 0.6), CFrame = cf * CFrame.new(0, f * floorH, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+			if f * floorH < height - 2 then
+				part({ Name = "Fascia", Size = Vector3.new(width + 0.6, 1, depth + 0.6), CFrame = cf * CFrame.new(0, f * floorH, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+			end
+		end
+		if not ruined and floors >= 2 then
+			local y0 = floorH
+			local panel = math.min(floorH, height - y0)
+			local diag = math.sqrt((width * 0.22) ^ 2 + panel ^ 2)
+			local angle = math.atan2(width * 0.22, panel)
+			for _, s in { -1, 1 } do
+				part({ Name = "Croce", Size = Vector3.new(0.8, diag, 0.5), CFrame = cf * CFrame.new(s * width * 0.36, y0 + panel / 2, -depth / 2 - 0.15) * CFrame.Angles(0, 0, s * angle), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
+			end
 		end
 	else
 		part({ Name = "Cornicione", Size = Vector3.new(width + 1.2, 1.4, depth + 1.2), CFrame = cf * CFrame.new(0, height + 0.7, 0), Material = Enum.Material.Concrete, Color = Color3.fromRGB(190, 184, 170), CastShadow = false })
+		for f = 1, floors - 1 do
+			part({ Name = "Marcapiano", Size = Vector3.new(width + 0.5, 0.7, depth + 0.5), CFrame = cf * CFrame.new(0, f * floorH, 0), Material = Enum.Material.Limestone, Color = Color3.fromRGB(206, 198, 182), CastShadow = false })
+		end
+		-- balcone con ringhiera al primo piano
+		if not ruined and floors >= 2 and rng:NextNumber() < 0.45 then
+			part({ Name = "Balcone", Size = Vector3.new(width * 0.4, 0.8, 3), CFrame = cf * CFrame.new(0, floorH + 0.4, -depth / 2 - 1.5), Material = Enum.Material.Limestone, Color = Color3.fromRGB(200, 192, 176) })
+			part({ Name = "Ringhiera", Size = Vector3.new(width * 0.4, 3, 0.25), CFrame = cf * CFrame.new(0, floorH + 2.3, -depth / 2 - 2.9), Material = Enum.Material.Metal, Color = Color3.fromRGB(40, 40, 42), CastShadow = false, CanCollide = false })
+		end
 	end
 
-	-- finestre su facciata e retro
+	-- finestre su facciata (con cornice) e retro (solo vetro)
 	local cols = math.max(1, math.floor(width / 9))
 	for f = 0, floors - 1 do
 		local y = f * floorH + 7
@@ -742,21 +795,35 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			for c = 1, cols do
 				local x = -width / 2 + width * (c - 0.5) / cols
 				if not (f == 0 and c == math.ceil(cols / 2)) then
-					window(cf, Vector3.new(x, y, -depth / 2 - 0.1), Vector2.new(3.2, 4.4))
+					facadeWindow(cf, x, y, -1, depth, isValdoria, not ruined)
 				end
 				if rng:NextNumber() < 0.6 then
-					window(cf, Vector3.new(x, y, depth / 2 + 0.1), Vector2.new(3.2, 4.4))
+					facadeWindow(cf, x, y, 1, depth, isValdoria, false)
 				end
 			end
 		end
 	end
-	-- porta
-	part({ Name = "Porta", Size = Vector3.new(4.4, 8, 0.4), CFrame = cf * CFrame.new(0, 4, -depth / 2 - 0.15), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(90, 60, 40), CastShadow = false })
+	-- porta con stipiti, architrave e gradino
+	local doorX = if cols % 2 == 1 then 0 else -width / 2 + width * (math.ceil(cols / 2) - 0.5) / cols
+	part({ Name = "Porta", Size = Vector3.new(4.4, 8, 0.4), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4, -depth / 2 - 0.15), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(90, 60, 40), CastShadow = false })
+	part({ Name = "Stipite", Size = Vector3.new(5.8, 9.2, 0.3), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4.6, -depth / 2 - 0.05), Material = if isValdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = if isValdoria then Color3.fromRGB(214, 206, 190) else PALETTE.Timber, CastShadow = false, CanCollide = false })
+	part({ Name = "Gradino", Size = Vector3.new(6, 0.8, 2), CFrame = cf * CFrame.new(doorX, 0.4, -depth / 2 - 1), Material = Enum.Material.Cobblestone, Color = Color3.fromRGB(140, 134, 124) })
+	if not ruined and rng:NextNumber() < 0.5 then
+		local lantern = part({ Name = "Lanterna", Size = Vector3.new(0.8, 1.2, 0.8), CFrame = cf * CFrame.new(doorX + 3.8, plinthH / 2 + 8, -depth / 2 - 0.7), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 196, 120), CastShadow = false, CanCollide = false })
+		local light = Instance.new("PointLight")
+		light.Range = 14
+		light.Brightness = 1.2
+		light.Color = Color3.fromRGB(255, 186, 110)
+		light.Shadows = false
+		light.Parent = lantern
+		CollectionService:AddTag(lantern, Config.Tags.Lamp)
+	end
 
 	-- tetto
 	if not ruined or rng:NextNumber() < 0.4 then
 		if isValdoria then
 			part({ Name = "Tetto", Size = Vector3.new(width, 1.2, depth), CFrame = cf * CFrame.new(0, height + 0.6, 0), Material = Enum.Material.Slate, Color = Color3.fromRGB(70, 70, 74) })
+			part({ Name = "Parapetto", Size = Vector3.new(width + 1.2, 2.2, 0.8), CFrame = cf * CFrame.new(0, height + 2.5, -depth / 2 - 0.2), Material = Enum.Material.Limestone, Color = Color3.fromRGB(196, 188, 172), CastShadow = false })
 		else
 			local roofH = math.min(width, depth) * 0.45
 			local roofColor = pick(PALETTE.Roof)
@@ -766,9 +833,14 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			local w2 = wedge({ Name = "Tetto", Size = Vector3.new(width + overhang, roofH, depth / 2 + overhang / 2), CFrame = cf * CFrame.new(0, roofTop, depth / 4 + overhang / 4) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.ClayRoofTiles, Color = roofColor })
 			w1.CollisionGroup = Config.CollisionGroups.Buildings
 			w2.CollisionGroup = Config.CollisionGroups.Buildings
+			-- colmo
+			part({ Name = "Colmo", Size = Vector3.new(width + overhang + 0.4, 0.9, 1.2), CFrame = cf * CFrame.new(0, height + roofH + 0.2, 0), Material = Enum.Material.ClayRoofTiles, Color = Color3.new(roofColor.R * 0.8, roofColor.G * 0.8, roofColor.B * 0.8), CastShadow = false })
 		end
 		if rng:NextNumber() < 0.65 then
-			part({ Name = "Comignolo", Size = Vector3.new(2.6, 8, 2.6), CFrame = cf * CFrame.new(width * 0.3, height + 4, depth * 0.15), Material = Enum.Material.Brick, Color = Color3.fromRGB(120, 70, 56), CastShadow = false })
+			local chimneyH = if isValdoria then 6 else 8
+			local chimneyY = height + chimneyH / 2
+			part({ Name = "Comignolo", Size = Vector3.new(2.6, chimneyH, 2.6), CFrame = cf * CFrame.new(width * 0.3, chimneyY, depth * 0.15), Material = Enum.Material.Brick, Color = Color3.fromRGB(120, 70, 56), CastShadow = false })
+			part({ Name = "CappelloComignolo", Size = Vector3.new(3.3, 0.6, 3.3), CFrame = cf * CFrame.new(width * 0.3, chimneyY + chimneyH / 2 + 0.3, depth * 0.15), Material = Enum.Material.Slate, Color = Color3.fromRGB(70, 66, 62), CastShadow = false })
 		end
 	elseif ruined then
 		-- travi bruciate al posto del tetto

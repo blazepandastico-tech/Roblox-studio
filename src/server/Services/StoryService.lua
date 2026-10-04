@@ -125,6 +125,11 @@ function StoryService.Advance(player: Player)
 	startStep(player)
 end
 
+-- Riavvia il passo attuale (usato dai comandi di prova)
+function StoryService.RestartStep(player: Player)
+	startStep(player)
+end
+
 -- Il giocatore parla con un PNG: se la storia lo richiede, restituisce il dialogo
 function StoryService.TryTalk(player: Player, npcId: string): boolean
 	local _, step = StoryService.Current(player)

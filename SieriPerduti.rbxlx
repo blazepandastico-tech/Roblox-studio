@@ -2150,6 +2150,34 @@ local Config = {
 		DodgeCooldown = 0.9,
 		DodgeIFrames = 0.3,
 		LandingRollSpeed = 85,
+		AwakenedSpeedMult = 1.3,
+
+		-- trazione: vicinanza dell'aggancio e angolo rispetto alla direzione di volo
+		NearPullMult = 1.15, -- aggancio vicinissimo
+		FarPullMult = 0.85, -- aggancio al limite della portata
+		AlignedPullBonus = 0.18, -- tirare nella direzione in cui si vola
+		OpposedPullPenalty = 0.3, -- tirare all'indietro rende meno: meglio oscillare
+
+		-- slancio cinetico: volare veloce rasente agli ostacoli accumula velocità
+		ProximityRadius = 16, -- entro questa distanza da muri/alberi/tetti
+		MomentumMinSpeed = 55,
+		MomentumGain = 0.9, -- slancio al secondo (0..1) quasi a contatto
+		MomentumDecay = 0.35,
+		MomentumSpeedBonus = 0.35, -- +35% di velocità massima a slancio pieno
+		MomentumThrust = 30,
+
+		-- convalida lato server (anti-trucchi): valori larghi per non punire chi ha lag
+		Validation = {
+			Enabled = true,
+			AnchorSlack = 18, -- studs oltre la portata del rampino
+			LatencyWindow = 0.3, -- secondi di movimento tollerati per la latenza
+			GasSlack = 2, -- il client può essere avanti di poco rispetto al server
+			SampleInterval = 0.25,
+			MinSpeedCap = 240, -- abilità come la Danza delle Lame arrivano a 220 studs/s
+			SpeedTolerance = 1.5,
+			DisplacementSlack = 30,
+			StrikesToCorrect = 2, -- campioni consecutivi sospetti prima di riportare indietro
+		},
 	},
 
 	Combat = {
@@ -2167,6 +2195,8 @@ local Config = {
 		BodyDamageShare = 0.2, -- i colpi fuori dalla nuca fanno solo il 20%
 		BrokenBladeMult = 0.1,
 		ReloadTime = 0.8,
+		SpearFuse = 1.4, -- secondi tra l'impatto della Lancia Dirompente e l'esplosione
+		ArmorBladeWear = 2, -- usura extra delle lame colpendo corazze o pelle indurita
 		KillShareMin = 0.1, -- per ricevere la ricompensa serve almeno il 10% del danno
 	},
 
@@ -6487,6 +6517,7 @@ Net.EventNames = {
 	"HitConfirm",
 	"TitanForm",
 	"Refilled",
+	"ODMCorrect",
 	-- in entrambe le direzioni
 	"ODM",
 }
@@ -6936,17 +6967,255 @@ return Util
           </Properties>
         </Item>
       </Item>
+      <Item class="Folder" referent="32">
+        <Properties>
+          <string name="Name">Modules</string>
+        </Properties>
+        <Item class="ModuleScript" referent="33">
+          <Properties>
+            <string name="Name">ODMPhysicsModule</string>
+            <string name="Source"><![CDATA[--[[
+	ODMPhysicsModule - la matematica dei Rampini a Gas, condivisa tra client e server.
+
+	Il client la usa ogni frame per simulare il volo (è lui il proprietario fisico del personaggio,
+	quindi niente ritardi di rete); il server usa le stesse formule per convalidare:
+	portata degli agganci, consumo di gas e velocità massima plausibile.
+
+	Non tocca istanze né servizi: solo Vector3 e numeri, così si può testare fuori da Studio.
+
+	Novità rispetto al vecchio controller:
+	  - la trazione scala con la VICINANZA dell'aggancio (più è vicino, più tira forte) e con
+	    l'ANGOLO rispetto alla direzione di volo (tirare "in avanti" rende di più che frenare);
+	  - SLANCIO CINETICO: volare veloce rasente a muri, alberi e tetti accumula slancio (0..1)
+	    che alza la velocità massima e dà una piccola spinta in avanti. Si perde allontanandosi
+	    dagli ostacoli o rallentando.
+]]
+
+local Config = require(script.Parent.Parent.Config)
+
+local ODMPhysics = {}
+
+local ODM = Config.ODM
+
+export type Hook = {
+	Target: Vector3, -- punto d'aggancio nel mondo
+	RopeLength: number, -- lunghezza del cavo (si accorcia mentre il verricello tira)
+	Held: boolean, -- il tasto è premuto: il verricello tira
+}
+
+export type StepInput = {
+	Position: Vector3,
+	Velocity: Vector3,
+	Hooks: { Hook },
+	Move: Vector3, -- direzione di sterzata nel mondo (WASD già ruotato dalla camera), modulo 0..1
+	Boost: boolean,
+	BoostDirection: Vector3, -- di solito lo sguardo della camera
+	Gas: number,
+	GasEfficiency: number,
+	SpeedMult: number,
+	Momentum: number, -- slancio accumulato 0..1
+	Clearance: number?, -- distanza dall'ostacolo più vicino (nil = nessuno nel raggio)
+	Range: number?, -- portata del rampino (per la scala della vicinanza)
+	Gravity: number?, -- workspace.Gravity (196.2 se assente)
+	dt: number,
+}
+
+export type StepOutput = {
+	Velocity: Vector3,
+	Acceleration: Vector3,
+	GasUsed: number,
+	Hanging: boolean,
+	Momentum: number,
+	Boosting: boolean,
+}
+
+local function unit(v: Vector3): Vector3
+	local m = v.Magnitude
+	if m < 1e-6 then
+		return Vector3.zero
+	end
+	return v / m
+end
+
+local function lerp(a: number, b: number, t: number): number
+	return a + (b - a) * t
+end
+
+-- Moltiplicatore di velocità finale (statistica + Risveglio della stirpe)
+function ODMPhysics.SpeedMult(reel: number?, awakened: boolean?): number
+	local mult = if type(reel) == "number" and reel > 0 then reel else 1
+	if awakened then
+		mult *= ODM.AwakenedSpeedMult
+	end
+	return mult
+end
+
+-- Velocità massima in volo, con lo slancio cinetico
+function ODMPhysics.MaxSpeed(speedMult: number, momentum: number?): number
+	return ODM.MaxSpeed * math.sqrt(math.max(speedMult, 0.01)) * (1 + ODM.MomentumSpeedBonus * math.clamp(momentum or 0, 0, 1))
+end
+
+-- Fattore di vicinanza: un aggancio vicino tira più forte di uno al limite della portata
+function ODMPhysics.ProximityFactor(dist: number, range: number?): number
+	local r = math.max(range or 115, 1)
+	return lerp(ODM.NearPullMult, ODM.FarPullMult, math.clamp(dist / r, 0, 1))
+end
+
+-- Fattore d'angolo: quanto la trazione è allineata con la direzione di volo.
+-- In avanti (dot = 1) rende di più, "contromano" (dot = -1) rende di meno: per invertire
+-- la rotta conviene oscillare attorno al cavo invece di tirare dritto.
+function ODMPhysics.AngleFactor(velocity: Vector3, pullDir: Vector3): number
+	local speed = velocity.Magnitude
+	if speed < 5 then
+		return 1
+	end
+	local align = (velocity / speed):Dot(pullDir)
+	if align >= 0 then
+		return 1 + ODM.AlignedPullBonus * align
+	end
+	return 1 + ODM.OpposedPullPenalty * align
+end
+
+-- Aggiorna lo slancio cinetico (0..1)
+function ODMPhysics.UpdateMomentum(momentum: number, speed: number, clearance: number?, dt: number): number
+	local radius = ODM.ProximityRadius
+	if clearance and clearance < radius and speed >= ODM.MomentumMinSpeed then
+		local closeness = 1 - math.clamp(clearance / radius, 0, 1)
+		local fast = math.clamp((speed - ODM.MomentumMinSpeed) / ODM.MomentumMinSpeed, 0.25, 1)
+		return math.min(1, momentum + ODM.MomentumGain * closeness * fast * dt)
+	end
+	local decay = if speed < ODM.MomentumMinSpeed * 0.6 then ODM.MomentumDecay * 3 else ODM.MomentumDecay
+	return math.max(0, momentum - decay * dt)
+end
+
+-- Gas consumato in dt (stesse regole per client e server)
+function ODMPhysics.GasDrain(reeling: number, boosting: boolean, gasEfficiency: number, dt: number): number
+	local eff = math.max(gasEfficiency, 0.1)
+	local used = reeling * ODM.GasDrainReel * dt
+	if boosting then
+		used += ODM.GasDrainBoost * dt
+	end
+	return used / eff
+end
+
+function ODMPhysics.HookCost(gasEfficiency: number): number
+	return ODM.GasPerHook / math.max(gasEfficiency, 0.1)
+end
+
+function ODMPhysics.DodgeCost(gasEfficiency: number): number
+	return ODM.GasPerDodge / math.max(gasEfficiency, 0.1)
+end
+
+--[[
+	Un passo di simulazione in volo. Le lunghezze dei cavi vengono accorciate sul posto
+	(il verricello riavvolge); tutto il resto viene restituito.
+]]
+function ODMPhysics.Step(input: StepInput): StepOutput
+	local dt = input.dt
+	local position = input.Position
+	local velocity = input.Velocity
+	local mult = input.SpeedMult
+	local accel = Vector3.zero
+	local hasGas = input.Gas > 0
+	local reeling = 0
+	local hanging = false
+	local attached = #input.Hooks
+
+	for _, h in input.Hooks do
+		local to = h.Target - position
+		local dist = to.Magnitude
+		if dist > 0.5 then
+			local dir = to / dist
+			if hasGas and h.Held then
+				local reel = ODM.ReelAcceleration * mult * ODMPhysics.ProximityFactor(dist, input.Range) * ODMPhysics.AngleFactor(velocity, dir)
+				local minDist = ODM.MinAttachDistance
+				if dist < minDist * 2.5 then
+					-- arrivando alla parete il verricello rallenta: ci si appende invece di schiantarsi
+					reel *= math.clamp((dist - minDist * 0.5) / (minDist * 2), 0, 1)
+					hanging = hanging or (dist < minDist * 1.6 and velocity.Magnitude < 25)
+				end
+				accel += dir * reel
+				reeling += 1
+			end
+			-- il cavo è teso: non ci si può allontanare oltre la sua lunghezza (pendolo)
+			h.RopeLength = math.min(h.RopeLength, dist + 0.3)
+			if dist >= h.RopeLength - 0.3 then
+				local radial = velocity:Dot(dir)
+				if radial < 0 then
+					velocity -= dir * radial
+				end
+			end
+		end
+	end
+	if hanging then
+		velocity *= 1 - math.min(1, dt * 6)
+	end
+	if attached > 0 then
+		accel += Vector3.new(0, (input.Gravity or 196.2) * ODM.AntiGravity, 0)
+	end
+
+	if input.Move.Magnitude > 0.05 then
+		accel += input.Move * (if attached > 0 then ODM.SteerAcceleration else ODM.AirSteer) * mult
+	end
+	local boosting = input.Boost and hasGas
+	if boosting then
+		accel += unit(input.BoostDirection) * ODM.BoostAcceleration * mult
+	end
+
+	-- slancio cinetico: piccola spinta lungo la direzione di volo
+	local momentum = ODMPhysics.UpdateMomentum(input.Momentum, velocity.Magnitude, input.Clearance, dt)
+	if momentum > 0 and velocity.Magnitude > 1 then
+		accel += unit(velocity) * ODM.MomentumThrust * momentum
+	end
+
+	velocity += accel * dt
+	velocity *= 1 - ODM.Drag * dt
+	local maxSpeed = ODMPhysics.MaxSpeed(mult, momentum)
+	if velocity.Magnitude > maxSpeed then
+		velocity = velocity.Unit * maxSpeed
+	end
+
+	return {
+		Velocity = velocity,
+		Acceleration = accel,
+		GasUsed = ODMPhysics.GasDrain(reeling, boosting, input.GasEfficiency, dt),
+		Hanging = hanging,
+		Momentum = momentum,
+		Boosting = boosting,
+	}
+end
+
+-- CONVALIDA (server) ---------------------------------------------------------------------
+
+-- Il punto d'aggancio è raggiungibile? Si tollera lo spostamento dovuto alla latenza.
+function ODMPhysics.ValidateAnchor(rootPosition: Vector3, anchor: Vector3, range: number, speed: number): boolean
+	local slack = ODM.Validation.AnchorSlack + speed * ODM.Validation.LatencyWindow
+	return (anchor - rootPosition).Magnitude <= range + slack
+end
+
+-- Spostamento massimo credibile in dt secondi (volo, abilità, spinte dei giganti)
+function ODMPhysics.MaxDisplacement(speedMult: number, dt: number): number
+	local v = ODM.Validation
+	local speed = math.max(ODMPhysics.MaxSpeed(speedMult, 1), v.MinSpeedCap)
+	return speed * dt * v.SpeedTolerance + v.DisplacementSlack
+end
+
+return ODMPhysics
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="32">
+  <Item class="ServerScriptService" referent="34">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="33">
+    <Item class="Folder" referent="35">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="34">
+      <Item class="Script" referent="36">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -6978,6 +7247,7 @@ local ORDER = {
 	"TitanService",
 	"EnemyService",
 	"CombatService",
+	"ODMService",
 	"QuestService",
 	"StoryService",
 	"SerumService",
@@ -6988,6 +7258,7 @@ local ORDER = {
 	"NPCService",
 	"SupplyService",
 	"CodesService",
+	"DevCommandsService",
 }
 
 local Services = {}
@@ -7032,11 +7303,11 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="35">
+      <Item class="Folder" referent="37">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -7098,7 +7369,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -7107,7 +7378,8 @@ return CodesService
 	  - fendenti con le lame (combo da 4 colpi) e abilità Z/X/C/V
 	  - armi a distanza (Lance Dirompenti, pistole, fucili, pistola di segnalazione)
 	  - sostituzione delle lame, Risveglio Valkar
-	Inoltre inoltra agli altri giocatori le animazioni e i cavi dei Rampini.
+	Inoltra inoltre agli altri giocatori le animazioni (i cavi dei Rampini li convalida
+	e inoltra ODMService).
 
 	Il client rileva i colpi (così sono precisi anche a 150 studs/s) e il server
 	controlla distanze, tempi di ricarica e danni: niente danni "inventati".
@@ -7190,8 +7462,9 @@ local function addMastery(player: Player, amount: number)
 	end
 end
 
--- Applica un colpo di lama a una parte (gigante o nemico umano)
-local function bladeHit(player: Player, part: BasePart, baseDamage: number, speed: number, opts)
+-- Applica un colpo di lama a una parte (gigante o nemico umano).
+-- Restituisce (colpito, bloccato): "bloccato" = corazza o pelle indurita, che consuma di più le lame.
+local function bladeHit(player: Player, part: BasePart, baseDamage: number, speed: number, opts): (boolean, boolean)
 	local stats = S.PlayerService.Stats(player)
 	local profile = S.DataService.Get(player)
 	local damage = baseDamage
@@ -7217,19 +7490,19 @@ local function bladeHit(player: Player, part: BasePart, baseDamage: number, spee
 			elseif result.Severed then
 				Net.Event("HitConfirm"):FireClient(player, { Kind = "Sever" })
 			end
-			return true
+			return true, result.Blocked == true
 		end
-		return false
+		return false, false
 	end
 	local e = S.EnemyService.GetFromPart(part)
 	if e then
 		local result = S.EnemyService.ApplyDamage(e, player, damage)
 		if result then
 			sendDamageNumber(player, part.Position, result.Damage, if crit then "Crit" else "Normal")
-			return true
+			return true, false
 		end
 	end
-	return false
+	return false, false
 end
 
 local function validPart(part: any, root: BasePart, reach: number, speed: number): boolean
@@ -7270,6 +7543,7 @@ local function onAttack(player: Player, payload: any)
 	end
 	local hits = payload.Hits
 	local anyHit = false
+	local anyBlocked = false
 	if type(hits) == "table" then
 		local seen = {}
 		local count = 0
@@ -7282,16 +7556,18 @@ local function onAttack(player: Player, payload: any)
 				if owner and not seen[owner] then
 					seen[owner] = true
 					count += 1
-					if bladeHit(player, part, base, speed) then
-						anyHit = true
-					end
+					local hit, blocked = bladeHit(player, part, base, speed)
+					anyHit = anyHit or hit
+					anyBlocked = anyBlocked or blocked
 				end
 			end
 		end
 	end
 	if anyHit then
 		if not broken then
-			state.BladeDurability = math.max(0, state.BladeDurability - 1)
+			-- la carne dei giganti consuma le lame; le corazze molto di più
+			local wear = 1 + (if anyBlocked then Config.Combat.ArmorBladeWear else 0)
+			state.BladeDurability = math.max(0, state.BladeDurability - wear)
 			if state.BladeDurability == 0 then
 				S.EventService.Notify(player, "Lame spezzate! Premi R per sostituirle.", "Errore", 3)
 			end
@@ -7370,7 +7646,7 @@ local function onSkillHit(player: Player, key: any, hits: any)
 				if done < perTargetLimit then
 					active.PerTarget[owner] = done + 1
 					active.Hits += 1
-					if bladeHit(player, part, base, speed, { ForcePerfect = key == "V" }) then
+					if (bladeHit(player, part, base, speed, { ForcePerfect = key == "V" })) then
 						anyHit = true
 					end
 				end
@@ -7431,12 +7707,22 @@ local function onRanged(player: Player, payload: any)
 	S.EventService.Effect("RangedShot", { From = origin, To = hitPos, Kind = kind, Color = def.ProjectileColor, Shooter = player }, origin, 900)
 
 	if kind == "Lancia" or kind == "Cannone" then
-		-- la lancia si conficca e poi esplode
+		-- la lancia si conficca, la miccia lampeggia e poi esplode (il cannone esplode subito)
 		local offset = nil
 		if hitPart then
 			offset = hitPart.CFrame:PointToObjectSpace(hitPos)
 		end
-		local delay = if kind == "Cannone" then 0.25 else 0.6
+		local delay = if kind == "Cannone" then 0.25 else (def.Fuse or Config.Combat.SpearFuse)
+		if kind == "Lancia" then
+			S.EventService.Effect("SpearArmed", {
+				Part = hitPart,
+				Offset = offset,
+				Position = hitPos,
+				From = origin,
+				Fuse = delay,
+				Color = def.ProjectileColor,
+			}, hitPos, 900)
+		end
 		task.delay(delay, function()
 			local pos = hitPos
 			if hitPart and offset and hitPart.Parent then
@@ -7540,7 +7826,7 @@ local function onAwaken(player: Player)
 	S.EventService.Notify(player, "RISVEGLIO ACKERMAN!", "Raro", 3)
 end
 
--- INOLTRO ANIMAZIONI E CAVI DEI RAMPINI -----------------------------------------------------------
+-- INOLTRO ANIMAZIONI -------------------------------------------------------------------------------
 
 local allowedClips = {}
 for name in Poses.Human.Clips do
@@ -7585,29 +7871,6 @@ local function onAnimRelay(player: Player, clip: any, speed: any)
 	relayToNearby(Net.Unreliable("AnimRelay"), player, 500, clip, if type(speed) == "number" then math.clamp(speed, 0.2, 3) else 1)
 end
 
-local function onODM(player: Player, action: any, data: any)
-	if type(action) ~= "string" or not withinBudget(player, 30) then
-		return
-	end
-	if action ~= "Attach" and action ~= "Release" and action ~= "Fire" then
-		return
-	end
-	local clean = {}
-	if type(data) == "table" then
-		clean.Side = if data.Side == "Left" then "Left" else "Right"
-		if typeof(data.Part) == "Instance" and data.Part:IsA("BasePart") then
-			clean.Part = data.Part
-		end
-		if typeof(data.Offset) == "Vector3" then
-			clean.Offset = data.Offset
-		end
-		if typeof(data.Position) == "Vector3" then
-			clean.Position = data.Position
-		end
-	end
-	relayToNearby(Net.Event("ODM"), player, 700, action, clean)
-end
-
 function CombatService.Init(services)
 	S = services
 end
@@ -7620,7 +7883,6 @@ function CombatService.Start()
 	Net.Event("ReloadBlades").OnServerEvent:Connect(onReload)
 	Net.Event("Awaken").OnServerEvent:Connect(onAwaken)
 	Net.Unreliable("AnimRelay").OnServerEvent:Connect(onAnimRelay)
-	Net.Event("ODM").OnServerEvent:Connect(onODM)
 	Players.PlayerRemoving:Connect(function(player)
 		relayBudget[player] = nil
 	end)
@@ -7630,7 +7892,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -7969,7 +8231,251 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="41">
+          <Properties>
+            <string name="Name">DevCommandsService</string>
+            <string name="Source"><![CDATA[--[[
+	DevCommandsService - comandi di prova in chat
+	Funzionano SOLO in Roblox Studio oppure per il proprietario del gioco: servono a
+	verificare storia, livelli e isole senza dover giocare ore.
+
+	/aiuto              elenco dei comandi
+	/livello N          porta il personaggio al livello N
+	/oro N              aggiunge N monete d'oro
+	/gemme N            aggiunge N gemme
+	/capitolo N         salta all'inizio del capitolo N della storia (1-17)
+	/passo              completa l'obiettivo attuale della storia
+	/vai Zona           teletrasporto in una zona (es. /vai Recinto, /vai Aurion)
+	/zone               elenco delle zone
+	/cura               vita, gas e lame al massimo
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TextChatService = game:GetService("TextChatService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Story = require(Shared.Data.Story)
+local Zones = require(Shared.Data.Zones)
+local Leveling = require(Shared.Data.Leveling)
+
+local DevCommandsService = {}
+local S
+
+local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura"
+
+local function allowed(player: Player): boolean
+	if RunService:IsStudio() then
+		return true
+	end
+	if game.CreatorType == Enum.CreatorType.User then
+		return player.UserId == game.CreatorId
+	end
+	local ok, rank = pcall(function()
+		return player:GetRankInGroup(game.CreatorId)
+	end)
+	return ok and rank == 255
+end
+
+local function say(player: Player, text: string)
+	S.EventService.Notify(player, text, "Prova", 6)
+	print(("[Comandi] %s: %s"):format(player.Name, text))
+end
+
+local function setLevel(player: Player, target: number)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	target = math.clamp(math.floor(target), 1, Config.MaxLevel)
+	local before = profile.Level
+	if target > before then
+		local need = -profile.XP
+		for level = before, target - 1 do
+			need += Leveling.XPToNext(level)
+		end
+		Leveling.AddXP(profile, need)
+	else
+		-- in discesa: si riparte da zero punti statistica spesi
+		profile.Level = target
+		profile.XP = 0
+		pcall(S.PlayerService.ResetStats, player)
+	end
+	S.PlayerService.Refresh(player, true)
+	local leaderstats = player:FindFirstChild("leaderstats")
+	local levelValue = leaderstats and leaderstats:FindFirstChild("Livello") :: IntValue?
+	if levelValue then
+		levelValue.Value = profile.Level
+	end
+	S.DataService.MarkDirty(player)
+	if profile.Level > before then
+		S.PlayerService.LevelUp:Fire(player, profile.Level, before)
+	end
+	say(player, ("Livello impostato a %d"):format(profile.Level))
+end
+
+local function jumpToChapter(player: Player, index: number)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	local chapter = Story.Chapters[index]
+	if not chapter then
+		say(player, ("Capitolo non valido: scegli da 1 a %d"):format(#Story.Chapters))
+		return
+	end
+	profile.Story.Chapter = index
+	profile.Story.Step = 1
+	profile.Story.Progress = 0
+	profile.Story.Done = false
+	S.DataService.MarkDirty(player)
+	say(player, ("Storia: %s (livello consigliato %d)"):format(chapter.Title, chapter.Level))
+	S.StoryService.RestartStep(player)
+end
+
+local function findZone(name: string)
+	local wanted = string.lower(name)
+	local exact = Zones.Get(name)
+	if exact then
+		return exact
+	end
+	for _, zone in Zones.List do
+		if string.lower(zone.Id) == wanted or string.lower(zone.Name or "") == wanted then
+			return zone
+		end
+	end
+	for _, zone in Zones.List do
+		if string.find(string.lower(zone.Id), wanted, 1, true) or string.find(string.lower(zone.Name or ""), wanted, 1, true) then
+			return zone
+		end
+	end
+	return nil
+end
+
+local function run(player: Player, text: string)
+	local args = string.split(text, " ")
+	local command = string.lower(args[1] or "")
+	local value = tonumber(args[2])
+	if command == "/aiuto" or command == "/comandi" then
+		say(player, HELP)
+	elseif command == "/livello" and value then
+		setLevel(player, value)
+	elseif command == "/oro" and value then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Gold += math.max(0, math.floor(value))
+			S.DataService.MarkDirty(player)
+			say(player, ("+%d oro"):format(math.floor(value)))
+		end
+	elseif command == "/gemme" and value then
+		S.MonetizationService.AddGems(player, math.max(0, math.floor(value)), "Prova")
+		say(player, ("+%d gemme"):format(math.floor(value)))
+	elseif command == "/capitolo" and value then
+		jumpToChapter(player, math.floor(value))
+	elseif command == "/passo" then
+		local chapter, step = S.StoryService.Current(player)
+		if chapter and step then
+			say(player, "Obiettivo completato: " .. step.Objective)
+			S.StoryService.Advance(player)
+		else
+			say(player, "La storia è già completata")
+		end
+	elseif command == "/vai" and args[2] then
+		local zone = findZone(table.concat(args, " ", 2))
+		if zone then
+			S.PlayerService.Teleport(player, Zones.SpawnPoint(zone))
+			say(player, "Teletrasporto: " .. (zone.Name or zone.Id))
+		else
+			say(player, "Zona non trovata. Scrivi /zone per l'elenco")
+		end
+	elseif command == "/zone" then
+		local ids = {}
+		for _, zone in Zones.List do
+			table.insert(ids, zone.Id)
+		end
+		say(player, table.concat(ids, ", "))
+	elseif command == "/cura" then
+		S.PlayerService.Heal(player, 1)
+		pcall(S.PlayerService.RefillWeapons, player)
+		say(player, "Vita, gas e lame ricaricati")
+	else
+		return false
+	end
+	return true
+end
+
+-- lo stesso messaggio può arrivare sia dai comandi della chat sia da Player.Chatted
+local lastRun: { [Player]: { Text: string, Time: number } } = {}
+
+local function handle(player: Player, text: string)
+	if string.sub(text, 1, 1) ~= "/" or not allowed(player) then
+		return
+	end
+	local last = lastRun[player]
+	local now = os.clock()
+	if last and last.Text == text and now - last.Time < 1 then
+		return
+	end
+	lastRun[player] = { Text = text, Time = now }
+	local ok, err = pcall(run, player, text)
+	if not ok then
+		warn("[Comandi] Errore: " .. tostring(err))
+	end
+end
+
+local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura" }
+
+function DevCommandsService.Init(services)
+	S = services
+end
+
+function DevCommandsService.Start()
+	-- comandi registrati nella chat moderna (così non vengono inviati come messaggi)
+	pcall(function()
+		local folder = Instance.new("Folder")
+		folder.Name = "ComandiDiProva"
+		folder.Parent = TextChatService
+		for _, alias in ALIASES do
+			local command = Instance.new("TextChatCommand")
+			command.Name = string.sub(alias, 2)
+			command.PrimaryAlias = alias
+			command.Parent = folder
+			command.Triggered:Connect(function(source: TextSource, text: string)
+				local player = Players:GetPlayerByUserId(source.UserId)
+				if player then
+					handle(player, text)
+				end
+			end)
+		end
+	end)
+	local function watch(player: Player)
+		player.Chatted:Connect(function(message)
+			handle(player, message)
+		end)
+		if RunService:IsStudio() then
+			task.delay(8, function()
+				if player.Parent then
+					say(player, "Comandi di prova attivi (solo in Studio): scrivi /aiuto in chat")
+				end
+			end)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+	Players.PlayerAdded:Connect(watch)
+	Players.PlayerRemoving:Connect(function(player)
+		lastRun[player] = nil
+	end)
+end
+
+return DevCommandsService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -8431,7 +8937,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -8544,7 +9050,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -8665,6 +9171,7 @@ local function useItem(player: Player, id: string): (boolean, string?)
 		end
 		S.PlayerService.Heal(player, def.Amount)
 	elseif effect == "RefillGas" then
+		S.ODMService.Refill(player)
 		Net.Event("Refilled"):FireClient(player, "Gas")
 	elseif effect == "RefillBlades" then
 		S.PlayerService.RefillWeapons(player)
@@ -8727,7 +9234,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -8855,7 +9362,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -9227,7 +9734,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -9692,7 +10199,408 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="48">
+          <Properties>
+            <string name="Name">ODMService</string>
+            <string name="Source"><![CDATA[--[[
+	ODMService - convalida dei Rampini a Gas lato server (anti-trucchi)
+
+	Il volo è simulato dal client (proprietario fisico del personaggio): così è fluido anche con
+	300 ms di ping. Il server non lo ricalcola, ma lo tiene d'occhio con le stesse formule
+	di Shared.Modules.ODMPhysicsModule:
+
+	  1. AGGANCI: ogni "Fire" viene controllato (portata del rampino + tolleranza di latenza,
+	     parte valida, niente agganci ai giocatori, personaggio vivo e non trasformato,
+	     gas sufficiente). Se non va bene il client riceve "Reject" e sgancia il cavo,
+	     e gli altri giocatori non vedono nulla.
+	  2. GAS: il server tiene un conteggio PRUDENTE (sottostima i consumi e sovrastima le
+	     ricariche), quindi è sempre >= del gas legittimo del client. Lo pubblica
+	     nell'attributo "GasCap" e il client non può superarlo: gas infinito impossibile,
+	     nessun falso positivo per chi gioca onestamente.
+	  3. SPOSTAMENTI: ogni 0,25 s confronta lo spostamento con il massimo credibile
+	     (volo a slancio pieno, abilità, spinte). Dopo campioni consecutivi sospetti
+	     riporta il personaggio all'ultima posizione valida (niente ban automatici).
+
+	Inoltra inoltre agli altri giocatori vicini i cavi convalidati (per vederli volare).
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Lib.Util)
+local Net = require(Shared.Lib.Net)
+local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
+
+local ODMService = {}
+local S
+
+local ODM = Config.ODM
+local V = ODM.Validation
+local TICK = 0.1
+local GROUND_PROBE = 8 -- entro questa altezza consideriamo il giocatore "a terra" (per eccesso)
+local DRAIN_FACTOR = 0.9 -- il server sottostima i consumi: mai più severo del client
+local RELAY_RADIUS = 700
+
+type HookInfo = { Since: number }
+type State = {
+	Gas: number,
+	PublishedGas: number,
+	Hooks: { [string]: HookInfo },
+	Boost: boolean,
+	Character: Model?,
+	LastValid: CFrame?,
+	LastValidTime: number,
+	LastSample: number,
+	Strikes: number,
+	GraceUntil: number,
+	BudgetCount: number,
+	BudgetReset: number,
+}
+
+local states: { [Player]: State } = {}
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+groundParams.IgnoreWater = false
+
+local function maxGas(player: Player): number
+	local value = player:GetAttribute("MaxGas")
+	return if type(value) == "number" and value > 0 then value else 100
+end
+
+local function gasEfficiency(player: Player): number
+	local value = player:GetAttribute("GasEfficiency")
+	return if type(value) == "number" and value > 0 then value else 1
+end
+
+local function speedMult(player: Player): number
+	local until_ = player:GetAttribute("AwakenedUntil")
+	local awakened = type(until_) == "number" and workspace:GetServerTimeNow() < until_
+	return ODMPhysics.SpeedMult(player:GetAttribute("ODMReel"), awakened)
+end
+
+local function publish(player: Player, st: State, force: boolean?)
+	local gas = st.Gas
+	if force or math.abs(gas - st.PublishedGas) >= 1 or (gas <= 0 and st.PublishedGas > 0) then
+		st.PublishedGas = gas
+		player:SetAttribute("GasCap", math.floor(gas * 10 + 0.5) / 10)
+	end
+end
+
+local function getState(player: Player): State
+	local st = states[player]
+	if not st then
+		st = {
+			Gas = maxGas(player),
+			PublishedGas = -1,
+			Hooks = {},
+			Boost = false,
+			Character = nil,
+			LastValid = nil,
+			LastValidTime = 0,
+			LastSample = 0,
+			Strikes = 0,
+			GraceUntil = os.clock() + 3,
+			BudgetCount = 0,
+			BudgetReset = 0,
+		}
+		states[player] = st
+	end
+	return st
+end
+
+-- personaggio vivo, non trasformato e non afferrato da un gigante
+local function canUseODM(player: Player): (boolean, BasePart?)
+	local character = player.Character
+	local root = Util.GetRoot(character)
+	local humanoid = Util.GetHumanoid(character)
+	if not root or not humanoid or humanoid.Health <= 0 then
+		return false, nil
+	end
+	local pstate = S.PlayerService.GetState(player)
+	if pstate.Transformed or pstate.GrabbedBy or pstate.Dead then
+		return false, root
+	end
+	return true, root
+end
+
+local function withinBudget(st: State, limit: number): boolean
+	local now = os.clock()
+	if now >= st.BudgetReset then
+		st.BudgetCount = 0
+		st.BudgetReset = now + 1
+	end
+	st.BudgetCount += 1
+	return st.BudgetCount <= limit
+end
+
+local function relay(sender: Player, root: BasePart, action: string, data)
+	local remote = Net.Event("ODM")
+	for _, other in Players:GetPlayers() do
+		if other ~= sender then
+			local otherRoot = Util.GetRoot(other.Character)
+			if otherRoot and (otherRoot.Position - root.Position).Magnitude <= RELAY_RADIUS then
+				remote:FireClient(other, sender, action, data)
+			end
+		end
+	end
+end
+
+local function reject(player: Player, st: State, side: string, seq: any)
+	st.Hooks[side] = nil
+	Net.Event("ODMCorrect"):FireClient(player, "Reject", { Side = side, Seq = if type(seq) == "number" then seq else nil })
+end
+
+-- AGGANCI ---------------------------------------------------------------------------------
+
+local function onFire(player: Player, st: State, data)
+	local side = if data.Side == "Left" then "Left" else "Right"
+	local ok, root = canUseODM(player)
+	local part = data.Part
+	local position = data.Position
+	if not ok or not root then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	if typeof(part) ~= "Instance" or not part:IsA("BasePart") or not part:IsDescendantOf(workspace) or typeof(position) ~= "Vector3" then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	-- niente agganci ai personaggi degli altri giocatori
+	local model = part:FindFirstAncestorOfClass("Model")
+	if model and Players:GetPlayerFromCharacter(model) then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	-- il punto dichiarato deve stare sulla parte (con margine per le parti in movimento);
+	-- il Terreno è un'unica "parte" grande quanto il mondo, quindi non si controlla
+	if not part:IsA("Terrain") and (part.Position - position).Magnitude > part.Size.Magnitude * 0.5 + 25 then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	local range = player:GetAttribute("ODMRange")
+	if type(range) ~= "number" or range <= 0 then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	if not ODMPhysics.ValidateAnchor(root.Position, position, range, root.AssemblyLinearVelocity.Magnitude) then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	local cost = ODMPhysics.HookCost(gasEfficiency(player))
+	if st.Gas + V.GasSlack < cost then
+		reject(player, st, side, data.Seq)
+		return
+	end
+	st.Gas = math.max(0, st.Gas - cost)
+	st.Hooks[side] = { Since = os.clock() }
+	publish(player, st)
+
+	local clean = { Side = side, Part = part, Position = position }
+	if typeof(data.Offset) == "Vector3" then
+		clean.Offset = data.Offset
+	end
+	relay(player, root, "Fire", clean)
+end
+
+local function onRelease(player: Player, st: State, data)
+	local side = if data.Side == "Left" then "Left" else "Right"
+	if not st.Hooks[side] then
+		return
+	end
+	st.Hooks[side] = nil
+	local root = Util.GetRoot(player.Character)
+	if root then
+		relay(player, root, "Release", { Side = side })
+	end
+end
+
+local function onODM(player: Player, action: any, data: any)
+	if type(action) ~= "string" or type(data) ~= "table" then
+		return
+	end
+	local st = getState(player)
+	if not withinBudget(st, 30) then
+		return
+	end
+	if action == "Fire" then
+		if V.Enabled then
+			onFire(player, st, data)
+		else
+			-- convalida spenta: si inoltra e basta
+			local root = Util.GetRoot(player.Character)
+			if root and typeof(data.Part) == "Instance" and typeof(data.Position) == "Vector3" then
+				st.Hooks[if data.Side == "Left" then "Left" else "Right"] = { Since = os.clock() }
+				relay(player, root, "Fire", { Side = data.Side, Part = data.Part, Offset = data.Offset, Position = data.Position })
+			end
+		end
+	elseif action == "Release" then
+		onRelease(player, st, data)
+	elseif action == "Boost" then
+		st.Boost = data.On == true
+	end
+end
+
+-- SIMULAZIONE PRUDENTE DEL GAS E CONTROLLO DEGLI SPOSTAMENTI -------------------------------
+
+local function nearGround(root: BasePart, character: Model): boolean
+	groundParams.FilterDescendantsInstances = { character }
+	return workspace:Raycast(root.Position, Vector3.new(0, -GROUND_PROBE, 0), groundParams) ~= nil
+end
+
+local function updateGas(player: Player, st: State, root: BasePart, character: Model, dt: number)
+	local reeling = 0
+	for _ in st.Hooks do
+		reeling += 1
+	end
+	local grounded = nearGround(root, character)
+	local boosting = st.Boost and not grounded
+	local maxG = maxGas(player)
+	if reeling > 0 or boosting then
+		st.Gas -= ODMPhysics.GasDrain(reeling, boosting, gasEfficiency(player), dt) * DRAIN_FACTOR
+	elseif grounded then
+		st.Gas += ODM.GasRegenGround * dt
+	end
+	st.Gas = math.clamp(st.Gas, 0, maxG)
+	publish(player, st)
+end
+
+local function checkMovement(player: Player, st: State, root: BasePart, humanoid: Humanoid, now: number)
+	if now - st.LastSample < V.SampleInterval then
+		return
+	end
+	st.LastSample = now
+	local exempt = now < st.GraceUntil or root.Anchored or humanoid.SeatPart ~= nil
+	if not st.LastValid or exempt then
+		st.LastValid = root.CFrame
+		st.LastValidTime = now
+		st.Strikes = 0
+		return
+	end
+	local delta = root.Position - (st.LastValid :: CFrame).Position
+	-- le cadute sono innocue (e la gravità non ha velocità limite): conta solo il resto
+	delta = Vector3.new(delta.X, math.max(delta.Y, 0), delta.Z)
+	local allowed = ODMPhysics.MaxDisplacement(speedMult(player), now - st.LastValidTime)
+	if delta.Magnitude <= allowed then
+		st.LastValid = root.CFrame
+		st.LastValidTime = now
+		st.Strikes = 0
+		return
+	end
+	st.Strikes += 1
+	if st.Strikes >= V.StrikesToCorrect then
+		warn(("[ODM] %s: spostamento non plausibile (%.0f studs, massimo %.0f): riportato indietro"):format(player.Name, delta.Magnitude, allowed))
+		local back = st.LastValid :: CFrame
+		pcall(function()
+			(player.Character :: Model):PivotTo(back)
+			root.AssemblyLinearVelocity = Vector3.zero
+		end)
+		st.Strikes = 0
+		st.LastValidTime = now
+		st.GraceUntil = now + 0.5
+	end
+end
+
+local function tick(dt: number)
+	local now = os.clock()
+	for player, st in states do
+		local character = player.Character
+		if character ~= st.Character then
+			-- nuovo personaggio: si riparte da zero
+			st.Character = character
+			st.Hooks = {}
+			st.Boost = false
+			st.Gas = maxGas(player)
+			st.LastValid = nil
+			st.GraceUntil = now + 3
+			publish(player, st, true)
+		end
+		local ok, root = canUseODM(player)
+		if not ok then
+			st.Hooks = {}
+			st.LastValid = nil
+		elseif root and character then
+			updateGas(player, st, root, character, dt)
+			local humanoid = Util.GetHumanoid(character)
+			if V.Enabled and humanoid then
+				checkMovement(player, st, root, humanoid, now)
+			end
+		end
+	end
+end
+
+-- API PER GLI ALTRI SERVIZI -----------------------------------------------------------------
+
+-- Bombole piene (Depositi, raid, oggetti)
+function ODMService.Refill(player: Player)
+	local st = getState(player)
+	st.Gas = maxGas(player)
+	publish(player, st, true)
+end
+
+-- Consuma gas per un'azione convalidata altrove (es. schivata)
+function ODMService.Spend(player: Player, amount: number)
+	local st = getState(player)
+	st.Gas = math.max(0, st.Gas - amount * DRAIN_FACTOR)
+	publish(player, st)
+end
+
+function ODMService.DodgeCost(player: Player): number
+	return ODMPhysics.DodgeCost(gasEfficiency(player))
+end
+
+-- Spostamenti decisi dal server (teletrasporti, traghetti, raid): non sono trucchi
+function ODMService.Grace(player: Player, seconds: number)
+	local st = getState(player)
+	st.GraceUntil = math.max(st.GraceUntil, os.clock() + seconds)
+	st.LastValid = nil
+end
+
+function ODMService.Gas(player: Player): number
+	return getState(player).Gas
+end
+
+function ODMService.Init(services)
+	S = services
+end
+
+function ODMService.Start()
+	Net.Event("ODM").OnServerEvent:Connect(onODM)
+	local function track(player: Player)
+		getState(player)
+		player:GetAttributeChangedSignal("MaxGas"):Connect(function()
+			-- bombole migliori: si parte pieni (come sul client)
+			ODMService.Refill(player)
+		end)
+	end
+	for _, player in Players:GetPlayers() do
+		track(player)
+	end
+	Players.PlayerAdded:Connect(track)
+	Players.PlayerRemoving:Connect(function(player)
+		states[player] = nil
+	end)
+	task.spawn(function()
+		local last = os.clock()
+		while true do
+			task.wait(TICK)
+			local now = os.clock()
+			local ok, err = pcall(tick, math.min(now - last, 0.5))
+			last = now
+			if not ok then
+				warn("[ODM] " .. tostring(err))
+			end
+		end
+	end)
+end
+
+return ODMService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -10229,7 +11137,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -10593,6 +11501,9 @@ end
 -- SPOSTAMENTI -------------------------------------------------------------------------
 
 function PlayerService.Teleport(player: Player, position: Vector3)
+	if S.ODMService then
+		S.ODMService.Grace(player, 2)
+	end
 	pcall(function()
 		player:RequestStreamAroundAsync(position, 4)
 	end)
@@ -10894,6 +11805,9 @@ function PlayerService.Start()
 		if now - state.LastDodge >= Config.ODM.DodgeCooldown * 0.85 then
 			state.LastDodge = now
 			state.IFramesUntil = now + Config.ODM.DodgeIFrames + 0.1
+			if S.ODMService then
+				S.ODMService.Spend(player, S.ODMService.DodgeCost(player))
+			end
 		end
 	end)
 
@@ -10904,7 +11818,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -11026,7 +11940,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -11288,6 +12202,7 @@ local function startFight()
 			task.wait(0.4)
 			S.PlayerService.Teleport(player, platform + offset)
 			S.PlayerService.RefillWeapons(player)
+			S.ODMService.Refill(player)
 			S.PlayerService.Heal(player, 1)
 			Net.Event("Refilled"):FireClient(player, "Tutto")
 		end)
@@ -11508,7 +12423,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -11822,7 +12737,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -12565,7 +13480,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -12782,7 +13697,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -12909,6 +13824,11 @@ function StoryService.Advance(player: Player)
 		end
 	end
 	S.DataService.MarkDirty(player)
+	startStep(player)
+end
+
+-- Riavvia il passo attuale (usato dai comandi di prova)
+function StoryService.RestartStep(player: Player)
 	startStep(player)
 end
 
@@ -13121,7 +14041,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -13153,6 +14073,7 @@ local function connectSupply(part: Instance)
 		end
 		lastRefill[player] = now
 		S.PlayerService.RefillWeapons(player)
+		S.ODMService.Refill(player)
 		S.PlayerService.Heal(player, 0.25)
 		Net.Event("Refilled"):FireClient(player, "Tutto")
 		S.EventService.Notify(player, "Gas, lame e munizioni ricaricati!", "Successo", 2.5)
@@ -13195,7 +14116,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -14787,7 +15708,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -15494,8 +16415,38 @@ end
 
 -- EDIFICI ------------------------------------------------------------------------------
 
-local function window(parentCF: CFrame, offset: Vector3, faceSize: Vector2)
-	part({ Name = "Finestra", Size = Vector3.new(faceSize.X, faceSize.Y, 0.3), CFrame = parentCF * CFrame.new(offset), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+local SHUTTERS = { Color3.fromRGB(62, 92, 64), Color3.fromRGB(58, 76, 104), Color3.fromRGB(110, 62, 44), Color3.fromRGB(86, 64, 46) }
+local FLOWERS = { Color3.fromRGB(196, 52, 60), Color3.fromRGB(230, 190, 60), Color3.fromRGB(176, 90, 190), Color3.fromRGB(236, 236, 236) }
+
+-- Finestra di facciata: cornice, vetro, davanzale e (a volte) persiane aperte e fiori.
+-- side = -1 facciata (-Z), +1 retro (+Z)
+local function facadeWindow(cf: CFrame, x: number, y: number, side: number, depth: number, valdoria: boolean, rich: boolean)
+	local z = side * (depth / 2)
+	local w, h = 3.2, if valdoria then 5.6 else 4.4
+	local frameColor = if valdoria then Color3.fromRGB(214, 206, 190) else PALETTE.Timber
+	if rich then
+		part({ Name = "Cornice", Size = Vector3.new(w + 0.9, h + 0.9, 0.25), CFrame = cf * CFrame.new(x, y, z + side * 0.08), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor, CastShadow = false, CanCollide = false })
+	end
+	part({ Name = "Finestra", Size = Vector3.new(w, h, 0.3), CFrame = cf * CFrame.new(x, y, z + side * 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+	if not rich then
+		return
+	end
+	part({ Name = "Davanzale", Size = Vector3.new(w + 1.4, 0.4, 0.9), CFrame = cf * CFrame.new(x, y - h / 2 - 0.4, z + side * 0.45), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor, CastShadow = false, CanCollide = false })
+	if valdoria then
+		-- architrave di pietra sopra la finestra
+		part({ Name = "Architrave", Size = Vector3.new(w + 1.6, 0.8, 0.6), CFrame = cf * CFrame.new(x, y + h / 2 + 0.7, z + side * 0.3), Material = Enum.Material.Limestone, Color = frameColor, CastShadow = false, CanCollide = false })
+		return
+	end
+	local roll = rng:NextNumber()
+	if roll < 0.45 then
+		local color = pick(SHUTTERS)
+		for _, s in { -1, 1 } do
+			part({ Name = "Persiana", Size = Vector3.new(w / 2 + 0.2, h + 0.4, 0.2), CFrame = cf * CFrame.new(x + s * (w * 0.75 + 0.55), y, z + side * 0.2), Material = Enum.Material.WoodPlanks, Color = color, CastShadow = false, CanCollide = false })
+		end
+	elseif roll < 0.65 then
+		part({ Name = "Fioriera", Size = Vector3.new(w + 0.6, 0.9, 0.9), CFrame = cf * CFrame.new(x, y - h / 2 - 0.1, z + side * 0.8), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 66, 44), CastShadow = false, CanCollide = false })
+		part({ Name = "Fiori", Size = Vector3.new(w + 0.4, 0.8, 0.8), CFrame = cf * CFrame.new(x, y - h / 2 + 0.6, z + side * 0.8), Material = Enum.Material.Grass, Color = pick(FLOWERS), CastShadow = false, CanCollide = false })
+	end
 end
 
 local function buildHouse(cf: CFrame, width: number, depth: number, floors: number, style: string, ruined: boolean?)
@@ -15512,21 +16463,44 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 	CollectionService:AddTag(body, "Edificio")
 	body.CollisionGroup = Config.CollisionGroups.Buildings
 
-	-- travi a vista (stile medievale delle Mura)
+	-- zoccolo di pietra alla base
+	local plinthH = if isValdoria then 4 else 2.4
+	part({ Name = "Zoccolo", Size = Vector3.new(width + 0.8, plinthH, depth + 0.8), CFrame = cf * CFrame.new(0, plinthH / 2, 0), Material = Enum.Material.Cobblestone, Color = if isValdoria then Color3.fromRGB(150, 144, 134) else Color3.fromRGB(132, 126, 116), CastShadow = false })
+
 	if not isValdoria then
+		-- travi a vista: montanti agli angoli, fasce ai piani e croci di Sant'Andrea in facciata
 		for _, sx in { -1, 1 } do
 			for _, sz in { -1, 1 } do
 				part({ Name = "Trave", Size = Vector3.new(1.2, height, 1.2), CFrame = cf * CFrame.new(sx * width / 2, height / 2, sz * depth / 2), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
 			end
 		end
 		for f = 1, floors - 1 do
-			part({ Name = "Fascia", Size = Vector3.new(width + 0.6, 1, depth + 0.6), CFrame = cf * CFrame.new(0, f * floorH, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+			if f * floorH < height - 2 then
+				part({ Name = "Fascia", Size = Vector3.new(width + 0.6, 1, depth + 0.6), CFrame = cf * CFrame.new(0, f * floorH, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+			end
+		end
+		if not ruined and floors >= 2 then
+			local y0 = floorH
+			local panel = math.min(floorH, height - y0)
+			local diag = math.sqrt((width * 0.22) ^ 2 + panel ^ 2)
+			local angle = math.atan2(width * 0.22, panel)
+			for _, s in { -1, 1 } do
+				part({ Name = "Croce", Size = Vector3.new(0.8, diag, 0.5), CFrame = cf * CFrame.new(s * width * 0.36, y0 + panel / 2, -depth / 2 - 0.15) * CFrame.Angles(0, 0, s * angle), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
+			end
 		end
 	else
 		part({ Name = "Cornicione", Size = Vector3.new(width + 1.2, 1.4, depth + 1.2), CFrame = cf * CFrame.new(0, height + 0.7, 0), Material = Enum.Material.Concrete, Color = Color3.fromRGB(190, 184, 170), CastShadow = false })
+		for f = 1, floors - 1 do
+			part({ Name = "Marcapiano", Size = Vector3.new(width + 0.5, 0.7, depth + 0.5), CFrame = cf * CFrame.new(0, f * floorH, 0), Material = Enum.Material.Limestone, Color = Color3.fromRGB(206, 198, 182), CastShadow = false })
+		end
+		-- balcone con ringhiera al primo piano
+		if not ruined and floors >= 2 and rng:NextNumber() < 0.45 then
+			part({ Name = "Balcone", Size = Vector3.new(width * 0.4, 0.8, 3), CFrame = cf * CFrame.new(0, floorH + 0.4, -depth / 2 - 1.5), Material = Enum.Material.Limestone, Color = Color3.fromRGB(200, 192, 176) })
+			part({ Name = "Ringhiera", Size = Vector3.new(width * 0.4, 3, 0.25), CFrame = cf * CFrame.new(0, floorH + 2.3, -depth / 2 - 2.9), Material = Enum.Material.Metal, Color = Color3.fromRGB(40, 40, 42), CastShadow = false, CanCollide = false })
+		end
 	end
 
-	-- finestre su facciata e retro
+	-- finestre su facciata (con cornice) e retro (solo vetro)
 	local cols = math.max(1, math.floor(width / 9))
 	for f = 0, floors - 1 do
 		local y = f * floorH + 7
@@ -15534,21 +16508,35 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			for c = 1, cols do
 				local x = -width / 2 + width * (c - 0.5) / cols
 				if not (f == 0 and c == math.ceil(cols / 2)) then
-					window(cf, Vector3.new(x, y, -depth / 2 - 0.1), Vector2.new(3.2, 4.4))
+					facadeWindow(cf, x, y, -1, depth, isValdoria, not ruined)
 				end
 				if rng:NextNumber() < 0.6 then
-					window(cf, Vector3.new(x, y, depth / 2 + 0.1), Vector2.new(3.2, 4.4))
+					facadeWindow(cf, x, y, 1, depth, isValdoria, false)
 				end
 			end
 		end
 	end
-	-- porta
-	part({ Name = "Porta", Size = Vector3.new(4.4, 8, 0.4), CFrame = cf * CFrame.new(0, 4, -depth / 2 - 0.15), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(90, 60, 40), CastShadow = false })
+	-- porta con stipiti, architrave e gradino
+	local doorX = if cols % 2 == 1 then 0 else -width / 2 + width * (math.ceil(cols / 2) - 0.5) / cols
+	part({ Name = "Porta", Size = Vector3.new(4.4, 8, 0.4), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4, -depth / 2 - 0.15), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(90, 60, 40), CastShadow = false })
+	part({ Name = "Stipite", Size = Vector3.new(5.8, 9.2, 0.3), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4.6, -depth / 2 - 0.05), Material = if isValdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = if isValdoria then Color3.fromRGB(214, 206, 190) else PALETTE.Timber, CastShadow = false, CanCollide = false })
+	part({ Name = "Gradino", Size = Vector3.new(6, 0.8, 2), CFrame = cf * CFrame.new(doorX, 0.4, -depth / 2 - 1), Material = Enum.Material.Cobblestone, Color = Color3.fromRGB(140, 134, 124) })
+	if not ruined and rng:NextNumber() < 0.5 then
+		local lantern = part({ Name = "Lanterna", Size = Vector3.new(0.8, 1.2, 0.8), CFrame = cf * CFrame.new(doorX + 3.8, plinthH / 2 + 8, -depth / 2 - 0.7), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 196, 120), CastShadow = false, CanCollide = false })
+		local light = Instance.new("PointLight")
+		light.Range = 14
+		light.Brightness = 1.2
+		light.Color = Color3.fromRGB(255, 186, 110)
+		light.Shadows = false
+		light.Parent = lantern
+		CollectionService:AddTag(lantern, Config.Tags.Lamp)
+	end
 
 	-- tetto
 	if not ruined or rng:NextNumber() < 0.4 then
 		if isValdoria then
 			part({ Name = "Tetto", Size = Vector3.new(width, 1.2, depth), CFrame = cf * CFrame.new(0, height + 0.6, 0), Material = Enum.Material.Slate, Color = Color3.fromRGB(70, 70, 74) })
+			part({ Name = "Parapetto", Size = Vector3.new(width + 1.2, 2.2, 0.8), CFrame = cf * CFrame.new(0, height + 2.5, -depth / 2 - 0.2), Material = Enum.Material.Limestone, Color = Color3.fromRGB(196, 188, 172), CastShadow = false })
 		else
 			local roofH = math.min(width, depth) * 0.45
 			local roofColor = pick(PALETTE.Roof)
@@ -15558,9 +16546,14 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			local w2 = wedge({ Name = "Tetto", Size = Vector3.new(width + overhang, roofH, depth / 2 + overhang / 2), CFrame = cf * CFrame.new(0, roofTop, depth / 4 + overhang / 4) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.ClayRoofTiles, Color = roofColor })
 			w1.CollisionGroup = Config.CollisionGroups.Buildings
 			w2.CollisionGroup = Config.CollisionGroups.Buildings
+			-- colmo
+			part({ Name = "Colmo", Size = Vector3.new(width + overhang + 0.4, 0.9, 1.2), CFrame = cf * CFrame.new(0, height + roofH + 0.2, 0), Material = Enum.Material.ClayRoofTiles, Color = Color3.new(roofColor.R * 0.8, roofColor.G * 0.8, roofColor.B * 0.8), CastShadow = false })
 		end
 		if rng:NextNumber() < 0.65 then
-			part({ Name = "Comignolo", Size = Vector3.new(2.6, 8, 2.6), CFrame = cf * CFrame.new(width * 0.3, height + 4, depth * 0.15), Material = Enum.Material.Brick, Color = Color3.fromRGB(120, 70, 56), CastShadow = false })
+			local chimneyH = if isValdoria then 6 else 8
+			local chimneyY = height + chimneyH / 2
+			part({ Name = "Comignolo", Size = Vector3.new(2.6, chimneyH, 2.6), CFrame = cf * CFrame.new(width * 0.3, chimneyY, depth * 0.15), Material = Enum.Material.Brick, Color = Color3.fromRGB(120, 70, 56), CastShadow = false })
+			part({ Name = "CappelloComignolo", Size = Vector3.new(3.3, 0.6, 3.3), CFrame = cf * CFrame.new(width * 0.3, chimneyY + chimneyH / 2 + 0.3, depth * 0.15), Material = Enum.Material.Slate, Color = Color3.fromRGB(70, 66, 62), CastShadow = false })
 		end
 	elseif ruined then
 		-- travi bruciate al posto del tetto
@@ -16413,19 +17406,19 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="56">
+  <Item class="SoundService" referent="60">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="57">
+  <Item class="StarterGui" referent="61">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="58">
+  <Item class="StarterPlayer" referent="62">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -16436,11 +17429,11 @@ return WorldBuilder
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="59">
+    <Item class="StarterCharacterScripts" referent="63">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="60">
+      <Item class="LocalScript" referent="64">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -16453,19 +17446,19 @@ return WorldBuilder
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="61">
+    <Item class="StarterPlayerScripts" referent="65">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="62">
+      <Item class="Folder" referent="66">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="63">
+        <Item class="Folder" referent="67">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="64">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -16637,7 +17630,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="65">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -17136,7 +18129,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="66">
+          <Item class="ModuleScript" referent="70">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -17471,7 +18464,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="71">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -17530,7 +18523,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="68">
+          <Item class="ModuleScript" referent="72">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -18207,7 +19200,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="69">
+          <Item class="ModuleScript" referent="73">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -18836,7 +19829,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="70">
+          <Item class="ModuleScript" referent="74">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -19178,6 +20171,74 @@ function EffectsController.Projectile(from: Vector3, to: Vector3, time: number, 
 			p:Destroy()
 		end
 	end)
+end
+
+-- Lancia Dirompente conficcata: segue il bersaglio, la miccia lampeggia sempre più veloce
+local function spearArmed(params, fuse: number)
+	local target: BasePart? = if typeof(params.Part) == "Instance" and params.Part:IsA("BasePart") then params.Part else nil
+	local position: Vector3 = params.Position
+	local from: Vector3 = if typeof(params.From) == "Vector3" then params.From else position + Vector3.yAxis
+	local dir = Util.SafeUnit(position - from)
+	if dir.Magnitude < 0.5 then
+		dir = -Vector3.yAxis
+	end
+	if target and not target.Parent then
+		target = nil
+	end
+	-- la punta resta dentro il bersaglio, l'asta sporge all'indietro
+	local world = CFrame.lookAt(position - dir * 1.6, position + dir)
+	local localCF = if target then target.CFrame:ToObjectSpace(world) else nil
+	local shaft = part({ Size = Vector3.new(0.35, 0.35, 4), Material = Enum.Material.Metal, Color = Color3.fromRGB(70, 72, 78), CFrame = world })
+	local light = part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 0.6, Color = params.Color or Color3.fromRGB(255, 70, 50), CFrame = world * CFrame.new(0, 0, 2.1) })
+	local glow = Instance.new("PointLight")
+	glow.Color = light.Color
+	glow.Range = 10
+	glow.Brightness = 0
+	glow.Parent = light
+	local start = os.clock()
+	local nextBeep = start
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local now = os.clock()
+		local k = math.clamp((now - start) / fuse, 0, 1)
+		if k >= 1 or not shaft.Parent then
+			conn:Disconnect()
+			shaft:Destroy()
+			light:Destroy()
+			return
+		end
+		if target and localCF and target.Parent then
+			world = target.CFrame * localCF
+		end
+		shaft.CFrame = world
+		light.CFrame = world * CFrame.new(0, 0, 2.1)
+		-- bip e lampi sempre più rapidi man mano che la miccia si consuma
+		if now >= nextBeep then
+			nextBeep = now + math.max(0.06, 0.4 * (1 - k))
+			light.Transparency = 0
+			glow.Brightness = 4
+			tween(light, 0.08, { Transparency = 0.8 })
+			tween(glow, 0.08, { Brightness = 0 })
+			if C.SoundController then
+				C.SoundController.Play("Type", world.Position, { Range = 160, Volume = 0.35, Pitch = 2 + k * 1.5 })
+			end
+		end
+	end)
+	EffectsController.Sparks(position, Color3.fromRGB(255, 220, 150), 10, 30)
+	if C.SoundController then
+		C.SoundController.Play("HookHit", position, { Range = 300, Pitch = 0.9 })
+	end
+end
+
+function EffectsController.SpearArmed(params)
+	local fuse = math.clamp(tonumber(params.Fuse) or 1.4, 0.1, 5)
+	local from = if typeof(params.From) == "Vector3" then params.From else params.Position
+	-- compare quando il proiettile arriva (stessa durata del volo mostrato a chi spara)
+	local travel = math.clamp((params.Position - from).Magnitude / 400, 0.12, 0.6)
+	if travel >= fuse - 0.1 then
+		return
+	end
+	task.delay(travel, spearArmed, params, fuse - travel)
 end
 
 function EffectsController.Tracer(from: Vector3, to: Vector3, color: Color3?)
@@ -19593,6 +20654,11 @@ handlers.RangedShot = function(p)
 		C.SoundController.Play("Shot", p.From, { Range = 500 })
 	end
 end
+handlers.SpearArmed = function(p)
+	if typeof(p.Position) == "Vector3" then
+		EffectsController.SpearArmed(p)
+	end
+end
 handlers.Tracer = function(p)
 	if p.Kind == "Spear" then
 		EffectsController.Projectile(p.From, p.To, 0.35, "Spear", 1)
@@ -19690,7 +20756,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="71">
+          <Item class="ModuleScript" referent="75">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -19836,7 +20902,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="72">
+          <Item class="ModuleScript" referent="76">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -19846,6 +20912,10 @@ return InputController
 	Spazio in volo: getto di gas. WASD: correggi la traiettoria. Ctrl: schivata.
 	Il gas si consuma: ricaricalo ai Depositi di Rifornimento.
 	I rampini si agganciano a edifici, alberi, mura, terreno... e ai giganti!
+
+	La matematica del volo è in Shared.Modules.ODMPhysicsModule (la stessa che usa il server
+	per convalidare): qui restano input, mira, sensori degli ostacoli, grafica e animazioni.
+	Volare veloce rasente agli ostacoli accumula SLANCIO CINETICO (più velocità massima).
 ]]
 
 local Players = game:GetService("Players")
@@ -19856,6 +20926,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Lib.Net)
 local Util = require(Shared.Lib.Util)
+local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
 
 local ODMController = {}
 local C
@@ -19876,6 +20947,10 @@ local boostEmitter: ParticleEmitter? = nil
 local windSound: Sound? = nil
 local lastGroundCheck = 0
 local airTime = 0
+local momentum = 0
+local clearance: number? = nil
+local lastProbe = 0
+local hookSeq = 0
 local remote: { [Player]: any } = {}
 local effectsFolder: Instance
 
@@ -19935,12 +21010,44 @@ local function disabled(): boolean
 end
 
 local function speedMult(): number
-	local mult = player:GetAttribute("ODMReel") or 1
 	local until_ = player:GetAttribute("AwakenedUntil")
-	if type(until_) == "number" and workspace:GetServerTimeNow() < until_ then
-		mult *= 1.3
+	local awakened = type(until_) == "number" and workspace:GetServerTimeNow() < until_
+	return ODMPhysics.SpeedMult(player:GetAttribute("ODMReel"), awakened)
+end
+
+local function gasEfficiency(): number
+	return player:GetAttribute("GasEfficiency") or 1
+end
+
+function ODMController.Momentum(): number
+	return momentum
+end
+
+-- SENSORI DEGLI OSTACOLI (slancio cinetico) ------------------------------------------------
+
+local PROBE_INTERVAL = 0.08
+
+-- Distanza dall'ostacolo più vicino ai lati, sopra e sotto la traiettoria
+local function probeClearance(root: BasePart, velocity: Vector3): number?
+	local forward = Util.SafeUnit(velocity)
+	if forward.Magnitude < 0.5 then
+		return nil
 	end
-	return mult
+	local side = forward:Cross(Vector3.yAxis)
+	if side.Magnitude < 0.2 then
+		side = forward:Cross(Vector3.xAxis)
+	end
+	side = side.Unit
+	local up = side:Cross(forward).Unit
+	local radius = ODM.ProximityRadius
+	local best: number? = nil
+	for _, dir in { side, -side, up, -up, (forward + side).Unit, (forward - side).Unit } do
+		local result = workspace:Raycast(root.Position, dir * radius, rayParams)
+		if result and (not best or result.Distance < best) then
+			best = result.Distance
+		end
+	end
+	return best
 end
 
 -- MIRA ---------------------------------------------------------------------------------
@@ -20222,8 +21329,10 @@ local function fire(side: string)
 		h.Part = part
 		h.Offset = part.CFrame:PointToObjectSpace(target)
 		h.Duration = (target - root.Position).Magnitude / ODM.HookSpeed
-		gas = math.max(0, gas - ODM.GasPerHook / (player:GetAttribute("GasEfficiency") or 1))
-		Net.Event("ODM"):FireServer("Fire", { Side = side, Part = part, Offset = h.Offset, Position = target })
+		gas = math.max(0, gas - ODMPhysics.HookCost(gasEfficiency()))
+		hookSeq += 1
+		h.Seq = hookSeq
+		Net.Event("ODM"):FireServer("Fire", { Side = side, Part = part, Offset = h.Offset, Position = target, Seq = hookSeq })
 	else
 		local _, dir = aimRay(side)
 		h.Phase = "Miss"
@@ -20264,7 +21373,7 @@ local function dodge()
 	if now - lastDodge < ODM.DodgeCooldown then
 		return
 	end
-	local cost = ODM.GasPerDodge / (player:GetAttribute("GasEfficiency") or 1)
+	local cost = ODMPhysics.DodgeCost(gasEfficiency())
 	if gas < cost then
 		return
 	end
@@ -20364,70 +21473,55 @@ local function physics(dt: number)
 		end
 	end
 
-	local gasEff = player:GetAttribute("GasEfficiency") or 1
 	local used = 0
 	if flying then
 		airTime += dt
-		local velocity = root.AssemblyLinearVelocity
-		local accel = Vector3.zero
 		local mult = speedMult()
-		local hanging = false
-		for _, h in attached do
-			local target = targetPosition(h)
-			local to = target - root.Position
-			local dist = to.Magnitude
-			if dist > 0.5 then
-				local dir = to / dist
-				if gas > 0 and h.Held then
-					local reel = ODM.ReelAcceleration * mult
-					local minDist = ODM.MinAttachDistance
-					if dist < minDist * 2.5 then
-						reel *= math.clamp((dist - minDist * 0.5) / (minDist * 2), 0, 1)
-						hanging = dist < minDist * 1.6 and velocity.Magnitude < 25
-					end
-					accel += dir * reel
-					used += ODM.GasDrainReel / gasEff * dt
-				end
-				-- il cavo è teso: non ci si può allontanare oltre la sua lunghezza
-				h.RopeLength = math.min(h.RopeLength, dist + 0.3)
-				if dist >= h.RopeLength - 0.3 then
-					local radial = velocity:Dot(dir)
-					if radial < 0 then
-						velocity -= dir * radial
-					end
-				end
-				if hanging then
-					-- appeso alla parete: smorza il movimento
-					velocity *= 1 - math.min(1, dt * 6)
-				end
-			end
+		local ropes = table.create(#attached)
+		for i, h in attached do
+			ropes[i] = { Target = targetPosition(h), RopeLength = h.RopeLength, Held = h.Held }
 		end
-		if #attached > 0 then
-			accel += Vector3.new(0, workspace.Gravity * ODM.AntiGravity, 0)
+		if now - lastProbe >= PROBE_INTERVAL then
+			lastProbe = now
+			clearance = probeClearance(root, root.AssemblyLinearVelocity)
 		end
 		local move = if controls then controls:GetMoveVector() else Vector3.zero
-		if move.Magnitude > 0.05 then
-			local steer = camera.CFrame:VectorToWorldSpace(move)
-			accel += steer * (if #attached > 0 then ODM.SteerAcceleration else ODM.AirSteer) * mult
+		local step = ODMPhysics.Step({
+			Position = root.Position,
+			Velocity = root.AssemblyLinearVelocity,
+			Hooks = ropes,
+			Move = if move.Magnitude > 0.05 then camera.CFrame:VectorToWorldSpace(move) else Vector3.zero,
+			Boost = boostHeld,
+			BoostDirection = camera.CFrame.LookVector,
+			Gas = gas,
+			GasEfficiency = gasEfficiency(),
+			SpeedMult = mult,
+			Momentum = momentum,
+			Clearance = clearance,
+			Range = player:GetAttribute("ODMRange") or 115,
+			Gravity = workspace.Gravity,
+			dt = dt,
+		})
+		for i, h in attached do
+			h.RopeLength = ropes[i].RopeLength
 		end
-		local emitter = ensureBoostEmitter()
-		if boostHeld and gas > 0 then
-			accel += camera.CFrame.LookVector * ODM.BoostAcceleration * mult
-			used += ODM.GasDrainBoost / gasEff * dt
-			if emitter then
-				emitter.Enabled = true
-			end
-		elseif emitter then
-			emitter.Enabled = #attached > 0 and gas > 0
-			emitter.Rate = if #attached > 0 then 30 else 70
-		end
-		velocity += accel * dt
-		velocity *= 1 - ODM.Drag * dt
-		local maxSpeed = ODM.MaxSpeed * math.sqrt(mult)
-		if velocity.Magnitude > maxSpeed then
-			velocity = velocity.Unit * maxSpeed
-		end
+		local velocity = step.Velocity
+		local accel = step.Acceleration
+		local hanging = step.Hanging
+		momentum = step.Momentum
+		used += step.GasUsed
 		root.AssemblyLinearVelocity = velocity
+
+		local emitter = ensureBoostEmitter()
+		if emitter then
+			if step.Boosting then
+				emitter.Enabled = true
+				emitter.Rate = 70
+			else
+				emitter.Enabled = #attached > 0 and gas > 0
+				emitter.Rate = 30
+			end
+		end
 
 		-- orientamento del corpo nella direzione del volo
 		if alignOri then
@@ -20468,6 +21562,7 @@ local function physics(dt: number)
 		if windSound then
 			windSound.Volume = 0
 		end
+		momentum = math.max(0, momentum - ODM.MomentumDecay * 3 * dt)
 		-- a terra il gas si ricarica lentamente
 		if hum.FloorMaterial ~= Enum.Material.Air then
 			gas = math.min(maxGas, gas + ODM.GasRegenGround * dt)
@@ -20615,6 +21710,8 @@ function ODMController.Start()
 	end)
 	C.InputController.On("Boost", function(began)
 		boostHeld = began
+		-- il server tiene il conto del gas (anti-trucchi): gli serve sapere quando si spinge
+		Net.Event("ODM"):FireServer("Boost", { On = began })
 		if began and flying and gas > 0 and C.SoundController then
 			local root = rootPart()
 			if root then
@@ -20633,6 +21730,25 @@ function ODMController.Start()
 	end)
 	Net.Event("ODM").OnClientEvent:Connect(onRemoteODM)
 
+	-- Correzioni del server: il gas non può superare il suo conteggio, e un aggancio
+	-- impossibile (fuori portata, senza gas) viene sganciato.
+	Net.Event("ODMCorrect").OnClientEvent:Connect(function(kind, data)
+		if kind == "Reject" and type(data) == "table" and (data.Side == "Left" or data.Side == "Right") then
+			-- solo se è ancora lo stesso cavo (nel frattempo potrebbe esserne partito un altro)
+			local h = hooks[data.Side]
+			if h and h.Seq == data.Seq then
+				release(data.Side)
+			end
+		end
+	end)
+	local function applyGasCap()
+		local cap = player:GetAttribute("GasCap")
+		if type(cap) == "number" then
+			gas = math.min(gas, cap + ODM.Validation.GasSlack)
+		end
+	end
+	player:GetAttributeChangedSignal("GasCap"):Connect(applyGasCap)
+
 	player.CharacterAdded:Connect(function()
 		ODMController.ReleaseAll(true)
 		flying = false
@@ -20640,6 +21756,7 @@ function ODMController.Start()
 		alignOri = nil
 		boostEmitter = nil
 		gas = maxGas
+		momentum = 0
 	end)
 
 	if C.SoundController then
@@ -20667,7 +21784,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="73">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -20757,7 +21874,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="74">
+          <Item class="ModuleScript" referent="78">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -21232,7 +22349,7 @@ return TitanAnimator
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="75">
+        <Item class="LocalScript" referent="79">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -21313,11 +22430,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="76">
+        <Item class="Folder" referent="80">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="77">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -21473,7 +22590,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -22129,7 +23246,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -22845,7 +23962,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -23346,7 +24463,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -23930,7 +25047,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -24210,7 +25327,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -24514,7 +25631,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="88">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -24642,7 +25759,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -25325,7 +26442,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -25570,7 +26687,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -25772,7 +26889,7 @@ return UIController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="88">
+  <Item class="Workspace" referent="92">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>

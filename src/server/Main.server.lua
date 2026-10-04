@@ -37,6 +37,7 @@ local ORDER = {
 	"NPCService",
 	"SupplyService",
 	"CodesService",
+	"DevCommandsService",
 }
 
 local Services = {}
