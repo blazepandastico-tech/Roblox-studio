@@ -36,13 +36,387 @@
     </Properties>
     <Item class="Folder" referent="3">
       <Properties>
+        <string name="Name">ModelliGiganti</string>
+      </Properties>
+    </Item>
+    <Item class="Folder" referent="4">
+      <Properties>
         <string name="Name">Shared</string>
       </Properties>
-      <Item class="Folder" referent="4">
+      <Item class="Folder" referent="5">
         <Properties>
           <string name="Name">Anim</string>
         </Properties>
-        <Item class="ModuleScript" referent="5">
+        <Item class="ModuleScript" referent="6">
+          <Properties>
+            <string name="Name">MeshTitan</string>
+            <string name="Source"><![CDATA[--[[
+	MeshTitan - giganti fatti con modelli 3D importati (es. da Meshy)
+
+	Il modello va importato in Studio dal file .glb preparato da tools/mesh_titan/convert.py
+	e messo in ReplicatedStorage → ModelliGiganti, con il nome del suo aspetto (es. "Redivivo").
+	Contiene:
+	  • 15 parti del corpo "SP_Head", "SP_Torso", "SP_RightUpperArm"... (MeshPart con texture)
+	  • segnaposto "J_Neck", "J_RightElbow"... nei punti delle articolazioni
+	Qui le parti vengono copiate, ridimensionate all'altezza voluta e collegate con Motor6D
+	che hanno gli STESSI nomi dei giganti costruiti via codice: così funzionano tutte le
+	animazioni, la nuca, gli occhi, le braccia e le gambe tagliabili.
+	Se il modello non c'è, TitanBuilder usa l'aspetto procedurale di riserva.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local MeshTitan = {}
+
+local FOLDER = "ModelliGiganti"
+
+-- nome dell'aspetto → colore medio della pelle (per le giunture)
+MeshTitan.Skins = {
+	Redivivo = Color3.fromRGB(150, 120, 88),
+}
+
+local PARTS = {
+	"Head", "Torso", "Hips",
+	"RightUpperArm", "RightLowerArm", "RightHand",
+	"LeftUpperArm", "LeftLowerArm", "LeftHand",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot",
+	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+}
+
+-- giuntura, parte0, parte1, segnaposto
+local JOINTS = {
+	{ "Waist", "Hips", "Torso", "Waist" },
+	{ "Neck", "Torso", "Head", "Neck" },
+	{ "RightShoulder", "Torso", "RightUpperArm", "RightShoulder" },
+	{ "RightElbow", "RightUpperArm", "RightLowerArm", "RightElbow" },
+	{ "RightWrist", "RightLowerArm", "RightHand", "RightWrist" },
+	{ "LeftShoulder", "Torso", "LeftUpperArm", "LeftShoulder" },
+	{ "LeftElbow", "LeftUpperArm", "LeftLowerArm", "LeftElbow" },
+	{ "LeftWrist", "LeftLowerArm", "LeftHand", "LeftWrist" },
+	{ "RightHip", "Hips", "RightUpperLeg", "RightHip" },
+	{ "RightKnee", "RightUpperLeg", "RightLowerLeg", "RightKnee" },
+	{ "RightAnkle", "RightLowerLeg", "RightFoot", "RightAnkle" },
+	{ "LeftHip", "Hips", "LeftUpperLeg", "LeftHip" },
+	{ "LeftKnee", "LeftUpperLeg", "LeftLowerLeg", "LeftKnee" },
+	{ "LeftAnkle", "LeftLowerLeg", "LeftFoot", "LeftAnkle" },
+}
+
+local LIMB = {
+	RightUpperArm = "RightArm", RightLowerArm = "RightArm", RightHand = "RightArm",
+	LeftUpperArm = "LeftArm", LeftLowerArm = "LeftArm", LeftHand = "LeftArm",
+	RightUpperLeg = "RightLeg", RightLowerLeg = "RightLeg", RightFoot = "RightLeg",
+	LeftUpperLeg = "LeftLeg", LeftLowerLeg = "LeftLeg", LeftFoot = "LeftLeg",
+}
+
+-- giunture coperte da una sfera color pelle (nasconde le fessure quando l'arto si piega)
+local COVERS = {
+	{ "RightElbow", "RightLowerArm", 0.032 }, { "LeftElbow", "LeftLowerArm", 0.032 },
+	{ "RightKnee", "RightLowerLeg", 0.045 }, { "LeftKnee", "LeftLowerLeg", 0.045 },
+	{ "RightWrist", "RightHand", 0.024 }, { "LeftWrist", "LeftHand", 0.024 },
+	{ "RightAnkle", "RightFoot", 0.03 }, { "LeftAnkle", "LeftFoot", 0.03 },
+}
+
+local cache: { [string]: any } = {}
+
+local function folder(): Instance?
+	return ReplicatedStorage:FindFirstChild(FOLDER)
+end
+
+-- Cerca il modello importato: nella cartella ModelliGiganti (anche "GiganteRedivivo" va bene)
+local function findTemplate(look: string): Instance?
+	local f = folder()
+	if not f then
+		return nil
+	end
+	local wanted = string.lower(look)
+	for _, child in f:GetChildren() do
+		local name = string.lower(child.Name)
+		if name == wanted or name == "gigante" .. wanted then
+			return child
+		end
+	end
+	return nil
+end
+
+-- Legge parti e segnaposto del modello e calcola il suo sistema di riferimento
+local function analyze(template: Instance)
+	local parts: { [string]: BasePart } = {}
+	local joints: { [string]: Vector3 } = {}
+	for _, d in template:GetDescendants() do
+		if d:IsA("BasePart") then
+			local p = d.Name:match("^SP_(%a+)")
+			local j = d.Name:match("^J_(%a+)")
+			if p then
+				parts[p] = d
+			elseif j then
+				joints[j] = d.Position
+			end
+		end
+	end
+	for _, name in PARTS do
+		if not parts[name] then
+			return nil, "manca la parte SP_" .. name
+		end
+	end
+	for _, name in { "Ground", "HeadTop", "Root", "Waist", "Neck", "RightShoulder", "LeftShoulder", "Nape" } do
+		if not joints[name] then
+			return nil, "manca il segnaposto J_" .. name
+		end
+	end
+	local ground, top = joints.Ground, joints.HeadTop
+	local up = (top - ground).Unit
+	local across = joints.RightShoulder - joints.LeftShoulder
+	local right = (across - up * across:Dot(up)).Unit
+	local frame = CFrame.fromMatrix(ground, right, up)
+	local height = (top - ground):Dot(up)
+	-- tutto nello spazio del corpo (altezza = 1): non importa come l'importer ha ruotato o scalato il modello
+	local body = { Parts = {}, Joints = {} }
+	for name, part in parts do
+		local rel = frame:ToObjectSpace(part.CFrame)
+		body.Parts[name] = {
+			Source = part,
+			CFrame = CFrame.new(rel.Position / height) * rel.Rotation,
+			Size = part.Size / height,
+		}
+	end
+	for name, pos in joints do
+		body.Joints[name] = frame:PointToObjectSpace(pos) / height
+	end
+	return body, nil
+end
+
+local function getBody(look: string)
+	local hit = cache[look]
+	if hit ~= nil then
+		return if hit == false then nil else hit
+	end
+	local template = findTemplate(look)
+	if not template then
+		return nil
+	end
+	local body, err = analyze(template)
+	if not body then
+		warn(("[Giganti 3D] Il modello '%s' non è valido: %s"):format(look, tostring(err)))
+		cache[look] = false
+		return nil
+	end
+	cache[look] = body
+	return body
+end
+
+function MeshTitan.Has(look: string): boolean
+	return getBody(look) ~= nil
+end
+
+local function invisiblePart(model: Instance, name: string, size: Vector3, cf: CFrame, zone: string?): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Transparency = 1
+	p.Anchored = false
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = zone ~= nil
+	p.Massless = true
+	p.CastShadow = false
+	if zone then
+		p:SetAttribute("HitZone", zone)
+	end
+	p.Parent = model
+	return p
+end
+
+local function weld(a: BasePart, b: BasePart)
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = a
+	w.Part1 = b
+	w.Parent = b
+end
+
+-- Costruisce il gigante. params come TitanBuilder.Build (Height, Look, Seed, Name, CFrame)
+function MeshTitan.Build(params): Model?
+	local look: string = params.Look
+	local body = getBody(look)
+	if not body then
+		return nil
+	end
+	local H: number = params.Height or 22
+	local J = body.Joints
+	local function at(name: string): Vector3
+		return (J[name] or J.Root) * H
+	end
+	local hipY = at("Root").Y
+	local base: CFrame = params.CFrame or CFrame.new(0, hipY, 0)
+	-- origine (a terra) del gigante nello spazio del mondo
+	local rootLocal = at("Root")
+	local origin = base * CFrame.new(-rootLocal)
+	local function world(p: Vector3): CFrame
+		return origin * CFrame.new(p)
+	end
+
+	local model = Instance.new("Model")
+	model.Name = params.Name or "Gigante"
+
+	local root = invisiblePart(model, "Root", Vector3.new(0.1, 0.08, 0.08) * H, base, nil)
+	root.Massless = false
+
+	local parts: { [string]: BasePart } = {}
+	for _, name in PARTS do
+		local info = body.Parts[name]
+		local part = info.Source:Clone() :: BasePart
+		part.Name = name
+		part.Size = info.Size * H
+		part.CFrame = origin * CFrame.new(info.CFrame.Position * H) * info.CFrame.Rotation
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = true
+		part.Massless = true
+		part.CastShadow = true
+		part:SetAttribute("HitZone", LIMB[name] or "Body")
+		if LIMB[name] then
+			part:SetAttribute("Limb", LIMB[name])
+		end
+		for _, child in part:GetChildren() do
+			if not child:IsA("SurfaceAppearance") and not child:IsA("Decal") and not child:IsA("Texture") then
+				child:Destroy()
+			end
+		end
+		part.Parent = model
+		parts[name] = part
+	end
+
+	local function motor(name: string, part0: BasePart, part1: BasePart, pivot: CFrame)
+		local m = Instance.new("Motor6D")
+		m.Name = name
+		m.Part0 = part0
+		m.Part1 = part1
+		m.C0 = part0.CFrame:ToObjectSpace(pivot)
+		m.C1 = part1.CFrame:ToObjectSpace(pivot)
+		m.Parent = part1
+	end
+	motor("Root", root, parts.Hips, world(at("Root")))
+	for _, j in JOINTS do
+		motor(j[1], parts[j[2]], parts[j[3]], world(at(j[4])))
+	end
+
+	-- mandibola (invisibile: serve alle animazioni del morso e dell'urlo)
+	local jaw = invisiblePart(model, "Jaw", Vector3.new(0.05, 0.03, 0.04) * H, world(at("Mouth")), nil)
+	motor("Jaw", parts.Head, jaw, world(at("Mouth")))
+
+	-- NUCA: il punto debole, invisibile, saldato al busto
+	local nape = invisiblePart(model, "Nape", Vector3.new(0.065, 0.055, 0.04) * H, world(at("Nape")), "Nape")
+	weld(parts.Torso, nape)
+	local napeAtt = Instance.new("Attachment")
+	napeAtt.Name = "NapeAtt"
+	napeAtt.Parent = nape
+
+	-- occhi colpibili (accecano il gigante)
+	for _, side in { "Right", "Left" } do
+		if J[side .. "Eye"] then
+			local eye = invisiblePart(model, side .. "Eye", Vector3.new(0.018, 0.014, 0.014) * H, world(at(side .. "Eye")), "Eye")
+			weld(parts.Head, eye)
+		end
+	end
+
+	-- sfere color pelle sulle giunture
+	local skin = MeshTitan.Skins[look] or Color3.fromRGB(190, 150, 120)
+	for _, c in COVERS do
+		local parent = parts[c[2]]
+		if J[c[1]] then
+			local ball = Instance.new("Part")
+			ball.Name = "Giuntura" .. c[1]
+			ball.Shape = Enum.PartType.Ball
+			ball.Size = Vector3.one * c[3] * H
+			ball.CFrame = world(at(c[1]))
+			ball.Color = skin
+			ball.Material = Enum.Material.SmoothPlastic
+			ball.Anchored = false
+			ball.CanCollide = false
+			ball.CanTouch = false
+			ball.CanQuery = false
+			ball.Massless = true
+			ball.CastShadow = false
+			ball:SetAttribute("Limb", parent:GetAttribute("Limb"))
+			ball.Parent = model
+			weld(parent, ball)
+		end
+	end
+
+	-- attacchi per effetti, prese e interfaccia (stessi nomi dei giganti procedurali)
+	local function attach(part: BasePart, name: string, pointName: string)
+		local a = Instance.new("Attachment")
+		a.Name = name
+		a.WorldPosition = world(at(pointName)).Position
+		a.Parent = part
+	end
+	attach(parts.Head, "HeadTopAtt", "HeadTop")
+	attach(parts.Head, "MouthAtt", "Mouth")
+	attach(parts.RightHand, "RightHandAtt", "RightHandTip")
+	attach(parts.LeftHand, "LeftHandAtt", "LeftHandTip")
+	local steam = Instance.new("Attachment")
+	steam.Name = "SteamAtt"
+	steam.Parent = parts.Torso
+
+	model.PrimaryPart = root
+	model:SetAttribute("Height", H)
+	model:SetAttribute("HipHeight", hipY)
+	model:SetAttribute("Look", look)
+	model:SetAttribute("Seed", params.Seed or 1)
+	model:SetAttribute("HeadTilt", 0)
+	model:SetAttribute("Archetype", "")
+	model:SetAttribute("CrawlPreferred", false)
+	model:SetAttribute("JawIdle", 0)
+	model:SetAttribute("Hunch", false)
+	model:SetAttribute("MeshTitan", true)
+	return model
+end
+
+-- Sul server: se il modello importato è rimasto nel Workspace, lo sposta nella cartella giusta
+function MeshTitan.CollectTemplates()
+	if not RunService:IsServer() then
+		return
+	end
+	local f = folder()
+	if not f then
+		f = Instance.new("Folder")
+		f.Name = FOLDER
+		f.Parent = ReplicatedStorage
+	end
+	for look in MeshTitan.Skins do
+		if not findTemplate(look) then
+			for _, child in workspace:GetChildren() do
+				local name = string.lower(child.Name)
+				if child:IsA("Model") and (name == string.lower(look) or name == "gigante" .. string.lower(look)) then
+					child.Parent = f
+					print(("[Giganti 3D] Modello '%s' spostato in ReplicatedStorage → %s"):format(child.Name, FOLDER))
+				end
+			end
+		end
+		local template = findTemplate(look)
+		if template then
+			-- il modello di riferimento non deve cadere né essere colpito
+			for _, d in template:GetDescendants() do
+				if d:IsA("BasePart") then
+					d.Anchored = true
+					d.CanCollide = false
+					d.CanQuery = false
+				end
+			end
+			print(("[Giganti 3D] Modello '%s' %s"):format(look, if MeshTitan.Has(look) then "pronto" else "NON valido (vedi l'avviso sopra)"))
+		else
+			print(("[Giganti 3D] Modello '%s' non importato: uso l'aspetto di riserva"):format(look))
+		end
+	end
+end
+
+return MeshTitan
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="7">
           <Properties>
             <string name="Name">Poses</string>
             <string name="Source"><![CDATA[--[[
@@ -905,7 +1279,7 @@ return Poses
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="6">
+        <Item class="ModuleScript" referent="8">
           <Properties>
             <string name="Name">ProceduralAnimator</string>
             <string name="Source"><![CDATA[--[[
@@ -1251,7 +1625,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="7">
+        <Item class="ModuleScript" referent="9">
           <Properties>
             <string name="Name">TitanBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -1264,6 +1638,8 @@ return Animator
 	Ogni gigante puro è diverso (proporzioni, volto, capelli, pelle) grazie al seme.
 	I mutaforma (Cacciatrice, Bastione, Vulcano, Fauno...) hanno un aspetto dedicato.
 ]]
+
+local MeshTitan = require(script.Parent.MeshTitan)
 
 local TitanBuilder = {}
 
@@ -1621,6 +1997,17 @@ local function makeProfile(look: string, rng: Random)
 		p.Grin = true
 		p.Ears = 1.5
 		p.EyeGlow = Color3.fromRGB(120, 255, 170)
+	elseif look == "Redivivo" then
+		-- aspetto di riserva finché il modello 3D non è importato
+		p.Skin = Color3.fromRGB(176, 140, 104)
+		p.Hair = Color3.fromRGB(40, 28, 22)
+		p.HairStyle = "Lungo"
+		p.LegMul, p.ArmMul, p.TorsoMul, p.HeadMul, p.WidthMul, p.ThickMul = 1.08, 1.05, 1.0, 0.85, 0.95, 1.0
+		p.Belly = 0
+		p.Muscle = true
+		p.Lips = false
+		p.Grin = false
+		p.MouthWidth = 0.55
 	elseif look == "Strisciante" then
 		p.Skin = Color3.fromRGB(196, 120, 96)
 		p.Hair = Color3.fromRGB(60, 40, 30)
@@ -1702,6 +2089,14 @@ function TitanBuilder.Build(params): Model
 	local seed: number = params.Seed or 1
 	if look == "Sagoma" then
 		return buildDummy(H, params.Name)
+	end
+	-- aspetto fatto con un modello 3D importato (vedi MeshTitan): se c'è, ha la precedenza
+	if MeshTitan.Has(look) then
+		local ok, meshModel = pcall(MeshTitan.Build, params)
+		if ok and meshModel then
+			return meshModel
+		end
+		warn("[Giganti 3D] Errore nel costruire '" .. look .. "': " .. tostring(meshModel))
 	end
 	local rng = Random.new(seed)
 	local p = makeProfile(look, rng)
@@ -2088,7 +2483,7 @@ return TitanBuilder
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="8">
+      <Item class="ModuleScript" referent="10">
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--[[
@@ -2293,11 +2688,11 @@ return Config
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="9">
+      <Item class="Folder" referent="11">
         <Properties>
           <string name="Name">Data</string>
         </Properties>
-        <Item class="ModuleScript" referent="10">
+        <Item class="ModuleScript" referent="12">
           <Properties>
             <string name="Name">Achievements</string>
             <string name="Source"><![CDATA[--[[
@@ -2383,7 +2778,7 @@ return Achievements
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="11">
+        <Item class="ModuleScript" referent="13">
           <Properties>
             <string name="Name">AnimationIds</string>
             <string name="Source"><![CDATA[--[[
@@ -2418,7 +2813,7 @@ return AnimationIds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="12">
+        <Item class="ModuleScript" referent="14">
           <Properties>
             <string name="Name">Bloodlines</string>
             <string name="Source"><![CDATA[--[[
@@ -2511,7 +2906,7 @@ return Bloodlines
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="13">
+        <Item class="ModuleScript" referent="15">
           <Properties>
             <string name="Name">Enemies</string>
             <string name="Source"><![CDATA[--[[
@@ -2624,7 +3019,7 @@ return Enemies
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="14">
+        <Item class="ModuleScript" referent="16">
           <Properties>
             <string name="Name">Items</string>
             <string name="Source"><![CDATA[--[[
@@ -3480,7 +3875,7 @@ return Items
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="15">
+        <Item class="ModuleScript" referent="17">
           <Properties>
             <string name="Name">Leveling</string>
             <string name="Source"><![CDATA[--[[
@@ -3541,7 +3936,7 @@ return Leveling
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="16">
+        <Item class="ModuleScript" referent="18">
           <Properties>
             <string name="Name">Monetization</string>
             <string name="Source"><![CDATA[--[[
@@ -3683,7 +4078,7 @@ return Monetization
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="17">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">NPCs</string>
             <string name="Source"><![CDATA[--[[
@@ -4047,7 +4442,7 @@ return NPCs
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[
@@ -4160,7 +4555,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">Raids</string>
             <string name="Source"><![CDATA[--[[
@@ -4275,7 +4670,7 @@ return Raids
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Rewards</string>
             <string name="Source"><![CDATA[--[[
@@ -4353,7 +4748,7 @@ return Rewards
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="23">
           <Properties>
             <string name="Name">Serums</string>
             <string name="Source"><![CDATA[--[[
@@ -4645,7 +5040,7 @@ return Serums
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="22">
+        <Item class="ModuleScript" referent="24">
           <Properties>
             <string name="Name">Shops</string>
             <string name="Source"><![CDATA[--[[
@@ -4716,7 +5111,7 @@ return Shops
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="25">
           <Properties>
             <string name="Name">Skills</string>
             <string name="Source"><![CDATA[--[[
@@ -4789,7 +5184,7 @@ return Skills
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[--[[
@@ -4832,7 +5227,7 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="27">
           <Properties>
             <string name="Name">StatsCalc</string>
             <string name="Source"><![CDATA[--[[
@@ -4994,7 +5389,7 @@ return StatsCalc
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">Story</string>
             <string name="Source"><![CDATA[--[[
@@ -5677,7 +6072,7 @@ return Story
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">Titans</string>
             <string name="Source"><![CDATA[--[[
@@ -5733,6 +6128,29 @@ Titans.DefaultAttacks = { "Grab", "Swipe", "Stomp", "Bite", "NapeSwat" }
 -- HPMult moltiplica la vita della nuca, DmgMult i danni. Respawn in secondi.
 
 Titans.Bosses = {
+	-- modello 3D importato (ReplicatedStorage → ModelliGiganti → Redivivo), vedi MeshTitan
+	Redivivo = {
+		Id = "Redivivo",
+		Name = "Il Gigante Redivivo",
+		Title = "Lo spettro delle Pianure",
+		Look = "Redivivo",
+		Zone = "PianureSud",
+		Level = 120,
+		Height = 46,
+		Speed = 24,
+		Abnormal = true,
+		HPMult = 28,
+		DmgMult = 1.8,
+		Attacks = { "Grab", "Swipe", "Stomp", "Leap", "NapeSwat" },
+		Respawn = 600,
+		XPMult = 18,
+		GoldMult = 14,
+		Fragments = { 2, 4 },
+		Drops = {
+			{ Id = "MidolloGigante", Chance = 0.8, Min = 2, Max = 4 },
+			{ Id = "PergamenaEsperienza", Chance = 0.15, Min = 1, Max = 1 },
+		},
+	},
 	Ghignante = {
 		Id = "Ghignante",
 		Name = "Il Gigante Ghignante",
@@ -6017,7 +6435,7 @@ return Titans
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="28">
+        <Item class="ModuleScript" referent="30">
           <Properties>
             <string name="Name">WorldLayout</string>
             <string name="Source"><![CDATA[--[[
@@ -6147,7 +6565,7 @@ return W
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="31">
           <Properties>
             <string name="Name">Zones</string>
             <string name="Source"><![CDATA[--[[
@@ -6654,11 +7072,11 @@ return Zones
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="30">
+      <Item class="Folder" referent="32">
         <Properties>
           <string name="Name">Lib</string>
         </Properties>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[--[[
@@ -6799,7 +7217,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="34">
           <Properties>
             <string name="Name">Signal</string>
             <string name="Source"><![CDATA[--[[
@@ -6880,7 +7298,7 @@ return Signal
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="35">
           <Properties>
             <string name="Name">Util</string>
             <string name="Source"><![CDATA[--[[
@@ -7174,11 +7592,11 @@ return Util
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="34">
+      <Item class="Folder" referent="36">
         <Properties>
           <string name="Name">Modules</string>
         </Properties>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">ODMPhysicsModule</string>
             <string name="Source"><![CDATA[--[[
@@ -7414,15 +7832,15 @@ return ODMPhysics
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="36">
+  <Item class="ServerScriptService" referent="38">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="37">
+    <Item class="Folder" referent="39">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="38">
+      <Item class="Script" referent="40">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -7515,11 +7933,11 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="39">
+      <Item class="Folder" referent="41">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">AchievementService</string>
             <string name="Source"><![CDATA[--[[
@@ -7610,7 +8028,7 @@ return AchievementService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--[[
@@ -8156,7 +8574,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -8218,7 +8636,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -8741,7 +9159,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">CommunityService</string>
             <string name="Source"><![CDATA[--[[
@@ -8877,7 +9295,7 @@ return CommunityService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -9226,7 +9644,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -9497,7 +9915,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -9959,7 +10377,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -10072,7 +10490,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -10256,7 +10674,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">LeaderboardService</string>
             <string name="Source"><![CDATA[--[[
@@ -10488,7 +10906,7 @@ return LeaderboardService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -10616,7 +11034,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -11027,7 +11445,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -11492,7 +11910,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -11893,7 +12311,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -12430,7 +12848,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -13115,7 +13533,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -13237,7 +13655,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -13720,7 +14138,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">RewardsService</string>
             <string name="Source"><![CDATA[--[[
@@ -13984,7 +14402,7 @@ return RewardsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -14309,7 +14727,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -15052,7 +15470,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -15269,7 +15687,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -15613,7 +16031,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -15688,7 +16106,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -15717,6 +16135,7 @@ local Leveling = require(Shared.Data.Leveling)
 local Items = require(Shared.Data.Items)
 local W = require(Shared.Data.WorldLayout)
 local TitanBuilder = require(Shared.Anim.TitanBuilder)
+local MeshTitan = require(Shared.Anim.MeshTitan)
 
 local TitanService = {}
 TitanService.Killed = Signal.new()
@@ -17228,6 +17647,11 @@ function TitanService.Init(services)
 end
 
 function TitanService.Start()
+	-- modelli 3D importati (es. il Gigante Redivivo): li prepara prima di far nascere i giganti
+	local okMesh, errMesh = pcall(MeshTitan.CollectTemplates)
+	if not okMesh then
+		warn("[Giganti 3D] " .. tostring(errMesh))
+	end
 	titanFolder = workspace:WaitForChild(Config.Folders.Titans) :: Folder
 	S.WorldBuilder.WaitReady()
 	spawnDummies()
@@ -17283,7 +17707,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -18981,11 +19405,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="67">
+  <Item class="ServerStorage" referent="69">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="68">
+    <Item class="ModuleScript" referent="70">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -19212,19 +19636,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="69">
+  <Item class="SoundService" referent="71">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="70">
+  <Item class="StarterGui" referent="72">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="71">
+  <Item class="StarterPlayer" referent="73">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -19235,11 +19659,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="72">
+    <Item class="StarterCharacterScripts" referent="74">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="73">
+      <Item class="LocalScript" referent="75">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -19252,19 +19676,19 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="74">
+    <Item class="StarterPlayerScripts" referent="76">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="75">
+      <Item class="Folder" referent="77">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="76">
+        <Item class="Folder" referent="78">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="77">
+          <Item class="ModuleScript" referent="79">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -19436,7 +19860,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -19935,7 +20359,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -20270,7 +20694,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -20329,7 +20753,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -21006,7 +21430,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -21635,7 +22059,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -22562,7 +22986,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -22710,7 +23134,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -23592,7 +24016,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="88">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -23682,7 +24106,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -24156,7 +24580,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -24267,7 +24691,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="89">
+        <Item class="LocalScript" referent="91">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -24351,11 +24775,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="90">
+        <Item class="Folder" referent="92">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -24850,7 +25274,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -25006,7 +25430,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -25662,7 +26086,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -26383,7 +26807,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -26884,7 +27308,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -27553,7 +27977,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -27833,7 +28257,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -28157,7 +28581,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -28285,7 +28709,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -28957,7 +29381,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -29640,7 +30064,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -29885,7 +30309,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -30087,7 +30511,7 @@ return UIController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="104">
+  <Item class="Workspace" referent="106">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>

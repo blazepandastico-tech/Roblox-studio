@@ -129,6 +129,23 @@ pubblicato quella voce risulta "non disponibile". Gli acquisti sono gestiti in m
 
 Tutti i passi per pubblicare e far crescere il gioco sono in [`docs/LANCIO.md`](docs/LANCIO.md).
 
+## 6c. Giganti con modelli 3D (es. da Meshy)
+
+Il **Gigante Redivivo** (boss delle Pianure Meridionali, Lv. 120) usa un modello 3D vero.
+Il file pronto da importare è `assets/modelli/GiganteRedivivo.glb`: è già diviso in 15 parti del corpo
+e ha le texture incluse.
+
+1. In Studio: **File → Importa 3D** (o *Avatar → Importa 3D*) → scegli `GiganteRedivivo.glb` →
+   lascia **disattivato** "Unisci mesh" (Merge meshes) → **Importa**.
+2. Il modello compare nel Workspace con il nome **GiganteRedivivo**: premi **Play**, il gioco lo sposta da solo in
+   `ReplicatedStorage → ModelliGiganti` e da quel momento il boss usa il modello 3D (con le animazioni dei giganti).
+3. Per non doverlo reimportare a ogni nuova versione: tasto destro sul modello → **Salva su file** (`.rbxmx`)
+   e mandalo, così viene incluso direttamente nel progetto.
+
+Finché il modello non è importato, il boss usa un aspetto di riserva costruito con le parti.
+Per convertire altri modelli: `python3 tools/mesh_titan/convert.py modello.fbx colore.png normali.png rugosita.png metallo.png uscita.glb NomeAspetto`
+(poi aggiungi l'aspetto in `MeshTitan.Skins` e in un boss o gigante di `Titans.lua`).
+
 ## 7. Codici regalo
 
 `SIERIPERDUTI`, `ARCIPELAGO`, `CORPODEIFALCHI`, `BENVENUTORECLUTA`, `OLTREILMARE`, `PRIMORAID`

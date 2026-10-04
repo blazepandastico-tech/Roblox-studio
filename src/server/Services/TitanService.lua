@@ -24,6 +24,7 @@ local Leveling = require(Shared.Data.Leveling)
 local Items = require(Shared.Data.Items)
 local W = require(Shared.Data.WorldLayout)
 local TitanBuilder = require(Shared.Anim.TitanBuilder)
+local MeshTitan = require(Shared.Anim.MeshTitan)
 
 local TitanService = {}
 TitanService.Killed = Signal.new()
@@ -1535,6 +1536,11 @@ function TitanService.Init(services)
 end
 
 function TitanService.Start()
+	-- modelli 3D importati (es. il Gigante Redivivo): li prepara prima di far nascere i giganti
+	local okMesh, errMesh = pcall(MeshTitan.CollectTemplates)
+	if not okMesh then
+		warn("[Giganti 3D] " .. tostring(errMesh))
+	end
 	titanFolder = workspace:WaitForChild(Config.Folders.Titans) :: Folder
 	S.WorldBuilder.WaitReady()
 	spawnDummies()

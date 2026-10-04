@@ -51,6 +51,29 @@ Titans.DefaultAttacks = { "Grab", "Swipe", "Stomp", "Bite", "NapeSwat" }
 -- HPMult moltiplica la vita della nuca, DmgMult i danni. Respawn in secondi.
 
 Titans.Bosses = {
+	-- modello 3D importato (ReplicatedStorage → ModelliGiganti → Redivivo), vedi MeshTitan
+	Redivivo = {
+		Id = "Redivivo",
+		Name = "Il Gigante Redivivo",
+		Title = "Lo spettro delle Pianure",
+		Look = "Redivivo",
+		Zone = "PianureSud",
+		Level = 120,
+		Height = 46,
+		Speed = 24,
+		Abnormal = true,
+		HPMult = 28,
+		DmgMult = 1.8,
+		Attacks = { "Grab", "Swipe", "Stomp", "Leap", "NapeSwat" },
+		Respawn = 600,
+		XPMult = 18,
+		GoldMult = 14,
+		Fragments = { 2, 4 },
+		Drops = {
+			{ Id = "MidolloGigante", Chance = 0.8, Min = 2, Max = 4 },
+			{ Id = "PergamenaEsperienza", Chance = 0.15, Min = 1, Max = 1 },
+		},
+	},
 	Ghignante = {
 		Id = "Ghignante",
 		Name = "Il Gigante Ghignante",
