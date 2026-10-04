@@ -2,7 +2,7 @@
 	MeshTitan - giganti fatti con modelli 3D importati (es. da Meshy)
 
 	Il modello va importato in Studio dal file .glb preparato da tools/mesh_titan/convert.py
-	e messo in ReplicatedStorage → ModelliGiganti, con il nome del suo aspetto (es. "Redivivo").
+	e messo in ReplicatedStorage → ModelliGiganti, con il nome del suo aspetto (es. "GiganteFuria").
 	Contiene:
 	  • 15 parti del corpo "SP_Head", "SP_Torso", "SP_RightUpperArm"... (MeshPart con texture)
 	  • segnaposto "J_Neck", "J_RightElbow"... nei punti delle articolazioni
@@ -21,7 +21,12 @@ local FOLDER = "ModelliGiganti"
 
 -- nome dell'aspetto → colore medio della pelle (per le giunture)
 MeshTitan.Skins = {
-	Redivivo = Color3.fromRGB(150, 120, 88),
+	Furia = Color3.fromRGB(150, 120, 88), -- il Gigante della Furia (boss, filmati e forma del siero)
+}
+
+-- altri nomi accettati per il modello importato
+MeshTitan.Aliases = {
+	Furia = { "Redivivo" },
 }
 
 local PARTS = {
@@ -71,16 +76,29 @@ local function folder(): Instance?
 	return ReplicatedStorage:FindFirstChild(FOLDER)
 end
 
--- Cerca il modello importato: nella cartella ModelliGiganti (anche "GiganteRedivivo" va bene)
+-- Cerca il modello importato: nella cartella ModelliGiganti (va bene anche "GiganteFuria")
+local function matches(name: string, look: string): boolean
+	local lower = string.lower(name)
+	local names = { look }
+	for _, alias in MeshTitan.Aliases[look] or {} do
+		table.insert(names, alias)
+	end
+	for _, n in names do
+		local wanted = string.lower(n)
+		if lower == wanted or lower == "gigante" .. wanted then
+			return true
+		end
+	end
+	return false
+end
+
 local function findTemplate(look: string): Instance?
 	local f = folder()
 	if not f then
 		return nil
 	end
-	local wanted = string.lower(look)
 	for _, child in f:GetChildren() do
-		local name = string.lower(child.Name)
-		if name == wanted or name == "gigante" .. wanted then
+		if matches(child.Name, look) then
 			return child
 		end
 	end
@@ -322,6 +340,113 @@ function MeshTitan.Build(params): Model?
 	return model
 end
 
+-- RIVESTIMENTO DEL GIOCATORE (forma di gigante del siero) ------------------------------------------
+-- Ogni pezzo del modello viene saldato alla parte R15 corrispondente, partendo dalla sua articolazione,
+-- e allungato perché combaci con le proporzioni del personaggio. Il corpo R15 resta (invisibile)
+-- e continua a muovere tutto con le sue animazioni.
+
+local SKIN = {
+	{ R15 = "LowerTorso", Mesh = "Hips", Prox = "Root", Dist = "Waist", Child = "UpperTorso", Width = { "RightHip", "LeftHip", "RightUpperLeg", "LeftUpperLeg" } },
+	{ R15 = "UpperTorso", Mesh = "Torso", Prox = "Waist", Dist = "Neck", Child = "Head", Width = { "RightShoulder", "LeftShoulder", "RightUpperArm", "LeftUpperArm" } },
+	{ R15 = "Head", Mesh = "Head", Prox = "Neck" },
+	{ R15 = "RightUpperArm", Mesh = "RightUpperArm", Prox = "RightShoulder", Dist = "RightElbow", Child = "RightLowerArm" },
+	{ R15 = "RightLowerArm", Mesh = "RightLowerArm", Prox = "RightElbow", Dist = "RightWrist", Child = "RightHand" },
+	{ R15 = "RightHand", Mesh = "RightHand", Prox = "RightWrist" },
+	{ R15 = "LeftUpperArm", Mesh = "LeftUpperArm", Prox = "LeftShoulder", Dist = "LeftElbow", Child = "LeftLowerArm" },
+	{ R15 = "LeftLowerArm", Mesh = "LeftLowerArm", Prox = "LeftElbow", Dist = "LeftWrist", Child = "LeftHand" },
+	{ R15 = "LeftHand", Mesh = "LeftHand", Prox = "LeftWrist" },
+	{ R15 = "RightUpperLeg", Mesh = "RightUpperLeg", Prox = "RightHip", Dist = "RightKnee", Child = "RightLowerLeg" },
+	{ R15 = "RightLowerLeg", Mesh = "RightLowerLeg", Prox = "RightKnee", Dist = "RightAnkle", Child = "RightFoot" },
+	{ R15 = "RightFoot", Mesh = "RightFoot", Prox = "RightAnkle" },
+	{ R15 = "LeftUpperLeg", Mesh = "LeftUpperLeg", Prox = "LeftHip", Dist = "LeftKnee", Child = "LeftLowerLeg" },
+	{ R15 = "LeftLowerLeg", Mesh = "LeftLowerLeg", Prox = "LeftKnee", Dist = "LeftAnkle", Child = "LeftFoot" },
+	{ R15 = "LeftFoot", Mesh = "LeftFoot", Prox = "LeftAnkle" },
+}
+
+-- la Motor6D che attacca una parte R15 al suo genitore
+local function motorOf(part: BasePart): Motor6D?
+	for _, child in part:GetChildren() do
+		if child:IsA("Motor6D") and child.Part1 == part then
+			return child
+		end
+	end
+	return nil
+end
+
+-- Riveste un personaggio R15 (già ingrandito) con il modello 3D. Restituisce true se ci è riuscito.
+function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instance): boolean
+	local body = getBody(look)
+	if not body then
+		return false
+	end
+	local J = body.Joints
+	local s = character:GetExtentsSize().Y
+	for _, entry in SKIN do
+		local part = character:FindFirstChild(entry.R15) :: BasePart?
+		local motor = part and motorOf(part)
+		local info = body.Parts[entry.Mesh]
+		if part and motor and info and J[entry.Prox] then
+			local jointLocal = motor.C1.Position
+			local kx, ky = 1, 1
+			-- lunghezza dell'osso: il pezzo si allunga/accorcia come la parte del personaggio
+			local child = entry.Child and character:FindFirstChild(entry.Child) :: BasePart?
+			local childMotor = child and motorOf(child)
+			if entry.Dist and childMotor and J[entry.Dist] then
+				local lengthR15 = (childMotor.C0.Position - jointLocal).Magnitude
+				local lengthMesh = (J[entry.Dist] - J[entry.Prox]).Magnitude * s
+				if lengthMesh > 0.01 then
+					ky = math.clamp(lengthR15 / lengthMesh, 0.5, 2)
+				end
+			end
+			-- larghezza (spalle e anche): i pezzi delle braccia e delle gambe restano attaccati
+			if entry.Width then
+				local right = character:FindFirstChild(entry.Width[3]) :: BasePart?
+				local left = character:FindFirstChild(entry.Width[4]) :: BasePart?
+				local rm = right and motorOf(right)
+				local lm = left and motorOf(left)
+				if rm and lm and J[entry.Width[1]] and J[entry.Width[2]] then
+					local widthR15 = math.abs(rm.C0.Position.X - lm.C0.Position.X)
+					local widthMesh = math.abs(J[entry.Width[1]].X - J[entry.Width[2]].X) * s
+					if widthMesh > 0.01 then
+						kx = math.clamp(widthR15 / widthMesh, 0.5, 2)
+					end
+				end
+			end
+			local stretch = Vector3.new(s * kx, s * ky, s)
+			local offset = (info.CFrame.Position - J[entry.Prox]) * stretch
+			local rotation = info.CFrame.Rotation
+			local piece = info.Source:Clone() :: BasePart
+			piece.Name = "Pelle" .. entry.Mesh
+			-- dimensione: ogni asse del pezzo prende l'allungamento dell'asse del corpo a cui corrisponde
+			local function axisScale(axis: Vector3): number
+				local d = rotation:VectorToWorldSpace(axis)
+				return math.abs(d.X) * stretch.X + math.abs(d.Y) * stretch.Y + math.abs(d.Z) * stretch.Z
+			end
+			piece.Size = Vector3.new(info.Size.X * axisScale(Vector3.xAxis), info.Size.Y * axisScale(Vector3.yAxis), info.Size.Z * axisScale(Vector3.zAxis))
+			piece.Anchored = false
+			piece.CanCollide = false
+			piece.CanTouch = false
+			piece.CanQuery = false
+			piece.Massless = true
+			piece.CastShadow = true
+			for _, extra in piece:GetChildren() do
+				if not extra:IsA("SurfaceAppearance") and not extra:IsA("Decal") and not extra:IsA("Texture") then
+					extra:Destroy()
+				end
+			end
+			local c0 = CFrame.new(jointLocal + offset) * rotation
+			piece.CFrame = part.CFrame * c0
+			local weldInstance = Instance.new("Weld")
+			weldInstance.Part0 = part
+			weldInstance.Part1 = piece
+			weldInstance.C0 = c0
+			weldInstance.Parent = piece
+			piece.Parent = folder
+		end
+	end
+	return true
+end
+
 -- Sul server: se il modello importato è rimasto nel Workspace, lo sposta nella cartella giusta
 function MeshTitan.CollectTemplates()
 	if not RunService:IsServer() then
@@ -336,8 +461,7 @@ function MeshTitan.CollectTemplates()
 	for look in MeshTitan.Skins do
 		if not findTemplate(look) then
 			for _, child in workspace:GetChildren() do
-				local name = string.lower(child.Name)
-				if child:IsA("Model") and (name == string.lower(look) or name == "gigante" .. string.lower(look)) then
+				if child:IsA("Model") and matches(child.Name, look) then
 					child.Parent = f
 					print(("[Giganti 3D] Modello '%s' spostato in ReplicatedStorage → %s"):format(child.Name, FOLDER))
 				end

@@ -17,6 +17,7 @@ local Util = require(Shared.Lib.Util)
 local Net = require(Shared.Lib.Net)
 local Serums = require(Shared.Data.Serums)
 local Bloodlines = require(Shared.Data.Bloodlines)
+local MeshTitan = require(Shared.Anim.MeshTitan)
 
 local ShifterService = {}
 local S
@@ -124,6 +125,16 @@ local function decorate(character: Model, serum)
 	local torso = character:FindFirstChild("UpperTorso") :: BasePart?
 	if not head or not torso then
 		return folder
+	end
+	-- aspetto con modello 3D importato (es. Gigante della Furia): il corpo R15 viene rivestito
+	if MeshTitan.Has(serum.Look) then
+		local ok, applied = pcall(MeshTitan.SkinCharacter, character, serum.Look, folder)
+		if ok and applied then
+			folder:SetAttribute("MeshSkin", true)
+			return folder
+		end
+		warn("[ShifterService] Rivestimento 3D non riuscito: " .. tostring(applied))
+		folder:ClearAllChildren()
 	end
 	local h = head.Size
 	local t = torso.Size
@@ -318,7 +329,18 @@ function ShifterService.Transform(player: Player): (boolean, string?)
 	end
 	store.Scale = scale
 	d.Store = store
-	decorate(character, serum)
+	local form = decorate(character, serum)
+	if form:GetAttribute("MeshSkin") then
+		-- il corpo R15 resta (muove i pezzi del modello) ma diventa invisibile
+		store.Transparency = {}
+		for _, name in BODY_PARTS do
+			local part = character:FindFirstChild(name)
+			if part and part:IsA("BasePart") then
+				store.Transparency[part] = part.Transparency
+				part.Transparency = 1
+			end
+		end
+	end
 
 	local stats = S.PlayerService.Stats(player)
 	local titanHP = math.floor(stats.MaxHealth * serum.Health * (1 + (profile.Stats.Gigante or 0) * 0.002))
@@ -376,6 +398,11 @@ function ShifterService.Revert(player: Player, reason: string?)
 		for part, color in store.Colors do
 			if part.Parent then
 				part.Color = color
+			end
+		end
+		for part, transparency in store.Transparency or {} do
+			if part.Parent then
+				part.Transparency = transparency
 			end
 		end
 		if store.Face and store.Face.Parent then

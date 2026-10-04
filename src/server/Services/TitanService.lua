@@ -1536,7 +1536,7 @@ function TitanService.Init(services)
 end
 
 function TitanService.Start()
-	-- modelli 3D importati (es. il Gigante Redivivo): li prepara prima di far nascere i giganti
+	-- modelli 3D importati (es. il Gigante della Furia): li prepara prima di far nascere i giganti
 	local okMesh, errMesh = pcall(MeshTitan.CollectTemplates)
 	if not okMesh then
 		warn("[Giganti 3D] " .. tostring(errMesh))

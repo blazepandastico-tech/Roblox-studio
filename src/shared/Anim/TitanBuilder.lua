@@ -367,17 +367,6 @@ local function makeProfile(look: string, rng: Random)
 		p.Grin = true
 		p.Ears = 1.5
 		p.EyeGlow = Color3.fromRGB(120, 255, 170)
-	elseif look == "Redivivo" then
-		-- aspetto di riserva finché il modello 3D non è importato
-		p.Skin = Color3.fromRGB(176, 140, 104)
-		p.Hair = Color3.fromRGB(40, 28, 22)
-		p.HairStyle = "Lungo"
-		p.LegMul, p.ArmMul, p.TorsoMul, p.HeadMul, p.WidthMul, p.ThickMul = 1.08, 1.05, 1.0, 0.85, 0.95, 1.0
-		p.Belly = 0
-		p.Muscle = true
-		p.Lips = false
-		p.Grin = false
-		p.MouthWidth = 0.55
 	elseif look == "Strisciante" then
 		p.Skin = Color3.fromRGB(196, 120, 96)
 		p.Hair = Color3.fromRGB(60, 40, 30)
