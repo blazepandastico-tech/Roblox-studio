@@ -13,7 +13,15 @@ local Config = {
 	DataStoreName = "SieriPerduti_Dati_v1",
 	AutosaveInterval = 120,
 
-	-- Generazione del mondo (stesso seme = stessa mappa)
+	-- Community: crea un Gruppo Roblox per il gioco e metti qui il suo ID (0 = disattivato).
+	-- Chi entra nel gruppo riceve +10% oro per sempre e un regalo di benvenuto.
+	GroupId = 0,
+	GroupReward = { Gems = 50, Spins = 2 },
+	GroupGoldBonus = 0.1,
+	FriendXPBonus = 0.1, -- per ogni amico nello stesso server
+	FriendXPBonusMax = 3, -- amici massimi conteggiati
+
+		-- Generazione del mondo (stesso seme = stessa mappa)
 	WorldSeed = 312,
 
 	-- Progressione

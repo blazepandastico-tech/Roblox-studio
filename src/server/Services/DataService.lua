@@ -66,6 +66,16 @@ local TEMPLATE = {
 	LastDailyLogin = 0,
 	RaidsWon = 0,
 	PlayTime = 0,
+	-- premi e community
+	Streak = { Day = 0, Last = 0, Count = 0, Best = 0 },
+	PlayToday = { Day = 0, Seconds = 0, Claimed = {} },
+	Spins = 0,
+	FreeSpinAt = 0,
+	Achievements = {},
+	StarterBought = false,
+	GroupRewarded = false,
+	FavoritePrompted = false,
+	FriendsSeen = 0,
 	CreatedAt = 0,
 	LastSeen = 0,
 }

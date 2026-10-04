@@ -26,7 +26,25 @@ Monetization.Products = {
 	{ Id = "Monete50K", ProductId = 0, Kind = "Gold", Amount = 50000, Robux = 49, Name = "Borsa di Monete", Icon = "💰" },
 	{ Id = "Monete400K", ProductId = 0, Kind = "Gold", Amount = 400000, Robux = 249, Name = "Cassa di Monete", Icon = "💰", Tag = "+60%" },
 	{ Id = "Monete2M", ProductId = 0, Kind = "Gold", Amount = 2000000, Robux = 799, Name = "Tesoro di Monete", Icon = "💰", Tag = "+150%" },
+	-- giri della Ruota della Fortuna (non compaiono dove i premi casuali a pagamento sono vietati)
+	{ Id = "Giri3", ProductId = 0, Kind = "Spins", Amount = 3, Robux = 79, Name = "3 giri della Ruota", Icon = "🎡" },
+	{ Id = "Giri10", ProductId = 0, Kind = "Spins", Amount = 10, Robux = 229, Name = "10 giri della Ruota", Icon = "🎡", Tag = "+25%" },
+	-- offerta di benvenuto: una sola volta, solo nei primi 3 giorni dal primo accesso
+	{
+		Id = "PacchettoIniziale",
+		ProductId = 0,
+		Kind = "Starter",
+		Robux = 99,
+		Name = "Pacchetto della Recluta",
+		Icon = "🎁",
+		Tag = "-80% SOLO ORA",
+		Bundle = { Gems = 300, Gold = 150000, Spins = 3, Items = { MantelloNotte = 1, PergamenaEsperienza = 3 } },
+		Contents = "300 💎 • 150.000 💰 • 3 🎡 • Mantello della Notte • 3 Pergamene XP",
+	},
 }
+
+-- Ore dal primo accesso in cui il Pacchetto della Recluta resta disponibile
+Monetization.StarterHours = 72
 
 -- Game Pass (si comprano una volta sola e valgono per sempre)
 -- Bonuses usa le stesse chiavi dell'equipaggiamento (vedi StatsCalc)
@@ -56,6 +74,12 @@ Monetization.Earn = {
 	FirstBossKill = 25, -- prima volta che sconfiggi un boss
 	DailyLogin = 10, -- primo accesso del giorno
 }
+
+-- Un prodotto o pass si può comprare solo se ha il suo ID Roblox (in Studio viene simulato)
+function Monetization.IsAvailable(entry): boolean
+	local id = entry.ProductId or entry.PassId or 0
+	return id ~= 0 or game:GetService("RunService"):IsStudio()
+end
 
 function Monetization.Product(id: string)
 	for _, p in Monetization.Products do

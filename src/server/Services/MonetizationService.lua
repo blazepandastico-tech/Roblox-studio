@@ -66,25 +66,62 @@ end
 
 -- CONSEGNA DEI PRODOTTI -------------------------------------------------------------------------
 
-local function grantProduct(player: Player, product): boolean
+-- Il Pacchetto della Recluta si può comprare una volta sola e solo nei primi giorni
+function MonetizationService.StarterAvailable(player: Player): boolean
+	local profile = S.DataService.Get(player)
+	if not profile or profile.StarterBought then
+		return false
+	end
+	return os.time() - (profile.CreatedAt or 0) < Monetization.StarterHours * 3600
+end
+
+-- Consegna un prodotto. Restituisce una funzione per annullarlo (nil se non consegnato)
+local function grantProduct(player: Player, product): (() -> ())?
 	local profile = S.DataService.Get(player)
 	if not profile then
-		return false
+		return nil
 	end
+	local undo: (() -> ())?
+	local text
 	if product.Kind == "Gems" then
 		profile.Gems += product.Amount
+		undo = function()
+			profile.Gems -= product.Amount
+		end
+		text = ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
 	elseif product.Kind == "Gold" then
 		profile.Gold += product.Amount
+		undo = function()
+			profile.Gold -= product.Amount
+		end
+		text = ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
+	elseif product.Kind == "Spins" then
+		profile.Spins = (profile.Spins or 0) + product.Amount
+		undo = function()
+			profile.Spins -= product.Amount
+		end
+		text = ("%s +%d giri della Ruota"):format(product.Icon, product.Amount)
+	elseif product.Kind == "Starter" then
+		local bundleUndo, summary = S.RewardsService.Apply(player, product.Bundle)
+		if not bundleUndo then
+			return nil
+		end
+		profile.StarterBought = true
+		undo = function()
+			bundleUndo()
+			profile.StarterBought = false
+		end
+		text = product.Name .. ": " .. summary
 	else
-		return false
+		return nil
 	end
 	S.DataService.MarkDirty(player)
-	S.EventService.AnnounceTo(player, "Grazie per il tuo supporto!", ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount)), "Raro")
+	S.EventService.AnnounceTo(player, "Grazie per il tuo supporto!", text, "Raro")
 	local root = Util.GetRoot(player.Character)
 	if root then
 		S.EventService.Effect("LevelUp", { Character = player.Character }, root.Position, 300)
 	end
-	return true
+	return undo
 end
 
 local function grantPass(player: Player, pass)
@@ -128,7 +165,8 @@ local function processReceipt(receipt)
 		warn("[Monetization] Prodotto sconosciuto: " .. tostring(receipt.ProductId))
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	if not grantProduct(player, product) then
+	local undo = grantProduct(player, product)
+	if not undo then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	table.insert(profile.Receipts, purchaseId)
@@ -138,11 +176,7 @@ local function processReceipt(receipt)
 	-- salva subito: se il salvataggio fallisce, Roblox riproverà più tardi
 	if not S.DataService.Save(player) and not isStudio() then
 		-- annulla la consegna per non regalare il prodotto due volte al prossimo tentativo
-		if product.Kind == "Gems" then
-			profile.Gems -= product.Amount
-		else
-			profile.Gold -= product.Amount
-		end
+		undo()
 		table.remove(profile.Receipts, #profile.Receipts)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -182,11 +216,8 @@ local function dailyGifts(player: Player)
 	if not profile then
 		return
 	end
+	-- (il premio del primo accesso del giorno ora è nel calendario di RewardsService)
 	local today = os.time() // DAY
-	if (profile.LastDailyLogin or 0) < today then
-		profile.LastDailyLogin = today
-		MonetizationService.AddGems(player, Monetization.Earn.DailyLogin, "primo accesso del giorno")
-	end
 	local vip = Monetization.Pass("VIP")
 	if vip and profile.Passes.VIP and (profile.LastDailyGems or 0) < today then
 		profile.LastDailyGems = today
@@ -244,6 +275,14 @@ local function onBuy(player: Player, kind: any, id: any)
 	if kind == "Product" then
 		local product = Monetization.Product(id)
 		if not product then
+			return
+		end
+		if product.Kind == "Starter" and not MonetizationService.StarterAvailable(player) then
+			S.EventService.Notify(player, "Questa offerta non è più disponibile.", "Info", 3)
+			return
+		end
+		if product.Kind == "Spins" and not S.RewardsService.PaidRandomAllowed(player) then
+			S.EventService.Notify(player, "I giri a pagamento non sono disponibili nel tuo paese.", "Info", 3)
 			return
 		end
 		if product.ProductId == 0 then

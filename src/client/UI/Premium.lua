@@ -120,6 +120,24 @@ end
 local function showProducts(kind: string)
 	local list = grid(210)
 	local order = 0
+	-- offerta di benvenuto in cima alle gemme (solo nei primi giorni e una volta sola)
+	if kind == "Gems" and C.RewardsPanel and C.RewardsPanel.StarterAvailable() and Monetization.IsAvailable(Monetization.Product("PacchettoIniziale") or {}) then
+		for _, product in Monetization.Products do
+			if product.Kind == "Starter" then
+				card(list, 0, {
+					Icon = product.Icon,
+					Title = product.Name,
+					Text = product.Contents,
+					Tag = product.Tag,
+					Button = ("R$ %d"):format(product.Robux),
+					ButtonColor = Color3.fromRGB(190, 120, 30),
+					OnClick = function()
+						buy("Product", product.Id)
+					end,
+				})
+			end
+		end
+	end
 	for _, product in Monetization.Products do
 		if product.Kind == kind then
 			order += 1
@@ -129,7 +147,8 @@ local function showProducts(kind: string)
 				Text = ("+%s %s"):format(Util.FormatNumber(product.Amount), if kind == "Gems" then "gemme" else "monete d'oro"),
 				Tag = product.Tag,
 				TitleColor = if kind == "Gems" then GEM_COLOR else Colors.GoldBright,
-				Button = ("R$ %d"):format(product.Robux),
+				Button = if Monetization.IsAvailable(product) then ("R$ %d"):format(product.Robux) else "In arrivo",
+				Disabled = not Monetization.IsAvailable(product),
 				ButtonColor = Color3.fromRGB(40, 150, 80),
 				OnClick = function()
 					buy("Product", product.Id)
@@ -149,8 +168,8 @@ local function showPasses()
 			Title = pass.Name,
 			Text = pass.Description,
 			Tag = if owned then "POSSEDUTO" else nil,
-			Button = if owned then "✔ Attivo" else ("R$ %d"):format(pass.Robux),
-			Disabled = owned,
+			Button = if owned then "✔ Attivo" elseif Monetization.IsAvailable(pass) then ("R$ %d"):format(pass.Robux) else "In arrivo",
+			Disabled = owned or not Monetization.IsAvailable(pass),
 			ButtonColor = Color3.fromRGB(40, 150, 80),
 			OnClick = function()
 				buy("Pass", pass.Id)
@@ -190,7 +209,8 @@ local function showTravel()
 				Icon = "🔒",
 				Title = "Serve il pass Viaggiatore",
 				Text = pass.Description .. " Senza il pass puoi sempre usare i traghetti nei porti di ogni isola.",
-				Button = ("R$ %d"):format(pass.Robux),
+				Button = if Monetization.IsAvailable(pass) then ("R$ %d"):format(pass.Robux) else "In arrivo",
+				Disabled = not Monetization.IsAvailable(pass),
 				ButtonColor = Color3.fromRGB(40, 150, 80),
 				OnClick = function()
 					buy("Pass", pass.Id)

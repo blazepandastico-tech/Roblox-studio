@@ -2106,7 +2106,15 @@ local Config = {
 	DataStoreName = "SieriPerduti_Dati_v1",
 	AutosaveInterval = 120,
 
-	-- Generazione del mondo (stesso seme = stessa mappa)
+	-- Community: crea un Gruppo Roblox per il gioco e metti qui il suo ID (0 = disattivato).
+	-- Chi entra nel gruppo riceve +10% oro per sempre e un regalo di benvenuto.
+	GroupId = 0,
+	GroupReward = { Gems = 50, Spins = 2 },
+	GroupGoldBonus = 0.1,
+	FriendXPBonus = 0.1, -- per ogni amico nello stesso server
+	FriendXPBonusMax = 3, -- amici massimi conteggiati
+
+		-- Generazione del mondo (stesso seme = stessa mappa)
 	WorldSeed = 312,
 
 	-- Progressione
@@ -2287,6 +2295,92 @@ return Config
         </Properties>
         <Item class="ModuleScript" referent="10">
           <Properties>
+            <string name="Name">Achievements</string>
+            <string name="Source"><![CDATA[--[[
+	Achievements - Traguardi (con medaglie Roblox opzionali)
+
+	Ogni traguardo dà gemme. Se crei una Medaglia (Badge) su create.roblox.com → il tuo gioco →
+	Medaglie, copia il suo ID in BadgeId: il giocatore la riceverà anche sul suo profilo Roblox
+	(le medaglie compaiono sul profilo e portano nuovi giocatori al gioco).
+
+	Stat:
+	  Titans / Napes / Bosses / Enemies  → profile.Kills[...]
+	  Level      → livello
+	  RaidsWon   → raid vinti
+	  Chapter    → capitoli della storia completati
+	  PlayHours  → ore di gioco
+	  Streak     → giorni di fila nel calendario
+	  Friends    → amici nello stesso server
+]]
+
+local Achievements = {}
+
+Achievements.List = {
+	{ Id = "Benvenuto", Icon = "🎖️", Name = "Benvenuto, Recluta", Description = "Entra nel gioco per la prima volta.", Stat = "Level", Goal = 1, Gems = 5, BadgeId = 0 },
+	{ Id = "PrimoSangue", Icon = "🩸", Name = "Primo Sangue", Description = "Uccidi il tuo primo gigante.", Stat = "Titans", Goal = 1, Gems = 5, BadgeId = 0 },
+	{ Id = "Cacciatore100", Icon = "⚔️", Name = "Cacciatore", Description = "Uccidi 100 giganti.", Stat = "Titans", Goal = 100, Gems = 15, BadgeId = 0 },
+	{ Id = "Cacciatore1000", Icon = "⚔️", Name = "Sterminatore", Description = "Uccidi 1.000 giganti.", Stat = "Titans", Goal = 1000, Gems = 40, BadgeId = 0 },
+	{ Id = "Cacciatore10000", Icon = "☠️", Name = "Flagello dei Giganti", Description = "Uccidi 10.000 giganti.", Stat = "Titans", Goal = 10000, Gems = 120, BadgeId = 0 },
+	{ Id = "Nuca50", Icon = "🎯", Name = "Colpo Preciso", Description = "Uccidi 50 giganti colpendo la nuca.", Stat = "Napes", Goal = 50, Gems = 10, BadgeId = 0 },
+	{ Id = "Nuca1000", Icon = "🎯", Name = "Lama Infallibile", Description = "Uccidi 1.000 giganti colpendo la nuca.", Stat = "Napes", Goal = 1000, Gems = 50, BadgeId = 0 },
+	{ Id = "PrimoBoss", Icon = "👹", Name = "Ammazzaboss", Description = "Sconfiggi il tuo primo boss.", Stat = "Bosses", Goal = 1, Gems = 15, BadgeId = 0 },
+	{ Id = "Boss50", Icon = "👹", Name = "Leggenda delle Mura", Description = "Sconfiggi 50 boss.", Stat = "Bosses", Goal = 50, Gems = 80, BadgeId = 0 },
+	{ Id = "Livello50", Icon = "⭐", Name = "Soldato", Description = "Raggiungi il livello 50.", Stat = "Level", Goal = 50, Gems = 10, BadgeId = 0 },
+	{ Id = "Livello200", Icon = "⭐", Name = "Veterano", Description = "Raggiungi il livello 200 e salpa per Edenia.", Stat = "Level", Goal = 200, Gems = 25, BadgeId = 0 },
+	{ Id = "Livello500", Icon = "🌟", Name = "Capitano", Description = "Raggiungi il livello 500.", Stat = "Level", Goal = 500, Gems = 50, BadgeId = 0 },
+	{ Id = "Livello1000", Icon = "🌟", Name = "Comandante", Description = "Raggiungi il livello 1000 e attraversa il mare.", Stat = "Level", Goal = 1000, Gems = 100, BadgeId = 0 },
+	{ Id = "Livello2000", Icon = "👑", Name = "Leggenda dell'Arcipelago", Description = "Raggiungi il livello massimo.", Stat = "Level", Goal = 2000, Gems = 300, BadgeId = 0 },
+	{ Id = "Stagione1", Icon = "📜", Name = "Il Muro Infranto", Description = "Completa la Stagione 1 della storia.", Stat = "Chapter", Goal = 5, Gems = 30, BadgeId = 0 },
+	{ Id = "Stagione2", Icon = "📜", Name = "La Nebbia", Description = "Completa la Stagione 2 della storia.", Stat = "Chapter", Goal = 9, Gems = 50, BadgeId = 0 },
+	{ Id = "Stagione3", Icon = "📜", Name = "La Verità", Description = "Completa la Stagione 3 della storia.", Stat = "Chapter", Goal = 13, Gems = 80, BadgeId = 0 },
+	{ Id = "Stagione4", Icon = "🏆", Name = "Oltre il Mare", Description = "Completa tutta la storia.", Stat = "Chapter", Goal = 17, Gems = 150, BadgeId = 0 },
+	{ Id = "PrimoRaid", Icon = "🔱", Name = "Squadra d'Assalto", Description = "Vinci il tuo primo raid.", Stat = "RaidsWon", Goal = 1, Gems = 15, BadgeId = 0 },
+	{ Id = "Raid25", Icon = "🔱", Name = "Maestro dei Raid", Description = "Vinci 25 raid.", Stat = "RaidsWon", Goal = 25, Gems = 60, BadgeId = 0 },
+	{ Id = "Fedele7", Icon = "📅", Name = "Fedele", Description = "Gioca 7 giorni di fila.", Stat = "Streak", Goal = 7, Gems = 30, BadgeId = 0 },
+	{ Id = "Ore10", Icon = "⏳", Name = "Instancabile", Description = "Gioca per 10 ore in totale.", Stat = "PlayHours", Goal = 10, Gems = 30, BadgeId = 0 },
+	{ Id = "Compagni", Icon = "🤝", Name = "Compagni d'Armi", Description = "Gioca nello stesso server con un amico.", Stat = "Friends", Goal = 1, Gems = 10, BadgeId = 0 },
+	{ Id = "Squadra", Icon = "👥", Name = "La Squadra al Completo", Description = "Gioca con 3 amici nello stesso server.", Stat = "Friends", Goal = 3, Gems = 25, BadgeId = 0 },
+}
+
+function Achievements.Get(id: string)
+	for _, a in Achievements.List do
+		if a.Id == id then
+			return a
+		end
+	end
+	return nil
+end
+
+-- Valore attuale di una statistica (funziona sia sul server sia sul client)
+function Achievements.Value(profile, stat: string, extra: { [string]: number }?): number
+	if stat == "Level" then
+		return profile.Level or 0
+	elseif stat == "Titans" or stat == "Napes" or stat == "Bosses" or stat == "Enemies" then
+		return profile.Kills and profile.Kills[stat] or 0
+	elseif stat == "RaidsWon" then
+		return profile.RaidsWon or 0
+	elseif stat == "Chapter" then
+		local story = profile.Story
+		if not story then
+			return 0
+		end
+		return if story.Done then 17 else math.max(0, (story.Chapter or 1) - 1)
+	elseif stat == "PlayHours" then
+		return math.floor((profile.PlayTime or 0) / 3600)
+	elseif stat == "Streak" then
+		return profile.Streak and profile.Streak.Best or 0
+	elseif stat == "Friends" then
+		return extra and extra.Friends or (profile.FriendsSeen or 0)
+	end
+	return 0
+end
+
+return Achievements
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="11">
+          <Properties>
             <string name="Name">AnimationIds</string>
             <string name="Source"><![CDATA[--[[
 	AnimationIds - animazioni caricate su Roblox (facoltative)
@@ -2320,7 +2414,7 @@ return AnimationIds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="11">
+        <Item class="ModuleScript" referent="12">
           <Properties>
             <string name="Name">Bloodlines</string>
             <string name="Source"><![CDATA[--[[
@@ -2413,7 +2507,7 @@ return Bloodlines
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="12">
+        <Item class="ModuleScript" referent="13">
           <Properties>
             <string name="Name">Enemies</string>
             <string name="Source"><![CDATA[--[[
@@ -2526,7 +2620,7 @@ return Enemies
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="13">
+        <Item class="ModuleScript" referent="14">
           <Properties>
             <string name="Name">Items</string>
             <string name="Source"><![CDATA[--[[
@@ -3382,7 +3476,7 @@ return Items
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="14">
+        <Item class="ModuleScript" referent="15">
           <Properties>
             <string name="Name">Leveling</string>
             <string name="Source"><![CDATA[--[[
@@ -3443,7 +3537,7 @@ return Leveling
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="15">
+        <Item class="ModuleScript" referent="16">
           <Properties>
             <string name="Name">Monetization</string>
             <string name="Source"><![CDATA[--[[
@@ -3474,7 +3568,25 @@ Monetization.Products = {
 	{ Id = "Monete50K", ProductId = 0, Kind = "Gold", Amount = 50000, Robux = 49, Name = "Borsa di Monete", Icon = "💰" },
 	{ Id = "Monete400K", ProductId = 0, Kind = "Gold", Amount = 400000, Robux = 249, Name = "Cassa di Monete", Icon = "💰", Tag = "+60%" },
 	{ Id = "Monete2M", ProductId = 0, Kind = "Gold", Amount = 2000000, Robux = 799, Name = "Tesoro di Monete", Icon = "💰", Tag = "+150%" },
+	-- giri della Ruota della Fortuna (non compaiono dove i premi casuali a pagamento sono vietati)
+	{ Id = "Giri3", ProductId = 0, Kind = "Spins", Amount = 3, Robux = 79, Name = "3 giri della Ruota", Icon = "🎡" },
+	{ Id = "Giri10", ProductId = 0, Kind = "Spins", Amount = 10, Robux = 229, Name = "10 giri della Ruota", Icon = "🎡", Tag = "+25%" },
+	-- offerta di benvenuto: una sola volta, solo nei primi 3 giorni dal primo accesso
+	{
+		Id = "PacchettoIniziale",
+		ProductId = 0,
+		Kind = "Starter",
+		Robux = 99,
+		Name = "Pacchetto della Recluta",
+		Icon = "🎁",
+		Tag = "-80% SOLO ORA",
+		Bundle = { Gems = 300, Gold = 150000, Spins = 3, Items = { MantelloNotte = 1, PergamenaEsperienza = 3 } },
+		Contents = "300 💎 • 150.000 💰 • 3 🎡 • Mantello della Notte • 3 Pergamene XP",
+	},
 }
+
+-- Ore dal primo accesso in cui il Pacchetto della Recluta resta disponibile
+Monetization.StarterHours = 72
 
 -- Game Pass (si comprano una volta sola e valgono per sempre)
 -- Bonuses usa le stesse chiavi dell'equipaggiamento (vedi StatsCalc)
@@ -3504,6 +3616,12 @@ Monetization.Earn = {
 	FirstBossKill = 25, -- prima volta che sconfiggi un boss
 	DailyLogin = 10, -- primo accesso del giorno
 }
+
+-- Un prodotto o pass si può comprare solo se ha il suo ID Roblox (in Studio viene simulato)
+function Monetization.IsAvailable(entry): boolean
+	local id = entry.ProductId or entry.PassId or 0
+	return id ~= 0 or game:GetService("RunService"):IsStudio()
+end
 
 function Monetization.Product(id: string)
 	for _, p in Monetization.Products do
@@ -3561,7 +3679,7 @@ return Monetization
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="16">
+        <Item class="ModuleScript" referent="17">
           <Properties>
             <string name="Name">NPCs</string>
             <string name="Source"><![CDATA[--[[
@@ -3925,7 +4043,7 @@ return NPCs
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="17">
+        <Item class="ModuleScript" referent="18">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[
@@ -4038,7 +4156,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">Raids</string>
             <string name="Source"><![CDATA[--[[
@@ -4153,7 +4271,85 @@ return Raids
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="20">
+          <Properties>
+            <string name="Name">Rewards</string>
+            <string name="Source"><![CDATA[--[[
+	Rewards - premi che fanno tornare i giocatori
+	  • Calendario di 7 giorni: ogni giorno di fila un premio più grande (se salti un giorno si riparte).
+	  • Regali a tempo: più minuti giochi oggi, più regali apri (si azzerano ogni giorno).
+	  • Ruota della Fortuna: un giro gratis ogni 20 ore, altri giri dai premi o con Robux.
+	    Le probabilità sono SEMPRE mostrate al giocatore (regola di Roblox per i premi casuali);
+	    nei paesi dove i premi casuali a pagamento sono vietati, i giri a pagamento non compaiono.
+
+	Oro: "GoldQuests = 3" significa "quanto 3 missioni al tuo livello", così il premio vale
+	sia al livello 5 sia al livello 1500.
+]]
+
+local Rewards = {}
+
+-- CALENDARIO -----------------------------------------------------------------------------
+Rewards.Daily = {
+	{ Day = 1, Icon = "💰", Name = "Borsa d'oro", GoldQuests = 3 },
+	{ Day = 2, Icon = "💎", Name = "15 gemme", Gems = 15 },
+	{ Day = 3, Icon = "🧪", Name = "Pozione dell'Oro", Items = { PozioneOro = 1 }, GoldQuests = 2 },
+	{ Day = 4, Icon = "🎡", Name = "2 giri della Ruota", Spins = 2 },
+	{ Day = 5, Icon = "📜", Name = "2 Pergamene XP", Items = { PergamenaEsperienza = 2 } },
+	{ Day = 6, Icon = "💎", Name = "30 gemme", Gems = 30, GoldQuests = 3 },
+	{ Day = 7, Icon = "👑", Name = "Forziere settimanale", Gems = 60, Spins = 3, Items = { SigilloRaid = 1, FrammentoSiero = 3 }, Big = true },
+}
+
+-- REGALI A TEMPO (minuti di gioco nella giornata) ----------------------------------------
+Rewards.Playtime = {
+	{ Minutes = 3, Icon = "🍞", Name = "3 Razioni", Items = { Razione = 3 } },
+	{ Minutes = 8, Icon = "💰", Name = "Oro", GoldQuests = 1 },
+	{ Minutes = 15, Icon = "🎡", Name = "1 giro della Ruota", Spins = 1 },
+	{ Minutes = 25, Icon = "💉", Name = "2 Fiale di Adrenalina", Items = { FialaAdrenalina = 2 } },
+	{ Minutes = 35, Icon = "💎", Name = "10 gemme", Gems = 10 },
+	{ Minutes = 50, Icon = "📜", Name = "Pergamena XP", Items = { PergamenaEsperienza = 1 }, GoldQuests = 2 },
+	{ Minutes = 70, Icon = "🎡", Name = "2 giri della Ruota", Spins = 2 },
+	{ Minutes = 90, Icon = "👑", Name = "Gran regalo", Gems = 25, Items = { FrammentoSiero = 2 }, GoldQuests = 3, Big = true },
+}
+
+-- RUOTA DELLA FORTUNA -------------------------------------------------------------------
+-- Weight = probabilità in percentuale (la somma deve fare 100)
+Rewards.Wheel = {
+	{ Id = "OroPiccolo", Icon = "💰", Name = "Oro", GoldQuests = 1, Weight = 28, Color = Color3.fromRGB(196, 150, 50) },
+	{ Id = "Gemme10", Icon = "💎", Name = "10 gemme", Gems = 10, Weight = 18, Color = Color3.fromRGB(70, 150, 210) },
+	{ Id = "Pozione", Icon = "🧪", Name = "Pozione dell'Oro", Items = { PozioneOro = 1 }, Weight = 12, Color = Color3.fromRGB(150, 110, 40) },
+	{ Id = "Pergamena", Icon = "📜", Name = "Pergamena XP", Items = { PergamenaEsperienza = 1 }, Weight = 12, Color = Color3.fromRGB(90, 160, 110) },
+	{ Id = "OroGrande", Icon = "💰", Name = "Tanto oro", GoldQuests = 4, Weight = 12, Color = Color3.fromRGB(220, 176, 60) },
+	{ Id = "Frammenti", Icon = "🧬", Name = "2 Frammenti di Siero", Items = { FrammentoSiero = 2 }, Weight = 9, Color = Color3.fromRGB(150, 70, 160) },
+	{ Id = "Gemme50", Icon = "💎", Name = "50 gemme", Gems = 50, Weight = 5, Color = Color3.fromRGB(60, 120, 230) },
+	{ Id = "Sigillo", Icon = "🔱", Name = "Sigillo del Raid", Items = { SigilloRaid = 1 }, Weight = 3, Color = Color3.fromRGB(180, 60, 60) },
+	-- premio massimo: mantello raro (se lo hai già, 150 gemme)
+	{ Id = "Jackpot", Icon = "🧥", Name = "JACKPOT: Mantello Cremisi", Items = { MantelloCremisi = 1 }, UniqueItem = "MantelloCremisi", FallbackGems = 150, Weight = 1, Color = Color3.fromRGB(230, 40, 50), Big = true },
+}
+
+Rewards.FreeSpinHours = 20
+
+function Rewards.WheelTotal(): number
+	local total = 0
+	for _, prize in Rewards.Wheel do
+		total += prize.Weight
+	end
+	return total
+end
+
+function Rewards.WheelPrize(id: string)
+	for _, prize in Rewards.Wheel do
+		if prize.Id == id then
+			return prize
+		end
+	end
+	return nil
+end
+
+return Rewards
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">Serums</string>
             <string name="Source"><![CDATA[--[[
@@ -4445,7 +4641,7 @@ return Serums
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Shops</string>
             <string name="Source"><![CDATA[--[[
@@ -4516,7 +4712,7 @@ return Shops
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="23">
           <Properties>
             <string name="Name">Skills</string>
             <string name="Source"><![CDATA[--[[
@@ -4589,7 +4785,7 @@ return Skills
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="22">
+        <Item class="ModuleScript" referent="24">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[--[[
@@ -4632,7 +4828,7 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="25">
           <Properties>
             <string name="Name">StatsCalc</string>
             <string name="Source"><![CDATA[--[[
@@ -4794,7 +4990,7 @@ return StatsCalc
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Story</string>
             <string name="Source"><![CDATA[--[[
@@ -5477,7 +5673,7 @@ return Story
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="27">
           <Properties>
             <string name="Name">Titans</string>
             <string name="Source"><![CDATA[--[[
@@ -5817,7 +6013,7 @@ return Titans
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">WorldLayout</string>
             <string name="Source"><![CDATA[--[[
@@ -5947,7 +6143,7 @@ return W
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">Zones</string>
             <string name="Source"><![CDATA[--[[
@@ -6454,11 +6650,11 @@ return Zones
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="28">
+      <Item class="Folder" referent="30">
         <Properties>
           <string name="Name">Lib</string>
         </Properties>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="31">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[--[[
@@ -6500,8 +6696,14 @@ Net.EventNames = {
 	"SaveSettings",
 	"PremiumBuy",
 	"FastTravel",
+	"ClaimReward",
+	"SpinWheel",
+	"CommunityAction",
 	-- server -> client
 	"RaidState",
+	"WheelResult",
+	"Leaderboards",
+	"Achievement",
 	"DataSync",
 	"Notify",
 	"Announce",
@@ -6592,7 +6794,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="30">
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">Signal</string>
             <string name="Source"><![CDATA[--[[
@@ -6673,7 +6875,7 @@ return Signal
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">Util</string>
             <string name="Source"><![CDATA[--[[
@@ -6967,11 +7169,11 @@ return Util
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="32">
+      <Item class="Folder" referent="34">
         <Properties>
           <string name="Name">Modules</string>
         </Properties>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="35">
           <Properties>
             <string name="Name">ODMPhysicsModule</string>
             <string name="Source"><![CDATA[--[[
@@ -7207,15 +7409,15 @@ return ODMPhysics
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="34">
+  <Item class="ServerScriptService" referent="36">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="35">
+    <Item class="Folder" referent="37">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="36">
+      <Item class="Script" referent="38">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -7258,6 +7460,10 @@ local ORDER = {
 	"NPCService",
 	"SupplyService",
 	"CodesService",
+	"RewardsService",
+	"CommunityService",
+	"AchievementService",
+	"LeaderboardService",
 	"DevCommandsService",
 }
 
@@ -7303,11 +7509,102 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="37">
+      <Item class="Folder" referent="39">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="40">
+          <Properties>
+            <string name="Name">AchievementService</string>
+            <string name="Source"><![CDATA[--[[
+	AchievementService - Traguardi
+	Controlla periodicamente i progressi di ogni giocatore e assegna gemme (e la medaglia
+	Roblox, se il traguardo ha un BadgeId) quando un obiettivo viene raggiunto.
+]]
+
+local BadgeService = game:GetService("BadgeService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Lib.Net)
+local Achievements = require(Shared.Data.Achievements)
+
+local AchievementService = {}
+local S
+
+local function awardBadge(player: Player, badgeId: number)
+	if badgeId == 0 then
+		return
+	end
+	task.spawn(function()
+		local ok, has = pcall(function()
+			return BadgeService:UserHasBadgeAsync(player.UserId, badgeId)
+		end)
+		if ok and not has then
+			pcall(function()
+				BadgeService:AwardBadge(player.UserId, badgeId)
+			end)
+		end
+	end)
+end
+
+function AchievementService.Check(player: Player)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	local extra = { Friends = player:GetAttribute("FriendsHere") or 0 }
+	local unlocked = false
+	for _, a in Achievements.List do
+		if not profile.Achievements[a.Id] and Achievements.Value(profile, a.Stat, extra) >= a.Goal then
+			profile.Achievements[a.Id] = os.time()
+			unlocked = true
+			profile.Gems += a.Gems
+			Net.Event("Achievement"):FireClient(player, a.Id)
+			S.EventService.Notify(player, ("🏅 Traguardo: %s  (+%d 💎)"):format(a.Name, a.Gems), "Raro", 5)
+			awardBadge(player, a.BadgeId)
+		elseif profile.Achievements[a.Id] and a.BadgeId ~= 0 and not profile._BadgesChecked then
+			-- medaglie aggiunte dopo: le consegna anche a chi aveva già il traguardo
+			awardBadge(player, a.BadgeId)
+		end
+	end
+	profile._BadgesChecked = true
+	if unlocked then
+		S.DataService.MarkDirty(player)
+	end
+end
+
+function AchievementService.Init(services)
+	S = services
+end
+
+function AchievementService.Start()
+	S.DataService.Loaded:Connect(function(player)
+		task.delay(6, function()
+			if player.Parent then
+				AchievementService.Check(player)
+			end
+		end)
+	end)
+	S.PlayerService.LevelUp:Connect(function(player)
+		AchievementService.Check(player)
+	end)
+	task.spawn(function()
+		while true do
+			task.wait(15)
+			for _, player in Players:GetPlayers() do
+				task.spawn(AchievementService.Check, player)
+			end
+		end
+	end)
+end
+
+return AchievementService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -7369,7 +7666,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -7892,7 +8189,143 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="43">
+          <Properties>
+            <string name="Name">CommunityService</string>
+            <string name="Source"><![CDATA[--[[
+	CommunityService - tutto ciò che porta nuovi giocatori
+	  • Bonus amici: +10% esperienza per ogni amico nello stesso server (massimo +30%).
+	  • Gruppo del gioco (Config.GroupId): +10% oro per sempre e un regalo di benvenuto.
+	  • Il client chiede una volta di aggiungere il gioco ai Preferiti (qui si ricorda che l'ha fatto).
+]]
+
+local GroupService = game:GetService("GroupService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Net = require(Shared.Lib.Net)
+
+local CommunityService = {}
+local S
+
+-- amicizie già controllate: friendCache[a][b] = true/false
+local friendCache: { [number]: { [number]: boolean } } = {}
+
+local function areFriends(a: Player, b: Player): boolean
+	local row = friendCache[a.UserId]
+	if not row then
+		row = {}
+		friendCache[a.UserId] = row
+	end
+	local known = row[b.UserId]
+	if known ~= nil then
+		return known
+	end
+	local ok, result = pcall(function()
+		return a:IsFriendsWith(b.UserId)
+	end)
+	local value = ok and result == true
+	row[b.UserId] = value
+	local other = friendCache[b.UserId] or {}
+	friendCache[b.UserId] = other
+	other[a.UserId] = value
+	return value
+end
+
+local function updateFriends()
+	local list = Players:GetPlayers()
+	for _, player in list do
+		local count = 0
+		for _, other in list do
+			if other ~= player and areFriends(player, other) then
+				count += 1
+			end
+		end
+		local before = player:GetAttribute("FriendsHere") or 0
+		player:SetAttribute("FriendsHere", count)
+		player:SetAttribute("BonusXP", math.min(count, Config.FriendXPBonusMax) * Config.FriendXPBonus)
+		local profile = S.DataService.Get(player)
+		if profile and count > (profile.FriendsSeen or 0) then
+			profile.FriendsSeen = count
+			S.DataService.MarkDirty(player)
+		end
+		if count > before then
+			S.EventService.Notify(player, ("🤝 Un amico è nel server: +%d%% esperienza!"):format(math.floor(math.min(count, Config.FriendXPBonusMax) * Config.FriendXPBonus * 100)), "Successo", 4)
+		end
+	end
+end
+
+local function checkGroup(player: Player, announce: boolean)
+	if Config.GroupId == 0 then
+		return
+	end
+	local ok, inGroup = pcall(function()
+		return player:IsInGroup(Config.GroupId)
+	end)
+	if not ok then
+		return
+	end
+	if not inGroup and announce then
+		-- IsInGroup può essere ancora quello vecchio: chiede l'elenco aggiornato dei gruppi
+		local okList, groups = pcall(function()
+			return GroupService:GetGroupsAsync(player.UserId)
+		end)
+		if okList and groups then
+			for _, info in groups do
+				if info.Id == Config.GroupId then
+					inGroup = true
+				end
+			end
+		end
+	end
+	player:SetAttribute("InGroup", inGroup)
+	player:SetAttribute("BonusGold", if inGroup then Config.GroupGoldBonus else 0)
+	local profile = S.DataService.Get(player)
+	if inGroup and profile and not profile.GroupRewarded then
+		profile.GroupRewarded = true
+		local _, text = S.RewardsService.Apply(player, Config.GroupReward)
+		S.EventService.AnnounceTo(player, "Grazie per esserti unito al gruppo!", text .. "  •  +10% oro per sempre", "Raro")
+		S.DataService.SyncNow(player)
+	elseif announce and not inGroup then
+		S.EventService.Notify(player, "Non risulti ancora nel gruppo. Unisciti dalla pagina del gioco e rientra.", "Info", 5)
+	end
+end
+
+function CommunityService.Init(services)
+	S = services
+end
+
+function CommunityService.Start()
+	ReplicatedStorage:SetAttribute("GroupId", Config.GroupId)
+	S.DataService.Loaded:Connect(function(player)
+		task.spawn(checkGroup, player, false)
+		task.defer(updateFriends)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		friendCache[player.UserId] = nil
+		task.defer(updateFriends)
+	end)
+	Net.Event("CommunityAction").OnServerEvent:Connect(function(player, action)
+		local profile = S.DataService.Get(player)
+		if not profile then
+			return
+		end
+		if action == "Favorite" then
+			profile.FavoritePrompted = true
+			S.DataService.MarkDirty(player)
+		elseif action == "CheckGroup" then
+			checkGroup(player, true)
+		end
+	end)
+end
+
+return CommunityService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -7963,6 +8396,16 @@ local TEMPLATE = {
 	LastDailyLogin = 0,
 	RaidsWon = 0,
 	PlayTime = 0,
+	-- premi e community
+	Streak = { Day = 0, Last = 0, Count = 0, Best = 0 },
+	PlayToday = { Day = 0, Seconds = 0, Claimed = {} },
+	Spins = 0,
+	FreeSpinAt = 0,
+	Achievements = {},
+	StarterBought = false,
+	GroupRewarded = false,
+	FavoritePrompted = false,
+	FriendsSeen = 0,
 	CreatedAt = 0,
 	LastSeen = 0,
 }
@@ -8231,7 +8674,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -8248,6 +8691,9 @@ return DataService
 	/vai Zona           teletrasporto in una zona (es. /vai Recinto, /vai Aurion)
 	/zone               elenco delle zone
 	/cura               vita, gas e lame al massimo
+	/giri N             aggiunge N giri della Ruota della Fortuna
+	/resetpremi         azzera calendario, regali a tempo e giro gratis (per riprovarli)
+	/tempo N            aggiunge N minuti ai regali a tempo di oggi
 ]]
 
 local Players = game:GetService("Players")
@@ -8264,7 +8710,7 @@ local Leveling = require(Shared.Data.Leveling)
 local DevCommandsService = {}
 local S
 
-local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura"
+local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N"
 
 local function allowed(player: Player): boolean
 	if RunService:IsStudio() then
@@ -8396,6 +8842,30 @@ local function run(player: Player, text: string)
 			table.insert(ids, zone.Id)
 		end
 		say(player, table.concat(ids, ", "))
+	elseif command == "/giri" and value then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Spins = (profile.Spins or 0) + math.max(0, math.floor(value))
+			S.DataService.MarkDirty(player)
+			say(player, ("+%d giri della Ruota"):format(math.floor(value)))
+		end
+	elseif command == "/resetpremi" then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Streak.Last = 0
+			profile.Streak.Day = 0
+			profile.PlayToday.Claimed = {}
+			profile.FreeSpinAt = 0
+			S.DataService.MarkDirty(player)
+			say(player, "Premi azzerati: calendario dal Giorno 1, regali e giro gratis di nuovo disponibili")
+		end
+	elseif command == "/tempo" and value then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.PlayToday.Seconds += math.max(0, math.floor(value)) * 60
+			player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
+			say(player, ("+%d minuti di gioco oggi"):format(math.floor(value)))
+		end
 	elseif command == "/cura" then
 		S.PlayerService.Heal(player, 1)
 		pcall(S.PlayerService.RefillWeapons, player)
@@ -8425,7 +8895,7 @@ local function handle(player: Player, text: string)
 	end
 end
 
-local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura" }
+local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura", "/giri", "/resetpremi", "/tempo" }
 
 function DevCommandsService.Init(services)
 	S = services
@@ -8475,7 +8945,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -8937,7 +9407,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -9050,7 +9520,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -9234,7 +9704,239 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="49">
+          <Properties>
+            <string name="Name">LeaderboardService</string>
+            <string name="Source"><![CDATA[--[[
+	LeaderboardService - classifiche globali (tutti i server)
+	Usa le OrderedDataStore: ogni 2 minuti salva i valori dei giocatori presenti e scarica i primi 50.
+	Le classifiche compaiono su tre tabelloni al Campo di Addestramento e nel Menu → Classifiche.
+	In Studio senza accesso alle API mostra solo i giocatori del server.
+]]
+
+local DataStoreService = game:GetService("DataStoreService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Lib.Net)
+local Util = require(Shared.Lib.Util)
+local Zones = require(Shared.Data.Zones)
+
+local LeaderboardService = {}
+local S
+
+local REFRESH = 120
+local TOP = 50
+
+LeaderboardService.Boards = {
+	{ Id = "Livello", Title = "⭐ LIVELLO", Store = "Classifica_Livello_v1", Value = function(p) return p.Level end },
+	{ Id = "Giganti", Title = "⚔️ GIGANTI UCCISI", Store = "Classifica_Giganti_v1", Value = function(p) return p.Kills.Titans end },
+	{ Id = "Raid", Title = "🔱 RAID VINTI", Store = "Classifica_Raid_v1", Value = function(p) return p.RaidsWon or 0 end },
+}
+
+local stores: { [string]: OrderedDataStore } = {}
+local latest: { [string]: { { UserId: number, Name: string, Value: number } } } = {}
+local names: { [number]: string } = {}
+local signs: { [string]: { Rows: { TextLabel } } } = {}
+
+local function nameOf(userId: number): string
+	if names[userId] then
+		return names[userId]
+	end
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		names[userId] = player.DisplayName
+		return player.DisplayName
+	end
+	local ok, name = pcall(function()
+		return Players:GetNameFromUserIdAsync(userId)
+	end)
+	names[userId] = if ok and name then name else ("Giocatore " .. userId)
+	return names[userId]
+end
+
+local function localBoard(board)
+	local rows = {}
+	for _, player in Players:GetPlayers() do
+		local profile = S.DataService.Get(player)
+		if profile then
+			table.insert(rows, { UserId = player.UserId, Name = player.DisplayName, Value = math.floor(board.Value(profile)) })
+		end
+	end
+	table.sort(rows, function(a, b)
+		return a.Value > b.Value
+	end)
+	return rows
+end
+
+local function pushScores()
+	for _, board in LeaderboardService.Boards do
+		local store = stores[board.Id]
+		if store then
+			for _, player in Players:GetPlayers() do
+				local profile = S.DataService.Get(player)
+				if profile and S.DataService.IsSaving(player) then
+					local value = math.floor(board.Value(profile))
+					pcall(function()
+						store:SetAsync(tostring(player.UserId), value)
+					end)
+				end
+			end
+		end
+	end
+end
+
+local function pullScores()
+	for _, board in LeaderboardService.Boards do
+		local store = stores[board.Id]
+		local rows = nil
+		if store then
+			local ok, pages = pcall(function()
+				return store:GetSortedAsync(false, TOP)
+			end)
+			if ok and pages then
+				rows = {}
+				for _, entry in pages:GetCurrentPage() do
+					local userId = tonumber(entry.key)
+					if userId and entry.value > 0 then
+						table.insert(rows, { UserId = userId, Name = nameOf(userId), Value = entry.value })
+					end
+				end
+			end
+		end
+		latest[board.Id] = rows or localBoard(board)
+	end
+end
+
+-- TABELLONI NEL MONDO ------------------------------------------------------------------------
+
+local function buildSign(board, cf: CFrame)
+	local folder = workspace:FindFirstChild("Classifiche") or Instance.new("Folder")
+	folder.Name = "Classifiche"
+	folder.Parent = workspace
+	local model = Instance.new("Model")
+	model.Name = "Classifica " .. board.Id
+	model.Parent = folder
+	local function block(name: string, size: Vector3, offset: CFrame, material: Enum.Material, color: Color3): Part
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Anchored = true
+		p.Size = size
+		p.CFrame = cf * offset
+		p.Material = material
+		p.Color = color
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = model
+		return p
+	end
+	local panel = block("Pannello", Vector3.new(14, 19, 1), CFrame.new(0, 13, 0), Enum.Material.WoodPlanks, Color3.fromRGB(70, 50, 34))
+	block("Cornice", Vector3.new(15.4, 20.4, 0.8), CFrame.new(0, 13, 0.3), Enum.Material.Wood, Color3.fromRGB(46, 32, 22))
+	for _, x in { -6.5, 6.5 } do
+		block("Palo", Vector3.new(1.2, 24, 1.2), CFrame.new(x, 12, 0.6), Enum.Material.Wood, Color3.fromRGB(46, 32, 22))
+	end
+	block("Tettoia", Vector3.new(16.5, 0.8, 3), CFrame.new(0, 23.6, -0.6), Enum.Material.Slate, Color3.fromRGB(70, 66, 62))
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.LightInfluence = 0.4
+	gui.Parent = panel
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.new(1, 0, 0, 90)
+	title.Font = Enum.Font.GrenzeGotisch
+	title.TextScaled = true
+	title.TextColor3 = Color3.fromRGB(255, 220, 130)
+	title.Text = board.Title
+	title.Parent = gui
+	local rows = {}
+	for i = 1, 10 do
+		local row = Instance.new("TextLabel")
+		row.BackgroundTransparency = if i % 2 == 0 then 1 else 0.85
+		row.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		row.Position = UDim2.new(0, 16, 0, 96 + (i - 1) * 64)
+		row.Size = UDim2.new(1, -32, 0, 60)
+		row.Font = Enum.Font.GothamBold
+		row.TextScaled = true
+		row.TextXAlignment = Enum.TextXAlignment.Left
+		row.TextColor3 = if i == 1 then Color3.fromRGB(255, 215, 90) elseif i == 2 then Color3.fromRGB(220, 220, 230) elseif i == 3 then Color3.fromRGB(215, 150, 90) else Color3.fromRGB(240, 230, 210)
+		row.Text = ""
+		row.Parent = gui
+		table.insert(rows, row)
+	end
+	signs[board.Id] = { Rows = rows }
+end
+
+local function updateSigns()
+	for _, board in LeaderboardService.Boards do
+		local sign = signs[board.Id]
+		local rows = latest[board.Id] or {}
+		if sign then
+			for i, label in sign.Rows do
+				local entry = rows[i]
+				label.Text = if entry then ("  %d.  %s  —  %s"):format(i, entry.Name, Util.FormatNumber(entry.Value)) else ""
+			end
+		end
+	end
+end
+
+local function broadcast(player: Player?)
+	local data = {}
+	for _, board in LeaderboardService.Boards do
+		data[board.Id] = latest[board.Id] or {}
+	end
+	if player then
+		Net.Event("Leaderboards"):FireClient(player, data)
+	else
+		Net.Event("Leaderboards"):FireAllClients(data)
+	end
+end
+
+function LeaderboardService.Init(services)
+	S = services
+	for _, board in LeaderboardService.Boards do
+		local ok, store = pcall(function()
+			return DataStoreService:GetOrderedDataStore(board.Store)
+		end)
+		if ok then
+			stores[board.Id] = store
+		end
+	end
+end
+
+function LeaderboardService.Start()
+	S.WorldBuilder.WaitReady()
+	local camp = Zones.Get("CampoAddestramento")
+	if camp then
+		local c = camp.Center
+		for i, board in LeaderboardService.Boards do
+			local pos = Vector3.new(c.X - 64, c.Y, c.Z - 34 + (i - 1) * 20)
+			pcall(buildSign, board, CFrame.lookAt(pos, Vector3.new(c.X, c.Y, pos.Z)))
+		end
+	end
+	S.DataService.Loaded:Connect(function(player)
+		task.delay(3, function()
+			if player.Parent then
+				broadcast(player)
+			end
+		end)
+	end)
+	while true do
+		pushScores()
+		pullScores()
+		updateSigns()
+		broadcast(nil)
+		task.wait(REFRESH)
+	end
+end
+
+return LeaderboardService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -9362,7 +10064,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -9433,25 +10135,62 @@ end
 
 -- CONSEGNA DEI PRODOTTI -------------------------------------------------------------------------
 
-local function grantProduct(player: Player, product): boolean
+-- Il Pacchetto della Recluta si può comprare una volta sola e solo nei primi giorni
+function MonetizationService.StarterAvailable(player: Player): boolean
+	local profile = S.DataService.Get(player)
+	if not profile or profile.StarterBought then
+		return false
+	end
+	return os.time() - (profile.CreatedAt or 0) < Monetization.StarterHours * 3600
+end
+
+-- Consegna un prodotto. Restituisce una funzione per annullarlo (nil se non consegnato)
+local function grantProduct(player: Player, product): (() -> ())?
 	local profile = S.DataService.Get(player)
 	if not profile then
-		return false
+		return nil
 	end
+	local undo: (() -> ())?
+	local text
 	if product.Kind == "Gems" then
 		profile.Gems += product.Amount
+		undo = function()
+			profile.Gems -= product.Amount
+		end
+		text = ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
 	elseif product.Kind == "Gold" then
 		profile.Gold += product.Amount
+		undo = function()
+			profile.Gold -= product.Amount
+		end
+		text = ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
+	elseif product.Kind == "Spins" then
+		profile.Spins = (profile.Spins or 0) + product.Amount
+		undo = function()
+			profile.Spins -= product.Amount
+		end
+		text = ("%s +%d giri della Ruota"):format(product.Icon, product.Amount)
+	elseif product.Kind == "Starter" then
+		local bundleUndo, summary = S.RewardsService.Apply(player, product.Bundle)
+		if not bundleUndo then
+			return nil
+		end
+		profile.StarterBought = true
+		undo = function()
+			bundleUndo()
+			profile.StarterBought = false
+		end
+		text = product.Name .. ": " .. summary
 	else
-		return false
+		return nil
 	end
 	S.DataService.MarkDirty(player)
-	S.EventService.AnnounceTo(player, "Grazie per il tuo supporto!", ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount)), "Raro")
+	S.EventService.AnnounceTo(player, "Grazie per il tuo supporto!", text, "Raro")
 	local root = Util.GetRoot(player.Character)
 	if root then
 		S.EventService.Effect("LevelUp", { Character = player.Character }, root.Position, 300)
 	end
-	return true
+	return undo
 end
 
 local function grantPass(player: Player, pass)
@@ -9495,7 +10234,8 @@ local function processReceipt(receipt)
 		warn("[Monetization] Prodotto sconosciuto: " .. tostring(receipt.ProductId))
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
-	if not grantProduct(player, product) then
+	local undo = grantProduct(player, product)
+	if not undo then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	table.insert(profile.Receipts, purchaseId)
@@ -9505,11 +10245,7 @@ local function processReceipt(receipt)
 	-- salva subito: se il salvataggio fallisce, Roblox riproverà più tardi
 	if not S.DataService.Save(player) and not isStudio() then
 		-- annulla la consegna per non regalare il prodotto due volte al prossimo tentativo
-		if product.Kind == "Gems" then
-			profile.Gems -= product.Amount
-		else
-			profile.Gold -= product.Amount
-		end
+		undo()
 		table.remove(profile.Receipts, #profile.Receipts)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -9549,11 +10285,8 @@ local function dailyGifts(player: Player)
 	if not profile then
 		return
 	end
+	-- (il premio del primo accesso del giorno ora è nel calendario di RewardsService)
 	local today = os.time() // DAY
-	if (profile.LastDailyLogin or 0) < today then
-		profile.LastDailyLogin = today
-		MonetizationService.AddGems(player, Monetization.Earn.DailyLogin, "primo accesso del giorno")
-	end
 	local vip = Monetization.Pass("VIP")
 	if vip and profile.Passes.VIP and (profile.LastDailyGems or 0) < today then
 		profile.LastDailyGems = today
@@ -9611,6 +10344,14 @@ local function onBuy(player: Player, kind: any, id: any)
 	if kind == "Product" then
 		local product = Monetization.Product(id)
 		if not product then
+			return
+		end
+		if product.Kind == "Starter" and not MonetizationService.StarterAvailable(player) then
+			S.EventService.Notify(player, "Questa offerta non è più disponibile.", "Info", 3)
+			return
+		end
+		if product.Kind == "Spins" and not S.RewardsService.PaidRandomAllowed(player) then
+			S.EventService.Notify(player, "I giri a pagamento non sono disponibili nel tuo paese.", "Info", 3)
 			return
 		end
 		if product.ProductId == 0 then
@@ -9734,7 +10475,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -10199,7 +10940,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -10600,7 +11341,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -11137,7 +11878,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -11359,7 +12100,8 @@ function PlayerService.AddXP(player: Player, amount: number, silent: boolean?): 
 		return 0
 	end
 	local stats = PlayerService.Stats(player)
-	local mult = 1 + stats.XPBonus
+	-- bonus della community (amici nel server, gruppo): vedi CommunityService
+	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0)
 	if (profile.Buffs.XPUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -11396,7 +12138,7 @@ function PlayerService.AddGold(player: Player, amount: number): number
 		return 0
 	end
 	local stats = PlayerService.Stats(player)
-	local mult = 1 + stats.GoldBonus
+	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0)
 	if (profile.Buffs.GoldUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -11818,7 +12560,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -11940,7 +12682,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -12423,7 +13165,271 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="58">
+          <Properties>
+            <string name="Name">RewardsService</string>
+            <string name="Source"><![CDATA[--[[
+	RewardsService - calendario giornaliero, regali a tempo e Ruota della Fortuna
+	Tutto è deciso dal server: il client chiede ("ClaimReward", "SpinWheel") e mostra il risultato.
+]]
+
+local Players = game:GetService("Players")
+local PolicyService = game:GetService("PolicyService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Lib.Net)
+local Util = require(Shared.Lib.Util)
+local Rewards = require(Shared.Data.Rewards)
+local Leveling = require(Shared.Data.Leveling)
+local Items = require(Shared.Data.Items)
+
+local RewardsService = {}
+local S
+
+local DAY = 86400
+local rng = Random.new()
+local lastRequest: { [Player]: number } = {}
+
+local function today(): number
+	return os.time() // DAY
+end
+
+-- Applica un pacchetto di premi direttamente al profilo.
+-- Restituisce una funzione che lo annulla (serve agli acquisti se il salvataggio fallisce)
+-- e il testo del riepilogo.
+function RewardsService.Apply(player: Player, bundle): ((() -> ())?, string)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return nil, ""
+	end
+	local parts = {}
+	local gold = bundle.Gold or 0
+	if bundle.GoldQuests then
+		gold += Leveling.QuestGold(profile.Level) * bundle.GoldQuests
+	end
+	gold = math.floor(gold)
+	local gems = bundle.Gems or 0
+	local spins = bundle.Spins or 0
+	local items: { [string]: number } = {}
+	if bundle.Items then
+		for id, count in bundle.Items do
+			if Items.Get(id) then
+				if bundle.UniqueItem == id and (profile.Inventory[id] or 0) > 0 then
+					gems += bundle.FallbackGems or 0
+				else
+					items[id] = count
+				end
+			end
+		end
+	end
+	if gold > 0 then
+		profile.Gold += gold
+		table.insert(parts, "💰 " .. Util.Abbreviate(gold) .. " oro")
+	end
+	if gems > 0 then
+		profile.Gems += gems
+		table.insert(parts, ("💎 %d gemme"):format(gems))
+	end
+	if spins > 0 then
+		profile.Spins = (profile.Spins or 0) + spins
+		table.insert(parts, ("🎡 %d %s"):format(spins, if spins == 1 then "giro" else "giri"))
+	end
+	for id, count in items do
+		profile.Inventory[id] = (profile.Inventory[id] or 0) + count
+		local def = Items.Get(id)
+		table.insert(parts, ("%s x%d"):format(def and def.Name or id, count))
+	end
+	S.DataService.MarkDirty(player)
+	local function undo()
+		profile.Gold -= gold
+		profile.Gems -= gems
+		profile.Spins = (profile.Spins or 0) - spins
+		for id, count in items do
+			profile.Inventory[id] = math.max(0, (profile.Inventory[id] or 0) - count)
+		end
+		S.DataService.MarkDirty(player)
+	end
+	return undo, table.concat(parts, "  •  ")
+end
+
+-- CALENDARIO --------------------------------------------------------------------------------
+
+-- Giorno del calendario che si può ritirare oggi (nil = già ritirato)
+function RewardsService.DailyIndex(profile): number?
+	local streak = profile.Streak
+	local now = today()
+	if streak.Last == now then
+		return nil
+	end
+	if streak.Last == now - 1 then
+		return (streak.Day % #Rewards.Daily) + 1
+	end
+	return 1
+end
+
+local function claimDaily(player: Player)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	local index = RewardsService.DailyIndex(profile)
+	if not index then
+		S.EventService.Notify(player, "Hai già ritirato il premio di oggi. Torna domani!", "Info", 3)
+		return
+	end
+	local reward = Rewards.Daily[index]
+	profile.Streak.Day = index
+	profile.Streak.Last = today()
+	profile.Streak.Count = if index == 1 then 1 else (profile.Streak.Count or 0) + 1
+	profile.Streak.Best = math.max(profile.Streak.Best or 0, profile.Streak.Count)
+	local _, text = RewardsService.Apply(player, reward)
+	S.EventService.AnnounceTo(player, ("Giorno %d: %s"):format(index, reward.Name), text, if reward.Big then "Raro" else "Ricompensa")
+	S.DataService.SyncNow(player)
+end
+
+-- REGALI A TEMPO ----------------------------------------------------------------------------
+
+local function playState(profile)
+	local play = profile.PlayToday
+	if play.Day ~= today() then
+		play.Day = today()
+		play.Seconds = 0
+		play.Claimed = {}
+	end
+	return play
+end
+
+local function claimPlaytime(player: Player, index: any)
+	local profile = S.DataService.Get(player)
+	local gift = type(index) == "number" and Rewards.Playtime[index]
+	if not profile or not gift then
+		return
+	end
+	local play = playState(profile)
+	local key = tostring(index)
+	if play.Claimed[key] then
+		return
+	end
+	if play.Seconds < gift.Minutes * 60 then
+		S.EventService.Notify(player, ("Questo regalo si apre dopo %d minuti di gioco oggi."):format(gift.Minutes), "Info", 3)
+		return
+	end
+	play.Claimed[key] = true
+	local _, text = RewardsService.Apply(player, gift)
+	S.EventService.AnnounceTo(player, "Regalo aperto: " .. gift.Name, text, if gift.Big then "Raro" else "Ricompensa")
+	S.DataService.SyncNow(player)
+end
+
+-- RUOTA DELLA FORTUNA ------------------------------------------------------------------------
+
+local function pickPrize()
+	local roll = rng:NextNumber() * Rewards.WheelTotal()
+	for _, prize in Rewards.Wheel do
+		roll -= prize.Weight
+		if roll <= 0 then
+			return prize
+		end
+	end
+	return Rewards.Wheel[1]
+end
+
+local function spin(player: Player)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	local now = os.time()
+	local free = (profile.FreeSpinAt or 0) <= now
+	if free then
+		profile.FreeSpinAt = now + Rewards.FreeSpinHours * 3600
+	elseif (profile.Spins or 0) > 0 then
+		profile.Spins -= 1
+	else
+		S.EventService.Notify(player, "Non hai giri: aspetta il giro gratis o guadagnane altri con i regali.", "Info", 3.5)
+		return
+	end
+	local prize = pickPrize()
+	local _, text = RewardsService.Apply(player, prize)
+	-- il client fa girare la ruota e poi mostra il premio
+	Net.Event("WheelResult"):FireClient(player, prize.Id, text)
+	if prize.Big then
+		task.delay(4.5, function()
+			if player.Parent then
+				S.EventService.Announce("🎡 " .. player.DisplayName .. " ha vinto il JACKPOT!", prize.Name, "Raro")
+			end
+		end)
+	end
+	S.DataService.SyncNow(player)
+end
+
+-- Nei paesi in cui i premi casuali a pagamento non sono permessi, i giri a pagamento spariscono
+local function checkPolicy(player: Player)
+	local ok, info = pcall(function()
+		return PolicyService:GetPolicyInfoForPlayerAsync(player)
+	end)
+	local restricted = not ok or (info and info.ArePaidRandomItemsRestricted == true)
+	player:SetAttribute("NoPaidRandom", restricted)
+end
+
+function RewardsService.PaidRandomAllowed(player: Player): boolean
+	return player:GetAttribute("NoPaidRandom") ~= true
+end
+
+function RewardsService.Init(services)
+	S = services
+end
+
+function RewardsService.Start()
+	Net.Event("ClaimReward").OnServerEvent:Connect(function(player, kind, index)
+		local now = os.clock()
+		if now - (lastRequest[player] or 0) < 0.4 then
+			return
+		end
+		lastRequest[player] = now
+		if kind == "Daily" then
+			claimDaily(player)
+		elseif kind == "Playtime" then
+			claimPlaytime(player, index)
+		end
+	end)
+	Net.Event("SpinWheel").OnServerEvent:Connect(function(player)
+		local now = os.clock()
+		if now - (lastRequest[player] or 0) < 1 then
+			return
+		end
+		lastRequest[player] = now
+		spin(player)
+	end)
+	S.DataService.Loaded:Connect(function(player, profile)
+		playState(profile)
+		player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
+		task.spawn(checkPolicy, player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastRequest[player] = nil
+	end)
+	-- conta i minuti di gioco della giornata
+	task.spawn(function()
+		while true do
+			task.wait(5)
+			for _, player in Players:GetPlayers() do
+				local profile = S.DataService.Get(player)
+				if profile then
+					local play = playState(profile)
+					play.Seconds += 5
+					player:SetAttribute("PlayToday", play.Seconds)
+				end
+			end
+		end
+	end)
+end
+
+return RewardsService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -12737,7 +13743,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -13480,7 +14486,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -13697,7 +14703,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -14041,7 +15047,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -14116,7 +15122,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -15708,7 +16714,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -17406,11 +18412,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="60">
+  <Item class="ServerStorage" referent="66">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="61">
+    <Item class="ModuleScript" referent="67">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -17637,19 +18643,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="62">
+  <Item class="SoundService" referent="68">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="63">
+  <Item class="StarterGui" referent="69">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="64">
+  <Item class="StarterPlayer" referent="70">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -17660,11 +18666,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="65">
+    <Item class="StarterCharacterScripts" referent="71">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="66">
+      <Item class="LocalScript" referent="72">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -17677,19 +18683,19 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="67">
+    <Item class="StarterPlayerScripts" referent="73">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="68">
+      <Item class="Folder" referent="74">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="69">
+        <Item class="Folder" referent="75">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="70">
+          <Item class="ModuleScript" referent="76">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -17861,7 +18867,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="71">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -18360,7 +19366,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="72">
+          <Item class="ModuleScript" referent="78">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -18695,7 +19701,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="73">
+          <Item class="ModuleScript" referent="79">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -18754,7 +19760,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="74">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -19431,7 +20437,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="75">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -20060,7 +21066,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="76">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -20987,7 +21993,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="77">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -21133,7 +22139,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -22015,7 +23021,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -22105,7 +23111,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -22579,8 +23585,118 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
+          <Item class="ModuleScript" referent="87">
+            <Properties>
+              <string name="Name">WaypointController</string>
+              <string name="Source"><![CDATA[--[[
+	WaypointController - segnalino 3D dell'obiettivo della storia
+	Una colonna di luce dorata sul punto da raggiungere e un'etichetta "◆ 120 m" sempre visibile:
+	i nuovi giocatori sanno sempre dove andare (fondamentale nei primi minuti di gioco).
+	Sparisce quando sei a meno di 12 metri dall'obiettivo.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local WaypointController = {}
+local C
+
+local player = Players.LocalPlayer
+local STUDS_PER_METER = 3.5
+
+local anchor: Part
+local billboard: BillboardGui
+local label: TextLabel
+local beam: Part
+
+local function build()
+	anchor = Instance.new("Part")
+	anchor.Name = "SegnalinoObiettivo"
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.new(1, 1, 1)
+	anchor.Parent = workspace
+
+	beam = Instance.new("Part")
+	beam.Name = "ColonnaDiLuce"
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.CanTouch = false
+	beam.CastShadow = false
+	beam.Material = Enum.Material.Neon
+	beam.Color = Color3.fromRGB(255, 210, 110)
+	beam.Transparency = 0.6
+	beam.Shape = Enum.PartType.Cylinder
+	beam.Size = Vector3.new(220, 3, 3)
+	beam.Parent = workspace
+
+	billboard = Instance.new("BillboardGui")
+	billboard.Name = "Obiettivo"
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
+	billboard.Size = UDim2.fromOffset(160, 54)
+	billboard.StudsOffset = Vector3.new(0, 10, 0)
+	billboard.MaxDistance = math.huge
+	billboard.Adornee = anchor
+	billboard.Parent = player:WaitForChild("PlayerGui")
+
+	label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 20
+	label.TextColor3 = Color3.fromRGB(255, 222, 130)
+	label.TextStrokeTransparency = 0.3
+	label.Text = ""
+	label.Parent = billboard
+end
+
+local function setVisible(on: boolean)
+	billboard.Enabled = on
+	beam.Transparency = if on then 0.6 else 1
+end
+
+function WaypointController.Init(c)
+	C = c
+end
+
+function WaypointController.Start()
+	build()
+	setVisible(false)
+	RunService.Heartbeat:Connect(function()
+		local target = C.HUD and C.HUD.ObjectivePosition and C.HUD.ObjectivePosition()
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local hidden = C.CutsceneController and C.CutsceneController.IsPlaying()
+		if not target or not root or hidden then
+			setVisible(false)
+			return
+		end
+		local distance = (Vector3.new(target.X, root.Position.Y, target.Z) - root.Position).Magnitude
+		if distance < 12 then
+			setVisible(false)
+			return
+		end
+		setVisible(true)
+		anchor.CFrame = CFrame.new(target)
+		-- colonna verticale (il cilindro è orientato lungo X: ruotato in piedi)
+		beam.CFrame = CFrame.new(target + Vector3.new(0, 110, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		-- da vicino la colonna sbiadisce per non coprire la visuale
+		beam.Transparency = math.clamp(1 - distance / 400, 0.6, 0.92)
+		label.Text = ("◆ %d m"):format(math.floor(distance / STUDS_PER_METER))
+	end)
+end
+
+return WaypointController
+]]></string>
+            </Properties>
+          </Item>
         </Item>
-        <Item class="LocalScript" referent="81">
+        <Item class="LocalScript" referent="88">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -22617,6 +23733,8 @@ local ORDER = {
 	{ UI, "Shop" },
 	{ UI, "Premium" },
 	{ UI, "Raid" },
+	{ UI, "RewardsPanel" },
+	{ Controllers, "WaypointController" },
 	{ UI, "Intro" },
 }
 
@@ -22661,11 +23779,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="82">
+        <Item class="Folder" referent="89">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -22821,7 +23939,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -23477,7 +24595,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -24096,6 +25214,11 @@ end
 
 -- API ---------------------------------------------------------------------------------------------
 
+-- Posizione dell'obiettivo attuale della storia (usata dal segnalino 3D)
+function HUD.ObjectivePosition(): Vector3?
+	return refs.ObjectivePos
+end
+
 function HUD.SetVisible(visible: boolean)
 	if root then
 		root.Visible = visible
@@ -24193,7 +25316,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -24694,12 +25817,12 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
 	Menu (tasto M)
-	Schede: Equipaggiamento • Statistiche • Sieri • Storia • Codici • Impostazioni
+	Schede: Equipaggiamento • Statistiche • Sieri • Storia • Traguardi • Classifiche • Codici • Impostazioni
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24715,6 +25838,7 @@ local Story = require(Shared.Data.Story)
 local Zones = require(Shared.Data.Zones)
 local Bloodlines = require(Shared.Data.Bloodlines)
 local Skills = require(Shared.Data.Skills)
+local Achievements = require(Shared.Data.Achievements)
 
 local Theme = require(script.Parent.Theme)
 local New = Theme.New
@@ -24731,12 +25855,23 @@ local selectedCategory = "Lame"
 local selectedItem: string? = nil
 
 local TABS = {
-	{ Id = "Equipaggiamento", Icon = "🎒" },
-	{ Id = "Statistiche", Icon = "📊" },
+	{ Id = "Equipaggiamento", Icon = "🎒", Label = "Equip." },
+	{ Id = "Statistiche", Icon = "📊", Label = "Statist." },
 	{ Id = "Sieri", Icon = "💉" },
 	{ Id = "Storia", Icon = "📜" },
+	{ Id = "Traguardi", Icon = "🏅" },
+	{ Id = "Classifiche", Icon = "🏆" },
 	{ Id = "Codici", Icon = "🎁" },
-	{ Id = "Impostazioni", Icon = "⚙️" },
+	{ Id = "Impostazioni", Icon = "⚙️", Label = "Opzioni" },
+}
+
+-- classifiche ricevute dal server (aggiornate ogni 2 minuti)
+local leaderboards: { [string]: { { UserId: number, Name: string, Value: number } } } = {}
+local boardTab = "Livello"
+local BOARDS = {
+	{ Id = "Livello", Title = "⭐ Livello" },
+	{ Id = "Giganti", Title = "⚔️ Giganti uccisi" },
+	{ Id = "Raid", Title = "🔱 Raid vinti" },
 }
 
 local function clear()
@@ -25122,6 +26257,69 @@ local function showStory()
 	end
 end
 
+-- SCHEDA TRAGUARDI ------------------------------------------------------------------------------------
+
+local function showAchievements()
+	clear()
+	local p = profile()
+	if not p then
+		return
+	end
+	local done = 0
+	for _, a in Achievements.List do
+		if p.Achievements and p.Achievements[a.Id] then
+			done += 1
+		end
+	end
+	Theme.Label(("Traguardi completati: %d / %d  •  ogni traguardo regala gemme 💎"):format(done, #Achievements.List), { Size = UDim2.new(1, 0, 0, 26), Font = Theme.Fonts.Header, TextSize = 17, TextColor3 = Colors.GoldBright, Parent = content })
+	local list = scroll(content, { Position = UDim2.fromOffset(0, 32), Size = UDim2.new(1, 0, 1, -32) })
+	New("UIGridLayout", { CellSize = UDim2.new(0.5, -8, 0, 74), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
+	local extra = { Friends = C.ClientData.Profile and (game:GetService("Players").LocalPlayer:GetAttribute("FriendsHere") or 0) or 0 }
+	for i, a in Achievements.List do
+		local unlocked = p.Achievements and p.Achievements[a.Id] ~= nil
+		local value = math.min(Achievements.Value(p, a.Stat, extra), a.Goal)
+		local card = Theme.Panel({ LayoutOrder = if unlocked then 1000 + i else i, BackgroundColor3 = if unlocked then Color3.fromRGB(30, 46, 32) else Colors.Background, Parent = list })
+		Theme.Padding(card, 8)
+		Theme.Label(if unlocked then "✔" else a.Icon, { Size = UDim2.fromOffset(50, 56), TextXAlignment = Enum.TextXAlignment.Center, TextSize = 34, TextColor3 = Colors.GreenBright, Parent = card })
+		Theme.Label(a.Name, { Position = UDim2.fromOffset(56, 0), Size = UDim2.new(1, -130, 0, 20), Font = Theme.Fonts.Bold, TextSize = 15, TextColor3 = if unlocked then Colors.GreenBright else Colors.Text, Parent = card })
+		Theme.Label(a.Description, { Position = UDim2.fromOffset(56, 20), Size = UDim2.new(1, -130, 0, 18), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = card })
+		Theme.Label(("+%d 💎"):format(a.Gems), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(70, 20), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(140, 220, 255), Parent = card })
+		local _, setBar = Theme.Bar({ Position = UDim2.fromOffset(56, 44), Size = UDim2.new(1, -130, 0, 10), Parent = card }, if unlocked then Colors.GreenBright else Colors.Gold)
+		setBar(if unlocked then 1 else value / a.Goal, true)
+		Theme.Label(if unlocked then "Completato" else ("%s / %s"):format(Util.FormatNumber(value), Util.FormatNumber(a.Goal)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 40), Size = UDim2.fromOffset(70, 18), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = card })
+	end
+end
+
+-- SCHEDA CLASSIFICHE -----------------------------------------------------------------------------------
+
+local function showLeaderboards()
+	clear()
+	local localPlayer = game:GetService("Players").LocalPlayer
+	local bar = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = content })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), Parent = bar })
+	for i, board in BOARDS do
+		Theme.Button(board.Title, { Size = UDim2.fromOffset(200, 36), TextSize = 15, LayoutOrder = i, BackgroundColor3 = if board.Id == boardTab then Colors.Green else Colors.PanelLight, Parent = bar }, function()
+			boardTab = board.Id
+			showLeaderboards()
+		end)
+	end
+	Theme.Label("Classifica di TUTTI i server • si aggiorna ogni 2 minuti • i primi 3 compaiono anche sui tabelloni del Campo", { Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 0, 20), Font = Theme.Fonts.UI, TextSize = 13, TextColor3 = Colors.TextDim, Parent = content })
+	local list = scroll(content, { Position = UDim2.fromOffset(0, 68), Size = UDim2.new(1, 0, 1, -68) })
+	New("UIListLayout", { Padding = UDim.new(0, 3), Parent = list })
+	local rows = leaderboards[boardTab] or {}
+	if #rows == 0 then
+		Theme.Label("Caricamento della classifica...", { Size = UDim2.new(1, 0, 0, 30), Font = Theme.Fonts.UI, TextSize = 15, Parent = list })
+	end
+	local medals = { "🥇", "🥈", "🥉" }
+	for i, entry in rows do
+		local mine = entry.UserId == localPlayer.UserId
+		local row = Theme.Panel({ Size = UDim2.new(1, -10, 0, 34), LayoutOrder = i, BackgroundColor3 = if mine then Color3.fromRGB(60, 50, 24) else Colors.Background, Parent = list })
+		Theme.Label(medals[i] or ("%d."):format(i), { Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(50, 34), Font = Theme.Fonts.Bold, TextSize = if medals[i] then 22 else 16, Parent = row })
+		Theme.Label(entry.Name .. (if mine then "  (tu)" else ""), { Position = UDim2.fromOffset(64, 0), Size = UDim2.new(1, -220, 1, 0), Font = Theme.Fonts.Bold, TextSize = 16, TextColor3 = if i <= 3 then Colors.GoldBright else Colors.Text, Parent = row })
+		Theme.Label(Util.FormatNumber(entry.Value), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 0), Size = UDim2.fromOffset(150, 34), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.Number, TextSize = 20, Parent = row })
+	end
+end
+
 -- SCHEDA CODICI ------------------------------------------------------------------------------------------
 
 local function showCodes()
@@ -25213,6 +26411,8 @@ local RENDER = {
 	Statistiche = showStats,
 	Sieri = showSerums,
 	Storia = showStory,
+	Traguardi = showAchievements,
+	Classifiche = showLeaderboards,
 	Codici = showCodes,
 	Impostazioni = showSettings,
 }
@@ -25253,7 +26453,7 @@ function Menu.Start()
 	local tabs = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 38), Parent = panel })
 	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), Parent = tabs })
 	for i, tab in TABS do
-		tabButtons[tab.Id] = Theme.Button(tab.Icon .. " " .. tab.Id, { Size = UDim2.fromOffset(150, 38), TextSize = 14, LayoutOrder = i, Parent = tabs }, function()
+		tabButtons[tab.Id] = Theme.Button(tab.Icon .. " " .. (tab.Label or tab.Id), { Size = UDim2.new(1 / #TABS, -6, 1, 0), TextSize = 13, LayoutOrder = i, Parent = tabs }, function()
 			currentTab = tab.Id
 			render()
 		end)
@@ -25272,13 +26472,21 @@ function Menu.Start()
 			render()
 		end
 	end)
+	Net.Event("Leaderboards").OnClientEvent:Connect(function(data)
+		if type(data) == "table" then
+			leaderboards = data
+			if C.UIController.IsOpen("Menu") and currentTab == "Classifiche" then
+				render()
+			end
+		end
+	end)
 end
 
 return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -25558,7 +26766,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -25683,6 +26891,24 @@ end
 local function showProducts(kind: string)
 	local list = grid(210)
 	local order = 0
+	-- offerta di benvenuto in cima alle gemme (solo nei primi giorni e una volta sola)
+	if kind == "Gems" and C.RewardsPanel and C.RewardsPanel.StarterAvailable() and Monetization.IsAvailable(Monetization.Product("PacchettoIniziale") or {}) then
+		for _, product in Monetization.Products do
+			if product.Kind == "Starter" then
+				card(list, 0, {
+					Icon = product.Icon,
+					Title = product.Name,
+					Text = product.Contents,
+					Tag = product.Tag,
+					Button = ("R$ %d"):format(product.Robux),
+					ButtonColor = Color3.fromRGB(190, 120, 30),
+					OnClick = function()
+						buy("Product", product.Id)
+					end,
+				})
+			end
+		end
+	end
 	for _, product in Monetization.Products do
 		if product.Kind == kind then
 			order += 1
@@ -25692,7 +26918,8 @@ local function showProducts(kind: string)
 				Text = ("+%s %s"):format(Util.FormatNumber(product.Amount), if kind == "Gems" then "gemme" else "monete d'oro"),
 				Tag = product.Tag,
 				TitleColor = if kind == "Gems" then GEM_COLOR else Colors.GoldBright,
-				Button = ("R$ %d"):format(product.Robux),
+				Button = if Monetization.IsAvailable(product) then ("R$ %d"):format(product.Robux) else "In arrivo",
+				Disabled = not Monetization.IsAvailable(product),
 				ButtonColor = Color3.fromRGB(40, 150, 80),
 				OnClick = function()
 					buy("Product", product.Id)
@@ -25712,8 +26939,8 @@ local function showPasses()
 			Title = pass.Name,
 			Text = pass.Description,
 			Tag = if owned then "POSSEDUTO" else nil,
-			Button = if owned then "✔ Attivo" else ("R$ %d"):format(pass.Robux),
-			Disabled = owned,
+			Button = if owned then "✔ Attivo" elseif Monetization.IsAvailable(pass) then ("R$ %d"):format(pass.Robux) else "In arrivo",
+			Disabled = owned or not Monetization.IsAvailable(pass),
 			ButtonColor = Color3.fromRGB(40, 150, 80),
 			OnClick = function()
 				buy("Pass", pass.Id)
@@ -25753,7 +26980,8 @@ local function showTravel()
 				Icon = "🔒",
 				Title = "Serve il pass Viaggiatore",
 				Text = pass.Description .. " Senza il pass puoi sempre usare i traghetti nei porti di ogni isola.",
-				Button = ("R$ %d"):format(pass.Robux),
+				Button = if Monetization.IsAvailable(pass) then ("R$ %d"):format(pass.Robux) else "In arrivo",
+				Disabled = not Monetization.IsAvailable(pass),
 				ButtonColor = Color3.fromRGB(40, 150, 80),
 				OnClick = function()
 					buy("Pass", pass.Id)
@@ -25862,7 +27090,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -25990,7 +27218,679 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="98">
+            <Properties>
+              <string name="Name">RewardsPanel</string>
+              <string name="Source"><![CDATA[--[[
+	RewardsPanel - pannello dei premi (pulsante 🎁 a sinistra)
+	  📅 Calendario di 7 giorni   ⏳ Regali a tempo   🎡 Ruota della Fortuna
+	Contiene anche i pulsanti laterali (Premi, Classifiche, Invita amici, Gruppo),
+	l'offerta di benvenuto (Pacchetto della Recluta) e la richiesta di aggiungere il gioco ai Preferiti.
+]]
+
+local AvatarEditorService = game:GetService("AvatarEditorService")
+local GroupService = game:GetService("GroupService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local SocialService = game:GetService("SocialService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Lib.Net)
+local Util = require(Shared.Lib.Util)
+local Rewards = require(Shared.Data.Rewards)
+local Leveling = require(Shared.Data.Leveling)
+local Monetization = require(Shared.Data.Monetization)
+
+local Theme = require(script.Parent.Theme)
+local New = Theme.New
+local Colors = Theme.Colors
+
+local RewardsPanel = {}
+local C
+
+local player = Players.LocalPlayer
+local DAY = 86400
+
+local panel: Frame
+local content: Frame
+local tabButtons: { [string]: TextButton } = {}
+local currentTab = "Calendario"
+local dot: Frame
+local wheel: Frame
+local wheelRotation = 0
+local spinning = false
+local spinButton: TextButton? = nil
+local resultLabel: TextLabel? = nil
+local playtimeLabels: { [number]: { Button: TextButton, Index: number } } = {}
+local wheelInfo: TextLabel? = nil
+local playBase = 0
+local playBaseClock = os.clock()
+
+local TABS = {
+	{ Id = "Calendario", Icon = "📅" },
+	{ Id = "Regali", Icon = "⏳" },
+	{ Id = "Ruota", Icon = "🎡" },
+}
+
+local function profile()
+	return C.ClientData.Profile
+end
+
+local function today(): number
+	return os.time() // DAY
+end
+
+local function dailyIndex(p): number?
+	local streak = p.Streak
+	if not streak then
+		return 1
+	end
+	if streak.Last == today() then
+		return nil
+	end
+	if streak.Last == today() - 1 then
+		return (streak.Day % #Rewards.Daily) + 1
+	end
+	return 1
+end
+
+local function playSeconds(): number
+	return playBase + (os.clock() - playBaseClock)
+end
+
+local function playtimeClaimed(p, index: number): boolean
+	local play = p.PlayToday
+	return play ~= nil and play.Day == today() and play.Claimed ~= nil and play.Claimed[tostring(index)] == true
+end
+
+local function freeSpinIn(p): number
+	return math.max(0, (p.FreeSpinAt or 0) - os.time())
+end
+
+-- Quanti premi sono pronti da ritirare (per il pallino rosso sul pulsante)
+local function readyCount(): number
+	local p = profile()
+	if not p then
+		return 0
+	end
+	local count = 0
+	if dailyIndex(p) then
+		count += 1
+	end
+	local seconds = playSeconds()
+	for i, gift in Rewards.Playtime do
+		if not playtimeClaimed(p, i) and seconds >= gift.Minutes * 60 then
+			count += 1
+		end
+	end
+	if freeSpinIn(p) <= 0 or (p.Spins or 0) > 0 then
+		count += 1
+	end
+	return count
+end
+
+local function rewardText(bundle): string
+	local parts = {}
+	local p = profile()
+	if bundle.GoldQuests and p then
+		table.insert(parts, "💰 " .. Util.Abbreviate(Leveling.QuestGold(p.Level) * bundle.GoldQuests))
+	end
+	if bundle.Gems then
+		table.insert(parts, ("💎 %d"):format(bundle.Gems))
+	end
+	if bundle.Spins then
+		table.insert(parts, ("🎡 %d"):format(bundle.Spins))
+	end
+	return table.concat(parts, "  ")
+end
+
+-- Cambia il bordo già presente in un pannello (un elemento può avere un solo UIStroke)
+local function highlight(frame: GuiObject, color: Color3, thickness: number)
+	local stroke = frame:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = color
+		stroke.Thickness = thickness
+		stroke.Transparency = 0
+	end
+end
+
+local function clear()
+	for _, child in content:GetChildren() do
+		child:Destroy()
+	end
+	playtimeLabels = {}
+	spinButton = nil
+	resultLabel = nil
+	wheelInfo = nil
+end
+
+-- CALENDARIO ---------------------------------------------------------------------------------
+
+local function showCalendar()
+	local p = profile()
+	if not p then
+		return
+	end
+	local claimable = dailyIndex(p)
+	local claimedUpTo = if claimable then claimable - 1 else (p.Streak and p.Streak.Day or 0)
+	Theme.Label("Torna ogni giorno: i premi crescono fino al Forziere del 7° giorno. Se salti un giorno si riparte dal Giorno 1.", {
+		Size = UDim2.new(1, 0, 0, 40),
+		Font = Theme.Fonts.UI,
+		TextSize = 14,
+		TextColor3 = Colors.TextDim,
+		Parent = content,
+	})
+	local row = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 50), Size = UDim2.new(1, 0, 0, 300), Parent = content })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center, Parent = row })
+	for i, reward in Rewards.Daily do
+		local isToday = claimable == i
+		local claimed = i <= claimedUpTo
+		local card = Theme.Panel({
+			Size = UDim2.new(1 / 7, -8, 1, if reward.Big then 0 else -30),
+			LayoutOrder = i,
+			BackgroundColor3 = if isToday then Color3.fromRGB(70, 56, 26) elseif claimed then Color3.fromRGB(30, 46, 32) else Colors.Background,
+			Parent = row,
+		})
+		Theme.Padding(card, 8)
+		if isToday then
+			highlight(card, Colors.GoldBright, 2.5)
+		end
+		Theme.Label(("Giorno %d"):format(i), { Size = UDim2.new(1, 0, 0, 22), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 15, TextColor3 = if isToday then Colors.GoldBright else Colors.Text, Parent = card })
+		Theme.Label(if claimed then "✔" else reward.Icon, { Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 64), TextXAlignment = Enum.TextXAlignment.Center, TextSize = if reward.Big then 56 else 46, TextColor3 = Colors.GreenBright, Parent = card })
+		Theme.Label(reward.Name, { Position = UDim2.fromOffset(0, 96), Size = UDim2.new(1, 0, 0, 40), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 13, Parent = card })
+		Theme.Label(rewardText(reward), { Position = UDim2.fromOffset(0, 138), Size = UDim2.new(1, 0, 0, 36), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = card })
+		if isToday then
+			Theme.Button("RITIRA", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 38), BackgroundColor3 = Colors.Green, TextSize = 15, Parent = card }, function()
+				C.SoundController.Play("Reward")
+				Net.Event("ClaimReward"):FireServer("Daily")
+			end)
+		end
+	end
+	local streak = p.Streak and p.Streak.Count or 0
+	Theme.Label(if claimable then "🎁 Il premio di oggi ti aspetta!" else ("✔ Premio di oggi ritirato • serie attuale: %d %s • torna domani!"):format(streak, if streak == 1 then "giorno" else "giorni"), {
+		Position = UDim2.fromOffset(0, 362),
+		Size = UDim2.new(1, 0, 0, 30),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Theme.Fonts.Header,
+		TextSize = 18,
+		TextColor3 = Colors.GoldBright,
+		Parent = content,
+	})
+end
+
+-- REGALI A TEMPO -----------------------------------------------------------------------------
+
+local function refreshPlaytime()
+	local p = profile()
+	if not p then
+		return
+	end
+	local seconds = playSeconds()
+	for _, entry in playtimeLabels do
+		local gift = Rewards.Playtime[entry.Index]
+		local button = entry.Button
+		if playtimeClaimed(p, entry.Index) then
+			button.Text = "✔ Aperto"
+			button.BackgroundColor3 = Color3.fromRGB(45, 39, 33)
+		elseif seconds >= gift.Minutes * 60 then
+			button.Text = "APRI!"
+			button.BackgroundColor3 = Colors.Green
+		else
+			button.Text = "⏳ " .. Util.FormatTime(gift.Minutes * 60 - seconds)
+			button.BackgroundColor3 = Color3.fromRGB(45, 39, 33)
+		end
+	end
+end
+
+local function showPlaytime()
+	Theme.Label("Più giochi oggi, più regali apri. Si azzerano ogni giorno a mezzanotte (UTC).", {
+		Size = UDim2.new(1, 0, 0, 30),
+		Font = Theme.Fonts.UI,
+		TextSize = 14,
+		TextColor3 = Colors.TextDim,
+		Parent = content,
+	})
+	local grid = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 1, -40), Parent = content })
+	New("UIGridLayout", { CellSize = UDim2.new(0.25, -9, 0.5, -9), CellPadding = UDim2.fromOffset(9, 9), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+	for i, gift in Rewards.Playtime do
+		local card = Theme.Panel({ LayoutOrder = i, BackgroundColor3 = Colors.Background, Parent = grid })
+		Theme.Padding(card, 8)
+		if gift.Big then
+			highlight(card, Colors.GoldBright, 2)
+		end
+		Theme.Label(("%d min"):format(gift.Minutes), { Size = UDim2.new(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.Gold, Parent = card })
+		Theme.Label(gift.Icon, { Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 50), TextXAlignment = Enum.TextXAlignment.Center, TextSize = 40, Parent = card })
+		Theme.Label(gift.Name, { Position = UDim2.fromOffset(0, 72), Size = UDim2.new(1, 0, 0, 34), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 13, Parent = card })
+		local button = Theme.Button("", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.new(1, 0, 0, 34), TextSize = 14, Parent = card }, function()
+			C.SoundController.Play("Reward")
+			Net.Event("ClaimReward"):FireServer("Playtime", i)
+		end)
+		table.insert(playtimeLabels, { Button = button, Index = i })
+	end
+	refreshPlaytime()
+end
+
+-- RUOTA DELLA FORTUNA ---------------------------------------------------------------------------
+
+local function segmentAngle(index: number): number
+	return (index - 1) * 360 / #Rewards.Wheel
+end
+
+local function buildWheel(parent: Instance)
+	local size = 360
+	local holder = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(10, 10), Size = UDim2.fromOffset(size, size + 20), Parent = parent })
+	wheel = New("Frame", {
+		Name = "Ruota",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, 20 + size / 2),
+		Size = UDim2.fromOffset(size, size),
+		BackgroundColor3 = Color3.fromRGB(40, 30, 22),
+		Rotation = wheelRotation % 360,
+		Parent = holder,
+	})
+	wheelRotation %= 360
+	Theme.Corner(wheel, size)
+	Theme.Stroke(wheel, Colors.Gold, 5, 0)
+	local n = #Rewards.Wheel
+	local radius = size / 2
+	for i, prize in Rewards.Wheel do
+		local a = math.rad(segmentAngle(i))
+		-- raggio di separazione tra due spicchi
+		local spoke = math.rad(segmentAngle(i) + 180 / n)
+		New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(radius + math.sin(spoke) * radius / 2, radius - math.cos(spoke) * radius / 2),
+			Size = UDim2.fromOffset(2, radius),
+			Rotation = math.deg(spoke),
+			BackgroundColor3 = Colors.Gold,
+			BackgroundTransparency = 0.3,
+			BorderSizePixel = 0,
+			Parent = wheel,
+		})
+		-- spicchio colorato (disco) con l'icona del premio
+		local r = radius * 0.68
+		local disc = New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(radius + math.sin(a) * r, radius - math.cos(a) * r),
+			Size = UDim2.fromOffset(if prize.Big then 74 else 62, if prize.Big then 74 else 62),
+			BackgroundColor3 = prize.Color,
+			Rotation = math.deg(a),
+			Parent = wheel,
+		})
+		Theme.Corner(disc, 40)
+		Theme.Stroke(disc, if prize.Big then Colors.GoldBright else Color3.fromRGB(20, 16, 12), if prize.Big then 3 else 1.5, 0)
+		Theme.Label(prize.Icon, { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextSize = if prize.Big then 40 else 32, Parent = disc })
+	end
+	local hub = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(70, 70), BackgroundColor3 = Colors.Panel, Parent = wheel })
+	Theme.Corner(hub, 40)
+	Theme.Stroke(hub, Colors.GoldBright, 3, 0)
+	Theme.Label("🎡", { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, TextSize = 34, Parent = hub })
+	-- freccia in alto
+	Theme.Label("▼", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, -6), Size = UDim2.fromOffset(50, 44), TextXAlignment = Enum.TextXAlignment.Center, TextSize = 44, TextColor3 = Colors.RedBright, ZIndex = 5, Parent = holder })
+end
+
+local function refreshWheelInfo()
+	local p = profile()
+	if not p or not wheelInfo then
+		return
+	end
+	local wait = freeSpinIn(p)
+	wheelInfo.Text = ("%s\n🎡 Giri disponibili: %d"):format(if wait <= 0 then "🎁 Giro GRATIS disponibile!" else "Prossimo giro gratis tra " .. Util.FormatTime(wait), p.Spins or 0)
+	if spinButton then
+		local can = wait <= 0 or (p.Spins or 0) > 0
+		spinButton.BackgroundColor3 = if can and not spinning then Colors.Green else Color3.fromRGB(45, 39, 33)
+		spinButton.Text = if spinning then "..." elseif wait <= 0 then "GIRA GRATIS!" else "GIRA"
+	end
+end
+
+local function showWheel()
+	buildWheel(content)
+	local side = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(400, 0), Size = UDim2.new(1, -400, 1, 0), Parent = content })
+	wheelInfo = Theme.Label("", { Size = UDim2.new(1, 0, 0, 50), Font = Theme.Fonts.Bold, TextSize = 16, TextColor3 = Colors.GoldBright, Parent = side })
+	spinButton = Theme.Button("GIRA", { Position = UDim2.fromOffset(0, 56), Size = UDim2.new(1, 0, 0, 50), TextSize = 22, BackgroundColor3 = Colors.Green, Parent = side }, function()
+		local p = profile()
+		if spinning or not p then
+			return
+		end
+		if freeSpinIn(p) > 0 and (p.Spins or 0) <= 0 then
+			C.Notifications.Toast("Non hai giri: aspetta il giro gratis o apri i regali a tempo.", "Info", 3)
+			return
+		end
+		spinning = true
+		refreshWheelInfo()
+		Net.Event("SpinWheel"):FireServer()
+		-- se il server non risponde, sblocca il pulsante
+		task.delay(6, function()
+			if spinning and not wheel:GetAttribute("Girando") then
+				spinning = false
+				refreshWheelInfo()
+			end
+		end)
+	end)
+	resultLabel = Theme.Label("", { Position = UDim2.fromOffset(0, 112), Size = UDim2.new(1, 0, 0, 44), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Header, TextSize = 17, TextColor3 = Colors.GreenBright, Parent = side })
+	-- acquisto di giri (solo dove i premi casuali a pagamento sono permessi)
+	local y = 160
+	if player:GetAttribute("NoPaidRandom") ~= true then
+		local buys = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, y), Size = UDim2.new(1, 0, 0, 40), Parent = side })
+		New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), Parent = buys })
+		for _, product in Monetization.Products do
+			if product.Kind == "Spins" and Monetization.IsAvailable(product) then
+				Theme.Button(("%s %d giri • R$ %d"):format(product.Icon, product.Amount, product.Robux), { Size = UDim2.new(0.5, -4, 1, 0), TextSize = 14, BackgroundColor3 = Color3.fromRGB(40, 110, 170), Parent = buys }, function()
+					C.SoundController.Play("Coins")
+					Net.Event("PremiumBuy"):FireServer("Product", product.Id)
+				end)
+			end
+		end
+		y += 48
+	end
+	-- probabilità (sempre visibili)
+	Theme.Label("Probabilità dei premi", { Position = UDim2.fromOffset(0, y), Size = UDim2.new(1, 0, 0, 22), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.Gold, Parent = side })
+	local odds = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, y + 24), Size = UDim2.new(1, 0, 1, -(y + 24)), Parent = side })
+	New("UIListLayout", { Padding = UDim.new(0, 1), Parent = odds })
+	local total = Rewards.WheelTotal()
+	for i, prize in Rewards.Wheel do
+		Theme.Label(("%s  %s — %.0f%%"):format(prize.Icon, prize.Name, prize.Weight / total * 100), { Size = UDim2.new(1, 0, 0, 19), LayoutOrder = i, Font = Theme.Fonts.UI, TextSize = 13, TextColor3 = if prize.Big then Colors.GoldBright else Colors.Text, Parent = odds })
+	end
+	refreshWheelInfo()
+end
+
+local function onWheelResult(prizeId: string, text: string)
+	local index = 1
+	for i, prize in Rewards.Wheel do
+		if prize.Id == prizeId then
+			index = i
+		end
+	end
+	local prize = Rewards.Wheel[index]
+	if not C.UIController.IsOpen("Rewards") or currentTab ~= "Ruota" or not wheel or not wheel.Parent then
+		spinning = false
+		C.Notifications.Announce("🎡 " .. prize.Name, text, if prize.Big then "Raro" else "Ricompensa")
+		return
+	end
+	wheel:SetAttribute("Girando", true)
+	local n = #Rewards.Wheel
+	local jitter = (math.random() - 0.5) * (360 / n) * 0.6
+	local target = wheelRotation - (wheelRotation % 360) + 360 * 6 + ((360 - segmentAngle(index)) % 360) + jitter
+	local start = wheelRotation
+	local duration = 4.2
+	local t0 = os.clock()
+	local lastTick = 0
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		local k = math.clamp((os.clock() - t0) / duration, 0, 1)
+		local eased = 1 - (1 - k) ^ 4
+		wheelRotation = start + (target - start) * eased
+		if wheel and wheel.Parent then
+			wheel.Rotation = wheelRotation
+		end
+		-- "tic" a ogni spicchio
+		local tick = math.floor(wheelRotation / (360 / n))
+		if tick ~= lastTick then
+			lastTick = tick
+			C.SoundController.Play("UI", nil, { Volume = 0.25, Pitch = 1.4 })
+		end
+		if k >= 1 then
+			connection:Disconnect()
+			spinning = false
+			if wheel and wheel.Parent then
+				wheel:SetAttribute("Girando", nil)
+			end
+			C.SoundController.Play("Reward")
+			if resultLabel then
+				resultLabel.Text = ("Hai vinto: %s %s"):format(prize.Icon, prize.Name)
+			end
+			C.Notifications.Announce("🎡 " .. prize.Name, text, if prize.Big then "Raro" else "Ricompensa")
+			if prize.Big and C.CameraController then
+				C.CameraController.Shake(0.4, 0.6)
+			end
+			refreshWheelInfo()
+		end
+	end)
+end
+
+-- PANNELLO ------------------------------------------------------------------------------------------
+
+local function render()
+	if not panel then
+		return
+	end
+	for id, button in tabButtons do
+		button.BackgroundColor3 = if id == currentTab then Colors.Green else Colors.PanelLight
+	end
+	clear()
+	local fn = if currentTab == "Calendario" then showCalendar elseif currentTab == "Regali" then showPlaytime else showWheel
+	local ok, err = pcall(fn)
+	if not ok then
+		warn("[Premi] " .. tostring(err))
+	end
+end
+
+function RewardsPanel.Open(tab: string?)
+	if tab then
+		currentTab = tab
+	end
+	if not C.UIController.IsOpen("Rewards") then
+		C.UIController.Open("Rewards")
+	else
+		render()
+	end
+end
+
+-- OFFERTA DI BENVENUTO -----------------------------------------------------------------------------
+
+local function starterProduct()
+	for _, product in Monetization.Products do
+		if product.Kind == "Starter" then
+			return product
+		end
+	end
+	return nil
+end
+
+function RewardsPanel.StarterAvailable(): boolean
+	local p = profile()
+	return p ~= nil and not p.StarterBought and os.time() - (p.CreatedAt or 0) < Monetization.StarterHours * 3600
+end
+
+local offerShown = false
+local function showStarterOffer()
+	local product = starterProduct()
+	if offerShown or not product or not RewardsPanel.StarterAvailable() or not Monetization.IsAvailable(product) then
+		return
+	end
+	offerShown = true
+	local p = profile()
+	local left = Monetization.StarterHours * 3600 - (os.time() - (p.CreatedAt or 0))
+	local box = Theme.Panel({ Name = "Offerta", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(460, 330), Parent = C.UIController.Layers.Overlay })
+	C.UIController.AttachScale(box)
+	Theme.Padding(box, 16)
+	highlight(box, Colors.GoldBright, 3)
+	Theme.Label("🎁 OFFERTA DI BENVENUTO", { Size = UDim2.new(1, 0, 0, 34), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Title, TextSize = 30, TextColor3 = Colors.GoldBright, Parent = box })
+	Theme.Label(product.Name, { Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 26), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Header, TextSize = 20, Parent = box })
+	Theme.Label(product.Contents or "", { Position = UDim2.fromOffset(0, 74), Size = UDim2.new(1, 0, 0, 70), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 16, TextColor3 = Colors.Text, Parent = box })
+	Theme.Label(("Solo per le nuove reclute • scade tra %s"):format(Util.FormatTime(left)), { Position = UDim2.fromOffset(0, 150), Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.UI, TextSize = 14, TextColor3 = Colors.RedBright, Parent = box })
+	Theme.Button(("Prendilo per R$ %d"):format(product.Robux), { Position = UDim2.fromOffset(0, 188), Size = UDim2.new(1, 0, 0, 52), TextSize = 22, BackgroundColor3 = Colors.Green, Parent = box }, function()
+		Net.Event("PremiumBuy"):FireServer("Product", product.Id)
+		box:Destroy()
+		C.UIController.RequestCursor("Offerta", false)
+	end)
+	Theme.Button("No grazie", { Position = UDim2.fromOffset(0, 250), Size = UDim2.new(1, 0, 0, 36), TextSize = 15, Parent = box }, function()
+		box:Destroy()
+		C.UIController.RequestCursor("Offerta", false)
+	end)
+	C.UIController.RequestCursor("Offerta", true)
+	C.SoundController.Play("Reward")
+end
+
+-- PULSANTI LATERALI ---------------------------------------------------------------------------------
+
+local function sideButton(parent: Instance, order: number, icon: string, label: string, onClick: () -> ()): TextButton
+	local button = Theme.Button(icon, { Size = UDim2.fromOffset(60, 60), TextSize = 28, LayoutOrder = order, Parent = parent }, onClick)
+	New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -1), Size = UDim2.new(1, 0, 0, 12), Font = Theme.Fonts.Bold, TextSize = 9, TextColor3 = Colors.Gold, Text = label, Parent = button })
+	return button
+end
+
+local function inviteFriends()
+	local ok, can = pcall(function()
+		return SocialService:CanSendGameInviteAsync(player)
+	end)
+	if ok and can then
+		pcall(function()
+			SocialService:PromptGameInvite(player)
+		end)
+	else
+		C.Notifications.Toast("Gli inviti non sono disponibili qui (in Studio non funzionano).", "Info", 3)
+	end
+end
+
+local function joinGroup()
+	local groupId = ReplicatedStorage:GetAttribute("GroupId") or 0
+	if groupId == 0 then
+		return
+	end
+	local ok = pcall(function()
+		GroupService:PromptJoinAsync(groupId)
+	end)
+	if not ok then
+		C.Notifications.Toast("Unisciti al gruppo dalla pagina del gioco, poi premi di nuovo questo pulsante.", "Info", 4)
+	end
+	Net.Event("CommunityAction"):FireServer("CheckGroup")
+end
+
+local function buildSideButtons()
+	local holder = New("Frame", { Name = "Premi", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), Size = UDim2.fromOffset(60, 4 * 60 + 3 * 8), BackgroundTransparency = 1, Parent = C.UIController.Layers.HUD })
+	C.UIController.AttachScale(holder)
+	New("UIListLayout", { Padding = UDim.new(0, 8), Parent = holder })
+	local gift = sideButton(holder, 1, "🎁", "PREMI", function()
+		RewardsPanel.Open()
+	end)
+	dot = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -4, 0, 4), Size = UDim2.fromOffset(20, 20), BackgroundColor3 = Colors.Red, Visible = false, Parent = gift })
+	Theme.Corner(dot, 10)
+	New("TextLabel", { Name = "Numero", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Font = Theme.Fonts.Bold, TextSize = 12, TextColor3 = Colors.White, Text = "", Parent = dot })
+	sideButton(holder, 2, "🏆", "CLASSIFICHE", function()
+		if C.Menu then
+			C.Menu.OpenTab("Classifiche")
+		end
+	end)
+	sideButton(holder, 3, "👥", "INVITA", inviteFriends)
+	if (ReplicatedStorage:GetAttribute("GroupId") or 0) ~= 0 and player:GetAttribute("InGroup") ~= true then
+		local groupButton = sideButton(holder, 4, "⭐", "GRUPPO", joinGroup)
+		player:GetAttributeChangedSignal("InGroup"):Connect(function()
+			groupButton.Visible = player:GetAttribute("InGroup") ~= true
+		end)
+	end
+end
+
+local function updateDot()
+	if not dot then
+		return
+	end
+	local count = readyCount()
+	dot.Visible = count > 0
+	local number = dot:FindFirstChild("Numero") :: TextLabel?
+	if number then
+		number.Text = tostring(count)
+	end
+end
+
+function RewardsPanel.Init(c)
+	C = c
+end
+
+function RewardsPanel.Start()
+	panel = Theme.Panel({ Name = "Rewards", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(920, 560), Parent = C.UIController.Layers.Panels })
+	Theme.Padding(panel, 14)
+	Theme.Label("🎁 Premi", { Size = UDim2.new(1, -60, 0, 34), Font = Theme.Fonts.Title, TextSize = 30, TextColor3 = Colors.GoldBright, Parent = panel })
+	Theme.Button("✕", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(36, 32), TextSize = 18, Parent = panel }, function()
+		C.UIController.Close("Rewards")
+	end)
+	local tabs = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 0, 38), Parent = panel })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), Parent = tabs })
+	for i, tab in TABS do
+		tabButtons[tab.Id] = Theme.Button(tab.Icon .. " " .. tab.Id, { Size = UDim2.fromOffset(180, 38), TextSize = 15, LayoutOrder = i, Parent = tabs }, function()
+			currentTab = tab.Id
+			render()
+		end)
+	end
+	content = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 92), Size = UDim2.new(1, 0, 1, -92), Parent = panel })
+	C.UIController.RegisterPanel("Rewards", panel, render)
+	buildSideButtons()
+
+	C.ClientData.Changed:Connect(function()
+		if C.UIController.IsOpen("Rewards") and not spinning then
+			render()
+		end
+		updateDot()
+	end)
+	local function syncPlay()
+		playBase = player:GetAttribute("PlayToday") or 0
+		playBaseClock = os.clock()
+	end
+	syncPlay()
+	player:GetAttributeChangedSignal("PlayToday"):Connect(syncPlay)
+	Net.Event("WheelResult").OnClientEvent:Connect(onWheelResult)
+	Net.Event("Achievement").OnClientEvent:Connect(function()
+		C.SoundController.Play("Reward")
+	end)
+
+	-- aggiornamenti ogni secondo (conti alla rovescia e pallino rosso)
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			updateDot()
+			if C.UIController.IsOpen("Rewards") then
+				if currentTab == "Regali" then
+					refreshPlaytime()
+				elseif currentTab == "Ruota" and not spinning then
+					refreshWheelInfo()
+				end
+			end
+		end
+	end)
+
+	-- all'ingresso: apre il calendario se c'è il premio del giorno
+	task.spawn(function()
+		local p = C.ClientData.WaitReady()
+		task.wait(10)
+		while (C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()) or (C.CutsceneController and C.CutsceneController.IsPlaying()) do
+			task.wait(2)
+		end
+		p = profile() or p
+		if p and dailyIndex(p) and not C.UIController.IsOpen("Menu") then
+			RewardsPanel.Open("Calendario")
+		end
+	end)
+
+	-- offerta di benvenuto dopo 6 minuti di gioco (una volta per sessione, solo nei primi 3 giorni)
+	task.delay(360, function()
+		while (C.CutsceneController and C.CutsceneController.IsPlaying()) or C.UIController.IsOpen("Menu") or C.UIController.IsOpen("Rewards") do
+			task.wait(5)
+		end
+		showStarterOffer()
+	end)
+
+	-- dopo 12 minuti chiede (una sola volta) di aggiungere il gioco ai Preferiti
+	task.delay(720, function()
+		local p = profile()
+		if not p or p.FavoritePrompted or game.PlaceId == 0 then
+			return
+		end
+		while C.CutsceneController and C.CutsceneController.IsPlaying() do
+			task.wait(5)
+		end
+		Net.Event("CommunityAction"):FireServer("Favorite")
+		pcall(function()
+			AvatarEditorService:PromptSetFavorite(game.PlaceId, Enum.AvatarItemType.Asset, true)
+		end)
+	end)
+end
+
+return RewardsPanel
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -26673,7 +28573,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -26918,7 +28818,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -27120,7 +29020,7 @@ return UIController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="94">
+  <Item class="Workspace" referent="102">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>

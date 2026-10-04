@@ -25,6 +25,8 @@ local W = require(Shared.Data.WorldLayout)
 local Raids = require(Shared.Data.Raids)
 local Monetization = require(Shared.Data.Monetization)
 local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
+local Rewards = require(Shared.Data.Rewards)
+local Achievements = require(Shared.Data.Achievements)
 
 local errors: { string } = {}
 local checks = 0
@@ -510,13 +512,75 @@ for _, raid in Raids.List do
 	check(raid.Level >= raid.LevelReq, "Raid %s: livello minore del requisito", raid.Id)
 end
 
+-- PREMI (calendario, regali a tempo, ruota) ------------------------------------------------------
+local function checkBundle(where: string, bundle)
+	local any = false
+	for _, key in { "Gold", "GoldQuests", "Gems", "Spins" } do
+		if bundle[key] ~= nil then
+			check(isNumber(bundle[key]) and bundle[key] > 0, "%s: %s non valido", where, key)
+			any = true
+		end
+	end
+	for id, count in bundle.Items or {} do
+		check(Items.Get(id) ~= nil, "%s: oggetto inesistente %s", where, id)
+		check(isNumber(count) and count > 0, "%s: quantità non valida per %s", where, id)
+		any = true
+	end
+	check(any, "%s: premio vuoto", where)
+end
+check(#Rewards.Daily == 7, "Il calendario deve avere 7 giorni")
+for i, day in Rewards.Daily do
+	check(day.Day == i, "Calendario: giorno %d fuori ordine", i)
+	checkBundle("Calendario giorno " .. i, day)
+end
+local lastMinutes = 0
+for i, gift in Rewards.Playtime do
+	check(gift.Minutes > lastMinutes, "Regalo a tempo %d: minuti non crescenti", i)
+	lastMinutes = gift.Minutes
+	checkBundle("Regalo a tempo " .. i, gift)
+end
+check(math.abs(Rewards.WheelTotal() - 100) < 0.001, "Ruota: le probabilità devono sommare 100 (ora %s)", Rewards.WheelTotal())
+local wheelIds = {}
+for _, prize in Rewards.Wheel do
+	check(not wheelIds[prize.Id], "Ruota: premio duplicato %s", prize.Id)
+	wheelIds[prize.Id] = true
+	check(prize.Weight > 0, "Ruota: peso non valido per %s", prize.Id)
+	checkBundle("Ruota " .. prize.Id, prize)
+	if prize.UniqueItem then
+		check(Items.Get(prize.UniqueItem) ~= nil and isNumber(prize.FallbackGems), "Ruota %s: premio unico non valido", prize.Id)
+	end
+end
+
+-- TRAGUARDI ----------------------------------------------------------------------------------------
+local validStats = { Level = true, Titans = true, Napes = true, Bosses = true, Enemies = true, RaidsWon = true, Chapter = true, PlayHours = true, Streak = true, Friends = true }
+local achievementIds = {}
+for _, a in Achievements.List do
+	check(not achievementIds[a.Id], "Traguardo duplicato %s", a.Id)
+	achievementIds[a.Id] = true
+	check(validStats[a.Stat], "Traguardo %s: statistica sconosciuta %s", a.Id, a.Stat)
+	check(isNumber(a.Goal) and a.Goal > 0 and isNumber(a.Gems) and isNumber(a.BadgeId), "Traguardo %s: valori non validi", a.Id)
+	if a.Stat == "Chapter" then
+		check(a.Goal <= #Story.Chapters, "Traguardo %s: capitolo oltre la fine della storia", a.Id)
+	end
+	if a.Stat == "Level" then
+		check(a.Goal <= Config.MaxLevel, "Traguardo %s: livello oltre il massimo", a.Id)
+	end
+end
+
 -- NEGOZIO PREMIUM ------------------------------------------------------------------------------
 local seen = {}
 for _, p in Monetization.Products do
 	check(not seen[p.Id], "Prodotto duplicato %s", p.Id)
 	seen[p.Id] = true
-	check(p.Kind == "Gems" or p.Kind == "Gold", "Prodotto %s: tipo non valido", p.Id)
-	check(isNumber(p.Amount) and p.Amount > 0 and isNumber(p.Robux), "Prodotto %s: valori non validi", p.Id)
+	check(p.Kind == "Gems" or p.Kind == "Gold" or p.Kind == "Spins" or p.Kind == "Starter", "Prodotto %s: tipo non valido", p.Id)
+	if p.Kind == "Starter" then
+		check(type(p.Bundle) == "table" and isNumber(p.Robux), "Prodotto %s: pacchetto non valido", p.Id)
+		for id in (p.Bundle and p.Bundle.Items or {}) do
+			check(Items.Get(id) ~= nil, "Prodotto %s: oggetto inesistente %s", p.Id, id)
+		end
+	else
+		check(isNumber(p.Amount) and p.Amount > 0 and isNumber(p.Robux), "Prodotto %s: valori non validi", p.Id)
+	end
 end
 for _, pass in Monetization.GamePasses do
 	check(type(pass.Bonuses) == "table", "Pass %s senza Bonuses", pass.Id)

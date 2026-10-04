@@ -113,6 +113,21 @@ Finché un ID vale `0`, **in Studio l'acquisto viene simulato gratis** (per prov
 pubblicato quella voce risulta "non disponibile". Gli acquisti sono gestiti in modo sicuro
 (`ProcessReceipt` con registro delle ricevute e salvataggio prima della conferma).
 
+## 6b. Premi, classifiche e community
+
+- **🎁 Premi** (pulsante a sinistra): calendario di 7 giorni di fila, regali a tempo (più giochi oggi,
+  più regali apri) e **Ruota della Fortuna** (un giro gratis ogni 20 ore, probabilità sempre visibili;
+  i giri a pagamento non compaiono nei paesi dove sono vietati).
+- **🏆 Classifiche globali** (Menu → Classifiche e tabelloni al Campo di Addestramento): livello,
+  giganti uccisi, raid vinti.
+- **🏅 Traguardi** (Menu → Traguardi): 24 obiettivi che regalano gemme e, se configuri le medaglie, i badge Roblox.
+- **👥 Amici**: +10% esperienza per ogni amico nello stesso server (fino a +30%) e pulsante Invita.
+- **⭐ Gruppo**: con `Config.GroupId` chi entra nel gruppo riceve un regalo e +10% oro per sempre.
+- **Pacchetto della Recluta**: offerta per i nuovi giocatori (solo i primi 3 giorni, una volta sola).
+- **Segnalino dell'obiettivo**: colonna di luce e distanza verso il prossimo obiettivo della storia.
+
+Tutti i passi per pubblicare e far crescere il gioco sono in [`docs/LANCIO.md`](docs/LANCIO.md).
+
 ## 7. Codici regalo
 
 `SIERIPERDUTI`, `ARCIPELAGO`, `CORPODEIFALCHI`, `BENVENUTORECLUTA`, `OLTREILMARE`, `PRIMORAID`
@@ -121,7 +136,7 @@ pubblicato quella voce risulta "non disponibile". Gli acquisti sono gestiti in m
 ## 7b. Verificare la storia (comandi di prova)
 
 In **Roblox Studio** (o se sei il proprietario del gioco) scrivi in chat: `/aiuto`, `/capitolo N`, `/passo`,
-`/livello N`, `/oro N`, `/gemme N`, `/vai Zona`, `/zone`, `/cura`.
+`/livello N`, `/oro N`, `/gemme N`, `/vai Zona`, `/zone`, `/cura`, `/giri N`, `/resetpremi`, `/tempo N`.
 La guida completa, capitolo per capitolo, è in [`docs/GUIDA_STORIA.md`](docs/GUIDA_STORIA.md).
 
 ## 8. Personalizzare

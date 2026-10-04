@@ -614,6 +614,11 @@ end
 
 -- API ---------------------------------------------------------------------------------------------
 
+-- Posizione dell'obiettivo attuale della storia (usata dal segnalino 3D)
+function HUD.ObjectivePosition(): Vector3?
+	return refs.ObjectivePos
+end
+
 function HUD.SetVisible(visible: boolean)
 	if root then
 		root.Visible = visible

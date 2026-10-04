@@ -32,6 +32,8 @@ local ORDER = {
 	{ UI, "Shop" },
 	{ UI, "Premium" },
 	{ UI, "Raid" },
+	{ UI, "RewardsPanel" },
+	{ Controllers, "WaypointController" },
 	{ UI, "Intro" },
 }
 

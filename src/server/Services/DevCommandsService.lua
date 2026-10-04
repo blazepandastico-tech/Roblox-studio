@@ -12,6 +12,9 @@
 	/vai Zona           teletrasporto in una zona (es. /vai Recinto, /vai Aurion)
 	/zone               elenco delle zone
 	/cura               vita, gas e lame al massimo
+	/giri N             aggiunge N giri della Ruota della Fortuna
+	/resetpremi         azzera calendario, regali a tempo e giro gratis (per riprovarli)
+	/tempo N            aggiunge N minuti ai regali a tempo di oggi
 ]]
 
 local Players = game:GetService("Players")
@@ -28,7 +31,7 @@ local Leveling = require(Shared.Data.Leveling)
 local DevCommandsService = {}
 local S
 
-local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura"
+local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N"
 
 local function allowed(player: Player): boolean
 	if RunService:IsStudio() then
@@ -160,6 +163,30 @@ local function run(player: Player, text: string)
 			table.insert(ids, zone.Id)
 		end
 		say(player, table.concat(ids, ", "))
+	elseif command == "/giri" and value then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Spins = (profile.Spins or 0) + math.max(0, math.floor(value))
+			S.DataService.MarkDirty(player)
+			say(player, ("+%d giri della Ruota"):format(math.floor(value)))
+		end
+	elseif command == "/resetpremi" then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Streak.Last = 0
+			profile.Streak.Day = 0
+			profile.PlayToday.Claimed = {}
+			profile.FreeSpinAt = 0
+			S.DataService.MarkDirty(player)
+			say(player, "Premi azzerati: calendario dal Giorno 1, regali e giro gratis di nuovo disponibili")
+		end
+	elseif command == "/tempo" and value then
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.PlayToday.Seconds += math.max(0, math.floor(value)) * 60
+			player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
+			say(player, ("+%d minuti di gioco oggi"):format(math.floor(value)))
+		end
 	elseif command == "/cura" then
 		S.PlayerService.Heal(player, 1)
 		pcall(S.PlayerService.RefillWeapons, player)
@@ -189,7 +216,7 @@ local function handle(player: Player, text: string)
 	end
 end
 
-local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura" }
+local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura", "/giri", "/resetpremi", "/tempo" }
 
 function DevCommandsService.Init(services)
 	S = services

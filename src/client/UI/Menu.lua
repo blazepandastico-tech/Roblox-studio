@@ -1,6 +1,6 @@
 --[[
 	Menu (tasto M)
-	Schede: Equipaggiamento • Statistiche • Sieri • Storia • Codici • Impostazioni
+	Schede: Equipaggiamento • Statistiche • Sieri • Storia • Traguardi • Classifiche • Codici • Impostazioni
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,6 +16,7 @@ local Story = require(Shared.Data.Story)
 local Zones = require(Shared.Data.Zones)
 local Bloodlines = require(Shared.Data.Bloodlines)
 local Skills = require(Shared.Data.Skills)
+local Achievements = require(Shared.Data.Achievements)
 
 local Theme = require(script.Parent.Theme)
 local New = Theme.New
@@ -32,12 +33,23 @@ local selectedCategory = "Lame"
 local selectedItem: string? = nil
 
 local TABS = {
-	{ Id = "Equipaggiamento", Icon = "🎒" },
-	{ Id = "Statistiche", Icon = "📊" },
+	{ Id = "Equipaggiamento", Icon = "🎒", Label = "Equip." },
+	{ Id = "Statistiche", Icon = "📊", Label = "Statist." },
 	{ Id = "Sieri", Icon = "💉" },
 	{ Id = "Storia", Icon = "📜" },
+	{ Id = "Traguardi", Icon = "🏅" },
+	{ Id = "Classifiche", Icon = "🏆" },
 	{ Id = "Codici", Icon = "🎁" },
-	{ Id = "Impostazioni", Icon = "⚙️" },
+	{ Id = "Impostazioni", Icon = "⚙️", Label = "Opzioni" },
+}
+
+-- classifiche ricevute dal server (aggiornate ogni 2 minuti)
+local leaderboards: { [string]: { { UserId: number, Name: string, Value: number } } } = {}
+local boardTab = "Livello"
+local BOARDS = {
+	{ Id = "Livello", Title = "⭐ Livello" },
+	{ Id = "Giganti", Title = "⚔️ Giganti uccisi" },
+	{ Id = "Raid", Title = "🔱 Raid vinti" },
 }
 
 local function clear()
@@ -423,6 +435,69 @@ local function showStory()
 	end
 end
 
+-- SCHEDA TRAGUARDI ------------------------------------------------------------------------------------
+
+local function showAchievements()
+	clear()
+	local p = profile()
+	if not p then
+		return
+	end
+	local done = 0
+	for _, a in Achievements.List do
+		if p.Achievements and p.Achievements[a.Id] then
+			done += 1
+		end
+	end
+	Theme.Label(("Traguardi completati: %d / %d  •  ogni traguardo regala gemme 💎"):format(done, #Achievements.List), { Size = UDim2.new(1, 0, 0, 26), Font = Theme.Fonts.Header, TextSize = 17, TextColor3 = Colors.GoldBright, Parent = content })
+	local list = scroll(content, { Position = UDim2.fromOffset(0, 32), Size = UDim2.new(1, 0, 1, -32) })
+	New("UIGridLayout", { CellSize = UDim2.new(0.5, -8, 0, 74), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
+	local extra = { Friends = C.ClientData.Profile and (game:GetService("Players").LocalPlayer:GetAttribute("FriendsHere") or 0) or 0 }
+	for i, a in Achievements.List do
+		local unlocked = p.Achievements and p.Achievements[a.Id] ~= nil
+		local value = math.min(Achievements.Value(p, a.Stat, extra), a.Goal)
+		local card = Theme.Panel({ LayoutOrder = if unlocked then 1000 + i else i, BackgroundColor3 = if unlocked then Color3.fromRGB(30, 46, 32) else Colors.Background, Parent = list })
+		Theme.Padding(card, 8)
+		Theme.Label(if unlocked then "✔" else a.Icon, { Size = UDim2.fromOffset(50, 56), TextXAlignment = Enum.TextXAlignment.Center, TextSize = 34, TextColor3 = Colors.GreenBright, Parent = card })
+		Theme.Label(a.Name, { Position = UDim2.fromOffset(56, 0), Size = UDim2.new(1, -130, 0, 20), Font = Theme.Fonts.Bold, TextSize = 15, TextColor3 = if unlocked then Colors.GreenBright else Colors.Text, Parent = card })
+		Theme.Label(a.Description, { Position = UDim2.fromOffset(56, 20), Size = UDim2.new(1, -130, 0, 18), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = card })
+		Theme.Label(("+%d 💎"):format(a.Gems), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(70, 20), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Color3.fromRGB(140, 220, 255), Parent = card })
+		local _, setBar = Theme.Bar({ Position = UDim2.fromOffset(56, 44), Size = UDim2.new(1, -130, 0, 10), Parent = card }, if unlocked then Colors.GreenBright else Colors.Gold)
+		setBar(if unlocked then 1 else value / a.Goal, true)
+		Theme.Label(if unlocked then "Completato" else ("%s / %s"):format(Util.FormatNumber(value), Util.FormatNumber(a.Goal)), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 40), Size = UDim2.fromOffset(70, 18), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = card })
+	end
+end
+
+-- SCHEDA CLASSIFICHE -----------------------------------------------------------------------------------
+
+local function showLeaderboards()
+	clear()
+	local localPlayer = game:GetService("Players").LocalPlayer
+	local bar = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = content })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), Parent = bar })
+	for i, board in BOARDS do
+		Theme.Button(board.Title, { Size = UDim2.fromOffset(200, 36), TextSize = 15, LayoutOrder = i, BackgroundColor3 = if board.Id == boardTab then Colors.Green else Colors.PanelLight, Parent = bar }, function()
+			boardTab = board.Id
+			showLeaderboards()
+		end)
+	end
+	Theme.Label("Classifica di TUTTI i server • si aggiorna ogni 2 minuti • i primi 3 compaiono anche sui tabelloni del Campo", { Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 0, 20), Font = Theme.Fonts.UI, TextSize = 13, TextColor3 = Colors.TextDim, Parent = content })
+	local list = scroll(content, { Position = UDim2.fromOffset(0, 68), Size = UDim2.new(1, 0, 1, -68) })
+	New("UIListLayout", { Padding = UDim.new(0, 3), Parent = list })
+	local rows = leaderboards[boardTab] or {}
+	if #rows == 0 then
+		Theme.Label("Caricamento della classifica...", { Size = UDim2.new(1, 0, 0, 30), Font = Theme.Fonts.UI, TextSize = 15, Parent = list })
+	end
+	local medals = { "🥇", "🥈", "🥉" }
+	for i, entry in rows do
+		local mine = entry.UserId == localPlayer.UserId
+		local row = Theme.Panel({ Size = UDim2.new(1, -10, 0, 34), LayoutOrder = i, BackgroundColor3 = if mine then Color3.fromRGB(60, 50, 24) else Colors.Background, Parent = list })
+		Theme.Label(medals[i] or ("%d."):format(i), { Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(50, 34), Font = Theme.Fonts.Bold, TextSize = if medals[i] then 22 else 16, Parent = row })
+		Theme.Label(entry.Name .. (if mine then "  (tu)" else ""), { Position = UDim2.fromOffset(64, 0), Size = UDim2.new(1, -220, 1, 0), Font = Theme.Fonts.Bold, TextSize = 16, TextColor3 = if i <= 3 then Colors.GoldBright else Colors.Text, Parent = row })
+		Theme.Label(Util.FormatNumber(entry.Value), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 0), Size = UDim2.fromOffset(150, 34), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.Number, TextSize = 20, Parent = row })
+	end
+end
+
 -- SCHEDA CODICI ------------------------------------------------------------------------------------------
 
 local function showCodes()
@@ -514,6 +589,8 @@ local RENDER = {
 	Statistiche = showStats,
 	Sieri = showSerums,
 	Storia = showStory,
+	Traguardi = showAchievements,
+	Classifiche = showLeaderboards,
 	Codici = showCodes,
 	Impostazioni = showSettings,
 }
@@ -554,7 +631,7 @@ function Menu.Start()
 	local tabs = New("Frame", { BackgroundTransparency = 1, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 38), Parent = panel })
 	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), Parent = tabs })
 	for i, tab in TABS do
-		tabButtons[tab.Id] = Theme.Button(tab.Icon .. " " .. tab.Id, { Size = UDim2.fromOffset(150, 38), TextSize = 14, LayoutOrder = i, Parent = tabs }, function()
+		tabButtons[tab.Id] = Theme.Button(tab.Icon .. " " .. (tab.Label or tab.Id), { Size = UDim2.new(1 / #TABS, -6, 1, 0), TextSize = 13, LayoutOrder = i, Parent = tabs }, function()
 			currentTab = tab.Id
 			render()
 		end)
@@ -571,6 +648,14 @@ function Menu.Start()
 	C.ClientData.Changed:Connect(function()
 		if C.UIController.IsOpen("Menu") then
 			render()
+		end
+	end)
+	Net.Event("Leaderboards").OnClientEvent:Connect(function(data)
+		if type(data) == "table" then
+			leaderboards = data
+			if C.UIController.IsOpen("Menu") and currentTab == "Classifiche" then
+				render()
+			end
 		end
 	end)
 end
