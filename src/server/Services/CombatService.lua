@@ -4,7 +4,8 @@
 	  - fendenti con le lame (combo da 4 colpi) e abilità Z/X/C/V
 	  - armi a distanza (Lance Dirompenti, pistole, fucili, pistola di segnalazione)
 	  - sostituzione delle lame, Risveglio Valkar
-	Inoltre inoltra agli altri giocatori le animazioni e i cavi dei Rampini.
+	Inoltra inoltre agli altri giocatori le animazioni (i cavi dei Rampini li convalida
+	e inoltra ODMService).
 
 	Il client rileva i colpi (così sono precisi anche a 150 studs/s) e il server
 	controlla distanze, tempi di ricarica e danni: niente danni "inventati".
@@ -87,8 +88,9 @@ local function addMastery(player: Player, amount: number)
 	end
 end
 
--- Applica un colpo di lama a una parte (gigante o nemico umano)
-local function bladeHit(player: Player, part: BasePart, baseDamage: number, speed: number, opts)
+-- Applica un colpo di lama a una parte (gigante o nemico umano).
+-- Restituisce (colpito, bloccato): "bloccato" = corazza o pelle indurita, che consuma di più le lame.
+local function bladeHit(player: Player, part: BasePart, baseDamage: number, speed: number, opts): (boolean, boolean)
 	local stats = S.PlayerService.Stats(player)
 	local profile = S.DataService.Get(player)
 	local damage = baseDamage
@@ -114,19 +116,19 @@ local function bladeHit(player: Player, part: BasePart, baseDamage: number, spee
 			elseif result.Severed then
 				Net.Event("HitConfirm"):FireClient(player, { Kind = "Sever" })
 			end
-			return true
+			return true, result.Blocked == true
 		end
-		return false
+		return false, false
 	end
 	local e = S.EnemyService.GetFromPart(part)
 	if e then
 		local result = S.EnemyService.ApplyDamage(e, player, damage)
 		if result then
 			sendDamageNumber(player, part.Position, result.Damage, if crit then "Crit" else "Normal")
-			return true
+			return true, false
 		end
 	end
-	return false
+	return false, false
 end
 
 local function validPart(part: any, root: BasePart, reach: number, speed: number): boolean
@@ -167,6 +169,7 @@ local function onAttack(player: Player, payload: any)
 	end
 	local hits = payload.Hits
 	local anyHit = false
+	local anyBlocked = false
 	if type(hits) == "table" then
 		local seen = {}
 		local count = 0
@@ -179,16 +182,18 @@ local function onAttack(player: Player, payload: any)
 				if owner and not seen[owner] then
 					seen[owner] = true
 					count += 1
-					if bladeHit(player, part, base, speed) then
-						anyHit = true
-					end
+					local hit, blocked = bladeHit(player, part, base, speed)
+					anyHit = anyHit or hit
+					anyBlocked = anyBlocked or blocked
 				end
 			end
 		end
 	end
 	if anyHit then
 		if not broken then
-			state.BladeDurability = math.max(0, state.BladeDurability - 1)
+			-- la carne dei giganti consuma le lame; le corazze molto di più
+			local wear = 1 + (if anyBlocked then Config.Combat.ArmorBladeWear else 0)
+			state.BladeDurability = math.max(0, state.BladeDurability - wear)
 			if state.BladeDurability == 0 then
 				S.EventService.Notify(player, "Lame spezzate! Premi R per sostituirle.", "Errore", 3)
 			end
@@ -267,7 +272,7 @@ local function onSkillHit(player: Player, key: any, hits: any)
 				if done < perTargetLimit then
 					active.PerTarget[owner] = done + 1
 					active.Hits += 1
-					if bladeHit(player, part, base, speed, { ForcePerfect = key == "V" }) then
+					if (bladeHit(player, part, base, speed, { ForcePerfect = key == "V" })) then
 						anyHit = true
 					end
 				end
@@ -328,12 +333,22 @@ local function onRanged(player: Player, payload: any)
 	S.EventService.Effect("RangedShot", { From = origin, To = hitPos, Kind = kind, Color = def.ProjectileColor, Shooter = player }, origin, 900)
 
 	if kind == "Lancia" or kind == "Cannone" then
-		-- la lancia si conficca e poi esplode
+		-- la lancia si conficca, la miccia lampeggia e poi esplode (il cannone esplode subito)
 		local offset = nil
 		if hitPart then
 			offset = hitPart.CFrame:PointToObjectSpace(hitPos)
 		end
-		local delay = if kind == "Cannone" then 0.25 else 0.6
+		local delay = if kind == "Cannone" then 0.25 else (def.Fuse or Config.Combat.SpearFuse)
+		if kind == "Lancia" then
+			S.EventService.Effect("SpearArmed", {
+				Part = hitPart,
+				Offset = offset,
+				Position = hitPos,
+				From = origin,
+				Fuse = delay,
+				Color = def.ProjectileColor,
+			}, hitPos, 900)
+		end
 		task.delay(delay, function()
 			local pos = hitPos
 			if hitPart and offset and hitPart.Parent then
@@ -437,7 +452,7 @@ local function onAwaken(player: Player)
 	S.EventService.Notify(player, "RISVEGLIO ACKERMAN!", "Raro", 3)
 end
 
--- INOLTRO ANIMAZIONI E CAVI DEI RAMPINI -----------------------------------------------------------
+-- INOLTRO ANIMAZIONI -------------------------------------------------------------------------------
 
 local allowedClips = {}
 for name in Poses.Human.Clips do
@@ -482,29 +497,6 @@ local function onAnimRelay(player: Player, clip: any, speed: any)
 	relayToNearby(Net.Unreliable("AnimRelay"), player, 500, clip, if type(speed) == "number" then math.clamp(speed, 0.2, 3) else 1)
 end
 
-local function onODM(player: Player, action: any, data: any)
-	if type(action) ~= "string" or not withinBudget(player, 30) then
-		return
-	end
-	if action ~= "Attach" and action ~= "Release" and action ~= "Fire" then
-		return
-	end
-	local clean = {}
-	if type(data) == "table" then
-		clean.Side = if data.Side == "Left" then "Left" else "Right"
-		if typeof(data.Part) == "Instance" and data.Part:IsA("BasePart") then
-			clean.Part = data.Part
-		end
-		if typeof(data.Offset) == "Vector3" then
-			clean.Offset = data.Offset
-		end
-		if typeof(data.Position) == "Vector3" then
-			clean.Position = data.Position
-		end
-	end
-	relayToNearby(Net.Event("ODM"), player, 700, action, clean)
-end
-
 function CombatService.Init(services)
 	S = services
 end
@@ -517,7 +509,6 @@ function CombatService.Start()
 	Net.Event("ReloadBlades").OnServerEvent:Connect(onReload)
 	Net.Event("Awaken").OnServerEvent:Connect(onAwaken)
 	Net.Unreliable("AnimRelay").OnServerEvent:Connect(onAnimRelay)
-	Net.Event("ODM").OnServerEvent:Connect(onODM)
 	Players.PlayerRemoving:Connect(function(player)
 		relayBudget[player] = nil
 	end)

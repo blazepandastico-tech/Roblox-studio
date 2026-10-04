@@ -339,6 +339,74 @@ function EffectsController.Projectile(from: Vector3, to: Vector3, time: number, 
 	end)
 end
 
+-- Lancia Dirompente conficcata: segue il bersaglio, la miccia lampeggia sempre più veloce
+local function spearArmed(params, fuse: number)
+	local target: BasePart? = if typeof(params.Part) == "Instance" and params.Part:IsA("BasePart") then params.Part else nil
+	local position: Vector3 = params.Position
+	local from: Vector3 = if typeof(params.From) == "Vector3" then params.From else position + Vector3.yAxis
+	local dir = Util.SafeUnit(position - from)
+	if dir.Magnitude < 0.5 then
+		dir = -Vector3.yAxis
+	end
+	if target and not target.Parent then
+		target = nil
+	end
+	-- la punta resta dentro il bersaglio, l'asta sporge all'indietro
+	local world = CFrame.lookAt(position - dir * 1.6, position + dir)
+	local localCF = if target then target.CFrame:ToObjectSpace(world) else nil
+	local shaft = part({ Size = Vector3.new(0.35, 0.35, 4), Material = Enum.Material.Metal, Color = Color3.fromRGB(70, 72, 78), CFrame = world })
+	local light = part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 0.6, Color = params.Color or Color3.fromRGB(255, 70, 50), CFrame = world * CFrame.new(0, 0, 2.1) })
+	local glow = Instance.new("PointLight")
+	glow.Color = light.Color
+	glow.Range = 10
+	glow.Brightness = 0
+	glow.Parent = light
+	local start = os.clock()
+	local nextBeep = start
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local now = os.clock()
+		local k = math.clamp((now - start) / fuse, 0, 1)
+		if k >= 1 or not shaft.Parent then
+			conn:Disconnect()
+			shaft:Destroy()
+			light:Destroy()
+			return
+		end
+		if target and localCF and target.Parent then
+			world = target.CFrame * localCF
+		end
+		shaft.CFrame = world
+		light.CFrame = world * CFrame.new(0, 0, 2.1)
+		-- bip e lampi sempre più rapidi man mano che la miccia si consuma
+		if now >= nextBeep then
+			nextBeep = now + math.max(0.06, 0.4 * (1 - k))
+			light.Transparency = 0
+			glow.Brightness = 4
+			tween(light, 0.08, { Transparency = 0.8 })
+			tween(glow, 0.08, { Brightness = 0 })
+			if C.SoundController then
+				C.SoundController.Play("Type", world.Position, { Range = 160, Volume = 0.35, Pitch = 2 + k * 1.5 })
+			end
+		end
+	end)
+	EffectsController.Sparks(position, Color3.fromRGB(255, 220, 150), 10, 30)
+	if C.SoundController then
+		C.SoundController.Play("HookHit", position, { Range = 300, Pitch = 0.9 })
+	end
+end
+
+function EffectsController.SpearArmed(params)
+	local fuse = math.clamp(tonumber(params.Fuse) or 1.4, 0.1, 5)
+	local from = if typeof(params.From) == "Vector3" then params.From else params.Position
+	-- compare quando il proiettile arriva (stessa durata del volo mostrato a chi spara)
+	local travel = math.clamp((params.Position - from).Magnitude / 400, 0.12, 0.6)
+	if travel >= fuse - 0.1 then
+		return
+	end
+	task.delay(travel, spearArmed, params, fuse - travel)
+end
+
 function EffectsController.Tracer(from: Vector3, to: Vector3, color: Color3?)
 	local len = (to - from).Magnitude
 	local line = part({ Size = Vector3.new(0.12, 0.12, len), CFrame = CFrame.lookAt((from + to) / 2, to), Color = color or Color3.fromRGB(255, 240, 190), Transparency = 0.1 })
@@ -750,6 +818,11 @@ handlers.RangedShot = function(p)
 	end
 	if C.SoundController then
 		C.SoundController.Play("Shot", p.From, { Range = 500 })
+	end
+end
+handlers.SpearArmed = function(p)
+	if typeof(p.Position) == "Vector3" then
+		EffectsController.SpearArmed(p)
 	end
 end
 handlers.Tracer = function(p)

@@ -26,6 +26,7 @@ local ORDER = {
 	"TitanService",
 	"EnemyService",
 	"CombatService",
+	"ODMService",
 	"QuestService",
 	"StoryService",
 	"SerumService",

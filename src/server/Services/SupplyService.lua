@@ -27,6 +27,7 @@ local function connectSupply(part: Instance)
 		end
 		lastRefill[player] = now
 		S.PlayerService.RefillWeapons(player)
+		S.ODMService.Refill(player)
 		S.PlayerService.Heal(player, 0.25)
 		Net.Event("Refilled"):FireClient(player, "Tutto")
 		S.EventService.Notify(player, "Gas, lame e munizioni ricaricati!", "Successo", 2.5)

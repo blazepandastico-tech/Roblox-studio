@@ -50,6 +50,13 @@ poi salva il luogo: all'avvio il server non rigenera una mappa che esiste già.
 
 Su telefono e tablet compaiono pulsanti a schermo.
 
+### Volo con i rampini: consigli
+- Un aggancio **vicino** tira più forte di uno al limite della portata; tirare **nella direzione in cui voli**
+  rende di più che tirare all'indietro (per invertire la rotta conviene oscillare attorno al cavo).
+- **Slancio cinetico**: volando veloce rasente a muri, alberi e tetti accumuli slancio, fino a +35% di velocità massima.
+- Le **Lance Dirompenti** si conficcano nel bersaglio: la miccia lampeggia per 1,4 secondi e poi esplodono.
+- Le lame si consumano a ogni colpo, e molto di più sulle **corazze**: tieni d'occhio la durabilità (R per sostituirle).
+
 ## 3. Il mondo: l'arcipelago
 
 Ci si sposta tra le isole con i **traghettatori** (uno in ogni città principale) o con le navi.

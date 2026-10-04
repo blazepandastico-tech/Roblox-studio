@@ -24,6 +24,7 @@ local Poses = require(Shared.Anim.Poses)
 local W = require(Shared.Data.WorldLayout)
 local Raids = require(Shared.Data.Raids)
 local Monetization = require(Shared.Data.Monetization)
+local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
 
 local errors: { string } = {}
 local checks = 0
@@ -529,6 +530,70 @@ for _, entry in Monetization.GemShop do
 end
 check(#Serums.Order == 8, "I sieri devono essere esattamente 8 (ora %d)", #Serums.Order)
 check(Config.Serums.Available == false, "I sieri devono restare bloccati fino al prossimo aggiornamento")
+
+-- FISICA DEI RAMPINI ------------------------------------------------------------------------
+do
+	local function stepWith(overrides)
+		local input = {
+			Position = Vector3.new(0, 50, 0),
+			Velocity = Vector3.new(0, 0, 0),
+			Hooks = {},
+			Move = Vector3.zero,
+			Boost = false,
+			BoostDirection = Vector3.new(0, 0, -1),
+			Gas = 100,
+			GasEfficiency = 1,
+			SpeedMult = 1,
+			Momentum = 0,
+			Clearance = nil,
+			Range = 115,
+			dt = 1 / 60,
+		}
+		for k, v in overrides do
+			input[k] = v
+		end
+		return ODMPhysics.Step(input), input
+	end
+
+	-- il verricello tira verso l'aggancio e consuma gas
+	local out = stepWith({ Hooks = { { Target = Vector3.new(0, 50, -80), RopeLength = 80, Held = true } } })
+	check(out.Velocity.Z < 0, "ODM: il verricello non tira verso l'aggancio (vz=%s)", out.Velocity.Z)
+	check(out.GasUsed > 0, "ODM: il verricello non consuma gas")
+	-- senza gas niente trazione
+	local dry = stepWith({ Gas = 0, Hooks = { { Target = Vector3.new(0, 50, -80), RopeLength = 80, Held = true } } })
+	check(dry.GasUsed == 0 and dry.Velocity.Z == 0, "ODM: senza gas il verricello tira ancora")
+	-- vicinanza: un aggancio vicino tira più di uno lontano
+	check(ODMPhysics.ProximityFactor(20, 115) > ODMPhysics.ProximityFactor(110, 115), "ODM: la vicinanza non aumenta la trazione")
+	-- angolo: tirare in avanti rende più che tirare all'indietro
+	local v = Vector3.new(0, 0, -100)
+	check(ODMPhysics.AngleFactor(v, Vector3.new(0, 0, -1)) > ODMPhysics.AngleFactor(v, Vector3.new(0, 0, 1)), "ODM: l'angolo non influisce sulla trazione")
+	check(ODMPhysics.AngleFactor(Vector3.zero, Vector3.new(0, 0, 1)) == 1, "ODM: da fermi l'angolo deve essere neutro")
+	-- il cavo teso impedisce di allontanarsi (pendolo)
+	local rope = { Target = Vector3.new(0, 100, 0), RopeLength = 50, Held = false }
+	local swing = stepWith({ Velocity = Vector3.new(0, -60, 0), Hooks = { rope } })
+	check(swing.Velocity.Y > -5, "ODM: il cavo teso non trattiene (vy=%s)", swing.Velocity.Y)
+	-- slancio cinetico: cresce rasente agli ostacoli, cala lontano
+	local m = 0
+	for _ = 1, 60 do
+		m = ODMPhysics.UpdateMomentum(m, 150, 3, 1 / 60)
+	end
+	check(m > 0.4, "ODM: lo slancio non cresce vicino agli ostacoli (%s)", m)
+	check(ODMPhysics.UpdateMomentum(m, 150, nil, 1) < m, "ODM: lo slancio non cala lontano dagli ostacoli")
+	check(ODMPhysics.UpdateMomentum(0, 20, 2, 1) == 0, "ODM: lo slancio cresce anche da fermi")
+	check(ODMPhysics.MaxSpeed(1, 1) > ODMPhysics.MaxSpeed(1, 0), "ODM: lo slancio non alza la velocità massima")
+	-- limite di velocità rispettato
+	local fast = stepWith({ Velocity = Vector3.new(0, 0, -1000), Momentum = 1 })
+	check(fast.Velocity.Magnitude <= ODMPhysics.MaxSpeed(1, 1) + 1e-6, "ODM: superato il limite di velocità")
+	-- coerenza con la convalida del server
+	check(ODMPhysics.ValidateAnchor(Vector3.zero, Vector3.new(0, 0, 110), 115, 0), "ODM: aggancio valido rifiutato")
+	check(not ODMPhysics.ValidateAnchor(Vector3.zero, Vector3.new(0, 0, 400), 115, 0), "ODM: aggancio a 400 studs accettato")
+	local maxStep = ODMPhysics.MaxDisplacement(1, 0.25)
+	check(maxStep >= ODMPhysics.MaxSpeed(1, 1) * 0.25, "ODM: la convalida punirebbe un volo legittimo")
+	check(maxStep >= Config.ODM.Validation.MinSpeedCap * 0.25, "ODM: la convalida punirebbe la Danza delle Lame")
+	check(ODMPhysics.HookCost(2) < ODMPhysics.HookCost(1), "ODM: l'efficienza del gas non riduce i consumi")
+	check(ODMPhysics.GasDrain(1, true, 1, 1) > ODMPhysics.GasDrain(1, false, 1, 1), "ODM: lo scatto non consuma gas")
+	check(Config.Combat.SpearFuse > 0.6 and Config.Combat.SpearFuse < 5, "Miccia delle Lance Dirompenti fuori misura")
+end
 
 -- RISULTATO ----------------------------------------------------------------------------------
 local cutsceneList = {}

@@ -5,6 +5,10 @@
 	Spazio in volo: getto di gas. WASD: correggi la traiettoria. Ctrl: schivata.
 	Il gas si consuma: ricaricalo ai Depositi di Rifornimento.
 	I rampini si agganciano a edifici, alberi, mura, terreno... e ai giganti!
+
+	La matematica del volo è in Shared.Modules.ODMPhysicsModule (la stessa che usa il server
+	per convalidare): qui restano input, mira, sensori degli ostacoli, grafica e animazioni.
+	Volare veloce rasente agli ostacoli accumula SLANCIO CINETICO (più velocità massima).
 ]]
 
 local Players = game:GetService("Players")
@@ -15,6 +19,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
 local Net = require(Shared.Lib.Net)
 local Util = require(Shared.Lib.Util)
+local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
 
 local ODMController = {}
 local C
@@ -35,6 +40,10 @@ local boostEmitter: ParticleEmitter? = nil
 local windSound: Sound? = nil
 local lastGroundCheck = 0
 local airTime = 0
+local momentum = 0
+local clearance: number? = nil
+local lastProbe = 0
+local hookSeq = 0
 local remote: { [Player]: any } = {}
 local effectsFolder: Instance
 
@@ -94,12 +103,44 @@ local function disabled(): boolean
 end
 
 local function speedMult(): number
-	local mult = player:GetAttribute("ODMReel") or 1
 	local until_ = player:GetAttribute("AwakenedUntil")
-	if type(until_) == "number" and workspace:GetServerTimeNow() < until_ then
-		mult *= 1.3
+	local awakened = type(until_) == "number" and workspace:GetServerTimeNow() < until_
+	return ODMPhysics.SpeedMult(player:GetAttribute("ODMReel"), awakened)
+end
+
+local function gasEfficiency(): number
+	return player:GetAttribute("GasEfficiency") or 1
+end
+
+function ODMController.Momentum(): number
+	return momentum
+end
+
+-- SENSORI DEGLI OSTACOLI (slancio cinetico) ------------------------------------------------
+
+local PROBE_INTERVAL = 0.08
+
+-- Distanza dall'ostacolo più vicino ai lati, sopra e sotto la traiettoria
+local function probeClearance(root: BasePart, velocity: Vector3): number?
+	local forward = Util.SafeUnit(velocity)
+	if forward.Magnitude < 0.5 then
+		return nil
 	end
-	return mult
+	local side = forward:Cross(Vector3.yAxis)
+	if side.Magnitude < 0.2 then
+		side = forward:Cross(Vector3.xAxis)
+	end
+	side = side.Unit
+	local up = side:Cross(forward).Unit
+	local radius = ODM.ProximityRadius
+	local best: number? = nil
+	for _, dir in { side, -side, up, -up, (forward + side).Unit, (forward - side).Unit } do
+		local result = workspace:Raycast(root.Position, dir * radius, rayParams)
+		if result and (not best or result.Distance < best) then
+			best = result.Distance
+		end
+	end
+	return best
 end
 
 -- MIRA ---------------------------------------------------------------------------------
@@ -381,8 +422,10 @@ local function fire(side: string)
 		h.Part = part
 		h.Offset = part.CFrame:PointToObjectSpace(target)
 		h.Duration = (target - root.Position).Magnitude / ODM.HookSpeed
-		gas = math.max(0, gas - ODM.GasPerHook / (player:GetAttribute("GasEfficiency") or 1))
-		Net.Event("ODM"):FireServer("Fire", { Side = side, Part = part, Offset = h.Offset, Position = target })
+		gas = math.max(0, gas - ODMPhysics.HookCost(gasEfficiency()))
+		hookSeq += 1
+		h.Seq = hookSeq
+		Net.Event("ODM"):FireServer("Fire", { Side = side, Part = part, Offset = h.Offset, Position = target, Seq = hookSeq })
 	else
 		local _, dir = aimRay(side)
 		h.Phase = "Miss"
@@ -423,7 +466,7 @@ local function dodge()
 	if now - lastDodge < ODM.DodgeCooldown then
 		return
 	end
-	local cost = ODM.GasPerDodge / (player:GetAttribute("GasEfficiency") or 1)
+	local cost = ODMPhysics.DodgeCost(gasEfficiency())
 	if gas < cost then
 		return
 	end
@@ -523,70 +566,55 @@ local function physics(dt: number)
 		end
 	end
 
-	local gasEff = player:GetAttribute("GasEfficiency") or 1
 	local used = 0
 	if flying then
 		airTime += dt
-		local velocity = root.AssemblyLinearVelocity
-		local accel = Vector3.zero
 		local mult = speedMult()
-		local hanging = false
-		for _, h in attached do
-			local target = targetPosition(h)
-			local to = target - root.Position
-			local dist = to.Magnitude
-			if dist > 0.5 then
-				local dir = to / dist
-				if gas > 0 and h.Held then
-					local reel = ODM.ReelAcceleration * mult
-					local minDist = ODM.MinAttachDistance
-					if dist < minDist * 2.5 then
-						reel *= math.clamp((dist - minDist * 0.5) / (minDist * 2), 0, 1)
-						hanging = dist < minDist * 1.6 and velocity.Magnitude < 25
-					end
-					accel += dir * reel
-					used += ODM.GasDrainReel / gasEff * dt
-				end
-				-- il cavo è teso: non ci si può allontanare oltre la sua lunghezza
-				h.RopeLength = math.min(h.RopeLength, dist + 0.3)
-				if dist >= h.RopeLength - 0.3 then
-					local radial = velocity:Dot(dir)
-					if radial < 0 then
-						velocity -= dir * radial
-					end
-				end
-				if hanging then
-					-- appeso alla parete: smorza il movimento
-					velocity *= 1 - math.min(1, dt * 6)
-				end
-			end
+		local ropes = table.create(#attached)
+		for i, h in attached do
+			ropes[i] = { Target = targetPosition(h), RopeLength = h.RopeLength, Held = h.Held }
 		end
-		if #attached > 0 then
-			accel += Vector3.new(0, workspace.Gravity * ODM.AntiGravity, 0)
+		if now - lastProbe >= PROBE_INTERVAL then
+			lastProbe = now
+			clearance = probeClearance(root, root.AssemblyLinearVelocity)
 		end
 		local move = if controls then controls:GetMoveVector() else Vector3.zero
-		if move.Magnitude > 0.05 then
-			local steer = camera.CFrame:VectorToWorldSpace(move)
-			accel += steer * (if #attached > 0 then ODM.SteerAcceleration else ODM.AirSteer) * mult
+		local step = ODMPhysics.Step({
+			Position = root.Position,
+			Velocity = root.AssemblyLinearVelocity,
+			Hooks = ropes,
+			Move = if move.Magnitude > 0.05 then camera.CFrame:VectorToWorldSpace(move) else Vector3.zero,
+			Boost = boostHeld,
+			BoostDirection = camera.CFrame.LookVector,
+			Gas = gas,
+			GasEfficiency = gasEfficiency(),
+			SpeedMult = mult,
+			Momentum = momentum,
+			Clearance = clearance,
+			Range = player:GetAttribute("ODMRange") or 115,
+			Gravity = workspace.Gravity,
+			dt = dt,
+		})
+		for i, h in attached do
+			h.RopeLength = ropes[i].RopeLength
 		end
-		local emitter = ensureBoostEmitter()
-		if boostHeld and gas > 0 then
-			accel += camera.CFrame.LookVector * ODM.BoostAcceleration * mult
-			used += ODM.GasDrainBoost / gasEff * dt
-			if emitter then
-				emitter.Enabled = true
-			end
-		elseif emitter then
-			emitter.Enabled = #attached > 0 and gas > 0
-			emitter.Rate = if #attached > 0 then 30 else 70
-		end
-		velocity += accel * dt
-		velocity *= 1 - ODM.Drag * dt
-		local maxSpeed = ODM.MaxSpeed * math.sqrt(mult)
-		if velocity.Magnitude > maxSpeed then
-			velocity = velocity.Unit * maxSpeed
-		end
+		local velocity = step.Velocity
+		local accel = step.Acceleration
+		local hanging = step.Hanging
+		momentum = step.Momentum
+		used += step.GasUsed
 		root.AssemblyLinearVelocity = velocity
+
+		local emitter = ensureBoostEmitter()
+		if emitter then
+			if step.Boosting then
+				emitter.Enabled = true
+				emitter.Rate = 70
+			else
+				emitter.Enabled = #attached > 0 and gas > 0
+				emitter.Rate = 30
+			end
+		end
 
 		-- orientamento del corpo nella direzione del volo
 		if alignOri then
@@ -627,6 +655,7 @@ local function physics(dt: number)
 		if windSound then
 			windSound.Volume = 0
 		end
+		momentum = math.max(0, momentum - ODM.MomentumDecay * 3 * dt)
 		-- a terra il gas si ricarica lentamente
 		if hum.FloorMaterial ~= Enum.Material.Air then
 			gas = math.min(maxGas, gas + ODM.GasRegenGround * dt)
@@ -774,6 +803,8 @@ function ODMController.Start()
 	end)
 	C.InputController.On("Boost", function(began)
 		boostHeld = began
+		-- il server tiene il conto del gas (anti-trucchi): gli serve sapere quando si spinge
+		Net.Event("ODM"):FireServer("Boost", { On = began })
 		if began and flying and gas > 0 and C.SoundController then
 			local root = rootPart()
 			if root then
@@ -792,6 +823,25 @@ function ODMController.Start()
 	end)
 	Net.Event("ODM").OnClientEvent:Connect(onRemoteODM)
 
+	-- Correzioni del server: il gas non può superare il suo conteggio, e un aggancio
+	-- impossibile (fuori portata, senza gas) viene sganciato.
+	Net.Event("ODMCorrect").OnClientEvent:Connect(function(kind, data)
+		if kind == "Reject" and type(data) == "table" and (data.Side == "Left" or data.Side == "Right") then
+			-- solo se è ancora lo stesso cavo (nel frattempo potrebbe esserne partito un altro)
+			local h = hooks[data.Side]
+			if h and h.Seq == data.Seq then
+				release(data.Side)
+			end
+		end
+	end)
+	local function applyGasCap()
+		local cap = player:GetAttribute("GasCap")
+		if type(cap) == "number" then
+			gas = math.min(gas, cap + ODM.Validation.GasSlack)
+		end
+	end
+	player:GetAttributeChangedSignal("GasCap"):Connect(applyGasCap)
+
 	player.CharacterAdded:Connect(function()
 		ODMController.ReleaseAll(true)
 		flying = false
@@ -799,6 +849,7 @@ function ODMController.Start()
 		alignOri = nil
 		boostEmitter = nil
 		gas = maxGas
+		momentum = 0
 	end)
 
 	if C.SoundController then

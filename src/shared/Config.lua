@@ -57,6 +57,34 @@ local Config = {
 		DodgeCooldown = 0.9,
 		DodgeIFrames = 0.3,
 		LandingRollSpeed = 85,
+		AwakenedSpeedMult = 1.3,
+
+		-- trazione: vicinanza dell'aggancio e angolo rispetto alla direzione di volo
+		NearPullMult = 1.15, -- aggancio vicinissimo
+		FarPullMult = 0.85, -- aggancio al limite della portata
+		AlignedPullBonus = 0.18, -- tirare nella direzione in cui si vola
+		OpposedPullPenalty = 0.3, -- tirare all'indietro rende meno: meglio oscillare
+
+		-- slancio cinetico: volare veloce rasente agli ostacoli accumula velocità
+		ProximityRadius = 16, -- entro questa distanza da muri/alberi/tetti
+		MomentumMinSpeed = 55,
+		MomentumGain = 0.9, -- slancio al secondo (0..1) quasi a contatto
+		MomentumDecay = 0.35,
+		MomentumSpeedBonus = 0.35, -- +35% di velocità massima a slancio pieno
+		MomentumThrust = 30,
+
+		-- convalida lato server (anti-trucchi): valori larghi per non punire chi ha lag
+		Validation = {
+			Enabled = true,
+			AnchorSlack = 18, -- studs oltre la portata del rampino
+			LatencyWindow = 0.3, -- secondi di movimento tollerati per la latenza
+			GasSlack = 2, -- il client può essere avanti di poco rispetto al server
+			SampleInterval = 0.25,
+			MinSpeedCap = 240, -- abilità come la Danza delle Lame arrivano a 220 studs/s
+			SpeedTolerance = 1.5,
+			DisplacementSlack = 30,
+			StrikesToCorrect = 2, -- campioni consecutivi sospetti prima di riportare indietro
+		},
 	},
 
 	Combat = {
@@ -74,6 +102,8 @@ local Config = {
 		BodyDamageShare = 0.2, -- i colpi fuori dalla nuca fanno solo il 20%
 		BrokenBladeMult = 0.1,
 		ReloadTime = 0.8,
+		SpearFuse = 1.4, -- secondi tra l'impatto della Lancia Dirompente e l'esplosione
+		ArmorBladeWear = 2, -- usura extra delle lame colpendo corazze o pelle indurita
 		KillShareMin = 0.1, -- per ricevere la ricompensa serve almeno il 10% del danno
 	},
 

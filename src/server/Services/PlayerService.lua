@@ -359,6 +359,9 @@ end
 -- SPOSTAMENTI -------------------------------------------------------------------------
 
 function PlayerService.Teleport(player: Player, position: Vector3)
+	if S.ODMService then
+		S.ODMService.Grace(player, 2)
+	end
 	pcall(function()
 		player:RequestStreamAroundAsync(position, 4)
 	end)
@@ -660,6 +663,9 @@ function PlayerService.Start()
 		if now - state.LastDodge >= Config.ODM.DodgeCooldown * 0.85 then
 			state.LastDodge = now
 			state.IFramesUntil = now + Config.ODM.DodgeIFrames + 0.1
+			if S.ODMService then
+				S.ODMService.Spend(player, S.ODMService.DodgeCost(player))
+			end
 		end
 	end)
 

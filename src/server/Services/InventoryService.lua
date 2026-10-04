@@ -116,6 +116,7 @@ local function useItem(player: Player, id: string): (boolean, string?)
 		end
 		S.PlayerService.Heal(player, def.Amount)
 	elseif effect == "RefillGas" then
+		S.ODMService.Refill(player)
 		Net.Event("Refilled"):FireClient(player, "Gas")
 	elseif effect == "RefillBlades" then
 		S.PlayerService.RefillWeapons(player)

@@ -54,6 +54,7 @@ Net.EventNames = {
 	"HitConfirm",
 	"TitanForm",
 	"Refilled",
+	"ODMCorrect",
 	-- in entrambe le direzioni
 	"ODM",
 }
