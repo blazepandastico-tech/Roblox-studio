@@ -134,12 +134,21 @@ local function decorate(character: Model, serum)
 		end
 	end
 	if MeshTitan.Has(serum.Look) then
-		local ok, applied = pcall(MeshTitan.SkinCharacter, character, serum.Look, folder)
-		if ok and applied then
+		local ok, skinned = pcall(MeshTitan.SkinCharacter, character, serum.Look, folder)
+		if ok and type(skinned) == "table" and #skinned > 0 then
 			folder:SetAttribute("MeshSkin", true)
+			-- nasconde SOLO le parti del corpo che hanno ricevuto il pezzo del modello
+			local hide = Instance.new("Folder")
+			hide.Name = "PartiNascoste"
+			for _, part in skinned do
+				local tag = Instance.new("ObjectValue")
+				tag.Value = part
+				tag.Parent = hide
+			end
+			hide.Parent = folder
 			return folder
 		end
-		warn("[ShifterService] Rivestimento 3D non riuscito: " .. tostring(applied))
+		warn("[ShifterService] Rivestimento 3D non riuscito: " .. tostring(skinned))
 		folder:ClearAllChildren()
 	end
 	local h = head.Size
@@ -336,11 +345,12 @@ function ShifterService.Transform(player: Player): (boolean, string?)
 	store.Scale = scale
 	d.Store = store
 	local form = decorate(character, serum)
-	if form:GetAttribute("MeshSkin") then
-		-- il corpo R15 resta (muove i pezzi del modello) ma diventa invisibile
+	local hidden = form:FindFirstChild("PartiNascoste")
+	if form:GetAttribute("MeshSkin") and hidden then
+		-- il corpo R15 resta (muove i pezzi del modello) ma le parti rivestite diventano invisibili
 		store.Transparency = {}
-		for _, name in BODY_PARTS do
-			local part = character:FindFirstChild(name)
+		for _, tag in hidden:GetChildren() do
+			local part = tag:IsA("ObjectValue") and tag.Value
 			if part and part:IsA("BasePart") then
 				store.Transparency[part] = part.Transparency
 				part.Transparency = 1

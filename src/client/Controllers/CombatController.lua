@@ -462,6 +462,34 @@ local function onTitanForm(data)
 	end
 	if data.On == true then
 		titanForm = true
+		task.delay(2, function()
+			local character = player.Character
+			local form = character and character:FindFirstChild("FormaGigante")
+			if not form or not form:GetAttribute("MeshSkin") then
+				return
+			end
+			local pieces, loaded = 0, 0
+			for _, d in form:GetChildren() do
+				if d:IsA("MeshPart") then
+					pieces += 1
+					local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+					if not root or (d.Position - root.Position).Magnitude < (data.Height or 30) * 2 then
+						loaded += 1
+					end
+				end
+			end
+			print(("[Giganti 3D] Sul tuo schermo: %d pezzi del modello, %d al posto giusto"):format(pieces, loaded))
+			if loaded < 12 then
+				warn("[Giganti 3D] Il modello non si vede: ti rendo di nuovo visibile. Mandami queste righe dell'Output.")
+				local hidden = form:FindFirstChild("PartiNascoste")
+				for _, tag in if hidden then hidden:GetChildren() else {} do
+					local part = tag:IsA("ObjectValue") and tag.Value
+					if part and part:IsA("BasePart") then
+						part.Transparency = 0
+					end
+				end
+			end
+		end)
 		C.CameraController.SetTitanForm(data.Height or 30)
 		C.ODMController.ReleaseAll(true)
 		if C.HUD then

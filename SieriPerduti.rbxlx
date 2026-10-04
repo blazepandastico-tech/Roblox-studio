@@ -425,14 +425,17 @@ local function motorOf(part: BasePart): Motor6D?
 	return nil
 end
 
--- Riveste un personaggio R15 (già ingrandito) con il modello 3D. Restituisce true se ci è riuscito.
-function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instance): boolean
+-- Riveste un personaggio R15 (già ingrandito) con il modello 3D.
+-- Restituisce l'elenco delle parti R15 rivestite (da nascondere): vuoto se non è riuscito.
+function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instance): { BasePart }
+	local skinned: { BasePart } = {}
 	local body = getBody(look)
 	if not body then
-		return false
+		return skinned
 	end
 	local J = body.Joints
 	local s = character:GetExtentsSize().Y
+	local problems = {}
 	for _, entry in SKIN do
 		local part = character:FindFirstChild(entry.R15) :: BasePart?
 		local motor = part and motorOf(part)
@@ -493,10 +496,26 @@ function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instanc
 			weldInstance.Part1 = piece
 			weldInstance.C0 = c0
 			weldInstance.Parent = piece
+			piece.Transparency = 0
 			piece.Parent = folder
+			table.insert(skinned, part)
+			if entry.Mesh == "Head" or entry.Mesh == "Torso" then
+				print(("[Giganti 3D] Pezzo %s: grandezza %.1f x %.1f x %.1f, distanza dalla parte del corpo %.1f"):format(entry.Mesh, piece.Size.X, piece.Size.Y, piece.Size.Z, (piece.Position - part.Position).Magnitude))
+			end
+		else
+			table.insert(problems, ("%s (parte:%s giuntura:%s pezzo:%s punto:%s)"):format(entry.R15, tostring(part ~= nil), tostring(motor ~= nil), tostring(info ~= nil), tostring(J[entry.Prox] ~= nil)))
 		end
 	end
-	return true
+	print(("[Giganti 3D] Rivestimento '%s': %d pezzi su %d, altezza del gigante %.1f"):format(look, #skinned, #SKIN, s))
+	if #problems > 0 then
+		warn("[Giganti 3D] Parti non rivestite: " .. table.concat(problems, ", "))
+	end
+	-- troppo pochi pezzi: meglio l'aspetto di riserva che un gigante a metà
+	if #skinned < 12 then
+		folder:ClearAllChildren()
+		return {}
+	end
+	return skinned
 end
 
 -- Sul server: se il modello importato è rimasto nel Workspace, lo sposta nella cartella giusta
@@ -15032,12 +15051,21 @@ local function decorate(character: Model, serum)
 		end
 	end
 	if MeshTitan.Has(serum.Look) then
-		local ok, applied = pcall(MeshTitan.SkinCharacter, character, serum.Look, folder)
-		if ok and applied then
+		local ok, skinned = pcall(MeshTitan.SkinCharacter, character, serum.Look, folder)
+		if ok and type(skinned) == "table" and #skinned > 0 then
 			folder:SetAttribute("MeshSkin", true)
+			-- nasconde SOLO le parti del corpo che hanno ricevuto il pezzo del modello
+			local hide = Instance.new("Folder")
+			hide.Name = "PartiNascoste"
+			for _, part in skinned do
+				local tag = Instance.new("ObjectValue")
+				tag.Value = part
+				tag.Parent = hide
+			end
+			hide.Parent = folder
 			return folder
 		end
-		warn("[ShifterService] Rivestimento 3D non riuscito: " .. tostring(applied))
+		warn("[ShifterService] Rivestimento 3D non riuscito: " .. tostring(skinned))
 		folder:ClearAllChildren()
 	end
 	local h = head.Size
@@ -15234,11 +15262,12 @@ function ShifterService.Transform(player: Player): (boolean, string?)
 	store.Scale = scale
 	d.Store = store
 	local form = decorate(character, serum)
-	if form:GetAttribute("MeshSkin") then
-		-- il corpo R15 resta (muove i pezzi del modello) ma diventa invisibile
+	local hidden = form:FindFirstChild("PartiNascoste")
+	if form:GetAttribute("MeshSkin") and hidden then
+		-- il corpo R15 resta (muove i pezzi del modello) ma le parti rivestite diventano invisibili
 		store.Transparency = {}
-		for _, name in BODY_PARTS do
-			local part = character:FindFirstChild(name)
+		for _, tag in hidden:GetChildren() do
+			local part = tag:IsA("ObjectValue") and tag.Value
 			if part and part:IsA("BasePart") then
 				store.Transparency[part] = part.Transparency
 				part.Transparency = 1
@@ -21448,6 +21477,34 @@ local function onTitanForm(data)
 	end
 	if data.On == true then
 		titanForm = true
+		task.delay(2, function()
+			local character = player.Character
+			local form = character and character:FindFirstChild("FormaGigante")
+			if not form or not form:GetAttribute("MeshSkin") then
+				return
+			end
+			local pieces, loaded = 0, 0
+			for _, d in form:GetChildren() do
+				if d:IsA("MeshPart") then
+					pieces += 1
+					local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+					if not root or (d.Position - root.Position).Magnitude < (data.Height or 30) * 2 then
+						loaded += 1
+					end
+				end
+			end
+			print(("[Giganti 3D] Sul tuo schermo: %d pezzi del modello, %d al posto giusto"):format(pieces, loaded))
+			if loaded < 12 then
+				warn("[Giganti 3D] Il modello non si vede: ti rendo di nuovo visibile. Mandami queste righe dell'Output.")
+				local hidden = form:FindFirstChild("PartiNascoste")
+				for _, tag in if hidden then hidden:GetChildren() else {} do
+					local part = tag:IsA("ObjectValue") and tag.Value
+					if part and part:IsA("BasePart") then
+						part.Transparency = 0
+					end
+				end
+			end
+		end)
 		C.CameraController.SetTitanForm(data.Height or 30)
 		C.ODMController.ReleaseAll(true)
 		if C.HUD then

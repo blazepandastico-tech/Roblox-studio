@@ -373,14 +373,17 @@ local function motorOf(part: BasePart): Motor6D?
 	return nil
 end
 
--- Riveste un personaggio R15 (già ingrandito) con il modello 3D. Restituisce true se ci è riuscito.
-function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instance): boolean
+-- Riveste un personaggio R15 (già ingrandito) con il modello 3D.
+-- Restituisce l'elenco delle parti R15 rivestite (da nascondere): vuoto se non è riuscito.
+function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instance): { BasePart }
+	local skinned: { BasePart } = {}
 	local body = getBody(look)
 	if not body then
-		return false
+		return skinned
 	end
 	local J = body.Joints
 	local s = character:GetExtentsSize().Y
+	local problems = {}
 	for _, entry in SKIN do
 		local part = character:FindFirstChild(entry.R15) :: BasePart?
 		local motor = part and motorOf(part)
@@ -441,10 +444,26 @@ function MeshTitan.SkinCharacter(character: Model, look: string, folder: Instanc
 			weldInstance.Part1 = piece
 			weldInstance.C0 = c0
 			weldInstance.Parent = piece
+			piece.Transparency = 0
 			piece.Parent = folder
+			table.insert(skinned, part)
+			if entry.Mesh == "Head" or entry.Mesh == "Torso" then
+				print(("[Giganti 3D] Pezzo %s: grandezza %.1f x %.1f x %.1f, distanza dalla parte del corpo %.1f"):format(entry.Mesh, piece.Size.X, piece.Size.Y, piece.Size.Z, (piece.Position - part.Position).Magnitude))
+			end
+		else
+			table.insert(problems, ("%s (parte:%s giuntura:%s pezzo:%s punto:%s)"):format(entry.R15, tostring(part ~= nil), tostring(motor ~= nil), tostring(info ~= nil), tostring(J[entry.Prox] ~= nil)))
 		end
 	end
-	return true
+	print(("[Giganti 3D] Rivestimento '%s': %d pezzi su %d, altezza del gigante %.1f"):format(look, #skinned, #SKIN, s))
+	if #problems > 0 then
+		warn("[Giganti 3D] Parti non rivestite: " .. table.concat(problems, ", "))
+	end
+	-- troppo pochi pezzi: meglio l'aspetto di riserva che un gigante a metà
+	if #skinned < 12 then
+		folder:ClearAllChildren()
+		return {}
+	end
+	return skinned
 end
 
 -- Sul server: se il modello importato è rimasto nel Workspace, lo sposta nella cartella giusta
