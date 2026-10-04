@@ -15,9 +15,9 @@ local Serums = {}
 
 -- Ordine di rarità (dal più comune al più raro)
 Serums.Order = {
+	"SieroFuria", -- il primo siero: Gigante della Furia (modello 3D, vedi MeshTitan)
 	"SieroZanna",
 	"SieroDestriero",
-	"SieroFuria",
 	"SieroBastione",
 	"SieroCacciatrice",
 	"SieroFauno",
@@ -88,8 +88,8 @@ Serums.List = {
 		Id = "SieroFuria",
 		Name = "Siero del Gigante della Furia",
 		TitanName = "Gigante della Furia",
-		Rarity = "Leggendario",
-		LevelReq = 350,
+		Rarity = "Epico",
+		LevelReq = 280,
 		Look = "Furia",
 		Height = 48,
 		Health = 2.6,
@@ -98,16 +98,16 @@ Serums.List = {
 		Energy = 90,
 		SkinColor = Color3.fromRGB(196, 140, 110),
 		HairColor = Color3.fromRGB(30, 24, 20),
-		Price = 8000000,
+		Price = 2500000,
 		DealerChance = 0.12,
 		WorldWeight = 60,
-		Fragments = 500,
-		CraftGold = 4000000,
+		Fragments = 200,
+		CraftGold = 1200000,
 		Passive = "Volontà indomabile: più sei ferito, più colpisci forte.",
 		Description = "Il gigante che ha sempre combattuto per la libertà.",
 		Skills = {
-			Z = { Name = "Pugno Indurito", Kind = "Punch", Mastery = 0, Cooldown = 4, Energy = 3, Damage = 2.5, Radius = 0.45, Description = "Un pugno ricoperto di cristallo." },
-			X = { Name = "Calcio Rotante", Kind = "Kick", Mastery = 60, Cooldown = 9, Energy = 5, Damage = 2.4, Radius = 0.8, Description = "Un calcio circolare che spazza via i giganti." },
+			Z = { Name = "Pugno Indurito", Kind = "Punch", Mastery = 0, Cooldown = 4, Energy = 3, Damage = 2.8, Radius = 0.55, HitDelay = 0.42, Description = "Carica il pugno, lo ricopre di cristallo e colpisce con un affondo devastante." },
+			X = { Name = "Calcio Rotante", Kind = "Kick", Mastery = 60, Cooldown = 9, Energy = 5, Damage = 2.4, Radius = 0.9, HitDelay = 0.3, AroundSelf = true, Description = "Un giro completo con la gamba tesa: colpisce tutti i giganti intorno." },
 			C = { Name = "Ruggito della Furia", Kind = "Roar", Mastery = 150, Cooldown = 20, Energy = 7, Damage = 1.2, Radius = 2.4, Duration = 3, Description = "Stordisce tutti i nemici vicini." },
 			V = { Name = "Visione del Futuro", Kind = "FutureSight", Mastery = 300, Cooldown = 60, Energy = 15, Duration = 6, Amount = 0.8, Description = "6 secondi di invulnerabilità e +80% danni." },
 		},

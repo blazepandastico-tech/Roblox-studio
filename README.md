@@ -132,7 +132,10 @@ Tutti i passi per pubblicare e far crescere il gioco sono in [`docs/LANCIO.md`](
 ## 6c. Il Gigante della Furia con modello 3D (es. da Meshy)
 
 Il **Gigante della Furia** (il gigante di Tobias) usa un modello 3D vero: come boss della Fortezza di Vael,
-nei filmati della storia e quando un giocatore usa il **Siero della Furia** (Pannello Admin → Sieri).
+nei filmati della storia e quando un giocatore usa il **Siero della Furia**, che è il **primo siero**
+(Pannello Admin → Sieri). In forma di gigante cammina e corre con passi pesanti e ha mosse dedicate:
+clic sinistro = ganci destro/sinistro, **Z** Pugno Indurito (pugno di cristallo), **X** Calcio Rotante
+(colpisce tutto intorno), **C** Ruggito della Furia (stordisce), **V** Visione del Futuro (invulnerabile + danni).
 Il file pronto da importare è `assets/modelli/GiganteFuria.glb`: è già diviso in 15 parti del corpo,
 con i punti delle articolazioni e le texture incluse.
 

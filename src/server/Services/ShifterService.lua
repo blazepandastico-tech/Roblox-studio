@@ -542,9 +542,12 @@ local function useSkill(player: Player, key: string, aim: Vector3?)
 	local hits = 0
 
 	if kind == "Punch" or kind == "Bite" or kind == "Kick" then
-		local center = root.Position + flatLook * radius * 0.9
-		task.delay(0.22, function()
-			if state.Transformed then
+		task.delay(skill.HitDelay or 0.22, function()
+			local r = Util.GetRoot(player.Character)
+			if state.Transformed and r then
+				-- il colpo parte da dove si trova il gigante al momento dell'impatto
+				local look2 = Util.SafeUnit(Util.Flat(r.CFrame.LookVector), flatLook)
+				local center = if skill.AroundSelf then r.Position else r.Position + look2 * radius * 0.9
 				local n = hitArea(player, center, radius, damage)
 				if n > 0 then
 					addMastery(player, serum, 1)

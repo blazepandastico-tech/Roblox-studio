@@ -33,11 +33,26 @@ function Animator.new(model: Model, absolute: boolean?)
 	self.Clips = {} -- clip attive
 	self.Time = 0
 	self.PositionScale = 1
+	-- scala del modello (Model:ScaleTo, es. la forma di gigante del giocatore): le pose di riposo
+	-- delle giunture sono salvate a scala 1 e ingrandite qui, altrimenti il corpo si "accartoccia"
+	self.BaseScale = 1
 	self.Context = {}
 	self.Result = {} :: Pose
 	self.Paused = 0
 	self:Refresh()
 	return self
+end
+
+local function modelScale(model: Instance): number
+	if model:IsA("Model") then
+		local ok, scale = pcall(function()
+			return model:GetScale()
+		end)
+		if ok and type(scale) == "number" and scale > 0 then
+			return scale
+		end
+	end
+	return 1
 end
 
 function Animator:Refresh()
@@ -46,7 +61,9 @@ function Animator:Refresh()
 		if d:IsA("Motor6D") and self.Motors[d.Name] == nil then
 			self.Motors[d.Name] = d
 			if self.BaseC0[d] == nil then
-				self.BaseC0[d] = d.C0
+				-- posa di riposo salvata come se il modello fosse a scala 1
+				local scale = modelScale(self.Model)
+				self.BaseC0[d] = CFrame.new(d.C0.Position / scale) * d.C0.Rotation
 			end
 		end
 	end
@@ -307,11 +324,17 @@ end
 
 function Animator:Apply()
 	local result = self.Result
+	local scale = modelScale(self.Model)
+	self.BaseScale = scale
 	for name, motor in self.Motors do
 		local base = self.BaseC0[motor]
 		if base == nil then
-			base = motor.C0
+			-- salvata come se il modello fosse a scala 1
+			base = CFrame.new(motor.C0.Position / scale) * motor.C0.Rotation
 			self.BaseC0[motor] = base
+		end
+		if scale ~= 1 then
+			base = CFrame.new(base.Position * scale) * base.Rotation
 		end
 		local offset = result[name]
 		local target = if offset then base * offset else base
@@ -329,9 +352,10 @@ end
 function Animator:Destroy()
 	table.clear(self.Clips)
 	table.clear(self.Layers)
+	local scale = modelScale(self.Model)
 	for motor, base in self.BaseC0 do
 		if motor.Parent then
-			motor.C0 = base
+			motor.C0 = CFrame.new(base.Position * scale) * base.Rotation
 		end
 	end
 	table.clear(self.BaseC0)

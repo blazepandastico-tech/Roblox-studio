@@ -619,6 +619,145 @@ function EffectsController.SerumObtained(character: Model?, color: Color3?)
 end
 
 -- Effetti delle abilità in forma di gigante
+-- MOSSE DEL GIGANTE DELLA FURIA ---------------------------------------------------------------------
+local FURIA_GREEN = Color3.fromRGB(120, 255, 170)
+local CRYSTAL = Color3.fromRGB(170, 230, 255)
+
+local function handPosition(character: Model, side: string): Vector3?
+	local hand = character:FindFirstChild(side .. "Hand") :: BasePart?
+	return hand and hand.Position
+end
+
+-- pugno di cristallo che brilla per un attimo sulla mano
+local function crystalFist(character: Model, side: string, size: number, duration: number)
+	local hand = character:FindFirstChild(side .. "Hand") :: BasePart?
+	if not hand then
+		return
+	end
+	local glow = Instance.new("Part")
+	glow.Name = "PugnoCristallo"
+	glow.Shape = Enum.PartType.Ball
+	glow.Size = Vector3.one * size
+	glow.Material = Enum.Material.Glass
+	glow.Color = CRYSTAL
+	glow.Transparency = 0.25
+	glow.CanCollide = false
+	glow.CanQuery = false
+	glow.CanTouch = false
+	glow.Massless = true
+	glow.CastShadow = false
+	glow.CFrame = hand.CFrame
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = hand
+	weld.Part1 = glow
+	weld.Parent = glow
+	local light = Instance.new("PointLight")
+	light.Color = CRYSTAL
+	light.Range = size * 4
+	light.Brightness = 3
+	light.Parent = glow
+	glow.Parent = workspace
+	TweenService:Create(glow, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Transparency = 1 }):Play()
+	Debris:AddItem(glow, duration + 0.1)
+end
+
+local LOOK_MOVES = {
+	Furia = {
+		M1 = {
+			Clip = { "FuriaHookR", "FuriaHookL" },
+			Fx = function(character, _root, radius, height)
+				task.delay(0.24, function()
+					local r = Util.GetRoot(character)
+					if r then
+						local center = r.Position + r.CFrame.LookVector * radius * 0.9
+						EffectsController.Shockwave(center, radius * 0.8, Color3.fromRGB(255, 240, 210), 0.3, 1)
+						EffectsController.ShakeAt(center, 0.4, height * 6, 0.2)
+					end
+				end)
+			end,
+		},
+		Z = {
+			Clip = "FuriaHardPunch",
+			Fx = function(character, _root, radius, height)
+				crystalFist(character, "Right", height * 0.09, 1.1)
+				task.delay(0.42, function()
+					local r = Util.GetRoot(character)
+					local fist = handPosition(character, "Right")
+					if r then
+						local center = fist or (r.Position + r.CFrame.LookVector * radius)
+						EffectsController.Shockwave(center, radius * 1.4, CRYSTAL, 0.5, 2)
+						EffectsController.DebrisBurst(center, 12, math.max(2, height * 0.04), nil, nil, 80)
+						EffectsController.Flash(Color3.fromRGB(220, 245, 255), 0.25, 0.25)
+						EffectsController.ShakeAt(center, 1, height * 10, 0.45)
+						if C.SoundController then
+							C.SoundController.Play("Explosion", center, { Range = 1200, Volume = 0.8, Pitch = 0.7 })
+						end
+					end
+				end)
+			end,
+		},
+		X = {
+			Clip = "FuriaSpinKick",
+			Fx = function(character, _root, radius, height)
+				for i = 0, 2 do
+					task.delay(0.15 + i * 0.12, function()
+						local r = Util.GetRoot(character)
+						if r then
+							EffectsController.Shockwave(r.Position - Vector3.new(0, height * 0.2, 0), radius * (0.7 + i * 0.25), Color3.fromRGB(255, 235, 200), 0.4, 1)
+						end
+					end)
+				end
+				task.delay(0.3, function()
+					local r = Util.GetRoot(character)
+					if r then
+						local feet = r.Position - Vector3.new(0, height * 0.45, 0)
+						EffectsController.Steam(feet, radius * 0.6, 14, 2, Color3.fromRGB(170, 150, 120))
+						EffectsController.DebrisBurst(feet, 10, math.max(2, height * 0.04), nil, nil, 70)
+						EffectsController.ShakeAt(feet, 0.8, height * 8, 0.4)
+					end
+				end)
+			end,
+		},
+		C = {
+			Clip = "FuriaRoar",
+			Fx = function(character, _root, radius, height)
+				task.delay(0.45, function()
+					local r = Util.GetRoot(character)
+					if not r then
+						return
+					end
+					for i = 0, 3 do
+						task.delay(i * 0.2, function()
+							EffectsController.Shockwave(r.Position, radius * (0.5 + i * 0.3), Color3.fromRGB(255, 255, 255), 0.8, 1)
+						end)
+					end
+					EffectsController.Steam(r.Position + Vector3.new(0, height * 0.3, 0), height * 0.5, 24, 3)
+					EffectsController.ShakeAt(r.Position, 1, height * 15, 1)
+					if C.SoundController then
+						C.SoundController.Play("Roar", r.Position, { Range = 1600, Volume = 1, Pitch = 0.8 })
+					end
+				end)
+			end,
+		},
+		V = {
+			Clip = "FuriaFocus",
+			Fx = function(character, _root, radius, height)
+				task.delay(0.6, function()
+					local r = Util.GetRoot(character)
+					if r then
+						EffectsController.HighlightModel(character, FURIA_GREEN, 6, 0.55)
+						EffectsController.Shockwave(r.Position, radius * 1.5, FURIA_GREEN, 0.7, 2)
+						EffectsController.Lightning(r.Position + Vector3.new(0, 700, 0), r.Position + Vector3.new(0, height * 0.5, 0), FURIA_GREEN, 3)
+						if C.SoundController then
+							C.SoundController.Play("Thunder", r.Position, { Range = 1500, Volume = 0.7 })
+						end
+					end
+				end)
+			end,
+		},
+	},
+}
+
 function EffectsController.TitanSkill(params)
 	local character = params.Character
 	local kind = params.Kind
@@ -646,6 +785,25 @@ function EffectsController.TitanSkill(params)
 		Harden = "TitanRoarSmall",
 		Crystal = "TitanRoarSmall",
 	}
+	-- mosse dedicate di un gigante (animazioni ed effetti propri)
+	local special = LOOK_MOVES[params.Look or ""]
+	local move = special and special[params.Key or ""]
+	if move and character then
+		local clipName = move.Clip
+		if type(clipName) == "table" then
+			-- combo: alterna i colpi (es. gancio destro e sinistro)
+			local n = (character:GetAttribute("ComboFuria") or 0) + 1
+			character:SetAttribute("ComboFuria", n)
+			clipName = clipName[(n - 1) % #clipName + 1]
+		end
+		if C.AnimationController then
+			C.AnimationController.Play(character, clipName, 1)
+		end
+		if root and move.Fx then
+			move.Fx(character, root, radius, height, params)
+		end
+		return
+	end
 	if character and C.AnimationController and clipByKind[kind] then
 		C.AnimationController.Play(character, clipByKind[kind], 1)
 	end

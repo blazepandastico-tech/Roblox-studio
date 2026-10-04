@@ -107,6 +107,8 @@ local function register(model: Model, kind: string)
 		animator.Context.Phase = 0
 		animator.Context.Air = 0
 		animator:SetLayer("Fly", Poses.Human.ODMFly, 0, 2, 5)
+		-- forma di gigante (siero): camminata e corsa pesanti da gigante
+		animator:SetLayer("TitanLoco", Poses.Titan.Locomotion, 0, 1, 4)
 		animator:SetLayer("Hang", Poses.Human.Hang, 0, 3, 6)
 		animator:SetLayer("Struggle", Poses.Human.Struggle, 0, 4, 8)
 		animator:SetLayer("Cloak", Poses.Human.Cloak, 1, 5, 6)
@@ -338,6 +340,30 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
 		ctx.Phase = (ctx.Phase or 0) + dt * flat * (0.95 - 0.12 * runK) * dir
 		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
+		-- forma di gigante: passo lento e pesante, la terra trema a ogni passo
+		rig.Animator:SetLayerWeight("TitanLoco", if transformed then 1 else 0)
+		if transformed then
+			local H = (owner and owner:GetAttribute("TitanHeight")) or 30
+			rig.Animator.PositionScale = H
+			ctx.Move = (ctx.Move or 0) + (math.clamp(flat / 6, 0, 1) - (ctx.Move or 0)) * math.min(1, dt * 5)
+			ctx.Run = (ctx.Run or 0) + (math.clamp((flat - 16) / 14, 0, 1) - (ctx.Run or 0)) * math.min(1, dt * 3)
+			local stride = math.max(2, H * 0.45)
+			local before = ctx.TitanPhase or 0
+			ctx.TitanPhase = before + dt * flat / stride * math.pi
+			ctx.Phase = ctx.TitanPhase
+			if ctx.Move > 0.3 and math.floor(before / math.pi) ~= math.floor(ctx.TitanPhase / math.pi) and C then
+				local foot = root.Position - Vector3.new(0, H * 0.48, 0)
+				if C.EffectsController then
+					C.EffectsController.Steam(foot, H * 0.08, 5, 1.2, Color3.fromRGB(170, 150, 120))
+					C.EffectsController.ShakeAt(foot, math.clamp(H / 140, 0.1, 0.5), H * 5, 0.2)
+				end
+				if C.SoundController then
+					C.SoundController.Play("Step", foot, { Range = H * 8, Volume = 1, Pitch = math.clamp(1.1 - H / 120, 0.3, 1) })
+				end
+			end
+		else
+			rig.Animator.PositionScale = 1
+		end
 	elseif rig.Kind == "NPC" then
 		if localRoot then
 			local offset = root.CFrame:PointToObjectSpace(localRoot.Position)

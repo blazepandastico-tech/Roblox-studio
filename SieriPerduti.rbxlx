@@ -1163,6 +1163,58 @@ addHuman(clip("TitanSlamSmall", {
 	K(0.8, { Waist = A(-10, 0, 0) }, "QuadOut"),
 }, { Priority = 3 }))
 
+-- MOSSE DEL GIGANTE DELLA FURIA (forma di gigante del giocatore) ------------------------------
+-- Gancio destro e sinistro (attacco base, si alternano)
+addHuman(clip("FuriaHookR", {
+	K(0, {}),
+	K(0.12, { RightShoulder = A(30, 0, 45), RightElbow = A(100, 0, 0), Waist = A(-5, -30, 0), LeftShoulder = A(45, 0, -25), LeftElbow = A(100, 0, 0) }, "QuadOut"),
+	K(0.24, { RightShoulder = A(90, 0, -15), RightElbow = A(15, 0, 0), Waist = A(-12, 35, 0), Root = A(-6, 10, 0), LeftShoulder = A(40, 0, -20), LeftElbow = A(95, 0, 0), RightHip = A(-10, 0, 0), LeftHip = A(25, 0, 0), LeftKnee = A(-30, 0, 0) }, "ExpoOut"),
+	K(0.55, { RightShoulder = A(35, 0, 10), RightElbow = A(40, 0, 0), LeftShoulder = A(35, 0, -10), LeftElbow = A(60, 0, 0), Waist = A(-5, 5, 0) }, "QuadOut"),
+}, { Priority = 3, FadeOut = 0.2 }))
+addHuman(clip("FuriaHookL", {
+	K(0, {}),
+	K(0.12, { LeftShoulder = A(30, 0, -45), LeftElbow = A(100, 0, 0), Waist = A(-5, 30, 0), RightShoulder = A(45, 0, 25), RightElbow = A(100, 0, 0) }, "QuadOut"),
+	K(0.24, { LeftShoulder = A(90, 0, 15), LeftElbow = A(15, 0, 0), Waist = A(-12, -35, 0), Root = A(-6, -10, 0), RightShoulder = A(40, 0, 20), RightElbow = A(95, 0, 0), LeftHip = A(-10, 0, 0), RightHip = A(25, 0, 0), RightKnee = A(-30, 0, 0) }, "ExpoOut"),
+	K(0.55, { LeftShoulder = A(35, 0, -10), LeftElbow = A(40, 0, 0), RightShoulder = A(35, 0, 10), RightElbow = A(60, 0, 0), Waist = A(-5, -5, 0) }, "QuadOut"),
+}, { Priority = 3, FadeOut = 0.2 }))
+
+-- Z - Pugno Indurito: lunga carica all'indietro, poi un diretto devastante con affondo
+addHuman(clip("FuriaHardPunch", {
+	K(0, {}),
+	K(0.3, { RightShoulder = A(-30, 0, 30), RightElbow = A(115, 0, 0), RightWrist = A(-20, 0, 0), Waist = A(5, -45, 0), Root = A(5, -20, 0), LeftShoulder = A(60, 0, -30), LeftElbow = A(40, 0, 0), RightHip = A(-15, 0, 0), LeftHip = A(35, 0, 0), LeftKnee = A(-45, 0, 0), RightKnee = A(-25, 0, 0) }, "QuadOut"),
+	K(0.42, { RightShoulder = A(95, 0, 0), RightElbow = A(0, 0, 0), RightWrist = A(0, 0, 0), Waist = A(-18, 40, 0), Root = A(-20, 15, 0), LeftShoulder = A(-20, 0, -40), LeftElbow = A(60, 0, 0), RightHip = A(-30, 0, 0), LeftHip = A(50, 0, 0), LeftKnee = A(-60, 0, 0), RightKnee = A(-10, 0, 0) }, "ExpoOut"),
+	K(0.65, { RightShoulder = A(90, 0, 0), RightElbow = A(5, 0, 0), Waist = A(-15, 35, 0), Root = A(-16, 12, 0), LeftHip = A(45, 0, 0), LeftKnee = A(-55, 0, 0) }, "Linear"),
+	K(1.0, { RightShoulder = A(30, 0, 10), RightElbow = A(40, 0, 0), Waist = A(-5, 5, 0) }, "QuadOut"),
+}, { Priority = 4, FadeOut = 0.25 }))
+
+-- X - Calcio Rotante: giro completo su se stesso con la gamba tesa
+addHuman(clip("FuriaSpinKick", spinKeys(0.6, 1, "Y", "Root", {
+	RightHip = A(80, 0, 45),
+	RightKnee = A(-5, 0, 0),
+	LeftKnee = A(-25, 0, 0),
+	LeftHip = A(10, 0, 0),
+	RightShoulder = A(25, 0, 70),
+	LeftShoulder = A(25, 0, -70),
+	Waist = A(5, 0, 0),
+}, 4), { Priority = 4, FadeIn = 0.04, FadeOut = 0.2 }))
+
+-- C - Ruggito della Furia: si raccoglie, poi spalanca braccia e petto e urla al cielo
+addHuman(clip("FuriaRoar", {
+	K(0, {}),
+	K(0.25, { Waist = A(-25, 0, 0), Neck = A(-20, 0, 0), RightShoulder = A(-20, 0, 20), LeftShoulder = A(-20, 0, -20), RightElbow = A(90, 0, 0), LeftElbow = A(90, 0, 0), RightKnee = A(-35, 0, 0), LeftKnee = A(-35, 0, 0), RightHip = A(25, 0, 0), LeftHip = A(25, 0, 0) }, "QuadOut"),
+	K(0.45, { Waist = A(18, 0, 0), Neck = A(35, 0, 0), RightShoulder = A(35, 0, 95), LeftShoulder = A(35, 0, -95), RightElbow = A(25, 0, 0), LeftElbow = A(25, 0, 0), RightWrist = A(-30, 0, 0), LeftWrist = A(-30, 0, 0) }, "ExpoOut"),
+	K(1.4, { Waist = A(15, 0, 0), Neck = A(32, 0, 0), RightShoulder = A(35, 0, 90), LeftShoulder = A(35, 0, -90), RightElbow = A(30, 0, 0), LeftElbow = A(30, 0, 0) }, "Linear"),
+	K(1.8, {}, "QuadOut"),
+}, { Priority = 4, FadeOut = 0.3 }))
+
+-- V - Visione del Futuro: mani al volto, poi si apre e gli occhi si accendono
+addHuman(clip("FuriaFocus", {
+	K(0, {}),
+	K(0.3, { RightShoulder = A(120, 0, -20), RightElbow = A(110, 0, 0), LeftShoulder = A(120, 0, 20), LeftElbow = A(110, 0, 0), Neck = A(-15, 0, 0), Waist = A(-10, 0, 0) }, "QuadOut"),
+	K(0.7, { RightShoulder = A(10, 0, 60), LeftShoulder = A(10, 0, -60), RightElbow = A(20, 0, 0), LeftElbow = A(20, 0, 0), Neck = A(20, 0, 0), Waist = A(10, 0, 0) }, "ExpoOut"),
+	K(1.1, {}, "QuadOut"),
+}, { Priority = 4, FadeOut = 0.25 }))
+
 -- =====================================================================================
 -- GIGANTI (Absolute: la posa è il Transform completo)
 -- =====================================================================================
@@ -1441,11 +1493,26 @@ function Animator.new(model: Model, absolute: boolean?)
 	self.Clips = {} -- clip attive
 	self.Time = 0
 	self.PositionScale = 1
+	-- scala del modello (Model:ScaleTo, es. la forma di gigante del giocatore): le pose di riposo
+	-- delle giunture sono salvate a scala 1 e ingrandite qui, altrimenti il corpo si "accartoccia"
+	self.BaseScale = 1
 	self.Context = {}
 	self.Result = {} :: Pose
 	self.Paused = 0
 	self:Refresh()
 	return self
+end
+
+local function modelScale(model: Instance): number
+	if model:IsA("Model") then
+		local ok, scale = pcall(function()
+			return model:GetScale()
+		end)
+		if ok and type(scale) == "number" and scale > 0 then
+			return scale
+		end
+	end
+	return 1
 end
 
 function Animator:Refresh()
@@ -1454,7 +1521,9 @@ function Animator:Refresh()
 		if d:IsA("Motor6D") and self.Motors[d.Name] == nil then
 			self.Motors[d.Name] = d
 			if self.BaseC0[d] == nil then
-				self.BaseC0[d] = d.C0
+				-- posa di riposo salvata come se il modello fosse a scala 1
+				local scale = modelScale(self.Model)
+				self.BaseC0[d] = CFrame.new(d.C0.Position / scale) * d.C0.Rotation
 			end
 		end
 	end
@@ -1715,11 +1784,17 @@ end
 
 function Animator:Apply()
 	local result = self.Result
+	local scale = modelScale(self.Model)
+	self.BaseScale = scale
 	for name, motor in self.Motors do
 		local base = self.BaseC0[motor]
 		if base == nil then
-			base = motor.C0
+			-- salvata come se il modello fosse a scala 1
+			base = CFrame.new(motor.C0.Position / scale) * motor.C0.Rotation
 			self.BaseC0[motor] = base
+		end
+		if scale ~= 1 then
+			base = CFrame.new(base.Position * scale) * base.Rotation
 		end
 		local offset = result[name]
 		local target = if offset then base * offset else base
@@ -1737,9 +1812,10 @@ end
 function Animator:Destroy()
 	table.clear(self.Clips)
 	table.clear(self.Layers)
+	local scale = modelScale(self.Model)
 	for motor, base in self.BaseC0 do
 		if motor.Parent then
-			motor.C0 = base
+			motor.C0 = CFrame.new(base.Position * scale) * base.Rotation
 		end
 	end
 	table.clear(self.BaseC0)
@@ -4881,9 +4957,9 @@ local Serums = {}
 
 -- Ordine di rarità (dal più comune al più raro)
 Serums.Order = {
+	"SieroFuria", -- il primo siero: Gigante della Furia (modello 3D, vedi MeshTitan)
 	"SieroZanna",
 	"SieroDestriero",
-	"SieroFuria",
 	"SieroBastione",
 	"SieroCacciatrice",
 	"SieroFauno",
@@ -4954,8 +5030,8 @@ Serums.List = {
 		Id = "SieroFuria",
 		Name = "Siero del Gigante della Furia",
 		TitanName = "Gigante della Furia",
-		Rarity = "Leggendario",
-		LevelReq = 350,
+		Rarity = "Epico",
+		LevelReq = 280,
 		Look = "Furia",
 		Height = 48,
 		Health = 2.6,
@@ -4964,16 +5040,16 @@ Serums.List = {
 		Energy = 90,
 		SkinColor = Color3.fromRGB(196, 140, 110),
 		HairColor = Color3.fromRGB(30, 24, 20),
-		Price = 8000000,
+		Price = 2500000,
 		DealerChance = 0.12,
 		WorldWeight = 60,
-		Fragments = 500,
-		CraftGold = 4000000,
+		Fragments = 200,
+		CraftGold = 1200000,
 		Passive = "Volontà indomabile: più sei ferito, più colpisci forte.",
 		Description = "Il gigante che ha sempre combattuto per la libertà.",
 		Skills = {
-			Z = { Name = "Pugno Indurito", Kind = "Punch", Mastery = 0, Cooldown = 4, Energy = 3, Damage = 2.5, Radius = 0.45, Description = "Un pugno ricoperto di cristallo." },
-			X = { Name = "Calcio Rotante", Kind = "Kick", Mastery = 60, Cooldown = 9, Energy = 5, Damage = 2.4, Radius = 0.8, Description = "Un calcio circolare che spazza via i giganti." },
+			Z = { Name = "Pugno Indurito", Kind = "Punch", Mastery = 0, Cooldown = 4, Energy = 3, Damage = 2.8, Radius = 0.55, HitDelay = 0.42, Description = "Carica il pugno, lo ricopre di cristallo e colpisce con un affondo devastante." },
+			X = { Name = "Calcio Rotante", Kind = "Kick", Mastery = 60, Cooldown = 9, Energy = 5, Damage = 2.4, Radius = 0.9, HitDelay = 0.3, AroundSelf = true, Description = "Un giro completo con la gamba tesa: colpisce tutti i giganti intorno." },
 			C = { Name = "Ruggito della Furia", Kind = "Roar", Mastery = 150, Cooldown = 20, Energy = 7, Damage = 1.2, Radius = 2.4, Duration = 3, Description = "Stordisce tutti i nemici vicini." },
 			V = { Name = "Visione del Futuro", Kind = "FutureSight", Mastery = 300, Cooldown = 60, Energy = 15, Duration = 6, Amount = 0.8, Description = "6 secondi di invulnerabilità e +80% danni." },
 		},
@@ -15364,9 +15440,12 @@ local function useSkill(player: Player, key: string, aim: Vector3?)
 	local hits = 0
 
 	if kind == "Punch" or kind == "Bite" or kind == "Kick" then
-		local center = root.Position + flatLook * radius * 0.9
-		task.delay(0.22, function()
-			if state.Transformed then
+		task.delay(skill.HitDelay or 0.22, function()
+			local r = Util.GetRoot(player.Character)
+			if state.Transformed and r then
+				-- il colpo parte da dove si trova il gigante al momento dell'impatto
+				local look2 = Util.SafeUnit(Util.Flat(r.CFrame.LookVector), flatLook)
+				local center = if skill.AroundSelf then r.Position else r.Position + look2 * radius * 0.9
 				local n = hitArea(player, center, radius, damage)
 				if n > 0 then
 					addMastery(player, serum, 1)
@@ -20089,6 +20168,8 @@ local function register(model: Model, kind: string)
 		animator.Context.Phase = 0
 		animator.Context.Air = 0
 		animator:SetLayer("Fly", Poses.Human.ODMFly, 0, 2, 5)
+		-- forma di gigante (siero): camminata e corsa pesanti da gigante
+		animator:SetLayer("TitanLoco", Poses.Titan.Locomotion, 0, 1, 4)
 		animator:SetLayer("Hang", Poses.Human.Hang, 0, 3, 6)
 		animator:SetLayer("Struggle", Poses.Human.Struggle, 0, 4, 8)
 		animator:SetLayer("Cloak", Poses.Human.Cloak, 1, 5, 6)
@@ -20320,6 +20401,30 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
 		ctx.Phase = (ctx.Phase or 0) + dt * flat * (0.95 - 0.12 * runK) * dir
 		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
+		-- forma di gigante: passo lento e pesante, la terra trema a ogni passo
+		rig.Animator:SetLayerWeight("TitanLoco", if transformed then 1 else 0)
+		if transformed then
+			local H = (owner and owner:GetAttribute("TitanHeight")) or 30
+			rig.Animator.PositionScale = H
+			ctx.Move = (ctx.Move or 0) + (math.clamp(flat / 6, 0, 1) - (ctx.Move or 0)) * math.min(1, dt * 5)
+			ctx.Run = (ctx.Run or 0) + (math.clamp((flat - 16) / 14, 0, 1) - (ctx.Run or 0)) * math.min(1, dt * 3)
+			local stride = math.max(2, H * 0.45)
+			local before = ctx.TitanPhase or 0
+			ctx.TitanPhase = before + dt * flat / stride * math.pi
+			ctx.Phase = ctx.TitanPhase
+			if ctx.Move > 0.3 and math.floor(before / math.pi) ~= math.floor(ctx.TitanPhase / math.pi) and C then
+				local foot = root.Position - Vector3.new(0, H * 0.48, 0)
+				if C.EffectsController then
+					C.EffectsController.Steam(foot, H * 0.08, 5, 1.2, Color3.fromRGB(170, 150, 120))
+					C.EffectsController.ShakeAt(foot, math.clamp(H / 140, 0.1, 0.5), H * 5, 0.2)
+				end
+				if C.SoundController then
+					C.SoundController.Play("Step", foot, { Range = H * 8, Volume = 1, Pitch = math.clamp(1.1 - H / 120, 0.3, 1) })
+				end
+			end
+		else
+			rig.Animator.PositionScale = 1
+		end
 	elseif rig.Kind == "NPC" then
 		if localRoot then
 			local offset = root.CFrame:PointToObjectSpace(localRoot.Position)
@@ -22800,6 +22905,145 @@ function EffectsController.SerumObtained(character: Model?, color: Color3?)
 end
 
 -- Effetti delle abilità in forma di gigante
+-- MOSSE DEL GIGANTE DELLA FURIA ---------------------------------------------------------------------
+local FURIA_GREEN = Color3.fromRGB(120, 255, 170)
+local CRYSTAL = Color3.fromRGB(170, 230, 255)
+
+local function handPosition(character: Model, side: string): Vector3?
+	local hand = character:FindFirstChild(side .. "Hand") :: BasePart?
+	return hand and hand.Position
+end
+
+-- pugno di cristallo che brilla per un attimo sulla mano
+local function crystalFist(character: Model, side: string, size: number, duration: number)
+	local hand = character:FindFirstChild(side .. "Hand") :: BasePart?
+	if not hand then
+		return
+	end
+	local glow = Instance.new("Part")
+	glow.Name = "PugnoCristallo"
+	glow.Shape = Enum.PartType.Ball
+	glow.Size = Vector3.one * size
+	glow.Material = Enum.Material.Glass
+	glow.Color = CRYSTAL
+	glow.Transparency = 0.25
+	glow.CanCollide = false
+	glow.CanQuery = false
+	glow.CanTouch = false
+	glow.Massless = true
+	glow.CastShadow = false
+	glow.CFrame = hand.CFrame
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = hand
+	weld.Part1 = glow
+	weld.Parent = glow
+	local light = Instance.new("PointLight")
+	light.Color = CRYSTAL
+	light.Range = size * 4
+	light.Brightness = 3
+	light.Parent = glow
+	glow.Parent = workspace
+	TweenService:Create(glow, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Transparency = 1 }):Play()
+	Debris:AddItem(glow, duration + 0.1)
+end
+
+local LOOK_MOVES = {
+	Furia = {
+		M1 = {
+			Clip = { "FuriaHookR", "FuriaHookL" },
+			Fx = function(character, _root, radius, height)
+				task.delay(0.24, function()
+					local r = Util.GetRoot(character)
+					if r then
+						local center = r.Position + r.CFrame.LookVector * radius * 0.9
+						EffectsController.Shockwave(center, radius * 0.8, Color3.fromRGB(255, 240, 210), 0.3, 1)
+						EffectsController.ShakeAt(center, 0.4, height * 6, 0.2)
+					end
+				end)
+			end,
+		},
+		Z = {
+			Clip = "FuriaHardPunch",
+			Fx = function(character, _root, radius, height)
+				crystalFist(character, "Right", height * 0.09, 1.1)
+				task.delay(0.42, function()
+					local r = Util.GetRoot(character)
+					local fist = handPosition(character, "Right")
+					if r then
+						local center = fist or (r.Position + r.CFrame.LookVector * radius)
+						EffectsController.Shockwave(center, radius * 1.4, CRYSTAL, 0.5, 2)
+						EffectsController.DebrisBurst(center, 12, math.max(2, height * 0.04), nil, nil, 80)
+						EffectsController.Flash(Color3.fromRGB(220, 245, 255), 0.25, 0.25)
+						EffectsController.ShakeAt(center, 1, height * 10, 0.45)
+						if C.SoundController then
+							C.SoundController.Play("Explosion", center, { Range = 1200, Volume = 0.8, Pitch = 0.7 })
+						end
+					end
+				end)
+			end,
+		},
+		X = {
+			Clip = "FuriaSpinKick",
+			Fx = function(character, _root, radius, height)
+				for i = 0, 2 do
+					task.delay(0.15 + i * 0.12, function()
+						local r = Util.GetRoot(character)
+						if r then
+							EffectsController.Shockwave(r.Position - Vector3.new(0, height * 0.2, 0), radius * (0.7 + i * 0.25), Color3.fromRGB(255, 235, 200), 0.4, 1)
+						end
+					end)
+				end
+				task.delay(0.3, function()
+					local r = Util.GetRoot(character)
+					if r then
+						local feet = r.Position - Vector3.new(0, height * 0.45, 0)
+						EffectsController.Steam(feet, radius * 0.6, 14, 2, Color3.fromRGB(170, 150, 120))
+						EffectsController.DebrisBurst(feet, 10, math.max(2, height * 0.04), nil, nil, 70)
+						EffectsController.ShakeAt(feet, 0.8, height * 8, 0.4)
+					end
+				end)
+			end,
+		},
+		C = {
+			Clip = "FuriaRoar",
+			Fx = function(character, _root, radius, height)
+				task.delay(0.45, function()
+					local r = Util.GetRoot(character)
+					if not r then
+						return
+					end
+					for i = 0, 3 do
+						task.delay(i * 0.2, function()
+							EffectsController.Shockwave(r.Position, radius * (0.5 + i * 0.3), Color3.fromRGB(255, 255, 255), 0.8, 1)
+						end)
+					end
+					EffectsController.Steam(r.Position + Vector3.new(0, height * 0.3, 0), height * 0.5, 24, 3)
+					EffectsController.ShakeAt(r.Position, 1, height * 15, 1)
+					if C.SoundController then
+						C.SoundController.Play("Roar", r.Position, { Range = 1600, Volume = 1, Pitch = 0.8 })
+					end
+				end)
+			end,
+		},
+		V = {
+			Clip = "FuriaFocus",
+			Fx = function(character, _root, radius, height)
+				task.delay(0.6, function()
+					local r = Util.GetRoot(character)
+					if r then
+						EffectsController.HighlightModel(character, FURIA_GREEN, 6, 0.55)
+						EffectsController.Shockwave(r.Position, radius * 1.5, FURIA_GREEN, 0.7, 2)
+						EffectsController.Lightning(r.Position + Vector3.new(0, 700, 0), r.Position + Vector3.new(0, height * 0.5, 0), FURIA_GREEN, 3)
+						if C.SoundController then
+							C.SoundController.Play("Thunder", r.Position, { Range = 1500, Volume = 0.7 })
+						end
+					end
+				end)
+			end,
+		},
+	},
+}
+
 function EffectsController.TitanSkill(params)
 	local character = params.Character
 	local kind = params.Kind
@@ -22827,6 +23071,25 @@ function EffectsController.TitanSkill(params)
 		Harden = "TitanRoarSmall",
 		Crystal = "TitanRoarSmall",
 	}
+	-- mosse dedicate di un gigante (animazioni ed effetti propri)
+	local special = LOOK_MOVES[params.Look or ""]
+	local move = special and special[params.Key or ""]
+	if move and character then
+		local clipName = move.Clip
+		if type(clipName) == "table" then
+			-- combo: alterna i colpi (es. gancio destro e sinistro)
+			local n = (character:GetAttribute("ComboFuria") or 0) + 1
+			character:SetAttribute("ComboFuria", n)
+			clipName = clipName[(n - 1) % #clipName + 1]
+		end
+		if C.AnimationController then
+			C.AnimationController.Play(character, clipName, 1)
+		end
+		if root and move.Fx then
+			move.Fx(character, root, radius, height, params)
+		end
+		return
+	end
 	if character and C.AnimationController and clipByKind[kind] then
 		C.AnimationController.Play(character, clipByKind[kind], 1)
 	end

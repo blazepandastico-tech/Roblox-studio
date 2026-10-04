@@ -618,6 +618,58 @@ addHuman(clip("TitanSlamSmall", {
 	K(0.8, { Waist = A(-10, 0, 0) }, "QuadOut"),
 }, { Priority = 3 }))
 
+-- MOSSE DEL GIGANTE DELLA FURIA (forma di gigante del giocatore) ------------------------------
+-- Gancio destro e sinistro (attacco base, si alternano)
+addHuman(clip("FuriaHookR", {
+	K(0, {}),
+	K(0.12, { RightShoulder = A(30, 0, 45), RightElbow = A(100, 0, 0), Waist = A(-5, -30, 0), LeftShoulder = A(45, 0, -25), LeftElbow = A(100, 0, 0) }, "QuadOut"),
+	K(0.24, { RightShoulder = A(90, 0, -15), RightElbow = A(15, 0, 0), Waist = A(-12, 35, 0), Root = A(-6, 10, 0), LeftShoulder = A(40, 0, -20), LeftElbow = A(95, 0, 0), RightHip = A(-10, 0, 0), LeftHip = A(25, 0, 0), LeftKnee = A(-30, 0, 0) }, "ExpoOut"),
+	K(0.55, { RightShoulder = A(35, 0, 10), RightElbow = A(40, 0, 0), LeftShoulder = A(35, 0, -10), LeftElbow = A(60, 0, 0), Waist = A(-5, 5, 0) }, "QuadOut"),
+}, { Priority = 3, FadeOut = 0.2 }))
+addHuman(clip("FuriaHookL", {
+	K(0, {}),
+	K(0.12, { LeftShoulder = A(30, 0, -45), LeftElbow = A(100, 0, 0), Waist = A(-5, 30, 0), RightShoulder = A(45, 0, 25), RightElbow = A(100, 0, 0) }, "QuadOut"),
+	K(0.24, { LeftShoulder = A(90, 0, 15), LeftElbow = A(15, 0, 0), Waist = A(-12, -35, 0), Root = A(-6, -10, 0), RightShoulder = A(40, 0, 20), RightElbow = A(95, 0, 0), LeftHip = A(-10, 0, 0), RightHip = A(25, 0, 0), RightKnee = A(-30, 0, 0) }, "ExpoOut"),
+	K(0.55, { LeftShoulder = A(35, 0, -10), LeftElbow = A(40, 0, 0), RightShoulder = A(35, 0, 10), RightElbow = A(60, 0, 0), Waist = A(-5, -5, 0) }, "QuadOut"),
+}, { Priority = 3, FadeOut = 0.2 }))
+
+-- Z - Pugno Indurito: lunga carica all'indietro, poi un diretto devastante con affondo
+addHuman(clip("FuriaHardPunch", {
+	K(0, {}),
+	K(0.3, { RightShoulder = A(-30, 0, 30), RightElbow = A(115, 0, 0), RightWrist = A(-20, 0, 0), Waist = A(5, -45, 0), Root = A(5, -20, 0), LeftShoulder = A(60, 0, -30), LeftElbow = A(40, 0, 0), RightHip = A(-15, 0, 0), LeftHip = A(35, 0, 0), LeftKnee = A(-45, 0, 0), RightKnee = A(-25, 0, 0) }, "QuadOut"),
+	K(0.42, { RightShoulder = A(95, 0, 0), RightElbow = A(0, 0, 0), RightWrist = A(0, 0, 0), Waist = A(-18, 40, 0), Root = A(-20, 15, 0), LeftShoulder = A(-20, 0, -40), LeftElbow = A(60, 0, 0), RightHip = A(-30, 0, 0), LeftHip = A(50, 0, 0), LeftKnee = A(-60, 0, 0), RightKnee = A(-10, 0, 0) }, "ExpoOut"),
+	K(0.65, { RightShoulder = A(90, 0, 0), RightElbow = A(5, 0, 0), Waist = A(-15, 35, 0), Root = A(-16, 12, 0), LeftHip = A(45, 0, 0), LeftKnee = A(-55, 0, 0) }, "Linear"),
+	K(1.0, { RightShoulder = A(30, 0, 10), RightElbow = A(40, 0, 0), Waist = A(-5, 5, 0) }, "QuadOut"),
+}, { Priority = 4, FadeOut = 0.25 }))
+
+-- X - Calcio Rotante: giro completo su se stesso con la gamba tesa
+addHuman(clip("FuriaSpinKick", spinKeys(0.6, 1, "Y", "Root", {
+	RightHip = A(80, 0, 45),
+	RightKnee = A(-5, 0, 0),
+	LeftKnee = A(-25, 0, 0),
+	LeftHip = A(10, 0, 0),
+	RightShoulder = A(25, 0, 70),
+	LeftShoulder = A(25, 0, -70),
+	Waist = A(5, 0, 0),
+}, 4), { Priority = 4, FadeIn = 0.04, FadeOut = 0.2 }))
+
+-- C - Ruggito della Furia: si raccoglie, poi spalanca braccia e petto e urla al cielo
+addHuman(clip("FuriaRoar", {
+	K(0, {}),
+	K(0.25, { Waist = A(-25, 0, 0), Neck = A(-20, 0, 0), RightShoulder = A(-20, 0, 20), LeftShoulder = A(-20, 0, -20), RightElbow = A(90, 0, 0), LeftElbow = A(90, 0, 0), RightKnee = A(-35, 0, 0), LeftKnee = A(-35, 0, 0), RightHip = A(25, 0, 0), LeftHip = A(25, 0, 0) }, "QuadOut"),
+	K(0.45, { Waist = A(18, 0, 0), Neck = A(35, 0, 0), RightShoulder = A(35, 0, 95), LeftShoulder = A(35, 0, -95), RightElbow = A(25, 0, 0), LeftElbow = A(25, 0, 0), RightWrist = A(-30, 0, 0), LeftWrist = A(-30, 0, 0) }, "ExpoOut"),
+	K(1.4, { Waist = A(15, 0, 0), Neck = A(32, 0, 0), RightShoulder = A(35, 0, 90), LeftShoulder = A(35, 0, -90), RightElbow = A(30, 0, 0), LeftElbow = A(30, 0, 0) }, "Linear"),
+	K(1.8, {}, "QuadOut"),
+}, { Priority = 4, FadeOut = 0.3 }))
+
+-- V - Visione del Futuro: mani al volto, poi si apre e gli occhi si accendono
+addHuman(clip("FuriaFocus", {
+	K(0, {}),
+	K(0.3, { RightShoulder = A(120, 0, -20), RightElbow = A(110, 0, 0), LeftShoulder = A(120, 0, 20), LeftElbow = A(110, 0, 0), Neck = A(-15, 0, 0), Waist = A(-10, 0, 0) }, "QuadOut"),
+	K(0.7, { RightShoulder = A(10, 0, 60), LeftShoulder = A(10, 0, -60), RightElbow = A(20, 0, 0), LeftElbow = A(20, 0, 0), Neck = A(20, 0, 0), Waist = A(10, 0, 0) }, "ExpoOut"),
+	K(1.1, {}, "QuadOut"),
+}, { Priority = 4, FadeOut = 0.25 }))
+
 -- =====================================================================================
 -- GIGANTI (Absolute: la posa è il Transform completo)
 -- =====================================================================================
