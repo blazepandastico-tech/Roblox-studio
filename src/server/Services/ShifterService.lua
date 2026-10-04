@@ -127,6 +127,12 @@ local function decorate(character: Model, serum)
 		return folder
 	end
 	-- aspetto con modello 3D importato (es. Gigante della Furia): il corpo R15 viene rivestito
+	if MeshTitan.Skins[serum.Look] and not MeshTitan.Has(serum.Look) then
+		local owner = game:GetService("Players"):GetPlayerFromCharacter(character)
+		if owner and S.EventService then
+			S.EventService.Notify(owner, "Modello 3D del gigante non importato: in Studio fai File → Importa 3D → GiganteFuria.glb, poi premi Play.", "Info", 8)
+		end
+	end
 	if MeshTitan.Has(serum.Look) then
 		local ok, applied = pcall(MeshTitan.SkinCharacter, character, serum.Look, folder)
 		if ok and applied then
