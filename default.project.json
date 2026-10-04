@@ -86,6 +86,12 @@
       "$properties": {
         "ResetPlayerGuiOnSpawn": false
       }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "LEGGIMI_GuidaStoria": {
+        "$path": "studio/LEGGIMI_GuidaStoria.lua"
+      }
     }
   }
 }

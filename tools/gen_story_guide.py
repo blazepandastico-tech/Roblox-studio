@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 STORY = ROOT / "src/shared/Data/Story.lua"
 OUT = ROOT / "docs/GUIDA_STORIA.md"
+# copia dentro il gioco: ServerStorage > LEGGIMI_GuidaStoria (si apre con doppio clic in Studio)
+STUDIO = ROOT / "studio/LEGGIMI_GuidaStoria.lua"
 
 SEASONS = {
     1: "Stagione 1 - isola di Vermiglia",
@@ -92,6 +94,12 @@ def main():
         "",
     ]
     OUT.write_text("\n".join(lines), encoding="utf-8")
+    STUDIO.parent.mkdir(exist_ok=True)
+    guide = "\n".join(lines).replace("]==]", "] ==]")
+    STUDIO.write_text(
+        "--[==[\n" + guide + "\n]==]\n\n-- Questo script contiene solo la guida: non fa nulla nel gioco.\nreturn {}\n",
+        encoding="utf-8",
+    )
     print(f"Scritto {OUT.relative_to(ROOT)}: {len(chapters)} capitoli")
 
 
