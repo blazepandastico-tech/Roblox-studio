@@ -408,6 +408,12 @@ ACTIONS.Invasion = function(admin)
 	S.EventService.Announce("⚠️ INVASIONE!", "I giganti attaccano: " .. (Zones.Get(zoneId).Name or zoneId), "Boss")
 	return "Invasione avviata"
 end
+ACTIONS.Weather = function(_, _, value)
+	if type(value) ~= "string" or not S.LightingService.SetWeather(value) then
+		return "Meteo sconosciuto"
+	end
+	return "Meteo: " .. value
+end
 ACTIONS.Time = function(_, _, value)
 	local hour = tonumber(value) or 12
 	Lighting.ClockTime = hour % 24

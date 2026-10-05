@@ -56,7 +56,7 @@ local TEMPLATE = {
 	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0 },
 	BossKills = {},
 	Codes = {},
-	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true },
+	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Scenery = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true },
 	Buffs = {},
 	Gems = 0,
 	Passes = {},

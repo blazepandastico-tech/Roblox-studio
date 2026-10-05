@@ -5424,11 +5424,31 @@ local Sounds = {
 	Roar = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 1, Pitch = 0.25 },
 }
 
--- Musica di sottofondo (lascia vuoto per nessuna musica, oppure metti ID del Creator Store)
+--[[
+	MUSICA DINAMICA: cambia da sola (con dissolvenza) in base a dove sei e a cosa succede.
+	Come aggiungere una traccia:
+	  1. in Studio apri la Casella degli strumenti (Toolbox) → scheda Audio;
+	  2. cerca per esempio "medieval town", "calm fantasy", "epic battle", "boss fight"
+	     (le tracce caricate dall'account "Roblox" si possono usare gratis nei giochi);
+	  3. tasto destro sulla traccia → "Copia ID risorsa" (Copy Asset ID);
+	  4. incolla qui sotto così: "rbxassetid://1234567890".
+	Una situazione lasciata "" usa la traccia Default; se anche Default è "", c'è silenzio.
+]]
 Sounds.Music = {
-	Default = "",
-	Battle = "",
-	Boss = "",
+	Default = "", -- traccia di riserva per tutte le situazioni senza una traccia propria
+	Calm = "", -- esplorazione di giorno (prati, foreste, mare)
+	City = "", -- città e zone sicure
+	Night = "", -- esplorazione di notte
+	Battle = "", -- giganti vicini o che ti stanno inseguendo
+	Boss = "", -- boss e raid
+}
+
+-- Suoni d'ambiente in sottofondo, insieme alla musica (stesse istruzioni; "" = spento)
+Sounds.Ambient = {
+	Rain = "", -- pioggia e temporale
+	Wind = "", -- vento forte (temporale)
+	Birds = "", -- uccellini di giorno all'aperto
+	Night = "", -- grilli di notte all'aperto
 }
 
 return Sounds
@@ -8626,6 +8646,12 @@ ACTIONS.Invasion = function(admin)
 	S.EventService.Announce("⚠️ INVASIONE!", "I giganti attaccano: " .. (Zones.Get(zoneId).Name or zoneId), "Boss")
 	return "Invasione avviata"
 end
+ACTIONS.Weather = function(_, _, value)
+	if type(value) ~= "string" or not S.LightingService.SetWeather(value) then
+		return "Meteo sconosciuto"
+	end
+	return "Meteo: " .. value
+end
 ACTIONS.Time = function(_, _, value)
 	local hour = tonumber(value) or 12
 	Lighting.ClockTime = hour % 24
@@ -9541,7 +9567,7 @@ local TEMPLATE = {
 	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0 },
 	BossKills = {},
 	Codes = {},
-	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true },
+	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Scenery = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true },
 	Buffs = {},
 	Gems = 0,
 	Passes = {},
@@ -11097,7 +11123,10 @@ return LeaderboardService
             <string name="Source"><![CDATA[--[[
 	LightingService
 	Grafica: atmosfera, nuvole, bloom, raggi del sole, correzione colore,
-	e il ciclo giorno/notte (di notte i giganti rallentano).
+	il ciclo giorno/notte (di notte i giganti rallentano) e il METEO:
+	Sereno, Nuvoloso, Pioggia e Temporale si alternano da soli e il vento cambia.
+	Il meteo attuale è l'attributo "Meteo" di ReplicatedStorage: i colori, la pioggia
+	e i fulmini li disegna ogni client (AmbienceController).
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -11109,6 +11138,68 @@ local Config = require(Shared.Config)
 
 local LightingService = {}
 local S
+
+-- meteo: probabilità e durata (secondi reali)
+LightingService.Weathers = {
+	{ Id = "Sereno", Weight = 45, Duration = { 420, 780 }, Wind = 8 },
+	{ Id = "Nuvoloso", Weight = 25, Duration = { 300, 540 }, Wind = 14 },
+	{ Id = "Pioggia", Weight = 20, Duration = { 240, 420 }, Wind = 18 },
+	{ Id = "Temporale", Weight = 10, Duration = { 180, 300 }, Wind = 30 },
+}
+local WEATHER_TEXT = {
+	Sereno = "Il cielo si rasserena.",
+	Nuvoloso = "Le nuvole coprono il sole.",
+	Pioggia = "Comincia a piovere.",
+	Temporale = "Si avvicina un temporale: tuoni e fulmini sull'arcipelago!",
+}
+local rng = Random.new()
+local windAngle = rng:NextNumber(0, math.pi * 2)
+
+function LightingService.Weather(): string
+	local weather = ReplicatedStorage:GetAttribute("Meteo")
+	return if type(weather) == "string" then weather else "Sereno"
+end
+
+function LightingService.SetWeather(id: string, announce: boolean?)
+	local def = nil
+	for _, w in LightingService.Weathers do
+		if w.Id == id then
+			def = w
+		end
+	end
+	if not def then
+		return false
+	end
+	local before = LightingService.Weather()
+	ReplicatedStorage:SetAttribute("Meteo", def.Id)
+	ReplicatedStorage:SetAttribute("MeteoDa", os.time())
+	-- il vento gira piano e si rinforza col brutto tempo (muove erba, nuvole, pioggia e particelle)
+	windAngle += rng:NextNumber(-0.8, 0.8)
+	workspace.GlobalWind = Vector3.new(math.cos(windAngle), 0, math.sin(windAngle)) * def.Wind
+	if announce ~= false and before ~= def.Id and S and S.EventService then
+		S.EventService.NotifyAll("🌦️ " .. WEATHER_TEXT[def.Id], "Info", 5)
+	end
+	return true
+end
+
+local function pickWeather(current: string): any
+	local total = 0
+	for _, w in LightingService.Weathers do
+		if w.Id ~= current then
+			total += w.Weight
+		end
+	end
+	local roll = rng:NextNumber() * total
+	for _, w in LightingService.Weathers do
+		if w.Id ~= current then
+			roll -= w.Weight
+			if roll <= 0 then
+				return w
+			end
+		end
+	end
+	return LightingService.Weathers[1]
+end
 
 local function ensure(className: string, parent: Instance, name: string?): any
 	local existing = parent:FindFirstChildOfClass(className)
@@ -11175,11 +11266,8 @@ function LightingService.Setup()
 	dof.InFocusRadius = 160
 	dof.NearIntensity = 0
 
-	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
-	if not clouds then
-		clouds = Instance.new("Clouds")
-		clouds.Parent = workspace.Terrain
-	end
+	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
+	clouds.Parent = workspace.Terrain
 	clouds.Cover = 0.55
 	clouds.Density = 0.62
 	clouds.Color = Color3.fromRGB(255, 255, 255)
@@ -11191,6 +11279,16 @@ end
 
 function LightingService.Start()
 	LightingService.Setup()
+	LightingService.SetWeather("Sereno", false)
+	-- il meteo cambia da solo
+	task.spawn(function()
+		local current = LightingService.Weathers[1]
+		while true do
+			task.wait(rng:NextNumber(current.Duration[1], current.Duration[2]))
+			current = pickWeather(LightingService.Weather())
+			LightingService.SetWeather(current.Id)
+		end
+	end)
 	local wasNight = LightingService.IsNight()
 	local hoursPerSecond = 24 / Config.World.DayLength
 	local accumulated = 0
@@ -17958,6 +18056,7 @@ return TitanService
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local HttpService = game:GetService("HttpService")
 local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -18793,6 +18892,182 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 	end
 end
 
+-- VITA IN CITTÀ: mercato, carretti, festoni e strade per i cittadini --------------------------------
+
+-- strade percorribili dai cittadini (le legge il client: CitizenController)
+local streets: { { number } } = {}
+
+local AWNINGS = {
+	{ Color3.fromRGB(176, 44, 44), Color3.fromRGB(240, 232, 214) },
+	{ Color3.fromRGB(52, 110, 64), Color3.fromRGB(236, 226, 196) },
+	{ Color3.fromRGB(46, 84, 150), Color3.fromRGB(236, 236, 240) },
+	{ Color3.fromRGB(214, 160, 40), Color3.fromRGB(110, 70, 40) },
+}
+local GOODS = {
+	Color3.fromRGB(214, 48, 40), Color3.fromRGB(240, 170, 40), Color3.fromRGB(110, 170, 60),
+	Color3.fromRGB(150, 90, 50), Color3.fromRGB(230, 210, 120), Color3.fromRGB(120, 60, 120),
+}
+
+-- Banco del mercato con tendone a strisce. cf a terra, il davanti guarda verso -Z
+local function marketStall(cf: CFrame)
+	local w, d = 8, 5
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			part({ Name = "PaloBanco", Size = Vector3.new(0.45, 7, 0.45), CFrame = cf * CFrame.new(sx * (w / 2 - 0.3), 3.5, sz * (d / 2 - 0.3)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+		end
+	end
+	part({ Name = "Bancone", Size = Vector3.new(w, 2.6, 1.6), CFrame = cf * CFrame.new(0, 1.3, -d / 2 + 0.8), Material = Enum.Material.WoodPlanks, Color = PALETTE.Wood })
+	part({ Name = "PianoBancone", Size = Vector3.new(w + 0.3, 0.3, 1.9), CFrame = cf * CFrame.new(0, 2.75, -d / 2 + 0.8), Material = Enum.Material.Wood, Color = Color3.fromRGB(140, 104, 70), CastShadow = false })
+	-- tendone a strisce, inclinato verso il davanti
+	local colors = pick(AWNINGS)
+	local stripes = 5
+	for i = 1, stripes do
+		local x = -w / 2 + (i - 0.5) * w / stripes
+		part({ Name = "Tendone", Size = Vector3.new(w / stripes + 0.02, 0.25, d + 1.6), CFrame = cf * CFrame.new(x, 7.1, -0.5) * CFrame.Angles(math.rad(-14), 0, 0), Material = Enum.Material.Fabric, Color = colors[(i % 2) + 1], CastShadow = i == 1 })
+	end
+	-- merce sul bancone (frutta, verdura, sacchi)
+	for i = 1, 6 do
+		local size = rng:NextNumber(0.6, 0.95)
+		part({ Name = "Merce", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = cf * CFrame.new(-w / 2 + 0.9 + (i - 1) * (w - 1.8) / 5, 2.9 + size / 2, -d / 2 + 0.8 + rng:NextNumber(-0.3, 0.3)), Material = Enum.Material.SmoothPlastic, Color = pick(GOODS), CastShadow = false })
+	end
+	part({ Name = "Cassa", Size = Vector3.new(2, 1.6, 1.6), CFrame = cf * CFrame.new(-w / 2 + 1.4, 0.8, d / 2 - 1.1) * CFrame.Angles(0, rng:NextNumber(-0.3, 0.3), 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(150, 110, 72) })
+	part({ Name = "Barile", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 1.8, 1.8), CFrame = cf * CFrame.new(w / 2 - 1.3, 1.2, d / 2 - 1.1) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(110, 76, 46) })
+end
+
+-- Carretto di legno con il carico. cf a terra, lungo l'asse X
+local function cart(cf: CFrame)
+	part({ Name = "Carretto", Size = Vector3.new(6, 0.8, 3.4), CFrame = cf * CFrame.new(0, 2.4, 0), Material = Enum.Material.WoodPlanks, Color = PALETTE.Wood })
+	for _, side in { -1, 1 } do
+		part({ Name = "Sponda", Size = Vector3.new(6, 1.2, 0.25), CFrame = cf * CFrame.new(0, 3.3, side * 1.6), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(104, 74, 48), CastShadow = false })
+		part({ Name = "Ruota", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 3.8, 3.8), CFrame = cf * CFrame.new(0.4, 1.9, side * 1.95) * CFrame.Angles(0, math.rad(90), 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(80, 56, 36) })
+		part({ Name = "Stanga", Size = Vector3.new(5, 0.25, 0.25), CFrame = cf * CFrame.new(5, 1.6, side * 0.9) * CFrame.Angles(0, 0, math.rad(-14)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+	end
+	-- carico: fieno o sacchi
+	if rng:NextNumber() < 0.5 then
+		part({ Name = "Fieno", Size = Vector3.new(5.2, 1.8, 2.8), CFrame = cf * CFrame.new(0, 3.7, 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(214, 184, 96) })
+	else
+		for i = -1, 1 do
+			part({ Name = "Sacco", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.6, 1.6), CFrame = cf * CFrame.new(i * 1.7, 3.5, rng:NextNumber(-0.4, 0.4)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(196, 176, 140), CastShadow = false })
+		end
+	end
+end
+
+-- Festone di bandierine colorate tra due pali
+local function bunting(a: Vector3, b: Vector3)
+	local height = 13
+	for _, p in { a, b } do
+		part({ Name = "PaloFestone", Size = Vector3.new(0.5, height + 1, 0.5), CFrame = CFrame.new(p + Vector3.new(0, (height + 1) / 2, 0)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+	end
+	local top = Vector3.new(0, height, 0)
+	local length = (b - a).Magnitude
+	part({ Name = "Corda", Size = Vector3.new(0.12, 0.12, length), CFrame = CFrame.lookAt((a + b) / 2 + top - Vector3.new(0, 0.8, 0), b + top - Vector3.new(0, 0.8, 0)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(90, 70, 50), CastShadow = false, CanCollide = false })
+	local flags = math.max(4, math.floor(length / 3.5))
+	for i = 1, flags do
+		local k = i / (flags + 1)
+		-- la corda scende un po' al centro
+		local sag = math.sin(k * math.pi) * 1.6
+		local pos = a:Lerp(b, k) + top - Vector3.new(0, 0.8 + sag, 0)
+		local flag = wedge({ Name = "Bandierina", Size = Vector3.new(0.1, 1.4, 1.2), CFrame = CFrame.lookAt(pos, pos + (b - a).Unit) * CFrame.new(0, -0.7, 0) * CFrame.Angles(math.pi, 0, 0), Material = Enum.Material.Fabric, Color = pick(GOODS), CastShadow = false })
+		flag.CanCollide = false
+	end
+end
+
+-- Registra i tratti di strada liberi (per i cittadini) lungo una retta, dentro la città
+local function recordStreet(from: Vector3, to: Vector3, inside: (Vector3) -> boolean)
+	local length = (to - from).Magnitude
+	local samples = math.max(2, math.floor(length / 4))
+	local runStart: Vector3? = nil
+	local last: Vector3? = nil
+	for i = 0, samples do
+		local p = from:Lerp(to, i / samples)
+		if inside(p) then
+			runStart = runStart or p
+			last = p
+		end
+		if (not inside(p) or i == samples) and runStart and last then
+			if (last - runStart).Magnitude > 30 then
+				table.insert(streets, {
+					math.floor(runStart.X * 10) / 10, math.floor(runStart.Y * 10) / 10, math.floor(runStart.Z * 10) / 10,
+					math.floor(last.X * 10) / 10, math.floor(last.Y * 10) / 10, math.floor(last.Z * 10) / 10,
+				})
+			end
+			runStart = nil
+			last = nil
+		end
+	end
+end
+
+-- Mercato, carretti, festoni e strade di una città
+local function townLife(center: Vector3, radius: number, cell: number, forward: Vector3, opts)
+	local right = Vector3.new(-forward.Z, 0, forward.X)
+	local y = opts.Y or G
+	local function inside(p: Vector3, margin: number): boolean
+		if Util.FlatDistance(p, center) > radius - margin then
+			return false
+		end
+		if opts.HalfPlaneOrigin then
+			return (p - opts.HalfPlaneOrigin):Dot(opts.HalfPlaneNormal) > margin + 4
+		end
+		return true
+	end
+	local function ground(p: Vector3): Vector3
+		return Vector3.new(p.X, y, p.Z)
+	end
+	-- città in rovina: niente mercato e niente cittadini
+	if opts.Ruined then
+		return
+	end
+	-- strade: il viale centrale e le vie trasversali (righe senza case)
+	local steps = math.floor(radius / cell)
+	local function walkable(p: Vector3): boolean
+		return inside(p, 24) and not isReserved(p, 3)
+	end
+	recordStreet(ground(center - forward * steps * cell), ground(center + forward * steps * cell), walkable)
+	for gz = -steps, steps do
+		if gz % 3 == 0 then
+			local mid = center + forward * gz * cell
+			recordStreet(ground(mid - right * steps * cell), ground(mid + right * steps * cell), walkable)
+		end
+	end
+	-- banchi del mercato lungo il viale, rivolti verso il centro della strada
+	local edge = cell * 0.61 - 4
+	local stalls = 0
+	for _, f in { 0.6, -0.6, 1.3, -1.3, 2.0, -2.0, 2.7, 3.4 } do
+		if stalls >= 6 then
+			break
+		end
+		for _, side in { -1, 1 } do
+			local pos = center + forward * (f * cell) + right * (side * edge)
+			if stalls < 6 and inside(pos, 20) and not isReserved(pos, 8) then
+				local g = ground(pos)
+				marketStall(CFrame.lookAt(g, g - right * side))
+				stalls += 1
+			end
+		end
+	end
+	-- carretti parcheggiati e festoni sopra il viale
+	local carts = 0
+	for _, f in { 2.4, -2.4, 3.1, -3.1, 1.0 } do
+		local side = if carts % 2 == 0 then 1 else -1
+		local pos = center + forward * (f * cell) + right * (side * (edge + 1))
+		if carts < 2 and inside(pos, 20) and not isReserved(pos, 8) then
+			local g = ground(pos)
+			cart(CFrame.lookAt(g, g + forward) * CFrame.Angles(0, math.rad(90), 0))
+			carts += 1
+		end
+	end
+	local flags = 0
+	for _, f in { 0.95, -0.95, 1.65, 2.35 } do
+		local mid = center + forward * (f * cell)
+		local a = mid - right * (edge + 2)
+		local b = mid + right * (edge + 2)
+		if flags < 2 and inside(a, 18) and inside(b, 18) and not isReserved(mid, 6) then
+			bunting(ground(a), ground(b))
+			flags += 1
+		end
+	end
+end
+
 -- Città su griglia dentro un cerchio (o semicerchio per i distretti)
 local function buildTown(name: string, center: Vector3, radius: number, opts)
 	currentGroup = group(name)
@@ -18825,6 +19100,10 @@ local function buildTown(name: string, center: Vector3, radius: number, opts)
 				end
 			end
 		end
+	end
+	local ok, err = pcall(townLife, center, radius, cell, forward, opts)
+	if not ok then
+		warn("[WorldBuilder] Vita in città (" .. name .. "): " .. tostring(err))
 	end
 	return count
 end
@@ -19592,7 +19871,18 @@ function WorldBuilder.Build()
 	step("Alberi", scatterTrees)
 	step("Confini", buildBoundaries)
 
-	print(("[WorldBuilder] Mappa generata: %d parti in %.1fs"):format(partCount, os.clock() - t0))
+	-- alberi che ondeggiano e camini che fumano (li anima il client)
+	for _, d in mapFolder:GetDescendants() do
+		if d:IsA("BasePart") then
+			if d.Name == "Chioma" or d.Name == "Fogliame" then
+				CollectionService:AddTag(d, "Fogliame")
+			elseif d.Name == "Comignolo" then
+				CollectionService:AddTag(d, "Comignolo")
+			end
+		end
+	end
+	mapFolder:SetAttribute("Strade", HttpService:JSONEncode(streets))
+	print(("[WorldBuilder] Mappa generata: %d parti in %.1fs, %d tratti di strada"):format(partCount, os.clock() - t0, #streets))
 	return mapFolder
 end
 
@@ -19926,7 +20216,10 @@ return {}
 	AmbienceController
 	Atmosfera di ogni zona (nebbia verde nella foresta, cenere tra le rovine di Halvar,
 	cielo arancione al Fronte della Grande Marcia...), banner con il nome della zona,
-	mulini a vento che girano e lampioni che si accendono di notte.
+	mulini a vento che girano, lampioni che si accendono di notte e la musica dinamica:
+	calma di giorno, città, notte, battaglia (giganti vicini o che ti inseguono) e boss,
+	con i suoni d'ambiente (pioggia, vento, uccellini, grilli). Gli ID delle tracce si
+	mettono in Shared/Data/Sounds.lua.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -19934,6 +20227,7 @@ local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -19949,8 +20243,8 @@ local player = Players.LocalPlayer
 local currentZoneId: string? = nil
 local currentRegion: string? = nil
 local currentAmbience = nil
+local currentZone = nil
 local spinners: { Model } = {}
-local music: Sound? = nil
 
 AmbienceController.ZoneId = nil :: string?
 AmbienceController.RegionName = ""
@@ -19960,6 +20254,11 @@ local function applyAmbience(ambience)
 		return
 	end
 	currentAmbience = ambience
+	-- il cielo mescola l'atmosfera della zona con l'ora del giorno e il meteo
+	if C.SkyController then
+		C.SkyController.SetZoneAmbience(ambience)
+		return
+	end
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	local cc = Lighting:FindFirstChild("ColorCorrection") or Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	local info = TweenInfo.new(3, Enum.EasingStyle.Sine)
@@ -19992,6 +20291,7 @@ local function updateZone()
 		return
 	end
 	local zone = Zones.Find(root.Position)
+	currentZone = zone
 	local zoneId = zone and zone.Id or nil
 	local region = Zones.RegionName(root.Position)
 	AmbienceController.RegionName = region
@@ -20046,18 +20346,141 @@ local function updateLamps()
 	end
 end
 
-local function setupMusic()
-	local id = Sounds.Music.Default
-	if not id or id == "" then
-		return
+-- MUSICA DINAMICA E SUONI D'AMBIENTE ---------------------------------------------------------------
+
+local MUSIC_VOLUME = 0.3
+local AMBIENT_VOLUME = 0.4
+local FADE_TIME = 2.5 -- secondi di dissolvenza quando la musica cambia
+local BATTLE_LINGER = 8 -- la musica di battaglia resta ancora qualche secondo dopo l'ultimo nemico
+
+local layers: { [string]: Sound } = {} -- un Sound per ogni ID: situazioni con lo stesso ID non ricominciano la traccia
+local battleUntil = 0
+local bossUntil = 0
+AmbienceController.MusicState = "Calm"
+
+local function trackId(list: { [string]: string }, key: string): string
+	local id = list[key]
+	if type(id) ~= "string" or id == "" then
+		return ""
 	end
-	music = Instance.new("Sound")
-	music.Name = "Musica"
-	music.SoundId = id
-	music.Looped = true
-	music.Volume = 0.3
-	music.Parent = game:GetService("SoundService")
-	music:Play()
+	return id
+end
+
+local function musicStateNow(): string
+	local now = os.clock()
+	local root = Util.GetRoot(player.Character)
+	if root then
+		local pos = root.Position
+		local titans = workspace:FindFirstChild(Config.Folders.Titans)
+		if titans then
+			for _, model in titans:GetChildren() do
+				if model:IsA("Model") and model.PrimaryPart and model:GetAttribute("State") ~= "Dead" and not model:GetAttribute("Ally") and not model:GetAttribute("Dummy") then
+					local d = (model.PrimaryPart.Position - pos).Magnitude
+					if model:GetAttribute("Boss") == true and d < 420 then
+						bossUntil = now + BATTLE_LINGER
+					elseif d < 140 or (model:GetAttribute("TargetUserId") == player.UserId and d < 320) then
+						battleUntil = now + BATTLE_LINGER
+					end
+				end
+			end
+		end
+		local enemies = workspace:FindFirstChild(Config.Folders.Enemies)
+		if enemies then
+			for _, model in enemies:GetChildren() do
+				local hrp = model:FindFirstChild("HumanoidRootPart")
+				if hrp and hrp:IsA("BasePart") and not model:GetAttribute("Dead") then
+					local d = (hrp.Position - pos).Magnitude
+					if model:GetAttribute("Boss") == true and d < 260 then
+						bossUntil = now + BATTLE_LINGER
+					elseif d < 90 then
+						battleUntil = now + BATTLE_LINGER
+					end
+				end
+			end
+		end
+	end
+	if now < bossUntil then
+		return "Boss"
+	elseif now < battleUntil then
+		return "Battle"
+	elseif currentZone and currentZone.Safe then
+		return "City"
+	end
+	local t = Lighting.ClockTime
+	if t >= 19 or t < 6 then
+		return "Night"
+	end
+	return "Calm"
+end
+
+local function layer(id: string): Sound
+	local existing = layers[id]
+	if existing then
+		return existing
+	end
+	local sound = Instance.new("Sound")
+	sound.Name = "Sottofondo"
+	sound.SoundId = id
+	sound.Looped = true
+	sound.Volume = 0
+	sound.Parent = SoundService
+	layers[id] = sound
+	return sound
+end
+
+-- volume desiderato per ogni traccia (musica + suoni d'ambiente) e il volume pieno di riferimento
+local function wantedVolumes(): ({ [string]: number }, number)
+	local wanted = {}
+	local function want(id: string, volume: number)
+		if id ~= "" and volume > 0 then
+			wanted[id] = math.max(wanted[id] or 0, volume)
+		end
+	end
+	local state = AmbienceController.MusicState
+	local musicId = trackId(Sounds.Music, state)
+	if musicId == "" then
+		musicId = trackId(Sounds.Music, "Default")
+	end
+	local full = MUSIC_VOLUME * (C.ClientData.Setting("Music", 0.5) or 0.5)
+	want(musicId, full)
+
+	local sfx = AMBIENT_VOLUME * (C.ClientData.Setting("Sfx", 0.8) or 0.8)
+	local root = Util.GetRoot(player.Character)
+	local below = root ~= nil and root.Position.Y < -120 -- sottosuolo: niente cielo
+	local weather = if C.SkyController then C.SkyController.Weather() else "Sereno"
+	local rainy = weather == "Pioggia" or weather == "Temporale"
+	local t = Lighting.ClockTime
+	local night = t >= 19.2 or t < 5.6
+	local ambient = Sounds.Ambient or {}
+	if not below then
+		want(trackId(ambient, "Rain"), if weather == "Temporale" then sfx else if rainy then sfx * 0.75 else 0)
+		want(trackId(ambient, "Wind"), if weather == "Temporale" then sfx * 0.6 else 0)
+		want(trackId(ambient, "Birds"), if not night and not rainy and state ~= "Battle" and state ~= "Boss" then sfx * 0.5 else 0)
+		want(trackId(ambient, "Night"), if night and not rainy then sfx * 0.5 else 0)
+	end
+	return wanted, math.max(full, sfx, 0.05)
+end
+
+local function updateSound(dt: number)
+	local wanted, full = wantedVolumes()
+	for id in wanted do
+		layer(id)
+	end
+	local step = full * dt / FADE_TIME
+	for id, sound in layers do
+		local target = wanted[id] or 0
+		if sound.Volume < target then
+			sound.Volume = math.min(target, sound.Volume + step)
+		else
+			sound.Volume = math.max(target, sound.Volume - step)
+		end
+		if target > 0 and not sound.IsPlaying then
+			sound:Play()
+		elseif target == 0 and sound.Volume <= 0.001 and sound.IsPlaying then
+			-- finita la dissolvenza si ferma (la prossima volta riparte dall'inizio)
+			sound:Stop()
+		end
+	end
 end
 
 function AmbienceController.Init(c)
@@ -20066,17 +20489,30 @@ end
 
 function AmbienceController.Start()
 	setupSpinners()
-	setupMusic()
 	task.spawn(function()
 		while true do
 			local ok, err = pcall(updateZone)
 			if not ok then
 				warn("[Atmosfera] " .. tostring(err))
 			end
-			if music then
-				music.Volume = 0.3 * (C.ClientData.Setting("Music", 0.5) or 0.5)
+			local okMusic, state = pcall(musicStateNow)
+			if okMusic then
+				AmbienceController.MusicState = state
 			end
 			task.wait(0.5)
+		end
+	end)
+	-- dissolvenze della musica (10 volte al secondo)
+	task.spawn(function()
+		local last = os.clock()
+		while true do
+			task.wait(0.1)
+			local now = os.clock()
+			local ok, err = pcall(updateSound, now - last)
+			last = now
+			if not ok then
+				warn("[Musica] " .. tostring(err))
+			end
 		end
 	end)
 	task.spawn(function()
@@ -20953,6 +21389,335 @@ return CameraController
           </Item>
           <Item class="ModuleScript" referent="82">
             <Properties>
+              <string name="Name">CitizenController</string>
+              <string name="Source"><![CDATA[--[[
+	CitizenController - cittadini che passeggiano per le strade (solo grafica, sul client)
+	Il server registra le strade libere delle città (attributo "Strade" della cartella Mappa);
+	qui vicino alla telecamera nascono fino a 14 cittadini che camminano avanti e indietro,
+	si fermano a guardarsi intorno e ripartono. Non si possono colpire né intralciano il gioco.
+	Si spengono con Menu → Impostazioni → "Dettagli ambientali".
+]]
+
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+
+local CitizenController = {}
+local C
+
+local MAX_CITIZENS = 14
+local SPAWN_RADIUS = 230
+local DESPAWN_RADIUS = 320
+
+type Street = { A: Vector3, B: Vector3, Length: number }
+
+local rng = Random.new()
+local streets: { Street } = {}
+local folder: Folder
+
+local SKINS = { Color3.fromRGB(242, 206, 176), Color3.fromRGB(226, 182, 150), Color3.fromRGB(196, 150, 116), Color3.fromRGB(150, 104, 76), Color3.fromRGB(110, 76, 56) }
+local CLOTHES = { Color3.fromRGB(122, 84, 56), Color3.fromRGB(86, 96, 70), Color3.fromRGB(150, 60, 50), Color3.fromRGB(70, 82, 110), Color3.fromRGB(196, 180, 150), Color3.fromRGB(110, 70, 90), Color3.fromRGB(160, 130, 80) }
+local PANTS = { Color3.fromRGB(70, 56, 44), Color3.fromRGB(60, 62, 66), Color3.fromRGB(96, 80, 60), Color3.fromRGB(46, 50, 62) }
+local HAIR = { Color3.fromRGB(40, 30, 24), Color3.fromRGB(90, 60, 36), Color3.fromRGB(150, 110, 60), Color3.fromRGB(200, 180, 130), Color3.fromRGB(140, 140, 140) }
+
+type Citizen = {
+	Parts: { BasePart },
+	Offsets: { CFrame }, -- posizione di ogni parte rispetto al corpo (senza animazione)
+	Limbs: { [number]: { Pivot: Vector3, Swing: number } },
+	Street: Street,
+	T: number, -- posizione lungo la strada (0..1)
+	Dir: number, -- 1 verso B, -1 verso A
+	Speed: number,
+	PauseUntil: number,
+	Phase: number,
+	GroundY: number,
+	NextGround: number,
+}
+local citizens: { Citizen } = {}
+
+local function enabled(): boolean
+	return C.ClientData.Setting("Scenery", true) ~= false
+end
+
+local function cameraPosition(): Vector3
+	local camera = workspace.CurrentCamera
+	return if camera then camera.CFrame.Position else Vector3.zero
+end
+
+local function newPart(props: { [string]: any }): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = true
+	p.Material = Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		(p :: any)[k] = v
+	end
+	return p
+end
+
+local function pick(list)
+	return list[rng:NextInteger(1, #list)]
+end
+
+-- Un cittadino semplice: gambe, busto, braccia, testa e capelli/cappello (alto circa come un giocatore)
+local function buildCitizen(): (Model, { BasePart }, { CFrame }, { [number]: { Pivot: Vector3, Swing: number } })
+	local model = Instance.new("Model")
+	model.Name = "Cittadino"
+	local skin = pick(SKINS)
+	local shirt = pick(CLOTHES)
+	local pants = pick(PANTS)
+	local dress = rng:NextNumber() < 0.4
+	local parts: { BasePart }, offsets: { CFrame }, limbs: { [number]: { Pivot: Vector3, Swing: number } } = {}, {}, {}
+	local function add(part: Part, offset: CFrame, limb: { Pivot: Vector3, Swing: number }?)
+		part.Parent = model
+		table.insert(parts, part)
+		table.insert(offsets, offset)
+		if limb then
+			limbs[#parts] = limb
+		end
+	end
+	-- gambe (oscillano attorno all'anca)
+	for _, side in { -1, 1 } do
+		add(newPart({ Name = "Gamba", Size = Vector3.new(0.75, 2.5, 0.8), Color = pants }), CFrame.new(side * 0.45, 1.25, 0), { Pivot = Vector3.new(side * 0.45, 2.5, 0), Swing = side })
+	end
+	add(newPart({ Name = "Busto", Size = Vector3.new(1.9, 2.1, 1), Color = shirt }), CFrame.new(0, 3.55, 0))
+	if dress then
+		add(newPart({ Name = "Gonna", Size = Vector3.new(2.1, 1.7, 1.3), Color = shirt:Lerp(Color3.new(0, 0, 0), 0.15) }), CFrame.new(0, 2.05, 0))
+	else
+		add(newPart({ Name = "Cintura", Size = Vector3.new(1.95, 0.3, 1.05), Color = Color3.fromRGB(60, 44, 30) }), CFrame.new(0, 2.6, 0))
+	end
+	-- braccia (oscillano attorno alla spalla, opposte alle gambe)
+	for _, side in { -1, 1 } do
+		add(newPart({ Name = "Braccio", Size = Vector3.new(0.6, 2.1, 0.6), Color = shirt }), CFrame.new(side * 1.25, 3.55, 0), { Pivot = Vector3.new(side * 1.25, 4.5, 0), Swing = -side })
+	end
+	add(newPart({ Name = "Testa", Shape = Enum.PartType.Ball, Size = Vector3.new(1.25, 1.25, 1.25), Color = skin }), CFrame.new(0, 5.2, 0))
+	local style = rng:NextInteger(1, 4)
+	if style == 1 then
+		add(newPart({ Name = "Capelli", Shape = Enum.PartType.Ball, Size = Vector3.new(1.32, 1.1, 1.32), Color = pick(HAIR), Material = Enum.Material.Fabric }), CFrame.new(0, 5.42, 0.08))
+	elseif style == 2 then
+		add(newPart({ Name = "Cappello", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, 1.7, 1.7), Color = Color3.fromRGB(110, 86, 56), Material = Enum.Material.Fabric }), CFrame.new(0, 5.75, 0) * CFrame.Angles(0, 0, math.rad(90)))
+	elseif style == 3 then
+		add(newPart({ Name = "Fazzoletto", Shape = Enum.PartType.Ball, Size = Vector3.new(1.36, 1.0, 1.36), Color = pick(CLOTHES), Material = Enum.Material.Fabric }), CFrame.new(0, 5.4, 0.12))
+	end
+	-- qualcuno porta un cesto
+	if rng:NextNumber() < 0.3 then
+		add(newPart({ Name = "Cesto", Size = Vector3.new(1.1, 0.7, 0.8), Color = Color3.fromRGB(170, 130, 80), Material = Enum.Material.Fabric }), CFrame.new(1.25, 2.4, -0.35), { Pivot = Vector3.new(1.25, 4.5, 0), Swing = -1 })
+	end
+	model.Parent = folder
+	return model, parts, offsets, limbs
+end
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+groundParams.FilterDescendantsInstances = { workspace.Terrain }
+
+local function groundAt(p: Vector3): number
+	local hit = workspace:Raycast(p + Vector3.new(0, 12, 0), Vector3.new(0, -40, 0), groundParams)
+	return if hit then hit.Position.Y else p.Y
+end
+
+local function positionOn(c: Citizen): Vector3
+	return c.Street.A:Lerp(c.Street.B, c.T)
+end
+
+local function spawnCitizen(street: Street)
+	local _, parts, offsets, limbs = buildCitizen()
+	local c: Citizen = {
+		Parts = parts,
+		Offsets = offsets,
+		Limbs = limbs,
+		Street = street,
+		T = rng:NextNumber(0.05, 0.95),
+		Dir = if rng:NextNumber() < 0.5 then 1 else -1,
+		Speed = rng:NextNumber(4.5, 6.5),
+		PauseUntil = 0,
+		Phase = rng:NextNumber(0, math.pi * 2),
+		GroundY = street.A.Y,
+		NextGround = 0,
+	}
+	c.GroundY = groundAt(positionOn(c))
+	table.insert(citizens, c)
+end
+
+local function removeCitizen(i: number)
+	local c = citizens[i]
+	local model = c.Parts[1] and c.Parts[1].Parent
+	if model then
+		model:Destroy()
+	end
+	table.remove(citizens, i)
+end
+
+local function distanceToStreet(p: Vector3, street: Street): number
+	local ab = street.B - street.A
+	local t = math.clamp((p - street.A):Dot(ab) / ab:Dot(ab), 0, 1)
+	local closest = street.A + ab * t
+	return Vector3.new(p.X - closest.X, 0, p.Z - closest.Z).Magnitude
+end
+
+local function manage()
+	local cam = cameraPosition()
+	-- via quelli lontani (o tutti, se i dettagli sono spenti)
+	for i = #citizens, 1, -1 do
+		local c = citizens[i]
+		local p = positionOn(c)
+		if not enabled() or Vector3.new(p.X - cam.X, 0, p.Z - cam.Z).Magnitude > DESPAWN_RADIUS then
+			removeCitizen(i)
+		end
+	end
+	if not enabled() or #streets == 0 then
+		return
+	end
+	-- di notte in giro c'è meno gente
+	local t = Lighting.ClockTime
+	local limit = if t >= 20.5 or t < 6 then math.floor(MAX_CITIZENS / 3) else MAX_CITIZENS
+	if #citizens > limit then
+		local farthest, farDistance = nil, -1
+		for i, c in citizens do
+			local p = positionOn(c)
+			local d = Vector3.new(p.X - cam.X, 0, p.Z - cam.Z).Magnitude
+			if d > farDistance then
+				farthest, farDistance = i, d
+			end
+		end
+		if farthest then
+			removeCitizen(farthest)
+		end
+		return
+	end
+	local near: { Street } = {}
+	for _, street in streets do
+		if distanceToStreet(cam, street) < SPAWN_RADIUS and math.abs(street.A.Y - cam.Y) < 160 then
+			table.insert(near, street)
+		end
+	end
+	local spawned = 0
+	while #near > 0 and #citizens < limit and spawned < 2 do
+		spawnCitizen(near[rng:NextInteger(1, #near)])
+		spawned += 1
+	end
+end
+
+local function animate(dt: number)
+	if #citizens == 0 then
+		return
+	end
+	local now = os.clock()
+	local parts: { BasePart }, cframes: { CFrame } = {}, {}
+	for _, c in citizens do
+		local walking = now >= c.PauseUntil
+		if walking then
+			c.T += c.Dir * c.Speed * dt / c.Street.Length
+			if c.T >= 1 or c.T <= 0 then
+				c.T = math.clamp(c.T, 0, 1)
+				c.Dir = -c.Dir
+				c.PauseUntil = now + rng:NextNumber(0.5, 2.5)
+			elseif rng:NextNumber() < dt * 0.04 then
+				-- ogni tanto si ferma a chiacchierare o a guardare le vetrine
+				c.PauseUntil = now + rng:NextNumber(2, 6)
+			end
+			c.Phase += dt * c.Speed * 1.15
+		end
+		local pos = positionOn(c)
+		if now >= c.NextGround then
+			c.NextGround = now + 0.5
+			c.GroundY = groundAt(pos)
+		end
+		local dir = (c.Street.B - c.Street.A) * c.Dir
+		local flatDir = Vector3.new(dir.X, 0, dir.Z)
+		local origin = Vector3.new(pos.X, c.GroundY, pos.Z)
+		local body = CFrame.lookAt(origin, origin + (if flatDir.Magnitude > 0.01 then flatDir.Unit else Vector3.new(0, 0, -1)))
+		local swing = if walking then math.sin(c.Phase) else 0
+		local bob = if walking then math.abs(math.cos(c.Phase)) * 0.12 else 0
+		for i, part in c.Parts do
+			local offset = c.Offsets[i]
+			local limb = c.Limbs[i]
+			if limb then
+				-- arto che oscilla attorno al suo perno (anca o spalla)
+				local angle = math.rad(28) * swing * limb.Swing
+				local rel = offset.Position - limb.Pivot
+				offset = CFrame.new(limb.Pivot) * CFrame.Angles(angle, 0, 0) * CFrame.new(rel) * offset.Rotation
+			end
+			table.insert(parts, part)
+			table.insert(cframes, body * CFrame.new(0, bob, 0) * offset)
+		end
+	end
+	workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+end
+
+local function loadStreets(map: Instance)
+	local raw = map:GetAttribute("Strade")
+	if type(raw) ~= "string" or raw == "" then
+		return
+	end
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(raw)
+	end)
+	if not ok or type(data) ~= "table" then
+		return
+	end
+	table.clear(streets)
+	for _, s in data do
+		local a = Vector3.new(s[1], s[2], s[3])
+		local b = Vector3.new(s[4], s[5], s[6])
+		local length = (b - a).Magnitude
+		if length > 10 then
+			table.insert(streets, { A = a, B = b, Length = length })
+		end
+	end
+end
+
+function CitizenController.Init(c)
+	C = c
+end
+
+function CitizenController.Start()
+	folder = Instance.new("Folder")
+	folder.Name = "CittadiniLocali"
+	folder.Parent = workspace
+	task.spawn(function()
+		local map = workspace:WaitForChild(Config.Folders.Map, 120)
+		if not map then
+			return
+		end
+		groundParams.FilterDescendantsInstances = { workspace.Terrain, map }
+		loadStreets(map)
+		map:GetAttributeChangedSignal("Strade"):Connect(function()
+			loadStreets(map)
+		end)
+	end)
+	RunService.Heartbeat:Connect(function(dt)
+		local ok, err = pcall(animate, dt)
+		if not ok then
+			warn("[Cittadini] " .. tostring(err))
+		end
+	end)
+	task.spawn(function()
+		while true do
+			local ok, err = pcall(manage)
+			if not ok then
+				warn("[Cittadini] " .. tostring(err))
+			end
+			task.wait(1)
+		end
+	end)
+end
+
+return CitizenController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="83">
+            <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
 	ClientData
@@ -21010,7 +21775,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -21715,7 +22480,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -22344,7 +23109,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -23429,7 +24194,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -23577,7 +24342,489 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="88">
+            <Properties>
+              <string name="Name">NatureController</string>
+              <string name="Source"><![CDATA[--[[
+	NatureController - la natura che si muove (solo grafica, sul client)
+	  • le chiome degli alberi vicini ondeggiano con il vento (più forte col temporale);
+	  • macchie di fiori colorati sull'erba attorno al giocatore;
+	  • stormi di uccelli che volano in cerchio di giorno;
+	  • lucciole di notte e farfalle di giorno nei prati;
+	  • fumo che esce dai camini delle case vicine.
+	Tutto viene creato solo vicino alla telecamera e si può spegnere in
+	Menu → Impostazioni → "Dettagli ambientali".
+]]
+
+local CollectionService = game:GetService("CollectionService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local NatureController = {}
+local C
+
+local player = Players.LocalPlayer
+local rng = Random.new()
+
+local FOLIAGE_TAG = "Fogliame"
+local CHIMNEY_TAG = "Comignolo"
+
+local function enabled(): boolean
+	return C.ClientData.Setting("Scenery", true) ~= false
+end
+
+local function cameraPosition(): Vector3
+	local camera = workspace.CurrentCamera
+	return if camera then camera.CFrame.Position else Vector3.zero
+end
+
+local function isNight(): boolean
+	local t = Lighting.ClockTime
+	return t >= 19.2 or t < 5.6
+end
+
+local function underground(): boolean
+	return cameraPosition().Y < -120
+end
+
+local function localPart(props: { [string]: any }): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		if k ~= "Parent" then
+			(p :: any)[k] = v
+		end
+	end
+	p.Parent = props.Parent
+	return p
+end
+
+-- ALBERI CHE ONDEGGIANO -------------------------------------------------------------------------------
+
+local foliage: { [BasePart]: { Base: CFrame, Pivot: Vector3, Phase: number, Speed: number } } = {}
+local activeFoliage: { BasePart } = {}
+
+local function addFoliage(part: Instance)
+	if part:IsA("BasePart") and not foliage[part] then
+		local size = part.Size
+		foliage[part] = {
+			Base = part.CFrame,
+			Pivot = part.Position - Vector3.new(0, size.Y * 0.55, 0),
+			Phase = rng:NextNumber(0, math.pi * 2),
+			Speed = rng:NextNumber(0.7, 1.2),
+		}
+	end
+end
+
+local function removeFoliage(part: Instance)
+	foliage[part :: BasePart] = nil
+end
+
+local MAX_SWAYING = 220
+
+local function refreshActiveFoliage()
+	table.clear(activeFoliage)
+	local cam = cameraPosition()
+	local near = {}
+	for part, info in foliage do
+		local d = (info.Base.Position - cam).Magnitude
+		if part.Parent and d < 260 then
+			table.insert(near, { Part = part, Distance = d })
+		end
+	end
+	if #near > MAX_SWAYING then
+		table.sort(near, function(a, b)
+			return a.Distance < b.Distance
+		end)
+	end
+	for i = 1, math.min(MAX_SWAYING, #near) do
+		table.insert(activeFoliage, near[i].Part)
+	end
+end
+
+local function swayFoliage(t: number)
+	if #activeFoliage == 0 then
+		return
+	end
+	local wind = workspace.GlobalWind
+	local strength = math.clamp(wind.Magnitude / 30, 0.15, 1.2)
+	local dir = if wind.Magnitude > 0.1 then wind.Unit else Vector3.new(1, 0, 0)
+	local parts: { BasePart }, cframes: { CFrame } = {}, {}
+	for _, part in activeFoliage do
+		local info = foliage[part]
+		if info and part.Parent then
+			local s = math.sin(t * info.Speed * (1 + strength) + info.Phase)
+			local gust = math.sin(t * 0.37 + info.Phase * 0.5) * 0.5 + 0.5
+			local angle = math.rad((1.2 + 3.5 * strength * gust) * s)
+			-- inclinazione verso la direzione del vento, attorno alla base della chioma
+			local axis = Vector3.new(dir.Z, 0, -dir.X)
+			local rot = CFrame.fromAxisAngle(axis, angle)
+			local offset = info.Base.Position - info.Pivot
+			local position = info.Pivot + rot:VectorToWorldSpace(offset)
+			table.insert(parts, part)
+			table.insert(cframes, CFrame.new(position) * rot * info.Base.Rotation)
+		end
+	end
+	if #parts > 0 then
+		workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+	end
+end
+
+local function restoreFoliage()
+	for part, info in foliage do
+		if part.Parent then
+			part.CFrame = info.Base
+		end
+	end
+end
+
+-- FIORI ------------------------------------------------------------------------------------------------
+
+local FLOWER_COLORS = {
+	Color3.fromRGB(236, 72, 84), Color3.fromRGB(250, 214, 70), Color3.fromRGB(170, 110, 220),
+	Color3.fromRGB(245, 245, 250), Color3.fromRGB(255, 150, 60), Color3.fromRGB(110, 160, 250),
+}
+local CELL = 40
+local RADIUS = 120
+local flowerFolder: Folder
+local cells: { [string]: Model } = {}
+local terrainParams = RaycastParams.new()
+terrainParams.FilterType = Enum.RaycastFilterType.Include
+terrainParams.FilterDescendantsInstances = { workspace.Terrain }
+-- per i fiori si guarda tutto: se sopra l'erba c'è una casa, un albero o una strada, niente fiori
+local openParams = RaycastParams.new()
+openParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function buildCell(cx: number, cz: number): Model
+	local model = Instance.new("Model")
+	model.Name = ("Fiori_%d_%d"):format(cx, cz)
+	local cellRng = Random.new(cx * 73856093 + cz * 19349663)
+	local patches = cellRng:NextInteger(0, 2)
+	for _ = 1, patches do
+		local px = (cx + cellRng:NextNumber()) * CELL
+		local pz = (cz + cellRng:NextNumber()) * CELL
+		local color = FLOWER_COLORS[cellRng:NextInteger(1, #FLOWER_COLORS)]
+		for _ = 1, cellRng:NextInteger(4, 8) do
+			local x = px + cellRng:NextNumber(-4, 4)
+			local z = pz + cellRng:NextNumber(-4, 4)
+			local hit = workspace:Raycast(Vector3.new(x, 600, z), Vector3.new(0, -1400, 0), openParams)
+			local onGrass = hit ~= nil and hit.Instance == workspace.Terrain and (hit.Material == Enum.Material.Grass or hit.Material == Enum.Material.LeafyGrass)
+			if hit and onGrass and hit.Position.Y > -100 then
+				local h = cellRng:NextNumber(0.9, 1.6)
+				localPart({ Name = "Stelo", Size = Vector3.new(0.12, h, 0.12), CFrame = CFrame.new(hit.Position + Vector3.new(0, h / 2, 0)) * CFrame.Angles(cellRng:NextNumber(-0.2, 0.2), 0, cellRng:NextNumber(-0.2, 0.2)), Color = Color3.fromRGB(74, 120, 56), Material = Enum.Material.SmoothPlastic, Parent = model })
+				local petal = cellRng:NextNumber(0.45, 0.7)
+				localPart({ Name = "Fiore", Shape = Enum.PartType.Ball, Size = Vector3.one * petal, CFrame = CFrame.new(hit.Position + Vector3.new(0, h + petal * 0.3, 0)), Color = color, Material = Enum.Material.SmoothPlastic, Parent = model })
+			end
+		end
+	end
+	model.Parent = flowerFolder
+	return model
+end
+
+local function updateFlowers()
+	local cam = cameraPosition()
+	if not enabled() or underground() then
+		for key, model in cells do
+			model:Destroy()
+			cells[key] = nil
+		end
+		return
+	end
+	local ccx, ccz = math.floor(cam.X / CELL), math.floor(cam.Z / CELL)
+	local reach = math.ceil(RADIUS / CELL)
+	local wanted = {}
+	local built = 0
+	openParams.FilterDescendantsInstances = { flowerFolder, player.Character or flowerFolder }
+	for dx = -reach, reach do
+		for dz = -reach, reach do
+			local cx, cz = ccx + dx, ccz + dz
+			if (Vector2.new(dx, dz) * CELL).Magnitude <= RADIUS then
+				local key = cx .. "_" .. cz
+				wanted[key] = true
+				if not cells[key] and built < 5 then
+					cells[key] = buildCell(cx, cz)
+					built += 1
+				end
+			end
+		end
+	end
+	for key, model in cells do
+		if not wanted[key] then
+			model:Destroy()
+			cells[key] = nil
+		end
+	end
+end
+
+-- UCCELLI -----------------------------------------------------------------------------------------------
+
+type Bird = { Body: Part, Left: Part, Right: Part, Offset: Vector3, Phase: number }
+type Flock = { Center: Vector3, Radius: number, Height: number, Angle: number, Speed: number, Birds: { Bird } }
+local flocks: { Flock } = {}
+local birdFolder: Folder
+local meadowGround = 0
+local birdBaseY: number? = nil
+
+local function makeFlock(center: Vector3): Flock
+	local flock: Flock = {
+		Center = center,
+		Radius = rng:NextNumber(60, 130),
+		Height = rng:NextNumber(70, 120),
+		Angle = rng:NextNumber(0, math.pi * 2),
+		Speed = rng:NextNumber(0.12, 0.22) * (if rng:NextNumber() < 0.5 then -1 else 1),
+		Birds = {},
+	}
+	local color = Color3.fromRGB(40, 36, 34)
+	for i = 1, rng:NextInteger(5, 8) do
+		local row = math.ceil(i / 2)
+		local side = if i % 2 == 0 then 1 else -1
+		local bird: Bird = {
+			Body = localPart({ Name = "Uccello", Size = Vector3.new(0.5, 0.35, 1.4), Color = color, Material = Enum.Material.SmoothPlastic, Parent = birdFolder }),
+			Left = localPart({ Name = "Ala", Size = Vector3.new(1.6, 0.08, 0.6), Color = color, Material = Enum.Material.SmoothPlastic, Parent = birdFolder }),
+			Right = localPart({ Name = "Ala", Size = Vector3.new(1.6, 0.08, 0.6), Color = color, Material = Enum.Material.SmoothPlastic, Parent = birdFolder }),
+			Offset = Vector3.new(side * row * 2.6, rng:NextNumber(-1, 1), row * 2.4),
+			Phase = rng:NextNumber(0, math.pi * 2),
+		}
+		table.insert(flock.Birds, bird)
+	end
+	return flock
+end
+
+local function clearFlocks()
+	for _, flock in flocks do
+		for _, bird in flock.Birds do
+			bird.Body:Destroy()
+			bird.Left:Destroy()
+			bird.Right:Destroy()
+		end
+	end
+	table.clear(flocks)
+end
+
+local function updateFlocks(t: number, dt: number)
+	local cam = cameraPosition()
+	local want = enabled() and not isNight() and not underground() and (C.SkyController == nil or C.SkyController.Weather() ~= "Temporale")
+	if not want then
+		if #flocks > 0 then
+			clearFlocks()
+		end
+		return
+	end
+	-- la quota segue il terreno sotto la telecamera, con calma
+	birdBaseY = if birdBaseY then birdBaseY + (meadowGround - birdBaseY) * math.min(1, dt * 0.4) else meadowGround
+	while #flocks < 3 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		table.insert(flocks, makeFlock(cam + Vector3.new(math.cos(a) * 120, 0, math.sin(a) * 120)))
+	end
+	local parts: { BasePart }, cframes: { CFrame } = {}, {}
+	for _, flock in flocks do
+		-- lo stormo segue (piano) il giocatore se si allontana troppo
+		local flat = Vector3.new(cam.X - flock.Center.X, 0, cam.Z - flock.Center.Z)
+		if flat.Magnitude > 300 then
+			flock.Center += flat * math.min(1, dt * 0.3)
+		end
+		flock.Angle += flock.Speed * dt
+		local a = flock.Angle
+		local pos = Vector3.new(flock.Center.X + math.cos(a) * flock.Radius, (birdBaseY or cam.Y) + flock.Height, flock.Center.Z + math.sin(a) * flock.Radius)
+		local forward = Vector3.new(-math.sin(a), 0, math.cos(a)) * math.sign(flock.Speed)
+		local frame = CFrame.lookAt(pos, pos + forward)
+		for _, bird in flock.Birds do
+			local cf = frame * CFrame.new(bird.Offset + Vector3.new(0, math.sin(t * 0.8 + bird.Phase) * 0.6, 0))
+			local flap = math.sin(t * 9 + bird.Phase) * 0.6
+			table.insert(parts, bird.Body)
+			table.insert(cframes, cf)
+			table.insert(parts, bird.Left)
+			table.insert(cframes, cf * CFrame.new(-0.2, 0, 0) * CFrame.Angles(0, 0, flap) * CFrame.new(-0.8, 0, 0))
+			table.insert(parts, bird.Right)
+			table.insert(cframes, cf * CFrame.new(0.2, 0, 0) * CFrame.Angles(0, 0, -flap) * CFrame.new(0.8, 0, 0))
+		end
+	end
+	workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+end
+
+-- LUCCIOLE E FARFALLE ------------------------------------------------------------------------------------
+
+local meadowPart: Part
+local fireflies: ParticleEmitter
+local butterflies: ParticleEmitter
+
+local function buildMeadow()
+	meadowPart = localPart({ Name = "Prato", Size = Vector3.new(90, 6, 90), Transparency = 1, Parent = workspace.CurrentCamera })
+	fireflies = Instance.new("ParticleEmitter")
+	fireflies.Name = "Lucciole"
+	fireflies.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	fireflies.Color = ColorSequence.new(Color3.fromRGB(214, 255, 120))
+	fireflies.LightEmission = 1
+	fireflies.LightInfluence = 0
+	fireflies.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.2, 0.35), NumberSequenceKeypoint.new(0.8, 0.35), NumberSequenceKeypoint.new(1, 0) })
+	fireflies.Lifetime = NumberRange.new(4, 7)
+	fireflies.Speed = NumberRange.new(0.4, 1.4)
+	fireflies.SpreadAngle = Vector2.new(180, 180)
+	fireflies.RotSpeed = NumberRange.new(-40, 40)
+	fireflies.Acceleration = Vector3.new(0, 0.15, 0)
+	fireflies.Shape = Enum.ParticleEmitterShape.Box
+	fireflies.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	fireflies.Rate = 0
+	fireflies.Parent = meadowPart
+
+	butterflies = Instance.new("ParticleEmitter")
+	butterflies.Name = "Farfalle"
+	butterflies.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	butterflies.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 200, 80)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)) })
+	butterflies.LightEmission = 0.1
+	butterflies.Size = NumberSequence.new(0.3)
+	butterflies.Squash = NumberSequence.new({ NumberSequenceKeypoint.new(0, -1), NumberSequenceKeypoint.new(0.25, 1), NumberSequenceKeypoint.new(0.5, -1), NumberSequenceKeypoint.new(0.75, 1), NumberSequenceKeypoint.new(1, -1) })
+	butterflies.Lifetime = NumberRange.new(5, 8)
+	butterflies.Speed = NumberRange.new(1.5, 3)
+	butterflies.SpreadAngle = Vector2.new(180, 60)
+	butterflies.Shape = Enum.ParticleEmitterShape.Box
+	butterflies.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	butterflies.Rate = 0
+	butterflies.Parent = meadowPart
+end
+
+local function updateMeadow()
+	local cam = cameraPosition()
+	local hit = workspace:Raycast(cam + Vector3.new(0, 10, 0), Vector3.new(0, -260, 0), terrainParams)
+	local onGrass = hit ~= nil and (hit.Material == Enum.Material.Grass or hit.Material == Enum.Material.LeafyGrass)
+	if hit then
+		meadowGround = hit.Position.Y
+	end
+	local weather = if C.SkyController then C.SkyController.Weather() else "Sereno"
+	local dry = weather == "Sereno" or weather == "Nuvoloso"
+	local on = enabled() and onGrass and dry and not underground()
+	fireflies.Rate = if on and isNight() then 10 else 0
+	butterflies.Rate = if on and not isNight() and weather == "Sereno" then 1.2 else 0
+end
+
+-- FUMO DAI CAMINI -----------------------------------------------------------------------------------------
+
+local smoking: { [BasePart]: ParticleEmitter } = {}
+
+local function smokeEmitter(chimney: BasePart): ParticleEmitter
+	local att = Instance.new("Attachment")
+	att.Name = "FumoCamino"
+	att.Position = Vector3.new(0, chimney.Size.Y / 2 + 0.4, 0)
+	att.Parent = chimney
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	e.Color = ColorSequence.new(Color3.fromRGB(200, 196, 190), Color3.fromRGB(150, 148, 146))
+	e.LightInfluence = 1
+	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(0.6, 0.75), NumberSequenceKeypoint.new(1, 1) })
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 6) })
+	e.Lifetime = NumberRange.new(6, 9)
+	e.Speed = NumberRange.new(2, 4)
+	e.SpreadAngle = Vector2.new(12, 12)
+	e.RotSpeed = NumberRange.new(-20, 20)
+	e.Rotation = NumberRange.new(0, 360)
+	e.Rate = 2.5
+	e.WindAffectsDrag = true
+	e.Drag = 0.6
+	e.Acceleration = Vector3.new(0, 0.8, 0)
+	e.Parent = att
+	return e
+end
+
+local function updateChimneys()
+	local cam = cameraPosition()
+	local candidates = {}
+	if enabled() then
+		for _, chimney in CollectionService:GetTagged(CHIMNEY_TAG) do
+			if chimney:IsA("BasePart") then
+				local d = (chimney.Position - cam).Magnitude
+				if d < 380 then
+					table.insert(candidates, { Part = chimney, Distance = d })
+				end
+			end
+		end
+		table.sort(candidates, function(a, b)
+			return a.Distance < b.Distance
+		end)
+	end
+	local keep = {}
+	for i = 1, math.min(24, #candidates) do
+		keep[candidates[i].Part] = true
+	end
+	for chimney, emitter in smoking do
+		if not keep[chimney] or not chimney.Parent then
+			if emitter.Parent then
+				emitter.Parent:Destroy()
+			end
+			smoking[chimney] = nil
+		end
+	end
+	for chimney in keep do
+		if not smoking[chimney] then
+			smoking[chimney] = smokeEmitter(chimney)
+		end
+	end
+end
+
+function NatureController.Init(c)
+	C = c
+end
+
+function NatureController.Start()
+	flowerFolder = Instance.new("Folder")
+	flowerFolder.Name = "FioriLocali"
+	flowerFolder.Parent = workspace
+	birdFolder = Instance.new("Folder")
+	birdFolder.Name = "UccelliLocali"
+	birdFolder.Parent = workspace
+	buildMeadow()
+
+	for _, part in CollectionService:GetTagged(FOLIAGE_TAG) do
+		addFoliage(part)
+	end
+	CollectionService:GetInstanceAddedSignal(FOLIAGE_TAG):Connect(addFoliage)
+	CollectionService:GetInstanceRemovedSignal(FOLIAGE_TAG):Connect(removeFoliage)
+
+	local t = 0
+	RunService.RenderStepped:Connect(function(dt)
+		t += dt
+		if enabled() then
+			swayFoliage(t)
+		end
+		local ok, err = pcall(updateFlocks, t, dt)
+		if not ok then
+			warn("[Natura] " .. tostring(err))
+		end
+		if meadowPart then
+			meadowPart.CFrame = CFrame.new(cameraPosition().X, meadowGround + 3, cameraPosition().Z)
+		end
+	end)
+
+	local wasEnabled = true
+	task.spawn(function()
+		while true do
+			local on = enabled()
+			if wasEnabled and not on then
+				restoreFoliage()
+			end
+			wasEnabled = on
+			for _, fn in { refreshActiveFoliage, updateFlowers, updateMeadow, updateChimneys } do
+				local ok, err = pcall(fn)
+				if not ok then
+					warn("[Natura] " .. tostring(err))
+				end
+			end
+			task.wait(1)
+		end
+	end)
+end
+
+return NatureController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -24459,7 +25706,320 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="90">
+            <Properties>
+              <string name="Name">SkyController</string>
+              <string name="Source"><![CDATA[--[[
+	SkyController - cielo, luce e meteo (solo grafica, sul client)
+	Mescola tre cose e le cambia piano piano:
+	  • l'atmosfera della zona (nebbia verde nella foresta, cenere tra le rovine...);
+	  • l'ora del giorno: alba e tramonto arancioni, notte blu con le stelle;
+	  • il meteo deciso dal server (attributo "Meteo" di ReplicatedStorage):
+	    Sereno, Nuvoloso, Pioggia (gocce, cielo grigio) e Temporale (pioggia forte, fulmini e tuoni).
+	Sottoterra il meteo e il cielo non si vedono.
+]]
+
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Zones = require(Shared.Data.Zones)
+
+local SkyController = {}
+local C
+
+local player = Players.LocalPlayer
+local rng = Random.new()
+
+local WEATHER = {
+	Sereno = { Cover = 0.42, CloudDensity = 0.5, CloudColor = Color3.fromRGB(255, 255, 255), Density = 0, Haze = 0, Bright = 1, Exposure = 0, Sat = 0, Grey = 0, Rain = 0 },
+	Nuvoloso = { Cover = 0.8, CloudDensity = 0.7, CloudColor = Color3.fromRGB(226, 229, 234), Density = 0.05, Haze = 0.5, Bright = 0.82, Exposure = -0.03, Sat = -0.06, Grey = 0.2, Rain = 0 },
+	Pioggia = { Cover = 0.92, CloudDensity = 0.86, CloudColor = Color3.fromRGB(160, 165, 175), Density = 0.14, Haze = 1.4, Bright = 0.6, Exposure = -0.08, Sat = -0.18, Grey = 0.45, Rain = 1 },
+	Temporale = { Cover = 0.98, CloudDensity = 0.96, CloudColor = Color3.fromRGB(98, 102, 112), Density = 0.22, Haze = 2, Bright = 0.42, Exposure = -0.14, Sat = -0.28, Grey = 0.68, Rain = 2 },
+}
+local NUMERIC = { "Cover", "CloudDensity", "Density", "Haze", "Bright", "Exposure", "Sat", "Grey", "Rain" }
+
+local zoneAmbience = Zones.Ambience.Default
+local indoor = false -- sottoterra: niente cielo né meteo
+local weather = table.clone(WEATHER.Sereno)
+local base = {
+	Brightness = Lighting.Brightness,
+	OutdoorAmbient = Lighting.OutdoorAmbient,
+}
+
+local rainPart: Part? = nil
+local rainEmitter: ParticleEmitter? = nil
+local splashPart: Part? = nil
+local splashEmitter: ParticleEmitter? = nil
+local nextLightning = 0
+
+function SkyController.SetZoneAmbience(ambience)
+	zoneAmbience = ambience or Zones.Ambience.Default
+end
+
+function SkyController.Weather(): string
+	local weather = ReplicatedStorage:GetAttribute("Meteo")
+	return if type(weather) == "string" then weather else "Sereno"
+end
+
+-- 0..1 a forma di campana attorno all'ora "center"
+local function bell(t: number, center: number, width: number): number
+	local d = (t - center) / width
+	return math.max(0, 1 - d * d)
+end
+
+local function smooth(a: number, b: number, x: number): number
+	local k = math.clamp((x - a) / (b - a), 0, 1)
+	return k * k * (3 - 2 * k)
+end
+
+-- quanto è alba/tramonto (warm) e quanto è notte (night) all'ora attuale
+local function timeOfDay(): (number, number, number)
+	local t = Lighting.ClockTime
+	local dawn = bell(t, 6.6, 1.4)
+	local dusk = bell(t, 18.4, 1.5)
+	local night = 1 - math.min(smooth(4.8, 6.3, t), 1 - smooth(18.9, 20.2, t))
+	return math.min(1, dawn + dusk), night, dawn
+end
+
+-- PIOGGIA ---------------------------------------------------------------------------------------------
+
+local function makeEmitterPart(name: string, size: Vector3): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Transparency = 1
+	p.Size = size
+	p.Parent = workspace.CurrentCamera
+	return p
+end
+
+local function buildRain()
+	rainPart = makeEmitterPart("Pioggia", Vector3.new(150, 2, 150))
+	local e = Instance.new("ParticleEmitter")
+	e.Name = "Gocce"
+	e.Texture = "rbxasset://textures/particles/fire_sparks_main.dds"
+	e.Color = ColorSequence.new(Color3.fromRGB(196, 210, 226))
+	e.LightEmission = 0.15
+	e.LightInfluence = 0.8
+	e.Orientation = Enum.ParticleOrientation.FacingCameraWorldUp
+	e.Size = NumberSequence.new(0.22)
+	e.Squash = NumberSequence.new(2.6)
+	e.Transparency = NumberSequence.new(0.35)
+	e.Lifetime = NumberRange.new(0.9, 1.1)
+	e.Speed = NumberRange.new(120, 145)
+	e.EmissionDirection = Enum.NormalId.Bottom
+	e.Shape = Enum.ParticleEmitterShape.Box
+	e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	e.WindAffectsDrag = true
+	e.Drag = 0.4
+	e.Rate = 0
+	e.Parent = rainPart
+	rainEmitter = e
+
+	splashPart = makeEmitterPart("Schizzi", Vector3.new(70, 1, 70))
+	local s = Instance.new("ParticleEmitter")
+	s.Name = "Schizzi"
+	s.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	s.Color = ColorSequence.new(Color3.fromRGB(220, 230, 240))
+	s.LightEmission = 0.2
+	s.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	s.Transparency = NumberSequence.new(0.45)
+	s.Lifetime = NumberRange.new(0.15, 0.25)
+	s.Speed = NumberRange.new(3, 6)
+	s.SpreadAngle = Vector2.new(35, 35)
+	s.EmissionDirection = Enum.NormalId.Top
+	s.Shape = Enum.ParticleEmitterShape.Box
+	s.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	s.Rate = 0
+	s.Parent = splashPart
+	splashEmitter = s
+end
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+groundParams.FilterDescendantsInstances = { workspace.Terrain }
+
+local lastGroundCheck = 0
+local groundY = 0
+
+-- la grafica "Automatica" (0) vale come media
+local function qualityMultiplier(): number
+	local ok, level = pcall(function()
+		return UserSettings().GameSettings.SavedQualityLevel.Value
+	end)
+	if not ok or level == 0 then
+		return 0.6
+	end
+	return math.clamp(level / 7, 0.35, 1)
+end
+
+-- posizione delle gocce: segue la telecamera a ogni fotogramma (anche in volo coi rampini)
+local function followCamera()
+	local camera = workspace.CurrentCamera
+	if not rainPart or not camera then
+		return
+	end
+	local cam = camera.CFrame.Position
+	rainPart.CFrame = CFrame.new(cam + Vector3.new(0, 60, 0) - workspace.GlobalWind * 0.6 + camera.CFrame.LookVector * 30)
+	if splashPart then
+		splashPart.CFrame = CFrame.new(cam.X, groundY + 0.6, cam.Z)
+	end
+end
+
+local function updateRain(rain: number)
+	local camera = workspace.CurrentCamera
+	if not rainEmitter or not camera then
+		return
+	end
+	local cam = camera.CFrame.Position
+	local mult = qualityMultiplier()
+	rainEmitter.Rate = rain * 1100 * mult
+	if splashEmitter then
+		local now = os.clock()
+		if now - lastGroundCheck > 0.4 then
+			lastGroundCheck = now
+			local hit = workspace:Raycast(cam + Vector3.new(0, 20, 0), Vector3.new(0, -300, 0), groundParams)
+			groundY = if hit then hit.Position.Y else cam.Y - 20
+		end
+		splashEmitter.Rate = if rain > 0.1 then rain * 260 * mult else 0
+	end
+end
+
+-- FULMINI ----------------------------------------------------------------------------------------------
+
+local function lightningStrike()
+	local camera = workspace.CurrentCamera
+	if not camera or not C.EffectsController then
+		return
+	end
+	local cam = camera.CFrame.Position
+	local angle = rng:NextNumber(0, math.pi * 2)
+	local dist = rng:NextNumber(220, 700)
+	local ground = Vector3.new(cam.X + math.cos(angle) * dist, cam.Y - 40, cam.Z + math.sin(angle) * dist)
+	local hit = workspace:Raycast(ground + Vector3.new(0, 400, 0), Vector3.new(0, -900, 0), groundParams)
+	if hit then
+		ground = hit.Position
+	end
+	C.EffectsController.Lightning(ground + Vector3.new(rng:NextNumber(-60, 60), 900, rng:NextNumber(-60, 60)), ground, Color3.fromRGB(225, 232, 255), 3 + rng:NextNumber() * 3)
+	C.EffectsController.Flash(Color3.fromRGB(230, 236, 255), math.clamp(0.5 - dist / 1800, 0.12, 0.4), 0.25)
+	-- il tuono arriva dopo il lampo (più lontano = più tardi)
+	task.delay(dist / 500, function()
+		if C.SoundController then
+			C.SoundController.Play("Thunder", nil, { Volume = math.clamp(1.1 - dist / 900, 0.35, 1), Pitch = rng:NextNumber(0.24, 0.34) })
+		end
+		if C.CameraController and dist < 400 then
+			C.CameraController.Shake(0.12, 0.4)
+		end
+	end)
+end
+
+-- CIELO ------------------------------------------------------------------------------------------------
+
+local function approach(current: number, target: number, k: number): number
+	return current + (target - current) * k
+end
+
+local function step(dt: number)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	indoor = (root ~= nil and root.Position.Y < -120) or zoneAmbience == Zones.Ambience.Sotterraneo or zoneAmbience == Zones.Ambience.Cristallo
+
+	-- il meteo cambia lentamente (circa 15 secondi)
+	local target = WEATHER[SkyController.Weather()] or WEATHER.Sereno
+	local kw = math.min(1, dt * 0.08)
+	for _, key in NUMERIC do
+		weather[key] = approach(weather[key], target[key], kw)
+	end
+	weather.CloudColor = (weather.CloudColor or target.CloudColor):Lerp(target.CloudColor, kw)
+
+	local warm, night, dawn = timeOfDay()
+	local w = if indoor then WEATHER.Sereno else weather
+	local sky = if indoor then 0 else 1
+	local amb = zoneAmbience
+	local grey = w.Grey * sky
+
+	local color = amb.Color:Lerp(Color3.fromRGB(255, 176, 128), warm * 0.55 * sky):Lerp(Color3.fromRGB(46, 58, 96), night * 0.75 * sky):Lerp(Color3.fromRGB(150, 156, 166), grey * (1 - night * 0.5))
+	local decay = amb.Decay:Lerp(Color3.fromRGB(214, 120, 86), warm * 0.6 * sky):Lerp(Color3.fromRGB(18, 24, 46), night * 0.8 * sky):Lerp(Color3.fromRGB(96, 100, 110), grey)
+	local tint = amb.Tint:Lerp(Color3.fromRGB(255, 214, 180), warm * 0.45 * sky):Lerp(Color3.fromRGB(198, 212, 255), night * 0.55 * sky):Lerp(Color3.fromRGB(226, 232, 240), grey * 0.6)
+
+	local k = math.min(1, dt * 0.6)
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atmosphere then
+		atmosphere.Density = approach(atmosphere.Density, amb.Density + w.Density * sky + dawn * 0.08 * sky, k)
+		atmosphere.Haze = approach(atmosphere.Haze, amb.Haze + w.Haze * sky + warm * 0.9 * sky, k)
+		atmosphere.Glare = approach(atmosphere.Glare, amb.Glare * (1 - grey) + warm * 0.5 * sky, k)
+		atmosphere.Color = atmosphere.Color:Lerp(color, k)
+		atmosphere.Decay = atmosphere.Decay:Lerp(decay, k)
+	end
+	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+	if cc then
+		cc.TintColor = cc.TintColor:Lerp(tint, k)
+		cc.Saturation = approach(cc.Saturation, amb.Saturation + w.Sat * sky + warm * 0.05 * sky, k)
+		cc.Contrast = approach(cc.Contrast, amb.Contrast + warm * 0.03 * sky, k)
+	end
+	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
+	if rays then
+		rays.Intensity = approach(rays.Intensity, (0.05 + warm * 0.12) * (1 - grey) * sky, k)
+	end
+	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, amb.Exposure + w.Exposure * sky + night * 0.05 * sky, k)
+	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * (if indoor then 1 else w.Bright), k)
+	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(Color3.fromRGB(96, 106, 146), night * 0.5 * sky), k)
+
+	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if clouds then
+		clouds.Cover = approach(clouds.Cover, w.Cover, k)
+		clouds.Density = approach(clouds.Density, w.CloudDensity, k)
+		local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
+		clouds.Color = clouds.Color:Lerp(cloudColor, k)
+	end
+
+	-- pioggia e fulmini
+	local rain = if indoor then 0 else weather.Rain
+	updateRain(rain)
+	if rain > 1.5 and not indoor then
+		local now = os.clock()
+		if now > nextLightning then
+			nextLightning = now + rng:NextNumber(5, 14)
+			lightningStrike()
+		end
+	end
+end
+
+function SkyController.Init(c)
+	C = c
+end
+
+function SkyController.Start()
+	base.Brightness = math.max(Lighting.Brightness, 2)
+	base.OutdoorAmbient = Lighting.OutdoorAmbient
+	weather = table.clone(WEATHER[SkyController.Weather()] or WEATHER.Sereno)
+	buildRain()
+	RunService.RenderStepped:Connect(followCamera)
+	local acc = 0
+	RunService.Heartbeat:Connect(function(dt)
+		acc += dt
+		if acc < 0.05 then
+			return
+		end
+		local ok, err = pcall(step, acc)
+		acc = 0
+		if not ok then
+			warn("[Cielo] " .. tostring(err))
+		end
+	end)
+end
+
+return SkyController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -24549,7 +26109,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -25023,7 +26583,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -25134,7 +26694,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="91">
+        <Item class="LocalScript" referent="94">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -25163,6 +26723,9 @@ local ORDER = {
 	{ Controllers, "ODMController" },
 	{ Controllers, "CombatController" },
 	{ Controllers, "AmbienceController" },
+	{ Controllers, "SkyController" },
+	{ Controllers, "NatureController" },
+	{ Controllers, "CitizenController" },
 	{ Controllers, "CutsceneController" },
 	{ UI, "DamageNumbers" },
 	{ UI, "HUD" },
@@ -25218,11 +26781,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="92">
+        <Item class="Folder" referent="95">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -25525,6 +27088,13 @@ local function showWorld()
 			send("Teleport", zone.Id)
 		end)
 	end
+	section("Meteo", "Cambia il tempo per tutto il server.")
+	r = row(160, 40)
+	for _, w in { { "Sereno", "☀️" }, { "Nuvoloso", "☁️" }, { "Pioggia", "🌧️" }, { "Temporale", "⛈️" } } do
+		button(r, w[2] .. " " .. w[1], nil, function()
+			send("Weather", w[1])
+		end)
+	end
 	section("Ora del giorno")
 	r = row(120, 40)
 	for _, hour in { 6, 9, 12, 15, 18, 21, 0 } do
@@ -25717,7 +27287,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -25873,7 +27443,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -26529,7 +28099,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -27250,7 +28820,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -27751,7 +29321,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -28301,6 +29871,7 @@ local function showSettings()
 		{ Key = "Shake", Name = "Scossa della telecamera" },
 		{ Key = "SpeedLines", Name = "Linee di velocità" },
 		{ Key = "DamageNumbers", Name = "Numeri dei danni" },
+		{ Key = "Scenery", Name = "Dettagli ambientali (natura e cittadini)" },
 	}
 	for i, t in toggles do
 		local on = C.ClientData.Setting(t.Key, true)
@@ -28420,7 +29991,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -28700,7 +30271,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -29024,7 +30595,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -29152,7 +30723,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -29824,7 +31395,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -30507,7 +32078,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -30752,7 +32323,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -30954,13 +32525,25 @@ return UIController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="106">
+  <Item class="Workspace" referent="109">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>
+      <Vector3 name="GlobalWind">
+        <X>10</X>
+        <Y>0</Y>
+        <Z>5</Z>
+      </Vector3>
       <float name="Gravity">196.2</float>
       <bool name="NeedsPivotMigration">false</bool>
       <bool name="StreamingEnabled">true</bool>
     </Properties>
+    <Item class="Terrain" referent="110">
+      <Properties>
+        <string name="Name">Terrain</string>
+        <bool name="Decoration">true</bool>
+        <float name="GrassLength">0.85</float>
+      </Properties>
+    </Item>
   </Item>
 </roblox>

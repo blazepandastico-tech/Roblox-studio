@@ -27,11 +27,31 @@ local Sounds = {
 	Roar = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 1, Pitch = 0.25 },
 }
 
--- Musica di sottofondo (lascia vuoto per nessuna musica, oppure metti ID del Creator Store)
+--[[
+	MUSICA DINAMICA: cambia da sola (con dissolvenza) in base a dove sei e a cosa succede.
+	Come aggiungere una traccia:
+	  1. in Studio apri la Casella degli strumenti (Toolbox) → scheda Audio;
+	  2. cerca per esempio "medieval town", "calm fantasy", "epic battle", "boss fight"
+	     (le tracce caricate dall'account "Roblox" si possono usare gratis nei giochi);
+	  3. tasto destro sulla traccia → "Copia ID risorsa" (Copy Asset ID);
+	  4. incolla qui sotto così: "rbxassetid://1234567890".
+	Una situazione lasciata "" usa la traccia Default; se anche Default è "", c'è silenzio.
+]]
 Sounds.Music = {
-	Default = "",
-	Battle = "",
-	Boss = "",
+	Default = "", -- traccia di riserva per tutte le situazioni senza una traccia propria
+	Calm = "", -- esplorazione di giorno (prati, foreste, mare)
+	City = "", -- città e zone sicure
+	Night = "", -- esplorazione di notte
+	Battle = "", -- giganti vicini o che ti stanno inseguendo
+	Boss = "", -- boss e raid
+}
+
+-- Suoni d'ambiente in sottofondo, insieme alla musica (stesse istruzioni; "" = spento)
+Sounds.Ambient = {
+	Rain = "", -- pioggia e temporale
+	Wind = "", -- vento forte (temporale)
+	Birds = "", -- uccellini di giorno all'aperto
+	Night = "", -- grilli di notte all'aperto
 }
 
 return Sounds

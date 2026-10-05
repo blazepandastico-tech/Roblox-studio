@@ -2,7 +2,10 @@
 	AmbienceController
 	Atmosfera di ogni zona (nebbia verde nella foresta, cenere tra le rovine di Halvar,
 	cielo arancione al Fronte della Grande Marcia...), banner con il nome della zona,
-	mulini a vento che girano e lampioni che si accendono di notte.
+	mulini a vento che girano, lampioni che si accendono di notte e la musica dinamica:
+	calma di giorno, città, notte, battaglia (giganti vicini o che ti inseguono) e boss,
+	con i suoni d'ambiente (pioggia, vento, uccellini, grilli). Gli ID delle tracce si
+	mettono in Shared/Data/Sounds.lua.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -10,6 +13,7 @@ local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -25,8 +29,8 @@ local player = Players.LocalPlayer
 local currentZoneId: string? = nil
 local currentRegion: string? = nil
 local currentAmbience = nil
+local currentZone = nil
 local spinners: { Model } = {}
-local music: Sound? = nil
 
 AmbienceController.ZoneId = nil :: string?
 AmbienceController.RegionName = ""
@@ -36,6 +40,11 @@ local function applyAmbience(ambience)
 		return
 	end
 	currentAmbience = ambience
+	-- il cielo mescola l'atmosfera della zona con l'ora del giorno e il meteo
+	if C.SkyController then
+		C.SkyController.SetZoneAmbience(ambience)
+		return
+	end
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	local cc = Lighting:FindFirstChild("ColorCorrection") or Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	local info = TweenInfo.new(3, Enum.EasingStyle.Sine)
@@ -68,6 +77,7 @@ local function updateZone()
 		return
 	end
 	local zone = Zones.Find(root.Position)
+	currentZone = zone
 	local zoneId = zone and zone.Id or nil
 	local region = Zones.RegionName(root.Position)
 	AmbienceController.RegionName = region
@@ -122,18 +132,141 @@ local function updateLamps()
 	end
 end
 
-local function setupMusic()
-	local id = Sounds.Music.Default
-	if not id or id == "" then
-		return
+-- MUSICA DINAMICA E SUONI D'AMBIENTE ---------------------------------------------------------------
+
+local MUSIC_VOLUME = 0.3
+local AMBIENT_VOLUME = 0.4
+local FADE_TIME = 2.5 -- secondi di dissolvenza quando la musica cambia
+local BATTLE_LINGER = 8 -- la musica di battaglia resta ancora qualche secondo dopo l'ultimo nemico
+
+local layers: { [string]: Sound } = {} -- un Sound per ogni ID: situazioni con lo stesso ID non ricominciano la traccia
+local battleUntil = 0
+local bossUntil = 0
+AmbienceController.MusicState = "Calm"
+
+local function trackId(list: { [string]: string }, key: string): string
+	local id = list[key]
+	if type(id) ~= "string" or id == "" then
+		return ""
 	end
-	music = Instance.new("Sound")
-	music.Name = "Musica"
-	music.SoundId = id
-	music.Looped = true
-	music.Volume = 0.3
-	music.Parent = game:GetService("SoundService")
-	music:Play()
+	return id
+end
+
+local function musicStateNow(): string
+	local now = os.clock()
+	local root = Util.GetRoot(player.Character)
+	if root then
+		local pos = root.Position
+		local titans = workspace:FindFirstChild(Config.Folders.Titans)
+		if titans then
+			for _, model in titans:GetChildren() do
+				if model:IsA("Model") and model.PrimaryPart and model:GetAttribute("State") ~= "Dead" and not model:GetAttribute("Ally") and not model:GetAttribute("Dummy") then
+					local d = (model.PrimaryPart.Position - pos).Magnitude
+					if model:GetAttribute("Boss") == true and d < 420 then
+						bossUntil = now + BATTLE_LINGER
+					elseif d < 140 or (model:GetAttribute("TargetUserId") == player.UserId and d < 320) then
+						battleUntil = now + BATTLE_LINGER
+					end
+				end
+			end
+		end
+		local enemies = workspace:FindFirstChild(Config.Folders.Enemies)
+		if enemies then
+			for _, model in enemies:GetChildren() do
+				local hrp = model:FindFirstChild("HumanoidRootPart")
+				if hrp and hrp:IsA("BasePart") and not model:GetAttribute("Dead") then
+					local d = (hrp.Position - pos).Magnitude
+					if model:GetAttribute("Boss") == true and d < 260 then
+						bossUntil = now + BATTLE_LINGER
+					elseif d < 90 then
+						battleUntil = now + BATTLE_LINGER
+					end
+				end
+			end
+		end
+	end
+	if now < bossUntil then
+		return "Boss"
+	elseif now < battleUntil then
+		return "Battle"
+	elseif currentZone and currentZone.Safe then
+		return "City"
+	end
+	local t = Lighting.ClockTime
+	if t >= 19 or t < 6 then
+		return "Night"
+	end
+	return "Calm"
+end
+
+local function layer(id: string): Sound
+	local existing = layers[id]
+	if existing then
+		return existing
+	end
+	local sound = Instance.new("Sound")
+	sound.Name = "Sottofondo"
+	sound.SoundId = id
+	sound.Looped = true
+	sound.Volume = 0
+	sound.Parent = SoundService
+	layers[id] = sound
+	return sound
+end
+
+-- volume desiderato per ogni traccia (musica + suoni d'ambiente) e il volume pieno di riferimento
+local function wantedVolumes(): ({ [string]: number }, number)
+	local wanted = {}
+	local function want(id: string, volume: number)
+		if id ~= "" and volume > 0 then
+			wanted[id] = math.max(wanted[id] or 0, volume)
+		end
+	end
+	local state = AmbienceController.MusicState
+	local musicId = trackId(Sounds.Music, state)
+	if musicId == "" then
+		musicId = trackId(Sounds.Music, "Default")
+	end
+	local full = MUSIC_VOLUME * (C.ClientData.Setting("Music", 0.5) or 0.5)
+	want(musicId, full)
+
+	local sfx = AMBIENT_VOLUME * (C.ClientData.Setting("Sfx", 0.8) or 0.8)
+	local root = Util.GetRoot(player.Character)
+	local below = root ~= nil and root.Position.Y < -120 -- sottosuolo: niente cielo
+	local weather = if C.SkyController then C.SkyController.Weather() else "Sereno"
+	local rainy = weather == "Pioggia" or weather == "Temporale"
+	local t = Lighting.ClockTime
+	local night = t >= 19.2 or t < 5.6
+	local ambient = Sounds.Ambient or {}
+	if not below then
+		want(trackId(ambient, "Rain"), if weather == "Temporale" then sfx else if rainy then sfx * 0.75 else 0)
+		want(trackId(ambient, "Wind"), if weather == "Temporale" then sfx * 0.6 else 0)
+		want(trackId(ambient, "Birds"), if not night and not rainy and state ~= "Battle" and state ~= "Boss" then sfx * 0.5 else 0)
+		want(trackId(ambient, "Night"), if night and not rainy then sfx * 0.5 else 0)
+	end
+	return wanted, math.max(full, sfx, 0.05)
+end
+
+local function updateSound(dt: number)
+	local wanted, full = wantedVolumes()
+	for id in wanted do
+		layer(id)
+	end
+	local step = full * dt / FADE_TIME
+	for id, sound in layers do
+		local target = wanted[id] or 0
+		if sound.Volume < target then
+			sound.Volume = math.min(target, sound.Volume + step)
+		else
+			sound.Volume = math.max(target, sound.Volume - step)
+		end
+		if target > 0 and not sound.IsPlaying then
+			sound:Play()
+		elseif target == 0 and sound.Volume <= 0.001 and sound.IsPlaying then
+			-- finita la dissolvenza si ferma (la prossima volta riparte dall'inizio)
+			sound:Stop()
+		end
+	end
 end
 
 function AmbienceController.Init(c)
@@ -142,17 +275,30 @@ end
 
 function AmbienceController.Start()
 	setupSpinners()
-	setupMusic()
 	task.spawn(function()
 		while true do
 			local ok, err = pcall(updateZone)
 			if not ok then
 				warn("[Atmosfera] " .. tostring(err))
 			end
-			if music then
-				music.Volume = 0.3 * (C.ClientData.Setting("Music", 0.5) or 0.5)
+			local okMusic, state = pcall(musicStateNow)
+			if okMusic then
+				AmbienceController.MusicState = state
 			end
 			task.wait(0.5)
+		end
+	end)
+	-- dissolvenze della musica (10 volte al secondo)
+	task.spawn(function()
+		local last = os.clock()
+		while true do
+			task.wait(0.1)
+			local now = os.clock()
+			local ok, err = pcall(updateSound, now - last)
+			last = now
+			if not ok then
+				warn("[Musica] " .. tostring(err))
+			end
 		end
 	end)
 	task.spawn(function()

@@ -298,6 +298,13 @@ local function showWorld()
 			send("Teleport", zone.Id)
 		end)
 	end
+	section("Meteo", "Cambia il tempo per tutto il server.")
+	r = row(160, 40)
+	for _, w in { { "Sereno", "☀️" }, { "Nuvoloso", "☁️" }, { "Pioggia", "🌧️" }, { "Temporale", "⛈️" } } do
+		button(r, w[2] .. " " .. w[1], nil, function()
+			send("Weather", w[1])
+		end)
+	end
 	section("Ora del giorno")
 	r = row(120, 40)
 	for _, hour in { 6, 9, 12, 15, 18, 21, 0 } do

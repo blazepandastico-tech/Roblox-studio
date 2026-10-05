@@ -15,6 +15,7 @@
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local HttpService = game:GetService("HttpService")
 local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -850,6 +851,182 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 	end
 end
 
+-- VITA IN CITTÀ: mercato, carretti, festoni e strade per i cittadini --------------------------------
+
+-- strade percorribili dai cittadini (le legge il client: CitizenController)
+local streets: { { number } } = {}
+
+local AWNINGS = {
+	{ Color3.fromRGB(176, 44, 44), Color3.fromRGB(240, 232, 214) },
+	{ Color3.fromRGB(52, 110, 64), Color3.fromRGB(236, 226, 196) },
+	{ Color3.fromRGB(46, 84, 150), Color3.fromRGB(236, 236, 240) },
+	{ Color3.fromRGB(214, 160, 40), Color3.fromRGB(110, 70, 40) },
+}
+local GOODS = {
+	Color3.fromRGB(214, 48, 40), Color3.fromRGB(240, 170, 40), Color3.fromRGB(110, 170, 60),
+	Color3.fromRGB(150, 90, 50), Color3.fromRGB(230, 210, 120), Color3.fromRGB(120, 60, 120),
+}
+
+-- Banco del mercato con tendone a strisce. cf a terra, il davanti guarda verso -Z
+local function marketStall(cf: CFrame)
+	local w, d = 8, 5
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			part({ Name = "PaloBanco", Size = Vector3.new(0.45, 7, 0.45), CFrame = cf * CFrame.new(sx * (w / 2 - 0.3), 3.5, sz * (d / 2 - 0.3)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+		end
+	end
+	part({ Name = "Bancone", Size = Vector3.new(w, 2.6, 1.6), CFrame = cf * CFrame.new(0, 1.3, -d / 2 + 0.8), Material = Enum.Material.WoodPlanks, Color = PALETTE.Wood })
+	part({ Name = "PianoBancone", Size = Vector3.new(w + 0.3, 0.3, 1.9), CFrame = cf * CFrame.new(0, 2.75, -d / 2 + 0.8), Material = Enum.Material.Wood, Color = Color3.fromRGB(140, 104, 70), CastShadow = false })
+	-- tendone a strisce, inclinato verso il davanti
+	local colors = pick(AWNINGS)
+	local stripes = 5
+	for i = 1, stripes do
+		local x = -w / 2 + (i - 0.5) * w / stripes
+		part({ Name = "Tendone", Size = Vector3.new(w / stripes + 0.02, 0.25, d + 1.6), CFrame = cf * CFrame.new(x, 7.1, -0.5) * CFrame.Angles(math.rad(-14), 0, 0), Material = Enum.Material.Fabric, Color = colors[(i % 2) + 1], CastShadow = i == 1 })
+	end
+	-- merce sul bancone (frutta, verdura, sacchi)
+	for i = 1, 6 do
+		local size = rng:NextNumber(0.6, 0.95)
+		part({ Name = "Merce", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = cf * CFrame.new(-w / 2 + 0.9 + (i - 1) * (w - 1.8) / 5, 2.9 + size / 2, -d / 2 + 0.8 + rng:NextNumber(-0.3, 0.3)), Material = Enum.Material.SmoothPlastic, Color = pick(GOODS), CastShadow = false })
+	end
+	part({ Name = "Cassa", Size = Vector3.new(2, 1.6, 1.6), CFrame = cf * CFrame.new(-w / 2 + 1.4, 0.8, d / 2 - 1.1) * CFrame.Angles(0, rng:NextNumber(-0.3, 0.3), 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(150, 110, 72) })
+	part({ Name = "Barile", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.4, 1.8, 1.8), CFrame = cf * CFrame.new(w / 2 - 1.3, 1.2, d / 2 - 1.1) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(110, 76, 46) })
+end
+
+-- Carretto di legno con il carico. cf a terra, lungo l'asse X
+local function cart(cf: CFrame)
+	part({ Name = "Carretto", Size = Vector3.new(6, 0.8, 3.4), CFrame = cf * CFrame.new(0, 2.4, 0), Material = Enum.Material.WoodPlanks, Color = PALETTE.Wood })
+	for _, side in { -1, 1 } do
+		part({ Name = "Sponda", Size = Vector3.new(6, 1.2, 0.25), CFrame = cf * CFrame.new(0, 3.3, side * 1.6), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(104, 74, 48), CastShadow = false })
+		part({ Name = "Ruota", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 3.8, 3.8), CFrame = cf * CFrame.new(0.4, 1.9, side * 1.95) * CFrame.Angles(0, math.rad(90), 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(80, 56, 36) })
+		part({ Name = "Stanga", Size = Vector3.new(5, 0.25, 0.25), CFrame = cf * CFrame.new(5, 1.6, side * 0.9) * CFrame.Angles(0, 0, math.rad(-14)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+	end
+	-- carico: fieno o sacchi
+	if rng:NextNumber() < 0.5 then
+		part({ Name = "Fieno", Size = Vector3.new(5.2, 1.8, 2.8), CFrame = cf * CFrame.new(0, 3.7, 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(214, 184, 96) })
+	else
+		for i = -1, 1 do
+			part({ Name = "Sacco", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.6, 1.6), CFrame = cf * CFrame.new(i * 1.7, 3.5, rng:NextNumber(-0.4, 0.4)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(196, 176, 140), CastShadow = false })
+		end
+	end
+end
+
+-- Festone di bandierine colorate tra due pali
+local function bunting(a: Vector3, b: Vector3)
+	local height = 13
+	for _, p in { a, b } do
+		part({ Name = "PaloFestone", Size = Vector3.new(0.5, height + 1, 0.5), CFrame = CFrame.new(p + Vector3.new(0, (height + 1) / 2, 0)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+	end
+	local top = Vector3.new(0, height, 0)
+	local length = (b - a).Magnitude
+	part({ Name = "Corda", Size = Vector3.new(0.12, 0.12, length), CFrame = CFrame.lookAt((a + b) / 2 + top - Vector3.new(0, 0.8, 0), b + top - Vector3.new(0, 0.8, 0)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(90, 70, 50), CastShadow = false, CanCollide = false })
+	local flags = math.max(4, math.floor(length / 3.5))
+	for i = 1, flags do
+		local k = i / (flags + 1)
+		-- la corda scende un po' al centro
+		local sag = math.sin(k * math.pi) * 1.6
+		local pos = a:Lerp(b, k) + top - Vector3.new(0, 0.8 + sag, 0)
+		local flag = wedge({ Name = "Bandierina", Size = Vector3.new(0.1, 1.4, 1.2), CFrame = CFrame.lookAt(pos, pos + (b - a).Unit) * CFrame.new(0, -0.7, 0) * CFrame.Angles(math.pi, 0, 0), Material = Enum.Material.Fabric, Color = pick(GOODS), CastShadow = false })
+		flag.CanCollide = false
+	end
+end
+
+-- Registra i tratti di strada liberi (per i cittadini) lungo una retta, dentro la città
+local function recordStreet(from: Vector3, to: Vector3, inside: (Vector3) -> boolean)
+	local length = (to - from).Magnitude
+	local samples = math.max(2, math.floor(length / 4))
+	local runStart: Vector3? = nil
+	local last: Vector3? = nil
+	for i = 0, samples do
+		local p = from:Lerp(to, i / samples)
+		if inside(p) then
+			runStart = runStart or p
+			last = p
+		end
+		if (not inside(p) or i == samples) and runStart and last then
+			if (last - runStart).Magnitude > 30 then
+				table.insert(streets, {
+					math.floor(runStart.X * 10) / 10, math.floor(runStart.Y * 10) / 10, math.floor(runStart.Z * 10) / 10,
+					math.floor(last.X * 10) / 10, math.floor(last.Y * 10) / 10, math.floor(last.Z * 10) / 10,
+				})
+			end
+			runStart = nil
+			last = nil
+		end
+	end
+end
+
+-- Mercato, carretti, festoni e strade di una città
+local function townLife(center: Vector3, radius: number, cell: number, forward: Vector3, opts)
+	local right = Vector3.new(-forward.Z, 0, forward.X)
+	local y = opts.Y or G
+	local function inside(p: Vector3, margin: number): boolean
+		if Util.FlatDistance(p, center) > radius - margin then
+			return false
+		end
+		if opts.HalfPlaneOrigin then
+			return (p - opts.HalfPlaneOrigin):Dot(opts.HalfPlaneNormal) > margin + 4
+		end
+		return true
+	end
+	local function ground(p: Vector3): Vector3
+		return Vector3.new(p.X, y, p.Z)
+	end
+	-- città in rovina: niente mercato e niente cittadini
+	if opts.Ruined then
+		return
+	end
+	-- strade: il viale centrale e le vie trasversali (righe senza case)
+	local steps = math.floor(radius / cell)
+	local function walkable(p: Vector3): boolean
+		return inside(p, 24) and not isReserved(p, 3)
+	end
+	recordStreet(ground(center - forward * steps * cell), ground(center + forward * steps * cell), walkable)
+	for gz = -steps, steps do
+		if gz % 3 == 0 then
+			local mid = center + forward * gz * cell
+			recordStreet(ground(mid - right * steps * cell), ground(mid + right * steps * cell), walkable)
+		end
+	end
+	-- banchi del mercato lungo il viale, rivolti verso il centro della strada
+	local edge = cell * 0.61 - 4
+	local stalls = 0
+	for _, f in { 0.6, -0.6, 1.3, -1.3, 2.0, -2.0, 2.7, 3.4 } do
+		if stalls >= 6 then
+			break
+		end
+		for _, side in { -1, 1 } do
+			local pos = center + forward * (f * cell) + right * (side * edge)
+			if stalls < 6 and inside(pos, 20) and not isReserved(pos, 8) then
+				local g = ground(pos)
+				marketStall(CFrame.lookAt(g, g - right * side))
+				stalls += 1
+			end
+		end
+	end
+	-- carretti parcheggiati e festoni sopra il viale
+	local carts = 0
+	for _, f in { 2.4, -2.4, 3.1, -3.1, 1.0 } do
+		local side = if carts % 2 == 0 then 1 else -1
+		local pos = center + forward * (f * cell) + right * (side * (edge + 1))
+		if carts < 2 and inside(pos, 20) and not isReserved(pos, 8) then
+			local g = ground(pos)
+			cart(CFrame.lookAt(g, g + forward) * CFrame.Angles(0, math.rad(90), 0))
+			carts += 1
+		end
+	end
+	local flags = 0
+	for _, f in { 0.95, -0.95, 1.65, 2.35 } do
+		local mid = center + forward * (f * cell)
+		local a = mid - right * (edge + 2)
+		local b = mid + right * (edge + 2)
+		if flags < 2 and inside(a, 18) and inside(b, 18) and not isReserved(mid, 6) then
+			bunting(ground(a), ground(b))
+			flags += 1
+		end
+	end
+end
+
 -- Città su griglia dentro un cerchio (o semicerchio per i distretti)
 local function buildTown(name: string, center: Vector3, radius: number, opts)
 	currentGroup = group(name)
@@ -882,6 +1059,10 @@ local function buildTown(name: string, center: Vector3, radius: number, opts)
 				end
 			end
 		end
+	end
+	local ok, err = pcall(townLife, center, radius, cell, forward, opts)
+	if not ok then
+		warn("[WorldBuilder] Vita in città (" .. name .. "): " .. tostring(err))
 	end
 	return count
 end
@@ -1649,7 +1830,18 @@ function WorldBuilder.Build()
 	step("Alberi", scatterTrees)
 	step("Confini", buildBoundaries)
 
-	print(("[WorldBuilder] Mappa generata: %d parti in %.1fs"):format(partCount, os.clock() - t0))
+	-- alberi che ondeggiano e camini che fumano (li anima il client)
+	for _, d in mapFolder:GetDescendants() do
+		if d:IsA("BasePart") then
+			if d.Name == "Chioma" or d.Name == "Fogliame" then
+				CollectionService:AddTag(d, "Fogliame")
+			elseif d.Name == "Comignolo" then
+				CollectionService:AddTag(d, "Comignolo")
+			end
+		end
+	end
+	mapFolder:SetAttribute("Strade", HttpService:JSONEncode(streets))
+	print(("[WorldBuilder] Mappa generata: %d parti in %.1fs, %d tratti di strada"):format(partCount, os.clock() - t0, #streets))
 	return mapFolder
 end
 

@@ -545,6 +545,7 @@ local function showSettings()
 		{ Key = "Shake", Name = "Scossa della telecamera" },
 		{ Key = "SpeedLines", Name = "Linee di velocità" },
 		{ Key = "DamageNumbers", Name = "Numeri dei danni" },
+		{ Key = "Scenery", Name = "Dettagli ambientali (natura e cittadini)" },
 	}
 	for i, t in toggles do
 		local on = C.ClientData.Setting(t.Key, true)

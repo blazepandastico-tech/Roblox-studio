@@ -1,7 +1,10 @@
 --[[
 	LightingService
 	Grafica: atmosfera, nuvole, bloom, raggi del sole, correzione colore,
-	e il ciclo giorno/notte (di notte i giganti rallentano).
+	il ciclo giorno/notte (di notte i giganti rallentano) e il METEO:
+	Sereno, Nuvoloso, Pioggia e Temporale si alternano da soli e il vento cambia.
+	Il meteo attuale è l'attributo "Meteo" di ReplicatedStorage: i colori, la pioggia
+	e i fulmini li disegna ogni client (AmbienceController).
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -13,6 +16,68 @@ local Config = require(Shared.Config)
 
 local LightingService = {}
 local S
+
+-- meteo: probabilità e durata (secondi reali)
+LightingService.Weathers = {
+	{ Id = "Sereno", Weight = 45, Duration = { 420, 780 }, Wind = 8 },
+	{ Id = "Nuvoloso", Weight = 25, Duration = { 300, 540 }, Wind = 14 },
+	{ Id = "Pioggia", Weight = 20, Duration = { 240, 420 }, Wind = 18 },
+	{ Id = "Temporale", Weight = 10, Duration = { 180, 300 }, Wind = 30 },
+}
+local WEATHER_TEXT = {
+	Sereno = "Il cielo si rasserena.",
+	Nuvoloso = "Le nuvole coprono il sole.",
+	Pioggia = "Comincia a piovere.",
+	Temporale = "Si avvicina un temporale: tuoni e fulmini sull'arcipelago!",
+}
+local rng = Random.new()
+local windAngle = rng:NextNumber(0, math.pi * 2)
+
+function LightingService.Weather(): string
+	local weather = ReplicatedStorage:GetAttribute("Meteo")
+	return if type(weather) == "string" then weather else "Sereno"
+end
+
+function LightingService.SetWeather(id: string, announce: boolean?)
+	local def = nil
+	for _, w in LightingService.Weathers do
+		if w.Id == id then
+			def = w
+		end
+	end
+	if not def then
+		return false
+	end
+	local before = LightingService.Weather()
+	ReplicatedStorage:SetAttribute("Meteo", def.Id)
+	ReplicatedStorage:SetAttribute("MeteoDa", os.time())
+	-- il vento gira piano e si rinforza col brutto tempo (muove erba, nuvole, pioggia e particelle)
+	windAngle += rng:NextNumber(-0.8, 0.8)
+	workspace.GlobalWind = Vector3.new(math.cos(windAngle), 0, math.sin(windAngle)) * def.Wind
+	if announce ~= false and before ~= def.Id and S and S.EventService then
+		S.EventService.NotifyAll("🌦️ " .. WEATHER_TEXT[def.Id], "Info", 5)
+	end
+	return true
+end
+
+local function pickWeather(current: string): any
+	local total = 0
+	for _, w in LightingService.Weathers do
+		if w.Id ~= current then
+			total += w.Weight
+		end
+	end
+	local roll = rng:NextNumber() * total
+	for _, w in LightingService.Weathers do
+		if w.Id ~= current then
+			roll -= w.Weight
+			if roll <= 0 then
+				return w
+			end
+		end
+	end
+	return LightingService.Weathers[1]
+end
 
 local function ensure(className: string, parent: Instance, name: string?): any
 	local existing = parent:FindFirstChildOfClass(className)
@@ -79,11 +144,8 @@ function LightingService.Setup()
 	dof.InFocusRadius = 160
 	dof.NearIntensity = 0
 
-	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
-	if not clouds then
-		clouds = Instance.new("Clouds")
-		clouds.Parent = workspace.Terrain
-	end
+	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
+	clouds.Parent = workspace.Terrain
 	clouds.Cover = 0.55
 	clouds.Density = 0.62
 	clouds.Color = Color3.fromRGB(255, 255, 255)
@@ -95,6 +157,16 @@ end
 
 function LightingService.Start()
 	LightingService.Setup()
+	LightingService.SetWeather("Sereno", false)
+	-- il meteo cambia da solo
+	task.spawn(function()
+		local current = LightingService.Weathers[1]
+		while true do
+			task.wait(rng:NextNumber(current.Duration[1], current.Duration[2]))
+			current = pickWeather(LightingService.Weather())
+			LightingService.SetWeather(current.Id)
+		end
+	end)
 	local wasNight = LightingService.IsNight()
 	local hoursPerSecond = 24 / Config.World.DayLength
 	local accumulated = 0

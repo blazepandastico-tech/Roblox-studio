@@ -71,6 +71,27 @@ Ci si sposta tra le isole con i **traghettatori** (uno in ogni città principale
 | **Valdoria** | 4 | 1000+ | il continente oltre il mare: porto, trincee, Revelia, la fortezza di Vael, il Fronte della Grande Marcia |
 | **Arena** | Raid | 120+ | l'anfiteatro dove si combattono i raid |
 
+## 3b. Un mondo vivo: cielo, meteo, natura, città e musica
+
+- **Cielo e luce**: alba rosata, tramonto arancione, notte blu con le stelle, raggi di sole e nebbia che
+  cambiano con l'ora e con la zona (foresta verde, cenere di Halvar, cielo rosso al Fronte...).
+- **Meteo** (uguale per tutti i giocatori del server, cambia da solo ogni 3-13 minuti): *Sereno*,
+  *Nuvoloso*, *Pioggia* (gocce e schizzi a terra) e *Temporale* (lampi, tuoni, vento forte).
+  Il vento piega l'erba, fa ondeggiare gli alberi e sposta il fumo. Dal pannello admin (**P → Mondo → Meteo**)
+  si sceglie il meteo all'istante, utile per provarlo.
+- **Natura**: erba 3D che si muove col vento sui prati, chiome degli alberi che ondeggiano, macchie di fiori
+  colorati, stormi di uccelli di giorno, farfalle col sereno e lucciole di notte.
+- **Città vive**: cittadini che passeggiano per le strade (meno di notte), banchi del mercato con i tendoni
+  a strisce, carretti, festoni colorati sopra il viale e fumo che esce dai camini. Le città in rovina restano deserte.
+- **Musica dinamica**: cambia da sola con una dissolvenza tra *calma* (giorno), *città*, *notte*, *battaglia*
+  (giganti vicini o che ti inseguono) e *boss/raid*, più i suoni d'ambiente (pioggia, vento, uccellini, grilli).
+  **Le tracce vanno scelte da te**: apri `src/shared/Data/Sounds.lua` (in Studio: ReplicatedStorage → Shared →
+  Data → Sounds), cerca le tracce nella Casella degli strumenti → Audio, copia l'ID e incollalo come
+  `"rbxassetid://123..."`. Una situazione lasciata vuota usa la traccia `Default`.
+
+Tutti questi dettagli sono solo grafici (ogni giocatore li vede sul suo dispositivo) e si adattano alla qualità
+grafica. Chi ha un dispositivo lento può spegnerli: **Menu (M) → Impostazioni → Dettagli ambientali**.
+
 ## 4. Giganti, boss e raid
 
 - **Giganti normali** (da 3 a 15 metri, più gli anomali) popolano ogni isola: più ti allontani, più sono forti.
@@ -165,7 +186,7 @@ Visibile solo agli amministratori: **Roblox Studio**, il **proprietario del gioc
 - **Sieri**: gli 8 Sieri Perduti (**per ora si ottengono SOLO da qui**), maestria massima, trasformazione (T).
 - **Poteri**: immortalità, gas infinito, colpo unico, velocità x1.5/x2/x3, cura completa.
 - **Mondo**: evoca giganti e boss, abbatti o rimuovi i giganti vicini, invasione, teletrasporto, ora del giorno,
-  vai da un giocatore o portalo da te.
+  meteo (sereno, nuvoloso, pioggia, temporale), vai da un giocatore o portalo da te.
 - **Storia**: completa l'obiettivo, salta a qualsiasi capitolo, storia completata.
 - **Server**: annuncio a tutti (filtrato da Roblox), esperienza doppia per tutti, espelli un giocatore.
 
@@ -187,7 +208,8 @@ La guida completa, capitolo per capitolo, è in [`docs/GUIDA_STORIA.md`](docs/GU
 | Storia e dialoghi | `src/shared/Data/Story.lua`, `NPCs.lua` |
 | Missioni, raid | `Quests.lua`, `Raids.lua` |
 | Prezzi in Robux e negozio delle gemme | `Monetization.lua` |
-| Suoni e musica (ID del Creator Store) | `Sounds.lua` |
+| Suoni, musica dinamica e suoni d'ambiente (ID del Creator Store) | `Sounds.lua` |
+| Durata e probabilità del meteo | `src/server/Services/LightingService.lua` (`Weathers`) |
 | Animazioni caricate da te (opzionale) | `AnimationIds.lua` |
 
 Le animazioni sono **procedurali** (calcolate dal codice): funzionano subito senza caricare nulla.
