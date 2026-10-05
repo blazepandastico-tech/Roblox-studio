@@ -2712,6 +2712,8 @@ local Config = {
 	-- Amministratori: UserId di chi può aprire il Pannello Admin (tasto P) anche nel gioco pubblicato.
 	-- Il proprietario del gioco e Roblox Studio sono sempre amministratori.
 	Admins = {},
+	-- Oppure per nome utente Roblox (quello con la @, senza la @; maiuscole/minuscole non contano).
+	AdminNames = { "matyy_pandini" },
 
 	-- Community: crea un Gruppo Roblox per il gioco e metti qui il suo ID (0 = disattivato).
 	-- Chi entra nel gruppo riceve +10% oro per sempre e un regalo di benvenuto.
@@ -8239,7 +8241,7 @@ return AchievementService
             <string name="Source"><![CDATA[--[[
 	AdminService - Pannello Admin (tasto P)
 	Solo gli amministratori possono usarlo: Roblox Studio, il proprietario del gioco
-	(o il capo del gruppo proprietario) e gli UserId in Config.Admins.
+	(o il capo del gruppo proprietario), gli UserId in Config.Admins e i nomi in Config.AdminNames.
 	Ogni azione è controllata QUI sul server: un giocatore normale non può usarla
 	nemmeno modificando il proprio client.
 
@@ -8275,6 +8277,12 @@ function AdminService.IsAdmin(player: Player): boolean
 	end
 	for _, id in Config.Admins do
 		if id == player.UserId then
+			return true
+		end
+	end
+	local name = string.lower(player.Name)
+	for _, adminName in Config.AdminNames or {} do
+		if string.lower(adminName) == name then
 			return true
 		end
 	end
@@ -27138,7 +27146,7 @@ local function showServer()
 			send("Kick")
 		end
 	end)
-	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro UserId in Config.lua → Admins. Ora ci sono %d admin extra."):format(#Config.Admins))
+	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro nome in Config.lua → AdminNames (o l'UserId in Admins). Ora ci sono %d admin extra."):format(#Config.Admins + #(Config.AdminNames or {})))
 end
 
 local RENDER = {

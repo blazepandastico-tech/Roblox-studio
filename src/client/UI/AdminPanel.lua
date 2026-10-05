@@ -348,7 +348,7 @@ local function showServer()
 			send("Kick")
 		end
 	end)
-	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro UserId in Config.lua → Admins. Ora ci sono %d admin extra."):format(#Config.Admins))
+	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro nome in Config.lua → AdminNames (o l'UserId in Admins). Ora ci sono %d admin extra."):format(#Config.Admins + #(Config.AdminNames or {})))
 end
 
 local RENDER = {

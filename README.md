@@ -179,7 +179,7 @@ Per convertire altri modelli: `python3 tools/mesh_titan/convert.py modello.fbx c
 ## 7a. Pannello Admin (tasto P)
 
 Visibile solo agli amministratori: **Roblox Studio**, il **proprietario del gioco** e gli UserId in
-`Config.lua → Admins`. Ogni azione è controllata dal server, quindi i giocatori normali non possono usarlo.
+`Config.lua → Admins` (oppure i nomi utente in `Config.lua → AdminNames`, ad esempio `matyy_pandini`). Ogni azione è controllata dal server, quindi i giocatori normali non possono usarlo.
 
 - **Progressione**: livello massimo, +10/+100 livelli, statistiche al massimo, oro, gemme, giri della ruota, azzera premi.
 - **Oggetti**: tutti gli oggetti con un clic o uno alla volta, tutti i game pass.

@@ -1,7 +1,7 @@
 --[[
 	AdminService - Pannello Admin (tasto P)
 	Solo gli amministratori possono usarlo: Roblox Studio, il proprietario del gioco
-	(o il capo del gruppo proprietario) e gli UserId in Config.Admins.
+	(o il capo del gruppo proprietario), gli UserId in Config.Admins e i nomi in Config.AdminNames.
 	Ogni azione è controllata QUI sul server: un giocatore normale non può usarla
 	nemmeno modificando il proprio client.
 
@@ -37,6 +37,12 @@ function AdminService.IsAdmin(player: Player): boolean
 	end
 	for _, id in Config.Admins do
 		if id == player.UserId then
+			return true
+		end
+	end
+	local name = string.lower(player.Name)
+	for _, adminName in Config.AdminNames or {} do
+		if string.lower(adminName) == name then
 			return true
 		end
 	end
