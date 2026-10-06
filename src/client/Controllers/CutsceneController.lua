@@ -3,6 +3,9 @@
 	Scene animate della storia: inquadrature cinematografiche, bande nere,
 	sottotitoli, giganti costruiti al volo, fulmini, esplosioni e vapore.
 	Il prologo viene girato su un "set" costruito nel cielo, così si vede sempre.
+	Le altre scene si girano nel mondo vero: prima di cominciare si carica la zona
+	(streaming), la telecamera non entra mai dentro muri o colline e lo schermo nero
+	iniziale si apre da solo appena la prima inquadratura è pronta.
 ]]
 
 local Players = game:GetService("Players")
@@ -11,6 +14,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
 local Net = require(Shared.Lib.Net)
 local Util = require(Shared.Lib.Util)
 local W = require(Shared.Data.WorldLayout)
@@ -27,6 +31,7 @@ local camera = workspace.CurrentCamera
 
 local playing = false
 local skipRequested = false
+local revealed = false -- lo schermo nero iniziale è già stato aperto?
 local shotCFrame: CFrame? = nil -- inquadratura attuale (senza scossa)
 local props: { Instance } = {}
 local animators: { any } = {}
@@ -48,6 +53,7 @@ local function buildUI()
 		Font = Theme.Fonts.Header,
 		TextSize = 20,
 		TextColor3 = Theme.Colors.Gold,
+		ZIndex = 8,
 		Parent = holder,
 	})
 	local text = Theme.Label("", {
@@ -58,6 +64,7 @@ local function buildUI()
 		Font = Theme.Fonts.Body,
 		TextSize = 22,
 		TextStrokeTransparency = 0.5,
+		ZIndex = 8,
 		Parent = holder,
 	})
 	local fade = Theme.New("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 5, Parent = holder })
@@ -141,12 +148,48 @@ function api.FadeOut(t: number)
 end
 
 function api.FadeIn(t: number)
+	revealed = true
 	TweenService:Create(ui.Fade, TweenInfo.new(t), { BackgroundTransparency = 1 }):Play()
+end
+
+-- Apre lo schermo nero iniziale (una volta sola): chiamata in automatico dalla prima inquadratura
+local function reveal()
+	if not revealed then
+		api.FadeIn(0.9)
+	end
+end
+
+-- Carica dal server la zona dove si gira la scena (con lo streaming attivo le zone lontane non ci sono)
+function api.Stream(position: Vector3)
+	pcall(function()
+		player:RequestStreamAroundAsync(position, 4)
+	end)
+end
+
+-- La telecamera non deve finire dentro un muro, una casa o una collina: se tra il soggetto
+-- e la telecamera c'è qualcosa, la telecamera si avvicina fino a vedere il soggetto.
+local sightParams = RaycastParams.new()
+sightParams.FilterType = Enum.RaycastFilterType.Include
+local function clearView(from: Vector3, at: Vector3): Vector3
+	local map = workspace:FindFirstChild(Config.Folders.Map)
+	sightParams.FilterDescendantsInstances = if map then { workspace.Terrain, map } else { workspace.Terrain }
+	local offset = from - at
+	if offset.Magnitude < 1 then
+		return from
+	end
+	local hit = workspace:Raycast(at, offset, sightParams)
+	if hit and (hit.Position - at).Magnitude > offset.Magnitude * 0.2 then
+		return hit.Position - offset.Unit * 3
+	end
+	return from
 end
 
 -- Muove la telecamera da un'inquadratura all'altra (attende la fine)
 function api.Shot(from: CFrame, to: CFrame, duration: number, style: string?)
 	camera.CameraType = Enum.CameraType.Scriptable
+	camera.CFrame = from
+	shotCFrame = from
+	reveal()
 	local start = os.clock()
 	while true do
 		if skipRequested then
@@ -165,13 +208,17 @@ end
 
 -- Come Shot, ma senza attendere (la scena continua mentre la telecamera si muove)
 function api.ShotAsync(from: CFrame, to: CFrame, duration: number, style: string?)
+	camera.CameraType = Enum.CameraType.Scriptable
+	camera.CFrame = from
+	shotCFrame = from
+	reveal()
 	task.spawn(function()
 		pcall(api.Shot, from, to, duration, style)
 	end)
 end
 
 function api.Look(from: Vector3, at: Vector3): CFrame
-	return CFrame.lookAt(from, at)
+	return CFrame.lookAt(clearView(from, at), at)
 end
 
 function api.Titan(look: string, height: number, position: Vector3, yaw: number?): Model
@@ -356,10 +403,11 @@ Scenes.Calaneth = function()
 	local gate = W.DistrictGatePoint("Calaneth")
 	local outward = W.DistrictOutward("Calaneth")
 	local outer = gate + outward * 140
+	api.Stream(outer)
 	local colossal = api.Titan("Vulcano", 190, outer + outward * 60 - Vector3.new(0, 120, 0), 0)
 	colossal:PivotTo(CFrame.lookAt(colossal:GetPivot().Position, colossal:GetPivot().Position - outward))
 	letterbox(true)
-	local camPos = gate + outward * 40 + Vector3.new(30, 25, 0)
+	local camPos = gate + outward * 40 + Vector3.new(30, W.GroundY + 55, 0)
 	api.ShotAsync(api.Look(camPos, outer + Vector3.new(0, 120, 0)), api.Look(camPos + Vector3.new(0, -10, 0), outer + Vector3.new(0, 170, 0)), 5)
 	fx().Lightning(outer + outward * 60 + Vector3.new(0, 700, 0), outer + outward * 60 + Vector3.new(0, 150, 0), Color3.fromRGB(255, 236, 130), 4)
 	fx().Flash(Color3.fromRGB(255, 240, 200), 0.4, 0.6)
@@ -382,10 +430,11 @@ end
 Scenes.TobiasGigante = function()
 	local zone = Zones.Get("Calaneth")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	local tobias = api.Titan("Furia", 48, center + Vector3.new(30, 0, 30), 200)
 	local enemy = api.Titan("Puro", 32, center + Vector3.new(30, 0, -12), 20)
 	letterbox(true)
-	api.ShotAsync(api.Look(center + Vector3.new(-60, 30, 10), center + Vector3.new(30, 30, 10)), api.Look(center + Vector3.new(-40, 22, 0), center + Vector3.new(30, 35, 10)), 6)
+	api.ShotAsync(api.Look(center + Vector3.new(-70, 50, 10), center + Vector3.new(30, 30, 10)), api.Look(center + Vector3.new(-50, 42, 0), center + Vector3.new(30, 35, 10)), 6)
 	api.Animate(tobias, "Roar")
 	if C.SoundController then
 		C.SoundController.Play("Roar")
@@ -404,11 +453,12 @@ end
 Scenes.Cacciatrice = function()
 	local zone = Zones.Get("Foresta")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	local female = api.Titan("Cacciatrice", 45, center + Vector3.new(-120, 0, 0), 270)
 	api.Walk(female, 1, 1)
 	letterbox(true)
 	api.Move(female, CFrame.new(center + Vector3.new(80, female:GetAttribute("HipHeight") :: number, 0)) * CFrame.Angles(0, math.rad(-90), 0), 5)
-	api.Shot(api.Look(center + Vector3.new(-40, 30, 80), center + Vector3.new(-100, 25, 0)), api.Look(center + Vector3.new(40, 26, 70), center + Vector3.new(60, 30, 0)), 5)
+	api.Shot(api.Look(center + Vector3.new(-40, 45, 80), center + Vector3.new(-100, 25, 0)), api.Look(center + Vector3.new(40, 40, 70), center + Vector3.new(60, 30, 0)), 5)
 	api.Say("Roth", "Qualcosa corre tra gli alberi... è un gigante, ma si muove come un soldato!", 3)
 	api.Walk(female, 0)
 	api.Animate(female, "Roar")
@@ -419,6 +469,7 @@ end
 Scenes.Fauno = function()
 	local zone = Zones.Get("Ostrava")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	local beast = api.Titan("Fauno", 55, center + Vector3.new(0, 0, -150), 0)
 	letterbox(true)
 	api.ShotAsync(api.Look(center + Vector3.new(40, 60, -40), center + Vector3.new(0, 50, -150)), api.Look(center + Vector3.new(30, 40, -60), center + Vector3.new(0, 55, -150)), 6)
@@ -435,6 +486,7 @@ end
 Scenes.Tradimento = function()
 	local zone = Zones.Get("GolaEdenia")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	letterbox(true)
 	local camFrom = api.Look(center + Vector3.new(-60, 40, -60), center + Vector3.new(0, 30, 0))
 	api.ShotAsync(camFrom, api.Look(center + Vector3.new(-40, 30, -40), center + Vector3.new(0, 40, 0)), 7)
@@ -473,6 +525,7 @@ end
 Scenes.Strisciante = function()
 	local zone = Zones.Get("PianaOrvel")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	local crawler = api.Titan("Strisciante", 110, center + Vector3.new(0, -60, -90), 180)
 	letterbox(true)
 	api.Move(crawler, CFrame.new(center + Vector3.new(0, (crawler:GetAttribute("HipHeight") :: number) * 0.6, -90)) * CFrame.Angles(0, math.pi, 0), 4)
@@ -494,6 +547,7 @@ end
 Scenes.Vulcano = function()
 	local zone = Zones.Get("Halvar")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	letterbox(true)
 	api.ShotAsync(api.Look(center + Vector3.new(-150, 40, -120), center + Vector3.new(0, 100, 60)), api.Look(center + Vector3.new(-120, 30, -100), center + Vector3.new(0, 140, 60)), 7)
 	api.Say("Narratore", "Una luce accecante squarciò il cielo sopra Halvar.", 2.5)
@@ -521,6 +575,7 @@ end
 Scenes.Primordiale = function()
 	local zone = Zones.Get("FronteMarcia")
 	local center = zone and zone.Center or Vector3.zero
+	api.Stream(center)
 	local boss = api.Titan("Primordiale", 240, center + Vector3.new(0, -200, 120), 180)
 	local marchers = {}
 	for i = -2, 2 do
@@ -559,6 +614,7 @@ function CutsceneController.Play(id: string)
 	end
 	playing = true
 	skipRequested = false
+	revealed = false
 	C.CameraController.SetCinematic(true)
 	C.UIController.RequestCursor("cutscene", true)
 	if C.HUD then
@@ -567,6 +623,14 @@ function CutsceneController.Play(id: string)
 	ui.Holder.Visible = true
 	ui.Fade.BackgroundTransparency = 0
 	ui.Title.TextTransparency = 1
+	ui.Speaker.Text = ""
+	ui.Text.Text = ""
+	-- sicurezza: se una scena non muove mai la telecamera, lo schermo nero si apre comunque
+	task.delay(6, function()
+		if playing and not revealed then
+			api.FadeIn(0.9)
+		end
+	end)
 	local ok, err = pcall(scene)
 	if not ok and err ~= "skip" then
 		warn("[Scene] " .. tostring(err))
@@ -599,8 +663,8 @@ function CutsceneController.Start()
 	buildUI()
 	Net.Event("Cutscene").OnClientEvent:Connect(function(id)
 		if type(id) == "string" then
-			-- aspetta che l'intro sia stata chiusa
-			while C.Intro and C.Intro.IsShowing() do
+			-- aspetta che l'intro e l'eventuale dialogo in corso siano stati chiusi
+			while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) do
 				task.wait(0.2)
 			end
 			CutsceneController.Play(id)
