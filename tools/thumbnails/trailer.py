@@ -739,7 +739,7 @@ def cmd_edit(frames_dir, cover_path, music, out_path, vertical_path=None):
     probe = Image.open(os.path.join(frames_dir, f"{SHOTS[0][0]}_0000.png"))
     W, H = probe.size
     starts, total = timeline()
-    tmp = tempfile.mkdtemp(prefix="trailer_", dir=os.path.dirname(out_path) or ".")
+    tmp = tempfile.mkdtemp(prefix="trailer_")
     idx = 0
     gold = ((255, 236, 160), (230, 120, 30))
     white = ((255, 255, 255), (200, 210, 230))
@@ -836,7 +836,7 @@ def cmd_edit(frames_dir, cover_path, music, out_path, vertical_path=None):
         cmd = ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(FPS), "-i", pattern, "-i", music]
         if extra:
             cmd += extra
-        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", dst]
+        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "22", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", dst]
         subprocess.run(cmd, check=True)
 
     encode(os.path.join(tmp, "f_%05d.jpg"), out_path, ["-vf", "scale=1920:1080:flags=lanczos"])
@@ -848,7 +848,7 @@ def cmd_edit(frames_dir, cover_path, music, out_path, vertical_path=None):
         logo_v = logo_v.convert("RGBA")
         logo_v.putalpha(Image.fromarray((lm * 255).astype(np.uint8)))
         cta = _text_layer("CERCA SIERI PERDUTI SU ROBLOX", 44, (255, 255, 255), (255, 210, 120), 1080, 140)
-        vt = tempfile.mkdtemp(prefix="vert_", dir=os.path.dirname(out_path) or ".")
+        vt = tempfile.mkdtemp(prefix="vert_")
         from PIL import ImageFilter
         for j in range(idx):
             fr = Image.open(os.path.join(tmp, f"f_{j:05d}.jpg"))
