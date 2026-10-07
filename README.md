@@ -149,6 +149,7 @@ pubblicato quella voce risulta "non disponibile". Gli acquisti sono gestiti in m
 - **Segnalino dell'obiettivo**: colonna di luce e distanza verso il prossimo obiettivo della storia.
 
 Tutti i passi per pubblicare e far crescere il gioco sono in [`docs/LANCIO.md`](docs/LANCIO.md).
+Icona, miniature e descrizione per la pagina del gioco: [`docs/PAGINA_ROBLOX.md`](docs/PAGINA_ROBLOX.md) (immagini in `assets/pagina_roblox/`).
 
 ## 6c. Il Gigante della Furia con modello 3D (es. da Meshy)
 
