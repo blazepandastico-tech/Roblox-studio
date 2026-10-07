@@ -87,7 +87,7 @@ def fbm(p, octaves=4, seed=0, lac=2.03, gain=0.5):
 # ---------------------------------------------------------------------------------------------
 
 # materiali
-M_TEX, M_COLOR, M_STONE, M_PLASTER, M_ROOF, M_GROUND, M_METAL, M_WOOD, M_SKIN, M_CLOTH, M_WATER, M_GLOW = range(12)
+M_TEX, M_COLOR, M_STONE, M_PLASTER, M_ROOF, M_GROUND, M_METAL, M_WOOD, M_SKIN, M_CLOTH, M_WATER, M_GLOW, M_FACE = range(13)
 
 
 class Scene:
@@ -100,6 +100,7 @@ class Scene:
         self.M = []  # materiale per faccia
         self.count = 0
         self.texture = None
+        self.face_tex = None
         self.particles = []  # (pos, radius, color, alpha, seed)
         self.lines = []  # (a, b, width_px, color)
 
@@ -502,6 +503,7 @@ class Look:
         self.shadow_center = np.array(kw.get("shadow_center", (0.0, 0.0, 0.0)))
         self.sun_disk = kw.get("sun_disk", True)
         self.lightning = kw.get("lightning", None)  # lista di punti (x,y) in pixel per fulmini
+        self.dof = kw.get("dof", None)  # (distanza a fuoco, forza): sfoca lo sfondo come una fotocamera
 
 
 def sky_color(D, look, seed=0):
@@ -576,6 +578,13 @@ def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light
     if sel.any():
         g = fbm(P[sel] * np.array([0.6, 6.0, 0.6]), 3, seed=51)
         alb[sel] = col[sel] * (0.7 + 0.5 * g[:, None])
+    sel = mat == M_FACE
+    if sel.any() and scene.face_tex is not None:
+        uv = interp(UV)[sel]
+        front = uv[:, 0] < 2
+        rgba = tex_sample(scene.face_tex, np.clip(uv, 0.001, 0.999))
+        a = (rgba[:, 3] * front)[:, None]
+        alb[sel] = col[sel] * (1 - a) + rgba[:, :3] * a
     sel = (mat == M_CLOTH) | (mat == M_SKIN)
     if sel.any():
         g = fbm(P[sel] * 8, 2, seed=61)
@@ -594,11 +603,11 @@ def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light
     occ = np.where((mat == M_TEX)[:, None], 1.0, occ)
     Hh = normalize(L + view)
     ndh = np.clip(np.sum(Nn * Hh, -1), 0, 1)
-    spec_k = np.select([mat == M_METAL, mat == M_TEX, mat == M_SKIN, mat == M_ROOF], [1.4, 0.10, 0.12, 0.05], 0.03)
-    shin = np.select([mat == M_METAL, mat == M_TEX, mat == M_SKIN], [120.0, 18.0, 24.0], 10.0)
+    spec_k = np.select([mat == M_METAL, mat == M_TEX, mat == M_SKIN, mat == M_FACE, mat == M_ROOF], [1.4, 0.10, 0.12, 0.18, 0.05], 0.03)
+    shin = np.select([mat == M_METAL, mat == M_TEX, mat == M_SKIN, mat == M_FACE], [120.0, 18.0, 24.0, 30.0], 10.0)
     spec = (spec_k * ndh ** shin * ndl * shade)[:, None] * look.sun_col
     rim = (np.clip(1 - np.sum(Nn * view, -1), 0, 1) ** 3 * 0.6 * np.clip(-np.sum(view * L, -1) * 0.5 + 0.5, 0, 1))[:, None]
-    rim = rim * look.sun_col * np.where(np.isin(mat, [M_TEX, M_SKIN, M_CLOTH, M_COLOR, M_METAL]), 1.0, 0.25)[:, None]
+    rim = rim * look.sun_col * np.where(np.isin(mat, [M_TEX, M_SKIN, M_FACE, M_CLOTH, M_COLOR, M_METAL]), 1.0, 0.25)[:, None]
     metal_env = np.where((mat == M_METAL)[:, None], look.sky_amb * 1.5, 0)
     lit = alb * ((ndl * shade)[:, None] * look.sun_col + amb * occ) + spec + rim * alb.mean(-1, keepdims=True) * 1.2 + metal_env * 0.3
     # nebbia
@@ -754,6 +763,15 @@ def gaussian(img, sigma):
 def post(img, depth, cam, look):
     H, W = depth.shape
     img = img * look.exposure
+    if look.dof:
+        focus, strength = look.dof
+        inv = np.where(np.isinf(depth), 0.0, 1.0 / np.maximum(depth, 1e-3))
+        coc = np.clip(np.abs(inv - 1.0 / focus) * focus * strength, 0, 1)
+        small = img[::2, ::2]
+        b1 = np.repeat(np.repeat(gaussian(small, W * 0.0025), 2, 0), 2, 1)[:H, :W]
+        b2 = np.repeat(np.repeat(gaussian(small, W * 0.007), 2, 0), 2, 1)[:H, :W]
+        c = coc[..., None]
+        img = np.where(c < 0.5, img * (1 - c * 2) + b1 * c * 2, b1 * (2 - c * 2) + b2 * (c * 2 - 1))
     # raggi di luce: sfocatura radiale del cielo luminoso verso il sole
     sun = cam.project((cam.pos + look.sun_dir * 1e4)[None])[0]
     if look.rays > 0 and np.sum(look.sun_dir * cam.f) > 0.05:

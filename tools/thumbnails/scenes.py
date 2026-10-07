@@ -38,7 +38,7 @@ def gas_trail(scene, points, rng, size=(0.35, 1.2), alpha=0.55):
             scene.particles.append((p, r, (0.96, 0.96, 0.98), alpha * (1 - age * 0.7), rng.uniform(0, 100)))
 
 
-def street_houses(scene, rng, z0, z1, x_side, depth_rows=3, skip_near=None, ruined_near=None):
+def street_houses(scene, rng, z0, z1, x_side, depth_rows=3, skip_near=None, ruined_near=None, skip_radius=9.0):
     z = z0
     chimneys = []
     while z < z1:
@@ -47,7 +47,7 @@ def street_houses(scene, rng, z0, z1, x_side, depth_rows=3, skip_near=None, ruin
         for row in range(depth_rows):
             x = x_side * (9 + d / 2 + row * (d + 4))
             pos = np.array([x, 0, z + w / 2])
-            if skip_near is not None and np.linalg.norm(pos[[0, 2]] - np.asarray(skip_near)[[0, 2]]) < 9:
+            if skip_near is not None and np.linalg.norm(pos[[0, 2]] - np.asarray(skip_near)[[0, 2]]) < skip_radius:
                 continue
             h = rng.uniform(6, 11) if row == 0 else rng.uniform(5, 12)
             if ruined_near is not None and np.linalg.norm(pos[[0, 2]] - np.asarray(ruined_near)[[0, 2]]) < 16:
@@ -396,6 +396,81 @@ def scene_icon(m, scale):
         cloud_cover=0.6, cloud_col=(1.3, 0.62, 0.35), cloud_dark=(0.30, 0.16, 0.22), rays=0.0, bloom=0.45,
         shadow_extent=120, shadow_center=(0, 0, 0), ground_mat="cobble", saturation=1.12, exposure=1.08, vignette=0.45,
     )
+    return render(sc, cam, look, ss=ss)
+
+
+# ---------------------------------------------------------------------------------------------
+# Stile "copertina": il soldato Roblox in primo piano, il gigante dietro (come gli esempi)
+# ---------------------------------------------------------------------------------------------
+
+VIVID = dict(
+    sun_dir=(0.80, 0.30, -0.45), sun_col=(2.5, 1.85, 1.35), sky_top=(0.22, 0.30, 0.62), sky_hor=(1.15, 0.62, 0.42),
+    sky_amb=(0.46, 0.44, 0.56), ground_amb=(0.26, 0.19, 0.13), fog_density=0.004, fog_height=45,
+    cloud_cover=0.5, cloud_col=(1.25, 0.78, 0.62), cloud_dark=(0.42, 0.32, 0.48), rays=0.3, bloom=0.45,
+    ground_mat="cobble", saturation=1.22, exposure=1.12, vignette=0.28,
+)
+
+
+def scene_hero2(m, scale):
+    rng = np.random.default_rng(52)
+    sc = Scene()
+    ground(sc)
+    H = 25.0
+    tpos = np.array([17.5, 0.0, 13.0])
+    yaw = math.radians(-30)
+    add_titan(sc, m, H, tpos, yaw=yaw, pose="roar")
+    J = joints_world(m, H, tpos, yaw)
+    street_houses(sc, rng, -60, 70, 1, skip_near=tpos + np.array([0, 0, -4]), skip_radius=20, ruined_near=tpos)
+    add_rubble(sc, tpos + np.array([-4, 0, -10]), 10, 26, rng)
+    street_houses(sc, rng, -60, 70, -1)
+    add_rubble(sc, tpos + np.array([0, 0, -6]), 8, 20, rng)
+    add_wall(sc, (-700, 0, 150), (700, 0, 150), 62, thick=16)
+    for x in (-150, 75, 250):
+        add_tower(sc, (x, 0, 141), 10, 76)
+    steam(sc, J["Neck"] + np.array([0, 1, 0]), (3.0, 1.5, 3.0), 24, rng, size=(2.2, 5.0), rise=10, alpha=0.5)
+    for p in ((22, 0, 40), (-24, 0, 55)):
+        steam(sc, p, (4, 2, 4), 12, rng, size=(5, 10), rise=28, color=(0.45, 0.40, 0.38), alpha=0.5)
+    # il soldato: in aria davanti alla telecamera, lama alzata, sorride
+    spos = np.array([-1.3, 4.05, -24.7])
+    anchors, tips = add_soldier(sc, spos, yaw=math.radians(-28), pitch=0.08, roll=-0.08, s=1.0, pose="hero")
+    sc.lines.append((anchors[0], np.array([-10.5, 13.0, 2.0]), 1.4, (0.10, 0.10, 0.11)))
+    sc.lines.append((anchors[1], np.array([7.0, 12.0, -8.0]), 1.4, (0.10, 0.10, 0.11)))
+    gas_trail(sc, [spos + np.array([-0.4, 0.2, 0.8]), spos + np.array([-1.5, 1.4, 5.0]), spos + np.array([-3.0, 2.8, 10.0])], rng, size=(0.25, 0.9), alpha=0.5)
+    # altri soldati in volo vicino al gigante
+    for p, yw, ps in (((25, 24, 6), 2.6, "dive"), ((8, 19, 8), 0.9, "fly")):
+        a3, _ = add_soldier(sc, np.array(p, float), yaw=yw, pitch=-1.0, roll=0.3, s=1.0, pose=ps)
+        sc.lines.append((a3[0], J["Nape"], 1.0, (0.10, 0.10, 0.11)))
+    W, Hh, ss, k = res(scale)
+    for i, (a, b, wdt, col) in enumerate(sc.lines):
+        sc.lines[i] = (a, b, wdt * k, col)
+    cam = Camera((0.6, 4.4, -29.5), (1.2, 7.6, 0), 50, W, Hh, roll=math.radians(-1.5))
+    look = Look(shadow_extent=110, shadow_center=(0, 0, -5), **VIVID)
+    return render(sc, cam, look, ss=ss)
+
+
+def scene_icon2(m, scale):
+    rng = np.random.default_rng(61)
+    sc = Scene()
+    ground(sc, size=600, n=30)
+    H = 22.0
+    tpos = np.array([5.0, 0.0, 30.0])
+    yaw = math.radians(-12)
+    add_titan(sc, m, H, tpos, yaw=yaw, pose="roar")
+    J = joints_world(m, H, tpos, yaw)
+    street_houses(sc, rng, -30, 60, 1, depth_rows=2, ruined_near=tpos)
+    street_houses(sc, rng, -30, 60, -1, depth_rows=2)
+    add_wall(sc, (-500, 0, 140), (500, 0, 140), 60, thick=14)
+    steam(sc, J["Neck"] + np.array([0, 1, 0]), (3.0, 1.5, 3.0), 18, rng, size=(2.2, 5.0), rise=9, alpha=0.5)
+    spos = np.array([-0.45, 1.55, -6.5])
+    add_soldier(sc, spos, yaw=math.radians(-22), pitch=0.05, roll=-0.05, s=1.0, pose="hero", head_scale=1.15)
+    if scale <= 1:
+        W = Hh = 512
+        ss = 1
+    else:
+        W = Hh = 2048
+        ss = 2
+    cam = Camera((0.15, 2.55, -9.6), (-0.15, 3.45, 0), 44, W, Hh)
+    look = Look(shadow_extent=80, shadow_center=(0, 0, 0), dof=(3.8, 0.75), **VIVID)
     return render(sc, cam, look, ss=ss)
 
 

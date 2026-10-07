@@ -5,15 +5,16 @@ Le immagini sono in `assets/pagina_roblox/`. Si caricano dal **Creator Hub**
 
 | File | Dove va | Formato |
 |---|---|---|
-| `Icona_512.png` | **Icona** del gioco | 512×512 |
-| `1_SieriPerduti_Gigante.png` | **Miniatura 1** (la prima che si vede) | 1920×1080 |
+| `Icona_512.png` (anche `Icona_1024.png`) | **Icona** del gioco | 512×512 |
+| `1_SieriPerduti_Copertina.png` | **Miniatura 1** (la prima che si vede) | 1920×1080 |
 | `2_SieriPerduti_Combattimento.png` | Miniatura 2 | 1920×1080 |
 | `3_SieriPerduti_Isole.png` | Miniatura 3 | 1920×1080 |
+| `4_SieriPerduti_Gigante.png` | Miniatura 4 (alternativa, stile cinematografico) | 1920×1080 |
 
 Consiglio: dopo qualche giorno guarda le statistiche (*Analytics → Acquisition*). Se poche persone
 cliccano sul gioco, prova a mettere un'altra miniatura come prima e confronta.
 
-Le immagini si rifanno con `python3 tools/thumbnails/scenes.py <cartella del modello Meshy> <uscita> 2`
+Le immagini si rifanno con `python3 tools/thumbnails/scenes.py <cartella del modello Meshy> <uscita> 2 hero2,icon2,combat,world,hero`
 e poi `python3 tools/thumbnails/compose.py <uscita> assets/pagina_roblox`.
 
 ## Titolo
