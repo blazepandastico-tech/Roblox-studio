@@ -106,23 +106,28 @@ def _superhead(scene, frame, size, face=True, hair=None, n=18):
             frame.box(scene, (x * half[0], 0.62 * half[1], -0.98 * half[2]), (0.55 * half[0], 0.35 * half[1], 0.2 * half[2]), M_CLOTH, hair, R_local=rot_z(rz), seg=0.2)
 
 
-def add_soldier(scene, pos, yaw=0.0, pitch=0.0, roll=0.0, s=1.0, pose="fly", hair=(0.28, 0.17, 0.09), blades=True, head_scale=1.0):
+def add_soldier(scene, pos, yaw=0.0, pitch=0.0, roll=0.0, s=1.0, pose="fly", hair=(0.28, 0.17, 0.09), blades=True, head_scale=1.0, overrides=None, outfit=None):
     """Avatar in stile Roblox (proporzioni R15) alto circa 1.9*s metri. Origine = anche.
     Restituisce le posizioni (mondo) delle due fondine del rampino e le punte delle lame."""
     if scene.face_tex is None:
         scene.face_tex = face_texture()
-    cfg = SOLDIER_POSES[pose]
+    cfg = dict(SOLDIER_POSES[pose])
+    if overrides:
+        cfg.update(overrides)
+    o = {"jacket": JACKET, "pants": PANTS, "shirt": (0.92, 0.90, 0.86), "cape": CAPE, "gear": True, "boots": BOOTS, "skin": SKIN}
+    if outfit:
+        o.update(outfit)
     R = rot_y(yaw) @ rot_x(pitch) @ rot_z(roll)
     body = Frame(R * s, pos)
     u = 0.38  # unità avatar: 1 stud ≈ 0.38 m
     for side, a in ((1, cfg["legs"][0]), (-1, cfg["legs"][1])):
         hip = body.child(rot_x(a), (side * 0.5 * u, 0, 0))
-        hip.box(scene, (0, -1.0 * u, 0), (0.95 * u, 2.0 * u, 0.95 * u), M_CLOTH, PANTS)
-        hip.box(scene, (0, -1.75 * u, 0), (1.0 * u, 0.6 * u, 1.05 * u), M_CLOTH, BOOTS)
+        hip.box(scene, (0, -1.0 * u, 0), (0.95 * u, 2.0 * u, 0.95 * u), M_CLOTH, o["pants"])
+        hip.box(scene, (0, -1.75 * u, 0), (1.0 * u, 0.6 * u, 1.05 * u), M_CLOTH, o["boots"])
         hip.box(scene, (0, -0.45 * u, 0), (1.0 * u, 0.12 * u, 1.0 * u), M_CLOTH, STRAP)
-    body.box(scene, (0, 1.0 * u, 0), (2.0 * u, 2.0 * u, 1.0 * u), M_CLOTH, JACKET)
+    body.box(scene, (0, 1.0 * u, 0), (2.0 * u, 2.0 * u, 1.0 * u), M_CLOTH, o["jacket"])
     body.box(scene, (0, 0.15 * u, 0), (2.02 * u, 0.3 * u, 1.02 * u), M_CLOTH, STRAP)
-    body.box(scene, (0, 1.0 * u, -0.505 * u), (0.9 * u, 1.9 * u, 0.02 * u), M_CLOTH, (0.92, 0.90, 0.86))
+    body.box(scene, (0, 1.0 * u, -0.505 * u), (0.9 * u, 1.9 * u, 0.02 * u), M_CLOTH, o["shirt"])
     for side in (1, -1):
         body.box(scene, (side * 0.45 * u, 1.0 * u, -0.53 * u), (0.14 * u, 2.0 * u, 0.06 * u), M_CLOTH, STRAP)
     hs = 1.3 * u * head_scale
@@ -132,15 +137,17 @@ def add_soldier(scene, pos, yaw=0.0, pitch=0.0, roll=0.0, s=1.0, pose="fly", hai
     for side in (1, -1):
         arm = cfg["armR"] if side > 0 else cfg["armL"]
         sh = body.child(rot_x(arm[0]) @ rot_z(side * arm[1]), (side * 1.5 * u, 1.8 * u, 0))
-        sh.box(scene, (0, -0.95 * u, 0), (0.95 * u, 2.0 * u, 0.95 * u), M_CLOTH, JACKET)
+        sh.box(scene, (0, -0.95 * u, 0), (0.95 * u, 2.0 * u, 0.95 * u), M_CLOTH, o["jacket"])
         sh.box(scene, (0, -2.05 * u, 0), (0.9 * u, 0.35 * u, 0.9 * u), M_SKIN, SKIN)
         if blades:
             hand = sh.child(rot_z(side * 0.12), (0, -2.1 * u, 0))
             hand.box(scene, (0, -0.1 * u, 0), (0.55 * u, 0.35 * u, 0.7 * u), M_METAL, GEAR)
             hand.box(scene, (0, -2.6 * u, 0), (0.08 * u, 4.8 * u, 0.5 * u), M_METAL, STEEL, seg=0.4)
             blade_tips.append(hand.p((0, -5.0 * u, 0)))
+    if o["cape"] is None:
+        return [body.p((0, 0, 0))] * 2, blade_tips
     cape = body.child(rot_x(cfg["cape"]), (0, 1.95 * u, 0.55 * u))
-    cape.box(scene, (0, -1.6 * u, 0.0), (2.3 * u, 3.2 * u, 0.08 * u), M_CLOTH, CAPE, seg=0.3)
+    cape.box(scene, (0, -1.6 * u, 0.0), (2.3 * u, 3.2 * u, 0.08 * u), M_CLOTH, o["cape"], seg=0.3)
     cape.box(scene, (0, -0.15 * u, 0.0), (2.4 * u, 0.3 * u, 0.12 * u), M_CLOTH, (0.10, 0.25, 0.17))
     em = cape.child(np.eye(3), (0, -1.3 * u, 0.06 * u))
     add_cylinder(scene, em.p((0, 0, 0)), em.p((0, 0, 0.02 * u)), 0.45 * u * s, M_METAL, (0.85, 0.66, 0.22), n=16)
@@ -236,3 +243,26 @@ def add_vial(scene, pos, h=0.3, color=(0.4, 2.6, 1.0)):
     pos = np.asarray(pos, float)
     add_cylinder(scene, pos, pos + np.array([0, h, 0]), h * 0.18, M_GLOW, color, n=16)
     add_cylinder(scene, pos + np.array([0, h, 0]), pos + np.array([0, h * 1.25, 0]), h * 0.12, M_METAL, (0.7, 0.55, 0.25), n=12)
+
+
+AWNINGS = [((0.80, 0.18, 0.15), (0.95, 0.92, 0.85)), ((0.15, 0.40, 0.70), (0.95, 0.92, 0.85)), ((0.20, 0.55, 0.25), (0.95, 0.90, 0.60)), ((0.85, 0.55, 0.12), (0.95, 0.92, 0.85))]
+GOODS = [(0.85, 0.20, 0.15), (0.95, 0.65, 0.10), (0.40, 0.70, 0.20), (0.60, 0.30, 0.65), (0.95, 0.85, 0.30)]
+
+
+def add_stall(scene, pos, yaw, rng):
+    """Banco del mercato con tendone a strisce e merce."""
+    f = Frame(rot_y(yaw), pos)
+    w, d = 3.2, 2.0
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            f.box(scene, (sx * (w / 2 - 0.1), 1.3, sz * (d / 2 - 0.1)), (0.14, 2.6, 0.14), M_WOOD, (0.40, 0.27, 0.16), seg=0.5)
+    f.box(scene, (0, 0.5, -d / 2 + 0.3), (w, 1.0, 0.6), M_WOOD, (0.48, 0.32, 0.18), seg=0.5)
+    f.box(scene, (0, 1.03, -d / 2 + 0.3), (w + 0.1, 0.08, 0.7), M_WOOD, (0.55, 0.40, 0.25), seg=0.5)
+    cols = AWNINGS[rng.integers(len(AWNINGS))]
+    for i in range(6):
+        x = -w / 2 + (i + 0.5) * w / 6
+        f.box(scene, (x, 2.75, -0.2), (w / 6 + 0.01, 0.06, d + 0.6), M_CLOTH, cols[i % 2], R_local=rot_x(-0.25), seg=0.5)
+    for i in range(7):
+        r = rng.uniform(0.12, 0.2)
+        add_sphere(scene, f.p((-w / 2 + 0.3 + i * (w - 0.6) / 6, 1.1 + r, -d / 2 + 0.3 + rng.uniform(-0.15, 0.15))), r, M_COLOR, GOODS[rng.integers(len(GOODS))], n=6)
+    f.box(scene, (w / 2 - 0.5, 0.35, d / 2 - 0.4), (0.7, 0.7, 0.6), M_WOOD, (0.55, 0.40, 0.25), seg=0.5)

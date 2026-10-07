@@ -130,6 +130,22 @@ class Scene:
         self.M.append(np.full(len(F), mat, dtype=np.int64))
         self.count += len(V)
 
+    def mark_static(self):
+        """Tutto ciò che è stato aggiunto finora non si muove più (le sue ombre si calcolano una volta)."""
+        self.static_faces = sum(len(f) for f in self.F)
+
+    def fork(self):
+        """Copia leggera: riusa la geometria fissa, per aggiungere gli oggetti che si muovono in un fotogramma."""
+        o = Scene.__new__(Scene)
+        o.V, o.N, o.UV, o.C, o.F, o.M = list(self.V), list(self.N), list(self.UV), list(self.C), list(self.F), list(self.M)
+        o.count = self.count
+        o.texture = self.texture
+        o.face_tex = self.face_tex
+        o.particles = list(self.particles)
+        o.lines = list(self.lines)
+        o.static_faces = getattr(self, "static_faces", None)
+        return o
+
     def arrays(self):
         return (np.concatenate(self.V), np.concatenate(self.N), np.concatenate(self.UV), np.concatenate(self.C), np.concatenate(self.F), np.concatenate(self.M))
 
@@ -534,7 +550,7 @@ def sky_color(D, look, seed=0):
     return sky
 
 
-def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light=1.0):
+def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light=1.0, shadow_cache=None, raw=False):
     W, H = cam.w, cam.h
     V, N, UV, C, F, M = scene.arrays()
     S = cam.project(V)
@@ -593,7 +609,7 @@ def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light
     # ombre
     shade = np.ones(len(P))
     if shadows:
-        shade = shadow_factor(V, F, P, Nn, look)
+        shade = shadow_factor(V, F, P, Nn, look, cache=shadow_cache, static_faces=getattr(scene, "static_faces", None))
     L = look.sun_dir
     ndl = np.clip(np.sum(Nn * L, -1), 0, 1)
     # luce ambiente emisferica + occlusione semplice verso il basso
@@ -655,7 +671,7 @@ def fog_amount(campos, P, dist, look):
     return 1 - np.exp(-dist * dens)
 
 
-def shadow_factor(V, F, P, Nn, look, res=3072):
+def shadow_factor(V, F, P, Nn, look, res=3072, cache=None, static_faces=None):
     L = look.sun_dir
     up = np.array([0, 1, 0]) if abs(L[1]) < 0.95 else np.array([1, 0, 0])
     r = normalize(np.cross(up, L))
@@ -671,7 +687,15 @@ def shadow_factor(V, F, P, Nn, look, res=3072):
         return np.stack([x, y, z], -1)
 
     S = proj(V)
-    dmap, _, _ = rasterize(S, F, res, res, near=-1e9, cull=False, want_bary=False)
+    if cache is not None and static_faces:
+        if "dmap" not in cache:
+            cache["dmap"], _, _ = rasterize(S, F[:static_faces], res, res, near=-1e9, cull=False, want_bary=False)
+        dmap = cache["dmap"].copy()
+        if len(F) > static_faces:
+            dyn, _, _ = rasterize(S, F[static_faces:], res, res, near=-1e9, cull=False, want_bary=False)
+            dmap = np.minimum(dmap, dyn)
+    else:
+        dmap, _, _ = rasterize(S, F, res, res, near=-1e9, cull=False, want_bary=False)
     Q = proj(P + Nn * 0.15)
     bias = 0.25
     sh = np.zeros(len(P))
@@ -685,8 +709,25 @@ def shadow_factor(V, F, P, Nn, look, res=3072):
     return sh / len(taps)
 
 
+_SPRITES = []
+
+
+def _sprites():
+    if not _SPRITES:
+        n = 96
+        ys, xs = np.mgrid[0:n, 0:n].astype(np.float64)
+        dx = (xs / (n - 1)) * 2.6 - 1.3
+        dy = (ys / (n - 1)) * 2.6 - 1.3
+        r2 = dx * dx + dy * dy
+        for k in range(8):
+            nz = fbm(np.stack([dx * 1.4 + k * 7.1, dy * 1.4, np.full_like(dx, k * 0.37)], -1), 4, seed=k)
+            _SPRITES.append(np.exp(-r2 * 2.2) * smoothstep(0.25, 0.75, nz + 0.25 - 0.35 * r2))
+    return _SPRITES
+
+
 def draw_particles(img, depth, cam, particles, look, light=1.0):
     H, W = depth.shape
+    sprites = _sprites()
     for (pos, radius, color, alpha, seed) in particles:
         s = cam.project(np.asarray(pos, float)[None])[0]
         if s[2] < 0.5:
@@ -701,9 +742,11 @@ def draw_particles(img, depth, cam, particles, look, light=1.0):
         ys, xs = np.mgrid[y0:y1, x0:x1].astype(np.float64)
         dx = (xs - s[0]) / rpx
         dy = (ys - s[1]) / rpx
-        r2 = dx * dx + dy * dy
-        n = fbm(np.stack([dx * 1.4 + seed, dy * 1.4, np.full_like(dx, seed * 0.37)], -1), 4, seed=int(seed) % 97)
-        a = np.exp(-r2 * 2.2) * smoothstep(0.25, 0.75, n + 0.25 - 0.35 * r2) * alpha
+        sp = sprites[int(seed) % len(sprites)]
+        n = sp.shape[0]
+        ix = np.clip(((dx + 1.3) / 2.6 * (n - 1)).astype(int), 0, n - 1)
+        iy = np.clip(((dy + 1.3) / 2.6 * (n - 1)).astype(int), 0, n - 1)
+        a = sp[iy, ix] * alpha
         # morbido contro la geometria
         d = depth[y0:y1, x0:x1]
         soft = np.clip((d - s[2]) / (radius * 0.8), 0, 1)

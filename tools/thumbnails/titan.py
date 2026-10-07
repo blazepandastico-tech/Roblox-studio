@@ -65,13 +65,15 @@ def _rot_about(V, pivot, R):
     return (V - pivot) @ R.T + pivot
 
 
-def posed(m, pose="roar"):
+def posed(m, pose="roar", amount=1.0):
     """Posa con pesi morbidi vicino alle articolazioni (spalle, gomiti, collo, vita)."""
     V0 = m["V"]
     N0 = m["N"]
     if pose is None:
         return V0.copy(), N0.copy()
-    cfg = POSES[pose]
+    cfg = {}
+    for key, val in POSES[pose].items():
+        cfg[key] = tuple(x * amount for x in val) if isinstance(val, tuple) else val * amount
     J = {k: np.array(v, dtype=np.float64) for k, v in m["J"].items()}
     part = m["part"]
     V = V0.copy()
@@ -133,9 +135,9 @@ def joints_world(m, height, position, yaw):
     return {k: (np.array(v) * height) @ R.T + np.asarray(position) for k, v in m["J"].items()}
 
 
-def add_titan(scene, m, height, position, yaw=0.0, pose="roar", tint=(1, 1, 1)):
+def add_titan(scene, m, height, position, yaw=0.0, pose="roar", tint=(1, 1, 1), amount=1.0):
     from engine import M_TEX
-    V, N = posed(m, pose)
+    V, N = posed(m, pose, amount)
     R = rot_y(yaw)
     Vw = (V * height) @ R.T + np.asarray(position)
     Nw = N @ R.T
