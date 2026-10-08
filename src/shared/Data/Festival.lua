@@ -5,7 +5,7 @@
 	  Start = 0           → l'evento è attivo da subito (appena pubblichi il gioco)
 	  End   = 1792969200  → finisce il 26 ottobre 2026 alle 00:00 (ora italiana)
 	Per cambiare le date usa https://www.epochconverter.com (incolla il numero che ti dà).
-	Dal Pannello Admin (P → Server → Evento) si può accendere o spegnere l'evento in ogni momento.
+	Dal Pannello Admin (P → 📢 Server → 🎉 Grande Inaugurazione) si può accendere o spegnere l'evento in ogni momento.
 
 	Durante l'evento:
 	  - esperienza e oro DOPPI per tutti
