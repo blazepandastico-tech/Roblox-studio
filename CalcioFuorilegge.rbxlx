@@ -3,7 +3,8 @@
 <Meta name="ExplicitAutoJoints">true</Meta>
 <Item class="Workspace" referent="RBX1"><Properties><string name="Name">Workspace</string></Properties></Item>
 <Item class="Players" referent="RBX2"><Properties><string name="Name">Players</string><bool name="CharacterAutoLoad">false</bool></Properties></Item>
-<Item class="ReplicatedStorage" referent="RBX5"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="ModuleScript" referent="RBX3"><Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[-- Tutti i numeri di bilanciamento del gioco stanno qui.
+<Item class="Lighting" referent="RBX3"><Properties><string name="Name">Lighting</string><token name="Technology">3</token></Properties></Item>
+<Item class="ReplicatedStorage" referent="RBX6"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[-- Tutti i numeri di bilanciamento del gioco stanno qui.
 local Config = {}
 
 Config.GameName = "Calcio Fuorilegge"
@@ -40,8 +41,9 @@ Config.Field = {
 	},
 }
 
+-- Belvedere di legno sulla parete sud del canyon: Y e' la quota del pavimento, il campo si vede davanti (verso +Z).
 Config.Lobby = {
-	Center = Vector3.new(0, 0, -900),
+	Center = Vector3.new(0, 60, -420),
 }
 
 Config.Move = {
@@ -143,7 +145,7 @@ Config.Controls = {
 }
 
 return Config
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">Net</string><ProtectedString name="Source"><![CDATA[-- Crea (server) e recupera (client) tutti i RemoteEvent del gioco.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX5"><Properties><string name="Name">Net</string><ProtectedString name="Source"><![CDATA[-- Crea (server) e recupera (client) tutti i RemoteEvent del gioco.
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -187,7 +189,7 @@ end
 
 return Net
 ]]></ProtectedString></Properties></Item></Item>
-<Item class="ServerScriptService" referent="RBX15"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX6"><Properties><string name="Name">Main</string><bool name="Disabled">false</bool><ProtectedString name="Source"><![CDATA[-- Punto d'ingresso del server di Calcio Fuorilegge.
+<Item class="ServerScriptService" referent="RBX26"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX7"><Properties><string name="Name">Main</string><bool name="Disabled">false</bool><ProtectedString name="Source"><![CDATA[-- Punto d'ingresso del server di Calcio Fuorilegge.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -230,7 +232,7 @@ for _, plr in ipairs(Players:GetPlayers()) do
 end
 
 task.spawn(Match.Run)
-]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX14"><Properties><string name="Name">Server</string></Properties><Item class="ModuleScript" referent="RBX7"><Properties><string name="Name">Actions</string><ProtectedString name="Source"><![CDATA[-- Gestione dei RemoteEvent di gioco: calci, scivolata, scatto, sprint, chiedi palla.
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX25"><Properties><string name="Name">Server</string></Properties><Item class="ModuleScript" referent="RBX8"><Properties><string name="Name">Actions</string><ProtectedString name="Source"><![CDATA[-- Gestione dei RemoteEvent di gioco: calci, scivolata, scatto, sprint, chiedi palla.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -450,7 +452,7 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 return Actions
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX8"><Properties><string name="Name">Ball</string><ProtectedString name="Source"><![CDATA[-- Palla: fisica autorevole sul server, conduzione, calci, effetto, goal.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX9"><Properties><string name="Name">Ball</string><ProtectedString name="Source"><![CDATA[-- Palla: fisica autorevole sul server, conduzione, calci, effetto, goal.
 local Players = game:GetService("Players")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -924,7 +926,7 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 return Ball
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX9"><Properties><string name="Name">Lobby</string><ProtectedString name="Source"><![CDATA[-- Squadre (servizio Teams), pedane della lobby e assegnazione automatica.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX10"><Properties><string name="Name">Lobby</string><ProtectedString name="Source"><![CDATA[-- Squadre (servizio Teams), pedane della lobby e assegnazione automatica.
 local Players = game:GetService("Players")
 local Teams = game:GetService("Teams")
 
@@ -935,6 +937,14 @@ local Net = require(ReplicatedStorage:WaitForChild("Net"))
 local Lobby = {}
 
 local teamObjects = {}
+local padCounters = {} -- [chiave squadra] = TextLabel sul contatore della pedana
+
+-- Aggiorna i contatori "n / 4" sulle pedane della lobby.
+function Lobby.RefreshPads()
+	for key, label in pairs(padCounters) do
+		label.Text = string.format("%d / %d", Lobby.Count(key), Config.Match.MaxPerTeam)
+	end
+end
 
 function Lobby.Init()
 	for key, t in pairs(Config.Teams) do
@@ -947,13 +957,27 @@ function Lobby.Init()
 		team.TeamColor = BrickColor.new(t.BrickColor)
 		team.AutoAssignable = false
 		teamObjects[key] = team
+		team.PlayerAdded:Connect(Lobby.RefreshPads)
+		team.PlayerRemoved:Connect(Lobby.RefreshPads)
 	end
 
-	local pads = workspace:WaitForChild("World"):WaitForChild("Lobby"):WaitForChild("Pads")
+	local world = workspace:WaitForChild("World", 15)
+	local lobby = world and world:WaitForChild("Lobby", 15)
+	local pads = lobby and lobby:WaitForChild("Pads", 15)
+	if not pads then
+		warn("[Calcio Fuorilegge] Pedane della lobby non trovate: la scelta della squadra e' disattivata (resta l'assegnazione automatica).")
+		return
+	end
 	local debounce = {}
 	for _, pad in ipairs(pads:GetChildren()) do
 		local key = pad:GetAttribute("TeamKey")
 		if key then
+			local counter = pad:FindFirstChild("Contatore")
+			local gui = counter and counter:FindFirstChild("Gui")
+			local label = gui and gui:FindFirstChild("Conteggio")
+			if label then
+				padCounters[key] = label
+			end
 			pad.Touched:Connect(function(other)
 				local plr = Players:GetPlayerFromCharacter(other.Parent)
 				if not plr then
@@ -970,7 +994,9 @@ function Lobby.Init()
 	end
 	Players.PlayerRemoving:Connect(function(plr)
 		debounce[plr] = nil
+		task.defer(Lobby.RefreshPads)
 	end)
+	Lobby.RefreshPads()
 end
 
 function Lobby.Count(key)
@@ -1037,207 +1063,1092 @@ function Lobby.ClearTeams()
 end
 
 return Lobby
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX10"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[-- Costruisce da codice illuminazione, campo (Canyon del Deserto) e lobby.
-local Lighting = game:GetService("Lighting")
-local CollectionService = game:GetService("CollectionService")
-
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX20"><Properties><string name="Name">Map</string></Properties><Item class="ModuleScript" referent="RBX11"><Properties><string name="Name">Arena</string><ProtectedString name="Source"><![CDATA[-- Lo stadio intorno al campo: piazza, pareti di vetro con tabelloni pubblicitari, tribune con tifosi,
+-- tabelloni segnapunti, torri faro e angoli arrotondati.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+local Util = require(script.Parent.Util)
+local Layout = require(script.Parent.Layout)
 
-local MapBuilder = {}
+local Arena = {}
 
-local F = Config.Field
-local HL = F.Length / 2
-local HW = F.Width / 2
+local HL, HW = Layout.HL, Layout.HW
+local XB, WH = Layout.XB, Layout.WALL_H
+local ST = Layout.STAND
 
-local function P(parent, name, size, cf, color, material, transparency, collide)
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.Name = name
-	p.Size = size
-	p.CFrame = cf
-	p.Color = color
-	p.Material = material or Enum.Material.SmoothPlastic
-	p.Transparency = transparency or 0
-	p.CanCollide = collide ~= false
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Parent = parent
-	return p
+local STEEL = Color3.fromRGB(40, 44, 66)
+local STEEL_LIGHT = Color3.fromRGB(78, 84, 112)
+local LILAC = Color3.fromRGB(190, 132, 255)
+local SAND_A = Color3.fromRGB(216, 178, 132)
+local SAND_B = Color3.fromRGB(198, 158, 112)
+local TERRACOTTA = Color3.fromRGB(190, 108, 78)
+local NEON = {
+	Color3.fromRGB(70, 220, 255),
+	Color3.fromRGB(255, 80, 170),
+	Color3.fromRGB(255, 196, 70),
+	Color3.fromRGB(150, 255, 120),
+	Color3.fromRGB(190, 132, 255),
+}
+local ADS = {
+	"CACTUS CUP",
+	"DUNE ENERGY",
+	"MESA BURGER",
+	"SOLE 24",
+	"FUORILEGGE TV",
+	"CANYON BANK",
+	"ROSSA SPRING",
+	"SABBIA & CO",
+	"POLVERE KART",
+	"OASI HOTEL",
+}
+
+----------------------------------------------------------------------
+-- Piazza: pavimento di lastre intorno allo stadio
+----------------------------------------------------------------------
+local function plaza(folder)
+	local PX, PZ = Layout.PLAZA_X, Layout.PLAZA_Z
+	local stone = Color3.fromRGB(206, 170, 132)
+	Util.P(folder, "Piazza", Vector3.new(2 * PX, 8, 2 * PZ), CFrame.new(0, -4, 0), stone, Enum.Material.Concrete)
+	-- cordolo scuro sul bordo
+	local curb = Color3.fromRGB(150, 104, 80)
+	Util.D(folder, "Cordolo", Vector3.new(2 * PX + 6, 2.6, 3), CFrame.new(0, -0.7, -PZ - 1.5), curb, Enum.Material.Concrete, 0, { shadow = false })
+	Util.D(folder, "Cordolo", Vector3.new(2 * PX + 6, 2.6, 3), CFrame.new(0, -0.7, PZ + 1.5), curb, Enum.Material.Concrete, 0, { shadow = false })
+	Util.D(folder, "Cordolo", Vector3.new(3, 2.6, 2 * PZ), CFrame.new(-PX - 1.5, -0.7, 0), curb, Enum.Material.Concrete, 0, { shadow = false })
+	Util.D(folder, "Cordolo", Vector3.new(3, 2.6, 2 * PZ), CFrame.new(PX + 1.5, -0.7, 0), curb, Enum.Material.Concrete, 0, { shadow = false })
+	-- fughe delle lastre
+	local joint = Color3.fromRGB(168, 130, 100)
+	for x = -PX + 24, PX - 24, 24 do
+		Util.D(folder, "Fuga", Vector3.new(0.35, 0.06, 2 * PZ - 6), CFrame.new(x, 0.03, 0), joint, Enum.Material.SmoothPlastic, 0.45, { shadow = false })
+	end
+	for z = -PZ + 26, PZ - 26, 26 do
+		Util.D(folder, "Fuga", Vector3.new(2 * PX - 6, 0.06, 0.35), CFrame.new(0, 0.03, z), joint, Enum.Material.SmoothPlastic, 0.45, { shadow = false })
+	end
+	-- grandi stemmi colorati dietro le porte (la scritta si legge guardando il campo)
+	for _, s in ipairs({ -1, 1 }) do
+		local key = (s < 0) and "Red" or "Blue"
+		local t = Config.Teams[key]
+		local cx = s * (XB + 36)
+		Util.D(folder, "StemmaAnello", Vector3.new(0.14, 47, 47), CFrame.new(cx, 0.06, 0) * CFrame.Angles(0, 0, math.pi / 2), t.Color, Enum.Material.Neon, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+		Util.D(folder, "Stemma", Vector3.new(0.16, 43, 43), CFrame.new(cx, 0.1, 0) * CFrame.Angles(0, 0, math.pi / 2), Util.shade(t.Color, 0.5), Enum.Material.SmoothPlastic, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+		local board = Util.D(folder, "StemmaTesto", Vector3.new(36, 0.1, 14), CFrame.new(cx, 0.2, 0) * CFrame.Angles(0, -s * math.pi / 2, 0), t.Color, Enum.Material.SmoothPlastic, 1, { shadow = false })
+		Util.label(board, Enum.NormalId.Top, string.upper(t.Name), { font = Enum.Font.GothamBlack, color = Color3.fromRGB(255, 244, 236), pps = 24 })
+	end
 end
 
-local function decor(p)
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	return p
+----------------------------------------------------------------------
+-- Pareti di vetro (collisione) con telaio, rotaie luminose, tabelloni e angoli smussati
+----------------------------------------------------------------------
+local function ads(folder)
+	local n = 0
+	-- tabellone luminoso a filo del vetro, con la scritta verso il campo (faccia Front dopo lookAt)
+	local function board(pos, faceDir, text, col)
+		local cf = CFrame.lookAt(pos, pos + faceDir)
+		local p = Util.D(folder, "Pubblicita", Vector3.new(20.4, 3.6, 0.8), cf, Color3.fromRGB(22, 24, 42), Enum.Material.SmoothPlastic, 0, { shadow = false })
+		Util.D(folder, "PubblicitaLuce", Vector3.new(20.4, 0.26, 0.95), cf * CFrame.new(0, 1.9, 0), col, Enum.Material.Neon, 0, { shadow = false })
+		Util.label(p, Enum.NormalId.Front, text, { font = Enum.Font.GothamBlack, color = col, pps = 22 })
+	end
+	for i = -5, 4 do
+		local x = i * 22 + 11
+		n = n + 1
+		board(Vector3.new(x, 1.9, -(HW + 0.4)), Vector3.new(0, 0, 1), ADS[(n % #ADS) + 1], NEON[(n % #NEON) + 1])
+		n = n + 1
+		board(Vector3.new(x, 1.9, HW + 0.4), Vector3.new(0, 0, -1), ADS[(n % #ADS) + 1], NEON[(n % #NEON) + 1])
+	end
+	-- testate: pubblicita' ai lati della porta
+	for _, s in ipairs({ -1, 1 }) do
+		for _, z in ipairs({ -48, -26, 26, 48 }) do
+			n = n + 1
+			board(Vector3.new(s * (XB + 0.4), 1.9, z), Vector3.new(-s, 0, 0), ADS[(n % #ADS) + 1], NEON[(n % #NEON) + 1])
+		end
+	end
 end
 
-local function folder(parent, name)
-	local f = Instance.new("Folder")
-	f.Name = name
-	f.Parent = parent
+local function walls(folder)
+	local glass = Color3.fromRGB(226, 236, 255)
+	local wallProps = PhysicalProperties.new(0.7, 0.2, 0.85, 100, 100)
+	local function wall(size, pos)
+		local w = Util.P(folder, "Vetro", size, CFrame.new(pos), glass, Enum.Material.Glass, 0.88, { shadow = false })
+		w.CustomPhysicalProperties = wallProps
+		w.CanQuery = false
+		return w
+	end
+	-- pareti di collisione (identiche a prima: la palla rimbalza qui)
+	wall(Vector3.new(2 * XB + 4, WH, 2), Vector3.new(0, WH / 2, -HW - 1))
+	wall(Vector3.new(2 * XB + 4, WH, 2), Vector3.new(0, WH / 2, HW + 1))
+	wall(Vector3.new(2, WH, 2 * HW + 4), Vector3.new(-XB - 1, WH / 2, 0))
+	wall(Vector3.new(2, WH, 2 * HW + 4), Vector3.new(XB + 1, WH / 2, 0))
+	local roof = Util.P(folder, "Soffitto", Vector3.new(2 * XB + 4, 2, 2 * HW + 4), CFrame.new(0, WH + 15, 0), glass, Enum.Material.Glass, 1, { shadow = false })
+	roof.CustomPhysicalProperties = wallProps
+	roof.CanQuery = false
+
+	-- angoli smussati: la palla non resta incastrata e il campo "respira"
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local d = Util.P(folder, "Angolo", Vector3.new(14.14, WH, 1.5), CFrame.new(sx * (XB - 5), WH / 2, sz * (HW - 5)) * CFrame.Angles(0, sx * sz * math.pi / 4, 0), glass, Enum.Material.Glass, 0.7, { shadow = false })
+			d.CustomPhysicalProperties = wallProps
+			d.CanQuery = false
+			Util.D(folder, "AngoloLuce", Vector3.new(14.14, 0.5, 0.7), CFrame.new(sx * (XB - 5), WH + 0.2, sz * (HW - 5)) * CFrame.Angles(0, sx * sz * math.pi / 4, 0), LILAC, Enum.Material.Neon, 0, { shadow = false })
+			-- pilastro d'angolo con faro
+			local px, pz = sx * (XB + 3.6), sz * (HW + 3.6)
+			Util.pillar(folder, "Pilastro", px, 0, pz, 7, WH + 8, Color3.fromRGB(196, 146, 108), Enum.Material.Sandstone, true, { shadow = true })
+			Util.pillar(folder, "PilastroAnello", px, WH - 4, pz, 7.6, 1.2, LILAC, Enum.Material.Neon, false, { shadow = false })
+			Util.pillar(folder, "PilastroCappello", px, WH + 8, pz, 8, 1.4, STEEL, Enum.Material.Metal, false)
+			local beacon = Util.sphere(folder, "Faro", Vector3.new(px, WH + 11, pz), 4, Color3.fromRGB(255, 226, 170), Enum.Material.Neon, false, { shadow = false })
+			local light = Instance.new("PointLight")
+			light.Color = Color3.fromRGB(255, 210, 160)
+			light.Range = 34
+			light.Brightness = 1.4
+			light.Shadows = false
+			light.Parent = beacon
+		end
+	end
+
+	-- telaio d'acciaio: montanti ogni 22 stud e rotaia luminosa in alto
+	for x = -98, 98, 28 do
+		for _, sz in ipairs({ -1, 1 }) do
+			Util.D(folder, "Montante", Vector3.new(1.1, WH + 1, 1.1), CFrame.new(x, (WH + 1) / 2, sz * (HW + 2.9)), STEEL, Enum.Material.Metal, 0, { shadow = false })
+		end
+	end
+	for z = -42, 42, 28 do
+		for _, sx in ipairs({ -1, 1 }) do
+			Util.D(folder, "Montante", Vector3.new(1.1, WH + 1, 1.1), CFrame.new(sx * (XB + 2.9), (WH + 1) / 2, z), STEEL, Enum.Material.Metal, 0, { shadow = false })
+		end
+	end
+	for _, sz in ipairs({ -1, 1 }) do
+		Util.D(folder, "Rotaia", Vector3.new(2 * XB + 8, 0.8, 0.8), CFrame.new(0, WH + 0.4, sz * (HW + 2.2)), LILAC, Enum.Material.Neon, 0, { shadow = false })
+		Util.D(folder, "Trave", Vector3.new(2 * XB + 8, 1.2, 1.6), CFrame.new(0, WH + 1.2, sz * (HW + 2.9)), STEEL, Enum.Material.Metal, 0, { shadow = false })
+		Util.D(folder, "TraveBassa", Vector3.new(2 * XB + 8, 1, 1.6), CFrame.new(0, 4.2, sz * (HW + 2.9)), STEEL, Enum.Material.Metal, 0, { shadow = false })
+	end
+	for _, sx in ipairs({ -1, 1 }) do
+		Util.D(folder, "Rotaia", Vector3.new(0.8, 0.8, 2 * HW + 8), CFrame.new(sx * (XB + 2.2), WH + 0.4, 0), LILAC, Enum.Material.Neon, 0, { shadow = false })
+		Util.D(folder, "Trave", Vector3.new(1.6, 1.2, 2 * HW + 8), CFrame.new(sx * (XB + 2.9), WH + 1.2, 0), STEEL, Enum.Material.Metal, 0, { shadow = false })
+		Util.D(folder, "TraveBassa", Vector3.new(1.6, 1, 2 * HW + 8), CFrame.new(sx * (XB + 2.9), 4.2, 0), STEEL, Enum.Material.Metal, 0, { shadow = false })
+	end
+
+	-- tabellone di squadra sopra ogni porta (solo luce, niente ombra)
+	for _, s in ipairs({ -1, 1 }) do
+		local key = (s < 0) and "Red" or "Blue"
+		local t = Config.Teams[key]
+		local pos = Vector3.new(s * (XB + 4.6), 30, 0)
+		local cf = CFrame.lookAt(pos, pos + Vector3.new(-s, 0, 0))
+		local p = Util.D(folder, "TabelloneSquadra", Vector3.new(40, 11, 1), cf, Color3.fromRGB(24, 20, 38), Enum.Material.SmoothPlastic, 0, { shadow = false })
+		Util.D(folder, "TabelloneSquadraBordo", Vector3.new(41, 0.6, 1.3), cf * CFrame.new(0, 5.8, -0.1), t.Color, Enum.Material.Neon, 0, { shadow = false })
+		Util.D(folder, "TabelloneSquadraBordo", Vector3.new(41, 0.6, 1.3), cf * CFrame.new(0, -5.8, -0.1), t.Color, Enum.Material.Neon, 0, { shadow = false })
+		Util.label(p, Enum.NormalId.Front, string.upper(t.Name), { font = Enum.Font.GothamBlack, color = t.Color, pps = 26 })
+	end
+
+	ads(folder)
+end
+
+----------------------------------------------------------------------
+-- Tribune: gradoni di pietra con tifosi, tetto, pannelli, tabellone segnapunti
+----------------------------------------------------------------------
+local FAN_COLORS = {
+	Color3.fromRGB(214, 56, 48),
+	Color3.fromRGB(238, 96, 66),
+	Color3.fromRGB(176, 36, 60),
+	Color3.fromRGB(36, 120, 230),
+	Color3.fromRGB(86, 176, 255),
+	Color3.fromRGB(30, 80, 190),
+	Color3.fromRGB(240, 240, 240),
+	Color3.fromRGB(250, 210, 60),
+	Color3.fromRGB(60, 170, 90),
+	Color3.fromRGB(150, 80, 210),
+}
+local SKINS = {
+	Color3.fromRGB(255, 214, 170),
+	Color3.fromRGB(234, 176, 128),
+	Color3.fromRGB(196, 134, 92),
+	Color3.fromRGB(128, 84, 58),
+}
+
+local function scoreboard(folder, sz, backZ)
+	local pos = Vector3.new(0, 47, sz * (backZ + 0.2))
+	local face = Enum.NormalId.Front
+	-- torre di sostegno
+	Util.P(folder, "TorreTabellone", Vector3.new(76, 40, 3), CFrame.new(0, 20, sz * (backZ + 1.6)), TERRACOTTA, Enum.Material.Concrete)
+	local board = Util.P(folder, "Tabellone", Vector3.new(66, 24, 2), CFrame.lookAt(pos, pos + Vector3.new(0, 0, -sz)), Color3.fromRGB(18, 18, 32), Enum.Material.SmoothPlastic)
+	board.CastShadow = false
+	Util.tag(board, "Scoreboard")
+	for _, dy in ipairs({ -12.6, 12.6 }) do
+		Util.D(folder, "TabelloneBordo", Vector3.new(68, 1.2, 2.4), CFrame.new(pos + Vector3.new(0, dy, 0)), LILAC, Enum.Material.Neon, 0, { shadow = false })
+	end
+	for _, dx in ipairs({ -33.6, 33.6 }) do
+		Util.D(folder, "TabelloneBordo", Vector3.new(1.2, 26, 2.4), CFrame.new(pos + Vector3.new(dx, 0, 0)), LILAC, Enum.Material.Neon, 0, { shadow = false })
+	end
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "Gui"
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 24
+	gui.LightInfluence = 0
+	gui.Parent = board
+	local function lab(name, text, color, px, py, sx, sy, font)
+		local l = Instance.new("TextLabel")
+		l.Name = name
+		l.BackgroundTransparency = 1
+		l.Position = UDim2.fromScale(px, py)
+		l.Size = UDim2.fromScale(sx, sy)
+		l.Font = font or Enum.Font.GothamBlack
+		l.TextScaled = true
+		l.TextColor3 = color
+		l.Text = text
+		l.Parent = gui
+		return l
+	end
+	lab("Titolo", "CALCIO FUORILEGGE", Color3.fromRGB(255, 205, 90), 0.1, 0.03, 0.8, 0.17)
+	lab("NomeRossi", string.upper(Config.Teams.Red.Name), Config.Teams.Red.Color, 0.03, 0.22, 0.31, 0.2)
+	lab("PunteggioRossi", "0", Color3.fromRGB(255, 255, 255), 0.03, 0.42, 0.31, 0.52)
+	lab("Tempo", "6:00", Color3.fromRGB(255, 196, 70), 0.36, 0.3, 0.28, 0.4)
+	lab("Fase", "", Color3.fromRGB(190, 132, 255), 0.33, 0.72, 0.34, 0.18)
+	lab("NomeBlu", string.upper(Config.Teams.Blue.Name), Config.Teams.Blue.Color, 0.66, 0.22, 0.31, 0.2)
+	lab("PunteggioBlu", "0", Color3.fromRGB(255, 255, 255), 0.66, 0.42, 0.31, 0.52)
+	-- due colonne di sostegno
+	for _, dx in ipairs({ -26, 26 }) do
+		Util.P(folder, "ColonnaTabellone", Vector3.new(5, 12, 5), CFrame.new(dx, 36, sz * (backZ + 1.6)), STEEL, Enum.Material.Metal)
+	end
+end
+
+local function stand(folder, sz, rng)
+	local f = Util.folder(folder, "Tribuna_" .. ((sz < 0) and "Sud" or "Nord"))
+	local half = ST.HalfLen
+	-- gradoni
+	for i = 1, ST.Rows do
+		local h = ST.Rise * i
+		local zc = sz * (ST.Z0 + ST.Depth * (i - 0.5))
+		Util.P(f, "Gradone", Vector3.new(2 * half, h, ST.Depth), CFrame.new(0, h / 2, zc), (i % 2 == 0) and SAND_A or SAND_B, Enum.Material.Concrete, 0, { shadow = false })
+	end
+	-- muro di fondo
+	local backZ = Layout.STAND_BACK
+	Util.P(f, "MuroFondo", Vector3.new(2 * half + 12, 26, 3), CFrame.new(0, 13, sz * (backZ + 1.5)), TERRACOTTA, Enum.Material.Concrete)
+	Util.D(f, "MuroFondoLuce", Vector3.new(2 * half + 12, 0.8, 0.6), CFrame.new(0, 26.4, sz * (backZ - 0.2)), LILAC, Enum.Material.Neon, 0, { shadow = false })
+	-- fianchi chiusi
+	for _, sx in ipairs({ -1, 1 }) do
+		Util.P(f, "Fianco", Vector3.new(3, 26, backZ - ST.Z0 + 2), CFrame.new(sx * (half + 4.5), 13, sz * ((backZ + ST.Z0) / 2)), TERRACOTTA, Enum.Material.Concrete)
+	end
+
+	-- tifosi: un corpo e una testa, a gruppi di colore
+	local fans = Util.folder(f, "Tifosi")
+	for i = 1, ST.Rows do
+		local h = ST.Rise * i
+		local z = sz * (ST.Z0 + ST.Depth * (i - 0.5))
+		local x = -half + 3 + ((i % 2 == 0) and 3.2 or 0)
+		while x < half - 3 do
+			local aisle = math.abs((x + half) % 37 - 18) < 3.4
+			if not aisle and rng.Next() > 0.2 then
+				local body = rng.Pick(FAN_COLORS)
+				local m = Instance.new("Model")
+				m.Name = "Tifoso"
+				local b = Util.D(m, "Corpo", Vector3.new(2, 3, 1.6), CFrame.new(x, h + 1.5, z), body, Enum.Material.SmoothPlastic, 0, { shadow = false })
+				local hd = Util.sphere(m, "Testa", Vector3.new(x, h + 3.8, z), 1.7, rng.Pick(SKINS), Enum.Material.SmoothPlastic, false, { shadow = false })
+				m.PrimaryPart = b
+				m.Parent = fans
+				Util.tag(m, "Fan")
+				-- il corpo ricorda la sua fase, cosi' i tifosi non saltano tutti insieme
+				m:SetAttribute("Fase", rng.Range(0, 6.28))
+				m:SetAttribute("Salto", rng.Range(0.7, 1.4))
+			end
+			x = x + 6.2
+		end
+	end
+
+	-- tetto con colonne e luce di bordo
+	local roofY, roofZ = 29, sz * (backZ - 14)
+	Util.P(f, "Tetto", Vector3.new(2 * half + 12, 1.4, 38), CFrame.new(0, roofY, roofZ) * CFrame.Angles(-sz * math.rad(8), 0, 0), Color3.fromRGB(244, 230, 206), Enum.Material.SmoothPlastic, 0, { shadow = true })
+	Util.D(f, "TettoLuce", Vector3.new(2 * half + 12, 0.7, 0.7), CFrame.new(0, roofY - 2.6, sz * (backZ - 33)), LILAC, Enum.Material.Neon, 0, { shadow = false })
+	for x = -half, half, 28 do
+		Util.pillar(f, "Colonna", x, 0, sz * (backZ - 2.5), 2.4, 30, STEEL_LIGHT, Enum.Material.Metal, true)
+	end
+	-- striscioni di squadra appesi al muro di fondo
+	local bannerCols = { Config.Teams.Red.Color, Config.Teams.Blue.Color, Color3.fromRGB(250, 210, 60), Color3.fromRGB(240, 240, 240) }
+	local k = 0
+	for x = -half + 12, half - 12, 24 do
+		k = k + 1
+		if math.abs(x) > 40 then
+			Util.D(f, "Striscione", Vector3.new(7, 15, 0.4), CFrame.new(x, 15, sz * (backZ - 0.3)), bannerCols[(k % #bannerCols) + 1], Enum.Material.Fabric, 0, { shadow = false })
+		end
+	end
+
+	scoreboard(f, sz, backZ)
 	return f
 end
 
-local function setupLighting()
-	Lighting.ClockTime = 17.4
-	Lighting.Brightness = 2.4
-	Lighting.Ambient = Color3.fromRGB(120, 92, 110)
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 110, 125)
-	Lighting.ColorShift_Top = Color3.fromRGB(255, 170, 120)
-	Lighting.EnvironmentDiffuseScale = 0.6
-	Lighting.EnvironmentSpecularScale = 0.4
+----------------------------------------------------------------------
+-- Torri faro (agganciabili col rampino)
+----------------------------------------------------------------------
+local function towers(folder)
+	local t = Util.folder(folder, "TorriFaro")
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local x, z = sx * Layout.TOWER_X, sz * Layout.TOWER_Z
+			local foot = Util.P(t, "Basamento", Vector3.new(10, 3, 10), CFrame.new(x, 1.5, z), Color3.fromRGB(186, 148, 118), Enum.Material.Concrete)
+			local mast = Util.pillar(t, "Traliccio", x, 3, z, 3.4, 64, STEEL_LIGHT, Enum.Material.Metal, true)
+			Util.tag(mast, "Grappable")
+			Util.tag(foot, "Grappable")
+			for _, y in ipairs({ 18, 36, 54 }) do
+				Util.pillar(t, "Anello", x, y, z, 4.6, 0.9, STEEL, Enum.Material.Metal, false)
+			end
+			-- bancata di proiettori puntata sul centro del campo
+			local top = Vector3.new(x, 70, z)
+			local aim = CFrame.lookAt(top, Vector3.new(-sx * 20, 0, -sz * 10))
+			local frame = Util.D(t, "Telaio", Vector3.new(21, 12, 1.6), aim, STEEL, Enum.Material.Metal, 0, { shadow = false })
+			for row = 0, 1 do
+				for col = -1, 1 do
+					local lamp = Util.D(t, "Proiettore", Vector3.new(6, 4.6, 0.7), aim * CFrame.new(col * 6.6, (row - 0.5) * 5.4, -1.1), Color3.fromRGB(255, 244, 214), Enum.Material.Neon, 0, { shadow = false })
+					if row == 0 and col == 0 then
+						local sp = Instance.new("SpotLight")
+						sp.Face = Enum.NormalId.Front
+						sp.Brightness = 2.4
+						sp.Range = 210
+						sp.Angle = 78
+						sp.Color = Color3.fromRGB(255, 236, 205)
+						sp.Shadows = false
+						sp.Parent = lamp
+						-- fascio di luce (decorativo) fino a terra
+						local a0 = Instance.new("Attachment")
+						a0.Parent = lamp
+						local target = Util.D(t, "BersaglioLuce", Vector3.new(1, 1, 1), CFrame.new(-sx * 38, 0.4, -sz * 16), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, 1, { shadow = false })
+						local a1 = Instance.new("Attachment")
+						a1.Parent = target
+						local beam = Instance.new("Beam")
+						beam.Attachment0 = a0
+						beam.Attachment1 = a1
+						beam.Width0 = 5
+						beam.Width1 = 50
+						beam.FaceCamera = true
+						beam.LightEmission = 0.8
+						beam.LightInfluence = 0
+						beam.Segments = 1
+						beam.Transparency = NumberSequence.new(0.9, 1)
+						beam.Color = ColorSequence.new(Color3.fromRGB(255, 230, 190))
+						beam.Parent = lamp
+					end
+				end
+			end
+			-- luce rossa di segnalazione in cima (lampeggia sul client)
+			local red = Util.sphere(t, "LuceRossa", Vector3.new(x, 77.5, z), 2.2, Color3.fromRGB(255, 50, 50), Enum.Material.Neon, false, { shadow = false })
+			Util.tag(red, "Blink")
+			frame.Name = "TelaioProiettori"
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Effetti d'atmosfera: pulviscolo dorato nell'aria e cannoncini di coriandoli (sparano al goal, vedi Ambient)
+----------------------------------------------------------------------
+local function atmosphereFx(folder)
+	local f = Util.folder(folder, "Atmosfera")
+	-- pulviscolo che fluttua nella luce del tramonto sopra il campo
+	local box = Util.D(f, "Polvere", Vector3.new(2 * XB - 4, 34, 2 * HW - 4), CFrame.new(0, 20, 0), Color3.new(1, 1, 1), SM, 1, { shadow = false })
+	local dust = Instance.new("ParticleEmitter")
+	dust.Name = "Pulviscolo"
+	dust.Rate = 16
+	dust.Lifetime = NumberRange.new(6, 10)
+	dust.Speed = NumberRange.new(0.3, 1.1)
+	dust.SpreadAngle = Vector2.new(180, 180)
+	dust.Acceleration = Vector3.new(0.6, 0.15, 0)
+	dust.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0.15) })
+	dust.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.55), NumberSequenceKeypoint.new(0.8, 0.6), NumberSequenceKeypoint.new(1, 1) })
+	dust.Color = ColorSequence.new(Color3.fromRGB(255, 226, 170))
+	dust.LightEmission = 0.6
+	dust.Shape = Enum.ParticleEmitterShape.Box
+	dust.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	dust.Parent = box
+
+	-- coriandoli: spenti finche' il client non li fa partire (fase "Goal")
+	local spots = {}
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			spots[#spots + 1] = Vector3.new(sx * (XB + 3.6), WH + 13, sz * (HW + 3.6))
+		end
+	end
+	spots[#spots + 1] = Vector3.new(0, 36, -(Layout.STAND_BACK - 12))
+	spots[#spots + 1] = Vector3.new(0, 36, Layout.STAND_BACK - 12)
+	local colors = { Color3.fromRGB(235, 64, 52), Color3.fromRGB(41, 160, 255), Color3.fromRGB(255, 214, 70), Color3.fromRGB(255, 255, 255) }
+	for _, pos in ipairs(spots) do
+		local p = Util.D(f, "Coriandoli", Vector3.new(1, 1, 1), CFrame.new(pos), Color3.new(1, 1, 1), SM, 1, { shadow = false })
+		Util.tag(p, "GoalBurst")
+		for _, col in ipairs(colors) do
+			local e = Instance.new("ParticleEmitter")
+			e.Name = "Coriandolo"
+			e.Enabled = false
+			e.Rate = 0
+			e.Lifetime = NumberRange.new(2.4, 3.6)
+			e.Speed = NumberRange.new(34, 64)
+			e.SpreadAngle = Vector2.new(48, 48)
+			e.Acceleration = Vector3.new(0, -34, 0)
+			e.Drag = 1
+			e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.6) })
+			e.Color = ColorSequence.new(col)
+			e.LightEmission = 0.25
+			e.Rotation = NumberRange.new(0, 360)
+			e.RotSpeed = NumberRange.new(-260, 260)
+			e.EmissionDirection = Enum.NormalId.Top
+			e.Parent = p
+		end
+	end
+end
+
+function Arena.Build(root)
+	local folder = Util.folder(root, "Arena")
+	local rng = Util.Rng(1207)
+	plaza(folder)
+	walls(folder)
+	stand(folder, -1, rng)
+	stand(folder, 1, rng)
+	towers(folder)
+	pcall(atmosphereFx, folder)
+	return folder
+end
+
+return Arena
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX12"><Properties><string name="Name">Atmosphere</string><ProtectedString name="Source"><![CDATA[-- Luce da tramonto, cielo, nuvole ed effetti di post-produzione.
+local Lighting = game:GetService("Lighting")
+
+local Atmosphere = {}
+
+function Atmosphere.Build()
+	-- via eventuali effetti gia' presenti (place nuovo o rilancio dello script)
+	for _, c in ipairs(Lighting:GetChildren()) do
+		if c:IsA("Sky") or c:IsA("Atmosphere") or c:IsA("PostEffect") then
+			c:Destroy()
+		end
+	end
+
+	-- Il percorso del sole va da +X (alba) a -X (tramonto): le ombre lunghe cadono lungo il campo, non attraverso.
+	Lighting.GeographicLatitude = 23.5
+	Lighting.ClockTime = 17.0
+	Lighting.Brightness = 2.6
+	Lighting.Ambient = Color3.fromRGB(96, 72, 112)
+	Lighting.OutdoorAmbient = Color3.fromRGB(138, 104, 130)
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 176, 120)
+	Lighting.ColorShift_Bottom = Color3.fromRGB(120, 84, 150)
+	Lighting.EnvironmentDiffuseScale = 0.55
+	Lighting.EnvironmentSpecularScale = 0.5
+	Lighting.ExposureCompensation = 0.1
 	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.35
 
 	local atm = Instance.new("Atmosphere")
-	atm.Density = 0.28
-	atm.Offset = 0.2
-	atm.Color = Color3.fromRGB(255, 190, 175)
-	atm.Decay = Color3.fromRGB(190, 110, 170)
-	atm.Glare = 0.5
-	atm.Haze = 1.2
+	atm.Name = "Foschia"
+	atm.Density = 0.34
+	atm.Offset = 0.3
+	atm.Color = Color3.fromRGB(255, 170, 142)
+	atm.Decay = Color3.fromRGB(148, 78, 122)
+	atm.Glare = 0.6
+	atm.Haze = 1.8
 	atm.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.4
-	bloom.Size = 24
-	bloom.Threshold = 1.1
+	bloom.Name = "Bagliore"
+	bloom.Intensity = 0.7
+	bloom.Size = 30
+	bloom.Threshold = 0.9
 	bloom.Parent = Lighting
 
 	local cc = Instance.new("ColorCorrectionEffect")
-	cc.Saturation = 0.25
-	cc.Contrast = 0.1
-	cc.TintColor = Color3.fromRGB(255, 240, 235)
+	cc.Name = "Colori"
+	cc.Brightness = 0
+	cc.Contrast = 0.14
+	cc.Saturation = 0.24
+	cc.TintColor = Color3.fromRGB(255, 238, 242)
 	cc.Parent = Lighting
 
 	local rays = Instance.new("SunRaysEffect")
-	rays.Intensity = 0.08
-	rays.Spread = 0.6
+	rays.Name = "Raggi"
+	rays.Intensity = 0.1
+	rays.Spread = 0.8
 	rays.Parent = Lighting
+
+	-- nuvole volumetriche (vivono dentro il Terrain)
+	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
+	if not clouds then
+		clouds = Instance.new("Clouds")
+		clouds.Name = "Nuvole"
+		clouds.Parent = workspace.Terrain
+	end
+	clouds.Enabled = true
+	clouds.Cover = 0.55
+	clouds.Density = 0.55
+	clouds.Color = Color3.fromRGB(255, 196, 190)
 end
 
--- linea piatta tra due punti del campo (coordinate X,Z)
-local function line(parent, x1, z1, x2, z2, thick)
-	local dx, dz = x2 - x1, z2 - z1
-	local len = math.sqrt(dx * dx + dz * dz)
-	local mid = Vector3.new((x1 + x2) / 2, 0.14, (z1 + z2) / 2)
-	local p = P(
-		parent,
-		"Line",
-		Vector3.new(len + (thick or 0.7), 0.06, thick or 0.7),
-		CFrame.new(mid) * CFrame.Angles(0, -math.atan2(dz, dx), 0),
-		Color3.fromRGB(232, 222, 255),
-		Enum.Material.Neon
-	)
-	return decor(p)
-end
+return Atmosphere
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX13"><Properties><string name="Name">Goals</string><ProtectedString name="Source"><![CDATA[-- Le due porte: pali spessi color pietra, rete a nido d'ape luminosa del colore della squadra che difende.
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+local Util = require(script.Parent.Util)
+local Layout = require(script.Parent.Layout)
 
--- rete a nido d'api (esagoni) su un pannello; origin: X locale = larghezza, Y locale = altezza
-local function hexNet(parent, origin, width, height, color)
-	local r = 1.7
+local Goals = {}
+
+local HL = Layout.HL
+local STONE = Color3.fromRGB(156, 148, 140)
+local STONE_DARK = Color3.fromRGB(112, 104, 100)
+local STEEL = Color3.fromRGB(44, 46, 66)
+
+-- Rete a nido d'ape su un pannello rettangolare. origin: X locale = larghezza, Y locale = altezza.
+-- Ogni spigolo e' disegnato una sola volta (due esagoni vicini ne condividono uno).
+local function hexNet(parent, origin, width, height, color, r)
 	local dx = math.sqrt(3) * r
 	local dy = 1.5 * r
-	local row = 0
-	local v = -height / 2 + r
-	while v <= height / 2 - r * 0.5 do
-		local offset = (row % 2 == 0) and 0 or dx / 2
-		local u = -width / 2 + r * 0.9 + offset
-		while u <= width / 2 - r * 0.8 do
+	local halfW = math.sqrt(3) / 2 * r
+	local umax = width / 2 - halfW
+	local vmax = height / 2 - r
+	if umax < 0 or vmax < 0 then
+		return
+	end
+	local seen = {}
+	local function edge(x1, y1, x2, y2)
+		local a1, b1, a2, b2 = math.floor(x1 * 100 + 0.5), math.floor(y1 * 100 + 0.5), math.floor(x2 * 100 + 0.5), math.floor(y2 * 100 + 0.5)
+		local k
+		if a1 < a2 or (a1 == a2 and b1 <= b2) then
+			k = a1 .. "," .. b1 .. "," .. a2 .. "," .. b2
+		else
+			k = a2 .. "," .. b2 .. "," .. a1 .. "," .. b1
+		end
+		if seen[k] then
+			return
+		end
+		seen[k] = true
+		local ex, ey = x2 - x1, y2 - y1
+		local len = math.sqrt(ex * ex + ey * ey)
+		local cf = origin * CFrame.new((x1 + x2) / 2, (y1 + y2) / 2, 0) * CFrame.Angles(0, 0, math.atan2(ey, ex))
+		Util.D(parent, "Maglia", Vector3.new(len + 0.12, 0.14, 0.14), cf, color, Enum.Material.Neon, 0, { shadow = false })
+	end
+	local rows = math.floor(2 * vmax / dy + 1e-6) + 1
+	local rowSpan = (rows - 1) * dy
+	local evenCols = math.floor(2 * umax / dx + 1e-6) + 1
+	for row = 0, rows - 1 do
+		local v = -rowSpan / 2 + row * dy
+		local cols = evenCols
+		local first = -(evenCols - 1) * dx / 2
+		if row % 2 == 1 then
+			cols = math.max(evenCols - 1, 1)
+			first = -(cols - 1) * dx / 2
+		end
+		for c = 0, cols - 1 do
+			local u = first + c * dx
 			for k = 0, 5 do
 				local a1 = math.rad(30 + 60 * k)
 				local a2 = math.rad(30 + 60 * (k + 1))
-				local x1, y1 = u + r * math.cos(a1), v + r * math.sin(a1)
-				local x2, y2 = u + r * math.cos(a2), v + r * math.sin(a2)
-				local ex, ey = x2 - x1, y2 - y1
-				local len = math.sqrt(ex * ex + ey * ey)
-				local cf = origin * CFrame.new((x1 + x2) / 2, (y1 + y2) / 2, 0) * CFrame.Angles(0, 0, math.atan2(ey, ex))
-				decor(P(parent, "NetEdge", Vector3.new(len, 0.16, 0.16), cf, color, Enum.Material.Neon))
+				edge(u + r * math.cos(a1), v + r * math.sin(a1), u + r * math.cos(a2), v + r * math.sin(a2))
 			end
-			u = u + dx
 		end
-		v = v + dy
-		row = row + 1
 	end
 end
 
 local function buildGoal(parent, sign, teamKey)
 	local color = Config.Teams[teamKey].Color
 	local netColor = (teamKey == "Red") and Color3.fromRGB(255, 70, 150) or Color3.fromRGB(70, 190, 255)
-	local g = folder(parent, "Goal_" .. teamKey)
-	local stone = Color3.fromRGB(150, 145, 138)
-	local gw, gh, gd = F.GoalWidth, F.GoalHeight, F.GoalDepth
+	local g = Util.folder(parent, "Goal_" .. teamKey)
+	local gw, gh, gd = Layout.GW, Layout.GH, Layout.GD
 	local x = sign * HL
-
-	-- pali spessi color pietra
-	for _, s in ipairs({ -1, 1 }) do
-		local post = P(g, "Post", Vector3.new(2.2, gh, 2.2), CFrame.new(x, gh / 2, s * gw / 2), stone, Enum.Material.Slate)
-		post.CustomPhysicalProperties = PhysicalProperties.new(1, 0.3, 0.8, 100, 1)
-	end
-	local bar = P(g, "Crossbar", Vector3.new(2.2, 2.2, gw + 2.2), CFrame.new(x, gh, 0), stone, Enum.Material.Slate)
-	bar.CustomPhysicalProperties = PhysicalProperties.new(1, 0.3, 0.8, 100, 1)
-
-	-- pannelli di collisione (quasi invisibili) + esagoni luminosi
 	local backX = sign * (HL + gd)
-	local netProps = PhysicalProperties.new(1, 0.5, 0.35, 100, 1)
-	local back = P(g, "NetBack", Vector3.new(0.5, gh, gw), CFrame.new(backX, gh / 2, 0), netColor, Enum.Material.Neon, 0.85)
-	back.CustomPhysicalProperties = netProps
-	hexNet(g, CFrame.new(backX, gh / 2, 0) * CFrame.Angles(0, math.pi / 2, 0), gw, gh, netColor)
+	local midX = sign * (HL + gd / 2)
+	local postProps = PhysicalProperties.new(1, 0.3, 0.8, 100, 1)
 
+	-- pali spessi di pietra (collidono)
 	for _, s in ipairs({ -1, 1 }) do
-		local cx = sign * (HL + gd / 2)
-		local side = P(g, "NetSide", Vector3.new(gd, gh, 0.5), CFrame.new(cx, gh / 2, s * gw / 2), netColor, Enum.Material.Neon, 0.85)
-		side.CustomPhysicalProperties = netProps
-		hexNet(g, CFrame.new(cx, gh / 2, s * gw / 2), gd, gh, netColor)
+		local post = Util.P(g, "Palo", Vector3.new(2.2, gh, 2.2), CFrame.new(x, gh / 2, s * gw / 2), STONE, Enum.Material.Slate)
+		post.CustomPhysicalProperties = postProps
+		-- basamento, fascia luminosa e cappello (solo estetica)
+		Util.D(g, "Basamento", Vector3.new(3.4, 1.2, 3.4), CFrame.new(x, 0.6, s * gw / 2), STONE_DARK, Enum.Material.Slate)
+		Util.D(g, "Fascia", Vector3.new(2.5, 0.5, 2.5), CFrame.new(x, gh - 1.6, s * gw / 2), netColor, Enum.Material.Neon, 0, { shadow = false })
+		Util.D(g, "Cappello", Vector3.new(3, 0.8, 3), CFrame.new(x, gh + 1.2, s * gw / 2), STONE_DARK, Enum.Material.Slate)
+		-- palo posteriore e travi del telaio
+		Util.pillar(g, "PaloRetro", backX, 0, s * gw / 2, 1.2, gh, STEEL, Enum.Material.Metal, false)
+		Util.beam(g, "TraveLaterale", Vector3.new(x, gh + 0.2, s * gw / 2), Vector3.new(backX, gh + 0.2, s * gw / 2), 0.9, 0.9, STEEL, Enum.Material.Metal, false)
+		Util.beam(g, "BaseLaterale", Vector3.new(x, 0.45, s * gw / 2), Vector3.new(backX, 0.45, s * gw / 2), 0.9, 0.9, STEEL, Enum.Material.Metal, false)
 	end
+	local bar = Util.P(g, "Traversa", Vector3.new(2.2, 2.2, gw + 2.2), CFrame.new(x, gh, 0), STONE, Enum.Material.Slate)
+	bar.CustomPhysicalProperties = postProps
+	Util.D(g, "TraversaLuce", Vector3.new(0.5, 0.5, gw), CFrame.new(x - sign * 1.4, gh, 0), netColor, Enum.Material.Neon, 0, { shadow = false })
+	Util.beam(g, "TraveRetro", Vector3.new(backX, gh + 0.2, -gw / 2), Vector3.new(backX, gh + 0.2, gw / 2), 0.9, 0.9, STEEL, Enum.Material.Metal, false)
+	Util.beam(g, "BaseRetro", Vector3.new(backX, 0.45, -gw / 2), Vector3.new(backX, 0.45, gw / 2), 0.9, 0.9, STEEL, Enum.Material.Metal, false)
 
-	local cx = sign * (HL + gd / 2)
-	local top = P(g, "NetTop", Vector3.new(gd, 0.5, gw), CFrame.new(cx, gh, 0), netColor, Enum.Material.Neon, 0.85)
-	top.CustomPhysicalProperties = netProps
-	hexNet(g, CFrame.new(cx, gh, 0) * CFrame.Angles(math.pi / 2, 0, 0), gd, gw, netColor)
+	-- pannelli di collisione quasi invisibili + nido d'ape luminoso
+	local netProps = PhysicalProperties.new(1, 0.5, 0.35, 100, 1)
+	local function panel(name, size, pos)
+		local p = Util.P(g, name, size, CFrame.new(pos), netColor, Enum.Material.Neon, 0.88, { shadow = false })
+		p.CustomPhysicalProperties = netProps
+		p.CanQuery = false
+		return p
+	end
+	local R = 2.0
+	panel("RetePosteriore", Vector3.new(0.5, gh, gw), Vector3.new(backX, gh / 2, 0))
+	hexNet(g, CFrame.new(backX - sign * 0.3, gh / 2, 0) * CFrame.Angles(0, math.pi / 2, 0), gw, gh, netColor, R)
+	for _, s in ipairs({ -1, 1 }) do
+		panel("ReteLato", Vector3.new(gd, gh, 0.5), Vector3.new(midX, gh / 2, s * gw / 2))
+		hexNet(g, CFrame.new(midX, gh / 2, s * gw / 2 - s * 0.3), gd, gh, netColor, R)
+	end
+	panel("ReteTetto", Vector3.new(gd, 0.5, gw), Vector3.new(midX, gh, 0))
+	hexNet(g, CFrame.new(midX, gh - 0.3, 0) * CFrame.Angles(math.pi / 2, 0, 0), gd, gw, netColor, R)
 
-	-- striscia colorata della squadra che difende, a terra davanti alla porta
-	decor(P(g, "GoalMark", Vector3.new(1.2, 0.07, gw), CFrame.new(x - sign * 1.5, 0.15, 0), color, Enum.Material.Neon))
+	-- tappeto scuro dentro la porta e striscia colorata della squadra che difende
+	Util.D(g, "FondoPorta", Vector3.new(gd, 0.1, gw), CFrame.new(midX, 0.2, 0), Util.shade(color, 0.35), Enum.Material.SmoothPlastic, 0.35, { shadow = false })
+	return g
 end
 
-local function buildField(root)
-	local field = folder(root, "Field")
-	local L, W, GD = F.Length, F.Width, F.GoalDepth
+function Goals.Build(field)
+	-- porte: i Rossi difendono -X, i Blu +X
+	buildGoal(field, -1, "Red")
+	buildGoal(field, 1, "Blue")
+end
 
-	-- terreno desertico enorme
-	local base = P(field, "DesertFloor", Vector3.new(2400, 4, 2400), CFrame.new(0, -2.1, 0), Color3.fromRGB(196, 140, 96), Enum.Material.Sand)
-	base.Name = "DesertFloor"
+return Goals
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX14"><Properties><string name="Name">Layout</string><ProtectedString name="Source"><![CDATA[-- Misure condivise da tutti i moduli della mappa (derivate da Config.Field).
+-- Sistema di coordinate: asse X = lunghezza del campo (Rossi difendono -X, Blu +X), asse Z = larghezza, Y verso l'alto.
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 
-	-- campo di terra a strisce
-	local totalLen = L + 2 * GD + 8
-	local stripes = 12
+local F = Config.Field
+
+local Layout = {}
+
+Layout.HL = F.Length / 2 -- mezza lunghezza: la linea di porta sta a x = +-HL
+Layout.HW = F.Width / 2 -- mezza larghezza: le linee laterali stanno a z = +-HW
+Layout.GD = F.GoalDepth
+Layout.GW = F.GoalWidth
+Layout.GH = F.GoalHeight
+Layout.WALL_H = F.WallHeight
+Layout.XB = Layout.HL + Layout.GD + 2 -- faccia interna delle pareti di testa
+Layout.ZB = Layout.HW -- faccia interna delle pareti laterali
+
+Layout.PITCH_Y = 0.15 -- quota della superficie di gioco (la palla appoggia qui)
+Layout.GROUND_Y = -2 -- quota del terreno della valle
+Layout.PLAZA_X = 192 -- semi-estensione della piazza dello stadio
+Layout.PLAZA_Z = 156
+
+-- tribune lungo i lati lunghi
+Layout.STAND = {
+	Z0 = 76, -- distanza dall'asse del campo del primo gradone
+	Rows = 6,
+	Depth = 5.5,
+	Rise = 2.3,
+	HalfLen = 112,
+}
+Layout.STAND_BACK = Layout.STAND.Z0 + Layout.STAND.Rows * Layout.STAND.Depth -- 109
+
+-- torri faro (fuori dalla piazza dei gradoni, agli angoli)
+Layout.TOWER_X = 140
+Layout.TOWER_Z = 98
+
+-- lobby: belvedere sulla parete sud del canyon, guarda il campo (verso +Z)
+Layout.LOBBY = Config.Lobby.Center
+
+return Layout
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX15"><Properties><string name="Name">LobbyBuilder</string><ProtectedString name="Source"><![CDATA[-- La lobby: baita di legno con vetrate panoramiche sul belvedere sopra il canyon, terrazza con le due pedane
+-- squadra (ROSSA e BLU), cartelli, camino, trofeo e telescopi puntati sul campo.
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+local Util = require(script.Parent.Util)
+local Layout = require(script.Parent.Layout)
+
+local LobbyBuilder = {}
+
+local c = Layout.LOBBY
+local SM = Enum.Material.SmoothPlastic
+local WOOD = Enum.Material.WoodPlanks
+
+local LOG = Color3.fromRGB(116, 74, 44)
+local LOG_DARK = Color3.fromRGB(84, 52, 32)
+local PLANK_A = Color3.fromRGB(158, 104, 62)
+local PLANK_B = Color3.fromRGB(144, 94, 56)
+local CREAM = Color3.fromRGB(246, 232, 204)
+local GOLD = Color3.fromRGB(246, 196, 60)
+local STONE = Color3.fromRGB(150, 140, 132)
+local STEEL = Color3.fromRGB(46, 50, 74)
+
+-- posizione/CFrame relativi al centro del pavimento (Y = pavimento, Z negativa = verso la parete del canyon)
+local function V(x, y, z)
+	return Vector3.new(c.X + x, c.Y + y, c.Z + z)
+end
+local function at(x, y, z)
+	return CFrame.new(c.X + x, c.Y + y, c.Z + z)
+end
+-- cartello che guarda in direzione dir (la faccia "Front" va verso dir)
+local function facing(pos, dir)
+	return CFrame.lookAt(pos, pos + dir)
+end
+
+local function board(parent, name, pos, dir, size, color, text, tcolor, pps)
+	local p = Util.D(parent, name, size, facing(pos, dir), color, WOOD, 0, { shadow = false })
+	Util.label(p, Enum.NormalId.Front, text, { font = Enum.Font.GothamBlack, color = tcolor, pps = pps or 30 })
+	return p
+end
+
+local function pointLight(parent, color, range, brightness)
+	local l = Instance.new("PointLight")
+	l.Color = color
+	l.Range = range
+	l.Brightness = brightness
+	l.Shadows = false
+	l.Parent = parent
+	return l
+end
+
+----------------------------------------------------------------------
+-- Pavimento e terrazza
+----------------------------------------------------------------------
+local function deck(f)
+	local d = Util.folder(f, "Pavimento")
+	for i = 0, 15 do
+		Util.P(d, "Asse", Vector3.new(10, 2, 110), at(-75 + i * 10, -1, 0), (i % 2 == 0) and PLANK_A or PLANK_B, WOOD)
+	end
+	-- tappeto davanti al camino e sotto la vetrata
+	local rug = Util.D(d, "Tappeto", Vector3.new(70, 0.12, 30), at(0, 0.07, -30), Color3.fromRGB(150, 54, 48), Enum.Material.Carpet, 0, { shadow = false })
+	Util.D(d, "TappetoBordo", Vector3.new(66, 0.14, 26), at(0, 0.09, -30), Color3.fromRGB(236, 214, 170), Enum.Material.Carpet, 0, { shadow = false })
+	Util.D(d, "TappetoCentro", Vector3.new(60, 0.16, 20), at(0, 0.11, -30), Color3.fromRGB(46, 96, 120), Enum.Material.Carpet, 0, { shadow = false })
+	rug.Name = "TappetoBase"
+end
+
+local function rails(f)
+	local r = Util.folder(f, "Ringhiera")
+	-- fronte e fianchi della terrazza (z da +5 a +55): parapetto solido + barriera invisibile piu' alta
+	local function run(a, b)
+		local mid = (a + b) / 2
+		local len = (b - a).Magnitude
+		Util.beam(r, "Corrimano", a + Vector3.new(0, 3.3, 0), b + Vector3.new(0, 3.3, 0), 0.8, 0.7, LOG, Enum.Material.Wood, true)
+		Util.beam(r, "Traversa", a + Vector3.new(0, 1.7, 0), b + Vector3.new(0, 1.7, 0), 0.4, 0.4, LOG_DARK, Enum.Material.Wood, true)
+		local n = math.max(2, math.floor(len / 10))
+		for i = 0, n do
+			local p = a:Lerp(b, i / n)
+			Util.pillar(r, "Paletto", p.X, c.Y, p.Z, 0.8, 3.6, LOG_DARK, Enum.Material.Wood, true)
+		end
+		-- barriera invisibile alta 40 (nessuno cade giu')
+		local cf = CFrame.lookAt(mid + Vector3.new(0, 20, 0), b + Vector3.new(0, 20, 0))
+		local wall = Util.P(r, "Barriera", Vector3.new(1.2, 40, len), cf, Color3.new(1, 1, 1), SM, 1, { shadow = false })
+		wall.CanQuery = false
+	end
+	run(V(-80, 0, 55), V(80, 0, 55))
+	run(V(-80, 0, 5), V(-80, 0, 55))
+	run(V(80, 0, 5), V(80, 0, 55))
+end
+
+----------------------------------------------------------------------
+-- Baita: pareti, vetrate, tetto a due falde, capriate
+----------------------------------------------------------------------
+local function cabin(f)
+	local cab = Util.folder(f, "Baita")
+	-- pareti di tronchi (dietro e ai lati)
+	Util.P(cab, "ParetePosteriore", Vector3.new(164, 22, 2), at(0, 11, -56), LOG, WOOD)
+	for _, sx in ipairs({ -1, 1 }) do
+		Util.P(cab, "ParetePosteriore", Vector3.new(2, 22, 62), at(sx * 81, 11, -25), LOG, WOOD)
+	end
+	-- fasce di legno scuro che imitano i tronchi
+	for y = 2, 20, 4.5 do
+		Util.D(cab, "Tronco", Vector3.new(164.4, 0.7, 2.4), at(0, y, -56), LOG_DARK, Enum.Material.Wood, 0, { shadow = false })
+		for _, sx in ipairs({ -1, 1 }) do
+			Util.D(cab, "Tronco", Vector3.new(2.4, 0.7, 62), at(sx * 81, y, -25), LOG_DARK, Enum.Material.Wood, 0, { shadow = false })
+		end
+	end
+	-- vetrata panoramica con la porta al centro
+	for _, sx in ipairs({ -1, 1 }) do
+		local g = Util.P(cab, "Vetrata", Vector3.new(66, 20, 0.6), at(sx * 47, 11, 5), Color3.fromRGB(190, 226, 255), Enum.Material.Glass, 0.62, { shadow = false })
+		g.CanQuery = false
+	end
+	for _, x in ipairs({ -80, -69, -58, -47, -36, -25, -14, 14, 25, 36, 47, 58, 69, 80 }) do
+		Util.P(cab, "Montante", Vector3.new(1.4, 22, 1.6), at(x, 11, 5), LOG_DARK, Enum.Material.Wood)
+	end
+	Util.P(cab, "Architrave", Vector3.new(30, 3, 2), at(0, 20.5, 5), LOG_DARK, Enum.Material.Wood)
+	for _, sx in ipairs({ -1, 1 }) do
+		Util.P(cab, "Zoccolo", Vector3.new(66, 1.6, 1.8), at(sx * 47, 0.8, 5), LOG_DARK, Enum.Material.Wood)
+	end
+	Util.P(cab, "Trave", Vector3.new(164, 2, 2), at(0, 22.2, 5), LOG_DARK, Enum.Material.Wood)
+
+	-- tetto a due falde
+	local ang = math.atan(19.2 / 36)
+	local roofCol = Color3.fromRGB(122, 52, 40)
+	Util.P(cab, "FaldaFronte", Vector3.new(176, 1.6, 40.8), at(0, 28.4, -7) * CFrame.Angles(ang, 0, 0), roofCol, Enum.Material.RoofShingles)
+	Util.P(cab, "FaldaRetro", Vector3.new(176, 1.6, 40.8), at(0, 28.4, -43) * CFrame.Angles(-ang, 0, 0), roofCol, Enum.Material.RoofShingles)
+	Util.P(cab, "Colmo", Vector3.new(178, 1.5, 3.4), at(0, 38.5, -25), LOG_DARK, Enum.Material.Wood)
+	-- timpani a gradini sulle testate
+	for _, sx in ipairs({ -1, 1 }) do
+		for k = 0, 7 do
+			local top = (k + 1) * 2
+			local w = 60 * (1 - top / 16) + 1
+			Util.P(cab, "Timpano", Vector3.new(1.8, 2, w), at(sx * 80.6, 22 + k * 2 + 1, -25.5), LOG, WOOD)
+		end
+	end
+	-- capriate a vista
+	for _, x in ipairs({ -60, -30, 0, 30, 60 }) do
+		Util.beam(cab, "Capriata", V(x, 22, 5), V(x, 38, -25), 1.2, 1.8, LOG_DARK, Enum.Material.Wood, false, { shadow = false })
+		Util.beam(cab, "Capriata", V(x, 22, -55), V(x, 38, -25), 1.2, 1.8, LOG_DARK, Enum.Material.Wood, false, { shadow = false })
+		Util.beam(cab, "Catena", V(x, 22, -55), V(x, 22, 5), 1.2, 1.4, LOG_DARK, Enum.Material.Wood, false, { shadow = false })
+	end
+	-- colonne del portico
+	for _, x in ipairs({ -72, -48, -24, 24, 48, 72 }) do
+		Util.pillar(cab, "Colonna", c.X + x, c.Y, c.Z + 10.5, 2.4, 19.4, LOG, Enum.Material.Wood, true)
+		Util.D(cab, "ColonnaBase", Vector3.new(3.6, 1.2, 3.6), at(x, 0.6, 10.5), STONE, Enum.Material.Slate)
+	end
+	-- luci a festone sotto la gronda
+	for i = -19, 19 do
+		local x = i * 4
+		local sag = 0.9 * math.abs(math.cos((x / 24) * math.pi))
+		Util.sphere(cab, "Lampadina", V(x, 17.5 - sag, 11.4), 0.9, Color3.fromRGB(255, 214, 130), Enum.Material.Neon, false, { shadow = false })
+	end
+	local fest = Util.D(cab, "Filo", Vector3.new(160, 0.15, 0.15), at(0, 18, 11.4), Color3.fromRGB(30, 30, 36), SM, 0, { shadow = false })
+	fest.Name = "FiloLuci"
+	-- luci calde dentro e fuori
+	local lamps = Util.folder(cab, "Lampade")
+	for _, p in ipairs({ V(-40, 18, -30), V(40, 18, -30), V(0, 18, -44), V(-45, 15, 30), V(45, 15, 30) }) do
+		local lp = Util.sphere(lamps, "Lampada", p, 2.4, Color3.fromRGB(255, 226, 170), Enum.Material.Neon, false, { shadow = false })
+		pointLight(lp, Color3.fromRGB(255, 200, 140), 44, 1.1)
+	end
+end
+
+----------------------------------------------------------------------
+-- Interni: camino, panche, trofeo, cartelli
+----------------------------------------------------------------------
+local function bench(parent, x, z, facingDir)
+	local base = facing(V(x, 0, z), facingDir)
+	Util.P(parent, "Sedile", Vector3.new(14, 1, 3.6), base * CFrame.new(0, 2.6, 0), LOG, WOOD)
+	Util.P(parent, "Schienale", Vector3.new(14, 3, 0.8), base * CFrame.new(0, 4.6, 1.5), LOG_DARK, WOOD)
+	for _, lx in ipairs({ -6, 6 }) do
+		Util.P(parent, "Gamba", Vector3.new(1, 2.4, 3), base * CFrame.new(lx, 1.2, 0), LOG_DARK, Enum.Material.Wood)
+	end
+end
+
+local function interior(f)
+	local int = Util.folder(f, "Interni")
+	-- camino in pietra nell'angolo posteriore sinistro, con fuoco acceso
+	Util.P(int, "Camino", Vector3.new(14, 14, 8), at(-72, 7, -51), STONE, Enum.Material.Slate)
+	Util.P(int, "Cappa", Vector3.new(9, 22, 6), at(-72, 25, -52), STONE, Enum.Material.Slate)
+	Util.D(int, "Focolare", Vector3.new(8, 6.5, 0.6), at(-72, 3.6, -46.7), Color3.fromRGB(26, 20, 22), SM, 0, { shadow = false })
+	for _, dz in ipairs({ -1.2, 1.2 }) do
+		Util.rod(int, "Ceppo", V(-75.5, 1, -45.4 + dz), V(-68.5, 1.4, -45.4 + dz), 1.2, Color3.fromRGB(70, 44, 30), Enum.Material.Wood, false, { shadow = false })
+	end
+	local flame = Util.D(int, "Fiamma", Vector3.new(3, 3, 1), at(-72, 2.4, -45.4), Color3.new(1, 1, 1), SM, 1, { shadow = false })
+	local fire = Instance.new("Fire")
+	fire.Heat = 6
+	fire.Size = 5
+	fire.Color = Color3.fromRGB(255, 150, 40)
+	fire.SecondaryColor = Color3.fromRGB(255, 70, 20)
+	fire.Parent = flame
+	pointLight(flame, Color3.fromRGB(255, 160, 90), 34, 1.6)
+
+	-- panche davanti alla vetrata e due sul terrazzo
+	bench(int, -50, -2, Vector3.new(0, 0, 1))
+	bench(int, 50, -2, Vector3.new(0, 0, 1))
+	bench(int, -62, 50, Vector3.new(0, 0, 1))
+	bench(int, 62, 50, Vector3.new(0, 0, 1))
+
+	-- trofeo con faretto
+	local tx, tz = 0, -48
+	Util.pillar(int, "PiedistalloTrofeo", c.X + tx, c.Y, c.Z + tz, 7, 3.2, Color3.fromRGB(86, 66, 120), SM, true)
+	Util.pillar(int, "PiedistalloTrofeoAnello", c.X + tx, c.Y + 3.2, c.Z + tz, 7.6, 0.5, Color3.fromRGB(190, 132, 255), Enum.Material.Neon, false, { shadow = false })
+	Util.pillar(int, "TrofeoStelo", c.X + tx, c.Y + 3.7, c.Z + tz, 1.1, 2.6, GOLD, Enum.Material.Metal, false)
+	Util.pillar(int, "TrofeoCoppa", c.X + tx, c.Y + 6.3, c.Z + tz, 4.6, 3.6, GOLD, Enum.Material.Metal, false)
+	for _, sx in ipairs({ -1, 1 }) do
+		Util.sphere(int, "TrofeoManico", V(tx + sx * 2.7, 8.2, tz), 1.6, GOLD, Enum.Material.Metal, false, { shadow = false })
+	end
+	Util.sphere(int, "TrofeoPomo", V(tx, 10.4, tz), 1.8, Color3.fromRGB(255, 244, 200), Enum.Material.Neon, false, { shadow = false })
+	local spot = Util.D(int, "FarettoTrofeo", Vector3.new(2, 1, 2), at(tx, 21, tz + 2) * CFrame.Angles(-math.pi / 2, 0, 0), STEEL, Enum.Material.Metal, 0, { shadow = false })
+	local sl = Instance.new("SpotLight")
+	sl.Face = Enum.NormalId.Front
+	sl.Brightness = 3
+	sl.Range = 40
+	sl.Angle = 40
+	sl.Color = Color3.fromRGB(255, 230, 170)
+	sl.Shadows = false
+	sl.Parent = spot
+
+	-- cartelli sulla parete di fondo e sulla parete sinistra
+	local north = Vector3.new(0, 0, 1)
+	board(int, "Titolo", V(0, 17, -54.7), north, Vector3.new(70, 9, 0.8), CREAM, "CALCIO FUORILEGGE", Color3.fromRGB(70, 44, 30), 30)
+	board(int, "Invito", V(0, 11, -54.7), north, Vector3.new(58, 4.4, 0.8), CREAM, "Sali su una pedana per scegliere la squadra", Color3.fromRGB(150, 54, 48), 34)
+	local lb = board(int, "LeaderboardSign", V(-46, 9, -54.7), north, Vector3.new(30, 16, 0.8), CREAM, "CLASSIFICHE\n(in arrivo)", Color3.fromRGB(70, 44, 30), 30)
+	lb.Name = "LeaderboardSign"
+	board(
+		int,
+		"Comandi",
+		V(48, 9, -54.7),
+		north,
+		Vector3.new(36, 17, 0.8),
+		CREAM,
+		"COMANDI\nClic sinistro: tiro (tieni premuto)\nClic destro: passaggio\nQ scavetto  -  F pallonetto\nE scivolata  -  Spazio dribbling/scatto\nMaiusc corsa  -  R chiama palla\nL torna in lobby",
+		Color3.fromRGB(70, 44, 30),
+		34
+	)
+	board(int, "Regole", V(-79.5, 12, -30), Vector3.new(1, 0, 0), Vector3.new(26, 14, 0.8), CREAM, "REGOLE\n4 contro 4 - 6 minuti\nNiente falli!\nVince chi segna di piu'", Color3.fromRGB(70, 44, 30), 34)
+end
+
+----------------------------------------------------------------------
+-- Pedane squadra
+----------------------------------------------------------------------
+local function chevron(parent, tip, dir, col, y)
+	-- freccia a "V" con la punta in tip che guarda verso dir
+	for _, s in ipairs({ -1, 1 }) do
+		local a = math.rad(36) * s
+		local vx, vz = -dir.X, -dir.Z
+		local back = Vector3.new(vx * math.cos(a) - vz * math.sin(a), 0, vx * math.sin(a) + vz * math.cos(a)).Unit
+		Util.beam(parent, "Freccia", Vector3.new(tip.X, y, tip.Z), Vector3.new(tip.X + back.X * 3.4, y, tip.Z + back.Z * 3.4), 0.9, 0.1, col, Enum.Material.Neon, false, { shadow = false })
+	end
+end
+
+local function pad(f, name, teamKey, x)
+	local t = Config.Teams[teamKey]
+	local pads = f.Pads
+	local deco = f.PadDecor
+	local z = 30
+	local top = 0.8
+	-- base scura + pedana (questa e' la parte che il server controlla: attributo TeamKey)
+	Util.P(deco, "BasePedana", Vector3.new(29, 0.5, 29), at(x, 0.25, z), STEEL, SM)
+	local p = Util.P(pads, name, Vector3.new(26, 0.8, 26), at(x, 0.4 + 0.25, z), t.Color, SM)
+	p:SetAttribute("TeamKey", teamKey)
+	local edge = Util.shade(t.Color, 1.0)
+	for _, s in ipairs({ -1, 1 }) do
+		Util.D(deco, "BordoPedana", Vector3.new(26.6, 0.4, 0.7), at(x, 1.2, z + s * 13), edge, Enum.Material.Neon, 0, { shadow = false })
+		Util.D(deco, "BordoPedana", Vector3.new(0.7, 0.4, 26.6), at(x + s * 13, 1.2, z), edge, Enum.Material.Neon, 0, { shadow = false })
+	end
+	local yTop = c.Y + 0.65 + top / 2 + 0.05
+	-- pallone al centro: disco bianco, pentagono scuro, cuciture e macchie sul bordo
+	local cx, cz = c.X + x, c.Z + z
+	local dark = Color3.fromRGB(34, 34, 44)
+	local function disc(d, col, dx, dz, dy)
+		Util.D(deco, "Pallone", Vector3.new(0.1, d, d), CFrame.new(cx + dx, yTop + dy, cz + dz) * CFrame.Angles(0, 0, math.pi / 2), col, SM, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+	end
+	disc(11.6, Color3.fromRGB(246, 246, 250), 0, 0, 0.03)
+	disc(3.6, dark, 0, 0, 0.06)
+	for i = 0, 4 do
+		local a1 = i * math.pi * 2 / 5 - math.pi / 2
+		local a2 = (i + 1) * math.pi * 2 / 5 - math.pi / 2
+		local R = 2.2
+		-- lato del pentagono
+		Util.beam(deco, "Pentagono", Vector3.new(cx + math.cos(a1) * R, yTop + 0.07, cz + math.sin(a1) * R), Vector3.new(cx + math.cos(a2) * R, yTop + 0.07, cz + math.sin(a2) * R), 0.7, 0.05, dark, SM, false, { shadow = false })
+		-- cucitura dal vertice verso il bordo e macchia di fine cucitura
+		Util.beam(deco, "Cucitura", Vector3.new(cx + math.cos(a1) * R, yTop + 0.07, cz + math.sin(a1) * R), Vector3.new(cx + math.cos(a1) * 3.9, yTop + 0.07, cz + math.sin(a1) * 3.9), 0.35, 0.05, dark, SM, false, { shadow = false })
+		disc(1.9, dark, math.cos(a1) * 4.7, math.sin(a1) * 4.7, 0.06)
+	end
+	-- frecce ai lati che indicano il centro (davanti e dietro ci sono le scritte)
+	for _, d in ipairs({ Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0) }) do
+		local tip = Vector3.new(cx - d.X * 8.4, 0, cz - d.Z * 8.4)
+		chevron(deco, tip, d, Color3.fromRGB(255, 255, 255), yTop + 0.06)
+	end
+	-- scritte (si leggono guardando il campo): nome squadra sul lato lontano, contatore su quello vicino
+	local yawRead = CFrame.Angles(0, math.pi, 0)
+	local nameP = Util.D(deco, "NomeSquadra", Vector3.new(20, 0.1, 5), CFrame.new(cx, yTop + 0.05, cz + 9.4) * yawRead, t.Color, SM, 1, { shadow = false })
+	Util.label(nameP, Enum.NormalId.Top, string.upper(t.Name), { font = Enum.Font.GothamBlack, color = Color3.fromRGB(255, 255, 255), pps = 36 })
+	local counter = Util.D(p, "Contatore", Vector3.new(10, 0.1, 3.4), CFrame.new(cx, yTop + 0.05, cz - 9.6) * yawRead, t.Color, SM, 1, { shadow = false })
+	Util.label(counter, Enum.NormalId.Top, "0 / " .. tostring(Config.Match.MaxPerTeam), { font = Enum.Font.GothamBlack, color = Color3.fromRGB(255, 255, 255), pps = 36, name = "Conteggio", guiName = "Gui" })
+	counter.Name = "Contatore"
+	return p
+end
+
+----------------------------------------------------------------------
+-- Telescopi puntati sul campo
+----------------------------------------------------------------------
+local function telescopes(f)
+	local t = Util.folder(f, "Telescopi")
+	for _, x in ipairs({ -24, 24 }) do
+		local base = V(x, 0, 52)
+		for k = 0, 2 do
+			local a = k * math.pi * 2 / 3
+			Util.rod(t, "Gamba", base + Vector3.new(math.cos(a) * 1.8, 0, math.sin(a) * 1.8), base + Vector3.new(0, 4.4, 0), 0.4, STEEL, Enum.Material.Metal, false, { shadow = false })
+		end
+		local tube0 = base + Vector3.new(0, 4.8, -1.8)
+		local tube1 = base + Vector3.new(0, 6.4, 3.6)
+		Util.rod(t, "Tubo", tube0, tube1, 1.5, Color3.fromRGB(190, 160, 70), Enum.Material.Metal, false, { shadow = false })
+		Util.rod(t, "Lente", tube1, tube1 + (tube1 - tube0).Unit * 0.4, 1.9, Color3.fromRGB(120, 200, 240), Enum.Material.Glass, false, { shadow = false })
+	end
+end
+
+function LobbyBuilder.Build(root)
+	local f = Util.folder(root, "Lobby")
+	Util.folder(f, "Pads")
+	Util.folder(f, "PadDecor")
+	deck(f)
+	rails(f)
+	cabin(f)
+	interior(f)
+	pad(f, "RedPad", "Red", -34)
+	pad(f, "BluePad", "Blue", 34)
+	telescopes(f)
+
+	-- punto di rinascita neutro (le posizioni vere le decide Match tramite LobbySpawnCFrame)
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "LobbySpawn"
+	spawn.Anchored = true
+	spawn.Size = Vector3.new(10, 1, 10)
+	spawn.CFrame = at(0, 0.5, 20)
+	spawn.Transparency = 1
+	spawn.CanCollide = false
+	spawn.Neutral = true
+	spawn.Duration = 0
+	spawn.TopSurface = Enum.SurfaceType.Smooth
+	spawn.Parent = f
+	local decal = spawn:FindFirstChildOfClass("Decal")
+	if decal then
+		decal:Destroy()
+	end
+	return f
+end
+
+return LobbyBuilder
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX16"><Properties><string name="Name">Pitch</string><ProtectedString name="Source"><![CDATA[-- Campo di terra a strisce con righe luminose bianco-lilla, aree di rigore colorate e stemma al centro.
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+local Util = require(script.Parent.Util)
+local Layout = require(script.Parent.Layout)
+
+local Pitch = {}
+
+local HL, HW, GD = Layout.HL, Layout.HW, Layout.GD
+local LINE_COLOR = Color3.fromRGB(236, 226, 255)
+local LIGHT = Color3.fromRGB(198, 140, 94)
+local DARK = Color3.fromRGB(158, 100, 64)
+
+-- linea piatta tra due punti del campo (coordinate X,Z)
+local function line(parent, x1, z1, x2, z2, thick)
+	local dx, dz = x2 - x1, z2 - z1
+	local len = math.sqrt(dx * dx + dz * dz)
+	local t = thick or 0.7
+	local mid = Vector3.new((x1 + x2) / 2, 0.14, (z1 + z2) / 2)
+	return Util.D(parent, "Linea", Vector3.new(len + t, 0.06, t), CFrame.new(mid) * CFrame.Angles(0, -math.atan2(dz, dx), 0), LINE_COLOR, Enum.Material.Neon, 0, { shadow = false })
+end
+
+-- arco di circonferenza (angoli in radianti) fatto di segmenti
+local function arc(parent, cx, cz, r, a0, a1, segs, thick)
+	for i = 0, segs - 1 do
+		local t0 = a0 + (a1 - a0) * (i / segs)
+		local t1 = a0 + (a1 - a0) * ((i + 1) / segs)
+		line(parent, cx + r * math.cos(t0), cz + r * math.sin(t0), cx + r * math.cos(t1), cz + r * math.sin(t1), thick)
+	end
+end
+
+local function dot(parent, x, z, d)
+	Util.D(parent, "Punto", Vector3.new(0.06, d, d), CFrame.new(x, 0.14, z) * CFrame.Angles(0, 0, math.pi / 2), LINE_COLOR, Enum.Material.Neon, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+end
+
+function Pitch.Build(field)
+	local surface = Util.folder(field, "Surface")
+	local lines = Util.folder(field, "Lines")
+	local decals = Util.folder(field, "Zones")
+
+	-- terra battuta a strisce chiare/scure lungo X (superficie a quota PITCH_Y: la fisica della palla dipende da qui)
+	local totalLen = 2 * Layout.XB + 4
+	local stripes = 18
 	local sw = totalLen / stripes
 	for i = 0, stripes - 1 do
-		local c = (i % 2 == 0) and Color3.fromRGB(150, 98, 62) or Color3.fromRGB(168, 114, 74)
-		local s = P(
-			field,
-			"Stripe",
-			Vector3.new(sw, 0.2, W + 6),
-			CFrame.new(-totalLen / 2 + sw * (i + 0.5), 0.05, 0),
+		local c = (i % 2 == 0) and LIGHT or DARK
+		local s = Util.P(
+			surface,
+			"Striscia",
+			Vector3.new(sw, 3, 2 * HW + 4),
+			CFrame.new(-totalLen / 2 + sw * (i + 0.5), Layout.PITCH_Y - 1.5, 0),
 			c,
 			Enum.Material.Ground
 		)
 		s.CustomPhysicalProperties = PhysicalProperties.new(1, 0.55, 0.45, 50, 1)
+		s.CastShadow = false
 	end
 
 	-- righe del campo
-	local lines = folder(field, "Lines")
 	line(lines, -HL, -HW, HL, -HW)
 	line(lines, -HL, HW, HL, HW)
 	line(lines, -HL, -HW, -HL, HW)
 	line(lines, HL, -HW, HL, HW)
 	line(lines, 0, -HW, 0, HW)
-	local radius, segs = 18, 40
-	for i = 0, segs - 1 do
-		local a1 = (i / segs) * math.pi * 2
-		local a2 = ((i + 1) / segs) * math.pi * 2
-		line(lines, radius * math.cos(a1), radius * math.sin(a1), radius * math.cos(a2), radius * math.sin(a2), 0.6)
-	end
+	arc(lines, 0, 0, 18, 0, math.pi * 2, 48, 0.6)
+	dot(lines, 0, 0, 1.8)
 	for _, s in ipairs({ -1, 1 }) do
+		-- area di rigore e area piccola
 		local px, pw = s * (HL - 22), 29
 		line(lines, s * HL, -pw, px, -pw)
 		line(lines, s * HL, pw, px, pw)
@@ -1246,303 +2157,1139 @@ local function buildField(root)
 		line(lines, s * HL, -gz, gx, -gz)
 		line(lines, s * HL, gz, gx, gz)
 		line(lines, gx, -gz, gx, gz)
-		decor(P(lines, "Spot", Vector3.new(1.4, 0.06, 1.4), CFrame.new(s * (HL - 15), 0.14, 0), Color3.fromRGB(232, 222, 255), Enum.Material.Neon))
+		dot(lines, s * (HL - 15), 0, 1.5)
+		-- "luna" fuori dall'area: raggio 12 dal dischetto
+		local a = math.acos(7 / 12)
+		if s > 0 then
+			arc(lines, s * (HL - 15), 0, 12, math.pi - a, math.pi + a, 12, 0.6)
+		else
+			arc(lines, s * (HL - 15), 0, 12, -a, a, 12, 0.6)
+		end
+		-- archi d'angolo
+		for _, sz in ipairs({ -1, 1 }) do
+			local cx, cz = s * HL, sz * HW
+			local base = math.atan2(-sz, -s) -- verso l'interno del campo
+			arc(lines, cx, cz, 4.5, base - math.pi / 4, base + math.pi / 4, 6, 0.55)
+		end
 	end
-	decor(P(lines, "CenterSpot", Vector3.new(1.6, 0.06, 1.6), CFrame.new(0, 0.14, 0), Color3.fromRGB(232, 222, 255), Enum.Material.Neon))
 
-	-- porte: Rossi difendono -X, Blu difendono +X
-	buildGoal(field, -1, "Red")
-	buildGoal(field, 1, "Blue")
-
-	-- pareti di vetro trasparenti (e soffitto invisibile)
-	local walls = folder(field, "Walls")
-	local wh = F.WallHeight
-	local glass = Color3.fromRGB(235, 240, 255)
-	local wallProps = PhysicalProperties.new(0.7, 0.2, 0.85, 100, 100)
-	local xb = HL + GD + 2
-	local function wall(size, pos)
-		local w = P(walls, "Glass", size, CFrame.new(pos), glass, Enum.Material.Glass, 0.88)
-		w.CustomPhysicalProperties = wallProps
-		w.CanQuery = false
-		return w
+	-- aree colorate della squadra che difende (trasparenti, sopra la terra)
+	for _, s in ipairs({ -1, 1 }) do
+		local key = (s < 0) and "Red" or "Blue"
+		local col = Config.Teams[key].Color
+		local px = s * (HL - 11)
+		Util.D(decals, "AreaRigore", Vector3.new(22, 0.1, 58), CFrame.new(px, 0.2, 0), col, Enum.Material.SmoothPlastic, 0.82, { shadow = false })
+		Util.D(decals, "AreaPiccola", Vector3.new(8, 0.1, 28), CFrame.new(s * (HL - 4), 0.2, 0), col, Enum.Material.SmoothPlastic, 0.74, { shadow = false })
+		-- fascia luminosa davanti alla porta: indica chi difende
+		Util.D(decals, "FasciaPorta", Vector3.new(1.2, 0.07, Layout.GW), CFrame.new(s * (HL - 1.5), 0.17, 0), col, Enum.Material.Neon, 0, { shadow = false })
 	end
-	wall(Vector3.new(2 * xb + 4, wh, 2), Vector3.new(0, wh / 2, -HW - 1))
-	wall(Vector3.new(2 * xb + 4, wh, 2), Vector3.new(0, wh / 2, HW + 1))
-	wall(Vector3.new(2, wh, W + 4), Vector3.new(-xb - 1, wh / 2, 0))
-	wall(Vector3.new(2, wh, W + 4), Vector3.new(xb + 1, wh / 2, 0))
-	local roof = P(walls, "Roof", Vector3.new(2 * xb + 4, 2, W + 4), CFrame.new(0, wh + 15, 0), glass, Enum.Material.Glass, 1)
-	roof.CustomPhysicalProperties = wallProps
-	roof.CanQuery = false
-	return field
+
+	-- stemma al centro: sole a 12 raggi dentro il cerchio di centrocampo
+	local sun = Util.folder(decals, "Stemma")
+	local ray = Color3.fromRGB(226, 172, 120)
+	for i = 0, 11 do
+		local ang = (i / 12) * math.pi * 2
+		local r0, r1 = 7.5, 15.5
+		local mx, mz = math.cos(ang) * (r0 + r1) / 2, math.sin(ang) * (r0 + r1) / 2
+		Util.D(sun, "Raggio", Vector3.new(r1 - r0, 0.06, (i % 2 == 0) and 1.8 or 1.0), CFrame.new(mx, 0.19, mz) * CFrame.Angles(0, -ang, 0), ray, Enum.Material.SmoothPlastic, 0.35, { shadow = false })
+	end
+	Util.D(sun, "Anello", Vector3.new(0.07, 13, 13), CFrame.new(0, 0.19, 0) * CFrame.Angles(0, 0, math.pi / 2), ray, Enum.Material.SmoothPlastic, 0.35, { shape = Enum.PartType.Cylinder, shadow = false })
+	Util.D(sun, "Nucleo", Vector3.new(0.07, 7, 7), CFrame.new(0, 0.2, 0) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(150, 98, 64), Enum.Material.SmoothPlastic, 0.2, { shape = Enum.PartType.Cylinder, shadow = false })
+end
+
+return Pitch
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX17"><Properties><string name="Name">Props</string><ProtectedString name="Source"><![CDATA[-- Il deserto intorno allo stadio: cactus, cespugli, rocce agganciabili, parabole, pali della luce con cavi,
+-- relitto d'aereo, mulini a vento, passerella con ponte e cartelli.
+local CollectionService = game:GetService("CollectionService")
+local Util = require(script.Parent.Util)
+local Layout = require(script.Parent.Layout)
+
+local Props = {}
+
+local G = Layout.GROUND_Y
+local SM = Enum.Material.SmoothPlastic
+
+local function tag(inst, name)
+	CollectionService:AddTag(inst, name)
+	return inst
+end
+
+-- punto fuori dallo stadio e lontano dal letto del fiume e dal sentiero?
+local function freeSpot(x, z, margin)
+	margin = margin or 0
+	if math.abs(x) < Layout.PLAZA_X + 24 + margin and math.abs(z) < Layout.PLAZA_Z + 24 + margin then
+		return false
+	end
+	-- fiume (a sud): fascia z in [-285, -190] circa
+	if z < -185 and z > -290 then
+		return false
+	end
+	-- sentiero e belvedere
+	if z < -150 and math.abs(x) < 60 then
+		return false
+	end
+	if z < -300 and math.abs(x) < 190 then
+		return false
+	end
+	return true
 end
 
 ----------------------------------------------------------------------
--- Scenario: mesas, colline, parabole, pali della luce, torri faro, aereo
+-- Cactus e cespugli
 ----------------------------------------------------------------------
-local ROCK_COLORS = {
-	Color3.fromRGB(196, 88, 50),
-	Color3.fromRGB(214, 120, 64),
-	Color3.fromRGB(170, 72, 46),
-	Color3.fromRGB(226, 150, 86),
-}
+local GREENS = { Color3.fromRGB(66, 150, 84), Color3.fromRGB(90, 170, 80), Color3.fromRGB(48, 126, 98), Color3.fromRGB(110, 176, 90) }
 
-local function outsideField(x, z, margin)
-	return math.abs(x) > HL + F.GoalDepth + margin or math.abs(z) > HW + margin
+local function cactus(parent, x, z, s, rng)
+	local col = rng.Pick(GREENS)
+	local h = (9 + rng.Next() * 8) * s
+	local d = 2.6 * s
+	local m = Util.model(parent, "Cactus")
+	Util.pillar(m, "Tronco", x, G, z, d, h, col, SM, false, { shadow = false })
+	Util.sphere(m, "Cima", Vector3.new(x, G + h, z), d, col, SM, false, { shadow = false })
+	local arms = rng.Int(0, 3)
+	for i = 1, arms do
+		local ang = rng.Range(0, math.pi * 2)
+		local ay = G + h * rng.Range(0.35, 0.6)
+		local len = rng.Range(2.6, 3.6) * s
+		local ex, ez = x + math.cos(ang) * len, z + math.sin(ang) * len
+		Util.rod(m, "Braccio", Vector3.new(x, ay, z), Vector3.new(ex, ay, ez), d * 0.72, col, SM, false, { shadow = false })
+		Util.sphere(m, "Gomito", Vector3.new(ex, ay, ez), d * 0.72, col, SM, false, { shadow = false })
+		local up = rng.Range(3.2, 6) * s
+		Util.pillar(m, "BraccioSu", ex, ay, ez, d * 0.72, up, col, SM, false, { shadow = false })
+		Util.sphere(m, "BraccioCima", Vector3.new(ex, ay + up, ez), d * 0.72, col, SM, false, { shadow = false })
+	end
+	if rng.Next() < 0.35 then
+		Util.sphere(m, "Fiore", Vector3.new(x, G + h + d * 0.55, z), d * 0.5, Color3.fromRGB(255, 120, 170), SM, false, { shadow = false })
+	end
+	return m
 end
 
-local function buildMesa(parent, rng, x, z, scale)
-	local layers = rng:NextInteger(3, 5)
-	local w = rng:NextNumber(60, 120) * scale
-	local d = rng:NextNumber(60, 120) * scale
-	local y = 0
-	for i = 1, layers do
-		local h = rng:NextNumber(14, 30) * scale
-		local c = ROCK_COLORS[rng:NextInteger(1, #ROCK_COLORS)]
-		local shrink = 1 - (i - 1) * 0.12
-		local p = P(
-			parent,
-			"Mesa",
-			Vector3.new(w * shrink, h, d * shrink),
-			CFrame.new(x, y + h / 2 - 2, z) * CFrame.Angles(0, rng:NextNumber(0, 0.3), 0),
-			c,
-			Enum.Material.Rock
-		)
-		CollectionService:AddTag(p, "Grappable")
-		y = y + h
+local function barrel(parent, x, z, rng)
+	local d = rng.Range(2.6, 4.6)
+	local col = rng.Pick(GREENS)
+	Util.sphere(parent, "Botte", Vector3.new(x, G + d * 0.35, z), d, col, SM, false, { shadow = false })
+	if rng.Next() < 0.6 then
+		Util.sphere(parent, "Fiore", Vector3.new(x, G + d * 0.85, z), d * 0.38, Color3.fromRGB(255, 190, 70), SM, false, { shadow = false })
 	end
 end
 
-local function buildScenery(root)
-	local sc = folder(root, "Scenery")
-	local rng = Random.new(42)
+local BUSHES = { Color3.fromRGB(150, 128, 70), Color3.fromRGB(120, 98, 52), Color3.fromRGB(170, 140, 78), Color3.fromRGB(104, 112, 60) }
 
-	for i = 1, 26 do
-		local ang = (i / 26) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
-		local dist = rng:NextNumber(300, 520)
-		local x, z = math.cos(ang) * dist, math.sin(ang) * dist * 0.8
-		buildMesa(sc, rng, x, z, rng:NextNumber(0.8, 1.5))
+local function bush(parent, x, z, rng)
+	local col = rng.Pick(BUSHES)
+	for i = 1, rng.Int(2, 3) do
+		local d = rng.Range(2.2, 4.8)
+		Util.sphere(parent, "Cespuglio", Vector3.new(x + rng.Range(-1.8, 1.8), G + d * 0.3, z + rng.Range(-1.8, 1.8)), d, Util.shade(col, rng.Range(0.85, 1.1)), SM, false, { shadow = false })
 	end
-	-- rocce agganciabili vicino al campo
-	for i = 1, 14 do
-		local x = rng:NextNumber(-260, 260)
-		local z = rng:NextNumber(-200, 200)
-		if outsideField(x, z, 30) then
-			local s = rng:NextNumber(8, 22)
-			local r = P(
-				sc,
-				"Rock",
-				Vector3.new(s, s * rng:NextNumber(0.8, 1.6), s * 0.9),
-				CFrame.new(x, s * 0.4, z) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 6), rng:NextNumber(-0.2, 0.2)),
-				ROCK_COLORS[rng:NextInteger(1, #ROCK_COLORS)],
-				Enum.Material.Rock
-			)
-			CollectionService:AddTag(r, "Grappable")
+end
+
+local function plants(root, rng)
+	local f = Util.folder(root, "Piante")
+	local placed, tries = 0, 0
+	while placed < 46 and tries < 400 do
+		tries = tries + 1
+		local x, z = rng.Range(-900, 900), rng.Range(-330, 330)
+		if freeSpot(x, z, 8) then
+			cactus(f, x, z, rng.Range(0.8, 1.5), rng)
+			placed = placed + 1
 		end
 	end
-	-- colline di sabbia
-	for i = 1, 16 do
-		local ang = rng:NextNumber(0, math.pi * 2)
-		local dist = rng:NextNumber(220, 420)
-		local s = rng:NextNumber(60, 130)
-		local hill = P(sc, "Dune", Vector3.new(s, s * 0.28, s * 0.8), CFrame.new(math.cos(ang) * dist, 0, math.sin(ang) * dist), Color3.fromRGB(226, 178, 116), Enum.Material.Sand)
-		hill.Shape = Enum.PartType.Ball
-		hill.Size = Vector3.new(s, s * 0.3, s * 0.8)
-	end
-	-- cespugli secchi
-	for i = 1, 70 do
-		local x = rng:NextNumber(-300, 300)
-		local z = rng:NextNumber(-220, 220)
-		if outsideField(x, z, 10) then
-			local s = rng:NextNumber(2, 4.5)
-			local b = P(sc, "Bush", Vector3.new(s, s * 0.7, s), CFrame.new(x, s * 0.3, z), Color3.fromRGB(135, 110, 60), Enum.Material.Grass)
-			b.Shape = Enum.PartType.Ball
-			decor(b)
+	placed, tries = 0, 0
+	while placed < 34 and tries < 400 do
+		tries = tries + 1
+		local x, z = rng.Range(-900, 900), rng.Range(-330, 330)
+		if freeSpot(x, z, 4) then
+			barrel(f, x, z, rng)
+			placed = placed + 1
 		end
 	end
-	-- parabole satellitari giganti
-	for i = 1, 3 do
-		local x, z = -190 + i * 140, 215 + (i % 2) * 30
-		local base = P(sc, "DishBase", Vector3.new(6, 24, 6), CFrame.new(x, 12, z), Color3.fromRGB(200, 200, 205), Enum.Material.Metal)
-		local dish = P(sc, "Dish", Vector3.new(46, 12, 46), CFrame.new(x, 28, z) * CFrame.Angles(0.5, i, 0.35), Color3.fromRGB(240, 240, 245), Enum.Material.SmoothPlastic)
-		dish.Shape = Enum.PartType.Ball
-		local feed = P(sc, "DishFeed", Vector3.new(1.2, 16, 1.2), dish.CFrame * CFrame.new(0, 10, 0), Color3.fromRGB(120, 120, 128), Enum.Material.Metal)
-		feed.CanCollide = false
-		CollectionService:AddTag(base, "Grappable")
-	end
-	-- pali della luce con cavi
-	local prevTop
-	for i = -5, 5 do
-		local x, z = i * 60, -190
-		local pole = P(sc, "Pole", Vector3.new(2, 38, 2), CFrame.new(x, 19, z), Color3.fromRGB(110, 78, 52), Enum.Material.Wood)
-		P(sc, "CrossArm", Vector3.new(16, 1.5, 1.5), CFrame.new(x, 36, z), Color3.fromRGB(110, 78, 52), Enum.Material.Wood).CanCollide = false
-		CollectionService:AddTag(pole, "Grappable")
-		local top = Vector3.new(x, 35, z)
-		if prevTop then
-			local mid = (top + prevTop) / 2 - Vector3.new(0, 1.5, 0)
-			local len = (top - prevTop).Magnitude
-			decor(P(sc, "Cable", Vector3.new(0.2, 0.2, len), CFrame.lookAt(mid, top), Color3.fromRGB(30, 30, 30), Enum.Material.Metal))
+	placed, tries = 0, 0
+	while placed < 70 and tries < 600 do
+		tries = tries + 1
+		local x, z = rng.Range(-800, 800), rng.Range(-330, 330)
+		if freeSpot(x, z, 2) then
+			bush(f, x, z, rng)
+			placed = placed + 1
 		end
-		prevTop = top
 	end
-	-- torri faro dello stadio ai quattro angoli
+	-- cespugli secchi anche sulla piazza, vicino ai cordoli
 	for _, sx in ipairs({ -1, 1 }) do
 		for _, sz in ipairs({ -1, 1 }) do
-			local x = sx * (HL + F.GoalDepth + 16)
-			local z = sz * (HW + 16)
-			local tower = P(sc, "FloodTower", Vector3.new(3, 70, 3), CFrame.new(x, 35, z), Color3.fromRGB(120, 124, 132), Enum.Material.Metal)
-			CollectionService:AddTag(tower, "Grappable")
-			local panel = P(sc, "FloodLamp", Vector3.new(14, 8, 2), CFrame.lookAt(Vector3.new(x, 72, z), Vector3.new(0, 10, 0)), Color3.fromRGB(255, 244, 210), Enum.Material.Neon)
-			panel.CanCollide = false
-			local spot = Instance.new("SpotLight")
-			spot.Face = Enum.NormalId.Front
-			spot.Brightness = 3
-			spot.Range = 150
-			spot.Angle = 80
-			spot.Color = Color3.fromRGB(255, 236, 200)
-			spot.Parent = panel
+			bush(f, sx * (Layout.PLAZA_X + 10), sz * (Layout.PLAZA_Z + 10), rng)
 		end
 	end
-	-- relitto d'aereo
-	local plane = folder(sc, "CrashedPlane")
-	local origin = CFrame.new(-330, 7, 130) * CFrame.Angles(0.12, 0.6, 0.2)
-	local fus = P(plane, "Fuselage", Vector3.new(46, 10, 10), origin, Color3.fromRGB(235, 235, 240), Enum.Material.Metal)
-	fus.Shape = Enum.PartType.Cylinder
-	P(plane, "Nose", Vector3.new(8, 10, 10), origin * CFrame.new(-27, 0, 0), Color3.fromRGB(200, 60, 50), Enum.Material.Metal).Shape = Enum.PartType.Ball
-	P(plane, "WingL", Vector3.new(10, 1.4, 34), origin * CFrame.new(2, -1, 22) * CFrame.Angles(0, 0, 0.1), Color3.fromRGB(215, 215, 222), Enum.Material.Metal)
-	P(plane, "WingR", Vector3.new(10, 1.4, 20), origin * CFrame.new(2, -2, -16) * CFrame.Angles(0.5, 0.2, -0.3), Color3.fromRGB(215, 215, 222), Enum.Material.Metal)
-	P(plane, "TailFin", Vector3.new(8, 14, 1.4), origin * CFrame.new(22, 8, 0) * CFrame.Angles(0, 0, 0.2), Color3.fromRGB(200, 60, 50), Enum.Material.Metal)
-	for _, d in ipairs(plane:GetChildren()) do
-		CollectionService:AddTag(d, "Grappable")
+end
+
+----------------------------------------------------------------------
+-- Rocce agganciabili col rampino (blocchi spigolosi sovrapposti)
+----------------------------------------------------------------------
+local ROCKS = {
+	Color3.fromRGB(190, 78, 52),
+	Color3.fromRGB(216, 112, 64),
+	Color3.fromRGB(164, 62, 48),
+	Color3.fromRGB(226, 148, 88),
+}
+
+local function rockCluster(parent, x, z, scale, rng)
+	local n = rng.Int(3, 5)
+	for i = 1, n do
+		local s = rng.Range(6, 14) * scale
+		local h = s * rng.Range(0.8, 1.7)
+		local ox, oz = rng.Range(-s * 0.7, s * 0.7), rng.Range(-s * 0.7, s * 0.7)
+		local rot = CFrame.Angles(rng.Range(-0.3, 0.3), rng.Range(0, 3.14), rng.Range(-0.3, 0.3))
+		local r = Util.P(parent, "Roccia", Vector3.new(s, h, s * rng.Range(0.7, 1.1)), CFrame.new(x + ox, G + h * 0.32, z + oz) * rot, rng.Pick(ROCKS), Enum.Material.Rock)
+		tag(r, "Grappable")
+	end
+end
+
+local function rocks(root, rng)
+	local f = Util.folder(root, "Rocce")
+	local spots = {
+		{ 224, 96 }, { 232, -110 }, { -226, 112 }, { -236, -100 },
+		{ 160, 188 }, { -170, 196 }, { 60, 204 }, { -80, 190 },
+		{ 208, -168 }, { -208, -168 }, { 262, 30 }, { -266, -20 },
+		{ 100, -170 }, { -90, -168 },
+	}
+	for _, p in ipairs(spots) do
+		rockCluster(f, p[1], p[2], rng.Range(0.8, 1.3), rng)
 	end
 end
 
 ----------------------------------------------------------------------
--- Lobby: baita di legno con vetrate sul canyon, due pedane squadra
+-- Parabole satellitari giganti: ciotola a gradini (paraboloide) su un pilone
 ----------------------------------------------------------------------
-local function buildSign(parent, cf, size, lines)
-	local board = P(parent, "Sign", size, cf, Color3.fromRGB(245, 245, 250), Enum.Material.SmoothPlastic)
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 40
-	gui.Parent = board
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(35, 35, 50)
-	label.Text = table.concat(lines, "\n")
-	label.Parent = gui
-	return board
-end
-
-local function buildPad(parent, name, teamKey, x)
-	local t = Config.Teams[teamKey]
-	local pad = P(parent, name, Vector3.new(26, 0.6, 26), CFrame.new(x, 0.3, 10), t.Color, Enum.Material.SmoothPlastic)
-	pad:SetAttribute("TeamKey", teamKey)
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Top
-	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = 30
-	gui.Parent = pad
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.fromScale(1, 1)
-	lbl.BackgroundTransparency = 1
-	lbl.Font = Enum.Font.GothamBlack
-	lbl.TextScaled = true
-	lbl.TextColor3 = Color3.new(1, 1, 1)
-	lbl.Text = "⚽\n" .. string.upper(t.Name) .. "\n▲ ▲ ▲"
-	lbl.Parent = gui
-	-- cornice chiara
-	decor(P(parent, name .. "Rim", Vector3.new(28, 0.4, 28), CFrame.new(x, 0.2, 10), Color3.fromRGB(245, 245, 250)))
-	return pad
-end
-
-local function buildLobby(root)
-	local c = Config.Lobby.Center
-	local lobby = folder(root, "Lobby")
-	local wood = Color3.fromRGB(150, 98, 58)
-	local darkWood = Color3.fromRGB(104, 66, 38)
-
-	-- pavimento di assi
-	for i = 0, 13 do
-		local col = (i % 2 == 0) and wood or Color3.fromRGB(138, 90, 52)
-		P(lobby, "Floor", Vector3.new(10, 2, 100), CFrame.new(c.X - 65 + i * 10, -1, c.Z), col, Enum.Material.WoodPlanks)
+local function dish(parent, x, z, axis, rng)
+	local m = Util.model(parent, "Parabola")
+	local white = Color3.fromRGB(240, 240, 246)
+	local greyBlue = Color3.fromRGB(150, 156, 176)
+	local baseH = 24
+	local base = Util.pillar(m, "Piedistallo", x, G, z, 9, baseH, Color3.fromRGB(206, 196, 186), Enum.Material.Concrete, true)
+	tag(base, "Grappable")
+	Util.pillar(m, "Anello", x, G + baseH, z, 11, 1.6, Color3.fromRGB(70, 74, 98), Enum.Material.Metal, false)
+	local vertex = Vector3.new(x, G + baseH + 9, z)
+	Util.rod(m, "Sostegno", Vector3.new(x, G + baseH, z), vertex, 3.2, Color3.fromRGB(86, 90, 114), Enum.Material.Metal, false)
+	local a = axis.Unit
+	-- ciotola (Model a parte: sul client ruota lentamente)
+	local bowl = Util.model(m, "Ciotola")
+	local layers = 10
+	local rmax = 31
+	local focus = 28
+	local first
+	for k = 0, layers - 1 do
+		local r = 3 + (rmax - 3) * (k / (layers - 1))
+		local d = r * r / (4 * focus)
+		local pos = vertex + a * d
+		local p = Util.D(bowl, "Piatto", Vector3.new(1.2, r * 2, r * 2), CFrame.lookAt(pos, pos + a) * CFrame.Angles(0, math.pi / 2, 0), (k % 2 == 0) and white or Util.shade(white, 0.92), SM, 0, { shape = Enum.PartType.Cylinder, shadow = (k >= layers - 3) })
+		first = first or p
 	end
+	bowl.PrimaryPart = first
+	-- bordo e braccio dell'illuminatore
+	local rim = vertex + a * (rmax * rmax / (4 * focus))
+	Util.D(bowl, "Bordo", Vector3.new(0.9, rmax * 2 + 1.6, rmax * 2 + 1.6), CFrame.lookAt(rim, rim + a) * CFrame.Angles(0, math.pi / 2, 0), greyBlue, Enum.Material.Metal, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+	local up = (Vector3.new(0, 1, 0) - a * a.Y).Unit
+	local side = a:Cross(up).Unit
+	local fpos = vertex + a * focus
+	for i = 0, 2 do
+		local ang = i * math.pi * 2 / 3 + 0.5
+		local dir = up * math.cos(ang) + side * math.sin(ang)
+		Util.rod(bowl, "Asta", rim + dir * rmax, fpos, 0.9, greyBlue, Enum.Material.Metal, false, { shadow = false })
+	end
+	Util.sphere(bowl, "Illuminatore", fpos, 3.4, Color3.fromRGB(255, 120, 90), Enum.Material.Neon, false, { shadow = false })
+	Util.tag(bowl, "Spin")
+	bowl:SetAttribute("SpinSpeed", rng.Range(0.05, 0.1) * rng.Sign())
+	return m
+end
+
+local function dishes(root, rng)
+	local f = Util.folder(root, "Parabole")
+	dish(f, -240, 212, Vector3.new(-0.55, 0.78, 0.3), rng)
+	dish(f, 22, 246, Vector3.new(-0.5, 0.8, -0.25), rng)
+	dish(f, 332, 220, Vector3.new(-0.6, 0.75, 0.2), rng)
+end
+
+----------------------------------------------------------------------
+-- Pali della luce con cavi che pendono
+----------------------------------------------------------------------
+local function powerLine(root)
+	local f = Util.folder(root, "LineaElettrica")
+	local wood = Color3.fromRGB(112, 78, 52)
+	local wire = Color3.fromRGB(28, 28, 34)
+	local zLine = -184
+	local prev
+	for i = -9, 9 do
+		local x = i * 60
+		if x ~= 0 then -- al centro passa il sentiero: i cavi lo scavalcano
+			local pole = Util.pillar(f, "Palo", x, G, zLine, 1.9, 38, wood, Enum.Material.Wood, true)
+			tag(pole, "Grappable")
+			Util.D(f, "Traversa", Vector3.new(16, 1.2, 1.4), CFrame.new(x, G + 35, zLine), wood, Enum.Material.Wood)
+			local attach = {}
+			for k = -1, 1 do
+				Util.pillar(f, "Isolatore", x + k * 6.4, G + 35.6, zLine, 0.9, 1.6, Color3.fromRGB(226, 230, 236), SM, false, { shadow = false })
+				attach[k] = Vector3.new(x + k * 6.4, G + 37.4, zLine)
+			end
+			if prev then
+				local span = math.abs(x - prev.x)
+				local sag = 2.6 * (span / 60) * (span / 60)
+				for k = -1, 1 do
+					local a, b = prev[k], attach[k]
+					local last = a
+					for seg = 1, 4 do
+						local t = seg / 4
+						local p = a:Lerp(b, t) - Vector3.new(0, 4 * sag * t * (1 - t), 0)
+						Util.beam(f, "Cavo", last, p, 0.2, 0.2, wire, SM, false, { shadow = false })
+						last = p
+					end
+				end
+			end
+			attach.x = x
+			prev = attach
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Relitto d'aereo con striscia di terra bruciata e fumo
+----------------------------------------------------------------------
+local function plane(root, rng)
+	local f = Util.folder(root, "RelittoAereo")
+	local white = Color3.fromRGB(236, 238, 244)
+	local red = Color3.fromRGB(206, 52, 46)
+	local metal = Color3.fromRGB(176, 182, 196)
+	local origin = CFrame.new(-344, G + 4.2, -112) * CFrame.Angles(0, 0.5, 0.1)
 	local function at(x, y, z)
-		return CFrame.new(c.X + x, c.Y + y, c.Z + z)
+		return origin * CFrame.new(x, y, z)
 	end
-	-- pareti: dietro, lati; davanti vetrata
-	P(lobby, "BackWall", Vector3.new(140, 30, 2), at(0, 15, -50), wood, Enum.Material.WoodPlanks)
-	P(lobby, "WallL", Vector3.new(2, 30, 100), at(-70, 15, 0), wood, Enum.Material.WoodPlanks)
-	P(lobby, "WallR", Vector3.new(2, 30, 100), at(70, 15, 0), wood, Enum.Material.WoodPlanks)
-	P(lobby, "Roof", Vector3.new(146, 2, 106), at(0, 31, 0), darkWood, Enum.Material.WoodPlanks)
-	local glassCol = Color3.fromRGB(190, 225, 255)
-	P(lobby, "FrontGlass", Vector3.new(136, 26, 1), at(0, 14, 50), glassCol, Enum.Material.Glass, 0.7)
-	for i = -3, 3 do
-		P(lobby, "Beam", Vector3.new(2, 30, 2), at(i * 22, 15, 50), darkWood, Enum.Material.Wood)
+	-- terra bruciata + solco
+	Util.D(f, "Bruciato", Vector3.new(0.3, 50, 50), CFrame.new(-344, G + 0.12, -112) * CFrame.Angles(0, 0, math.pi / 2), Color3.fromRGB(54, 40, 42), Enum.Material.Basalt, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+	Util.D(f, "Solco", Vector3.new(130, 0.3, 12), CFrame.new(-420, G + 0.12, -88) * CFrame.Angles(0, 0.5, 0), Color3.fromRGB(86, 62, 52), Enum.Material.Ground, 0, { shadow = false })
+	-- fusoliera: tronco centrale + muso + coda
+	local body = Util.P(f, "Fusoliera", Vector3.new(44, 10, 10), at(0, 0, 0), white, Enum.Material.Metal)
+	body.Shape = Enum.PartType.Cylinder
+	tag(body, "Grappable")
+	Util.sphere(f, "Muso", origin * Vector3.new(-23, 0, 0), 10, white, Enum.Material.Metal, true)
+	Util.D(f, "Cabina", Vector3.new(4, 3, 6), at(-21, 1.6, 0) * CFrame.Angles(0, 0, -0.35), Color3.fromRGB(46, 70, 96), Enum.Material.Glass, 0.2)
+	for _, x in ipairs({ -12, 11 }) do
+		Util.D(f, "Fascia", Vector3.new(2.4, 10.4, 10.4), at(x, 0, 0), red, Enum.Material.Metal, 0, { shape = Enum.PartType.Cylinder, shadow = false })
 	end
-	P(lobby, "BeamTop", Vector3.new(140, 3, 2), at(0, 28.5, 50), darkWood, Enum.Material.Wood)
-	-- terrazza esterna
-	P(lobby, "Terrace", Vector3.new(140, 2, 30), at(0, -1, 65), wood, Enum.Material.WoodPlanks)
-	P(lobby, "Rail", Vector3.new(140, 1.2, 1), at(0, 3, 79.5), darkWood, Enum.Material.Wood)
+	for i = 0, 6 do
+		for _, sz in ipairs({ -1, 1 }) do
+			Util.D(f, "Finestrino", Vector3.new(1.5, 1.7, 0.3), at(-9 + i * 3.4, 1.4, sz * 5.05), Color3.fromRGB(120, 200, 240), SM, 0, { shadow = false })
+		end
+	end
+	local tail = Util.P(f, "Coda", Vector3.new(16, 6, 6), at(30, 1.6, 0) * CFrame.Angles(0, 0, 0.08), white, Enum.Material.Metal)
+	tail.Shape = Enum.PartType.Cylinder
+	Util.P(f, "Deriva", Vector3.new(9, 14, 1.2), at(33, 9, 0) * CFrame.Angles(0, 0, 0.2), red, Enum.Material.Metal)
+	Util.P(f, "Stabilizzatore", Vector3.new(6, 0.8, 18), at(34, 3, 0), metal, Enum.Material.Metal)
+	-- ala intera e ala spezzata
+	Util.P(f, "Ala", Vector3.new(12, 1.4, 38), at(2, -2.2, 22) * CFrame.Angles(0.06, 0, 0.1), metal, Enum.Material.Metal)
+	Util.P(f, "AlaMozza", Vector3.new(12, 1.4, 10), at(2, -2.2, -8) * CFrame.Angles(-0.2, 0, -0.18), metal, Enum.Material.Metal)
+	Util.P(f, "AlaCaduta", Vector3.new(12, 1.4, 22), CFrame.new(-382, G + 1.4, -64) * CFrame.Angles(0.15, 1.1, 0.35), metal, Enum.Material.Metal)
+	-- motore staccato
+	local eng = Util.P(f, "Motore", Vector3.new(9, 5.4, 5.4), CFrame.new(-366, G + 2.6, -78) * CFrame.Angles(0.3, 0.9, 0.2), Color3.fromRGB(80, 84, 98), Enum.Material.Metal)
+	eng.Shape = Enum.PartType.Cylinder
+	-- rottami
+	for i = 1, 16 do
+		local s = rng.Range(1, 3.4)
+		Util.D(f, "Rottame", Vector3.new(s, s * rng.Range(0.3, 1), s * rng.Range(0.5, 1.4)), CFrame.new(-344 + rng.Range(-48, 40), G + 0.6, -112 + rng.Range(-30, 30)) * CFrame.Angles(rng.Range(-1, 1), rng.Range(0, 6), rng.Range(-1, 1)), rng.Pick({ white, red, metal }), Enum.Material.Metal, 0, { shadow = false })
+	end
+	-- fumo
+	local emit = Util.D(f, "Fumo", Vector3.new(2, 1, 2), at(4, 5.4, 0), Color3.new(0, 0, 0), SM, 1, { shadow = false })
+	local smoke = Instance.new("ParticleEmitter")
+	smoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	smoke.Rate = 6
+	smoke.Lifetime = NumberRange.new(6, 9)
+	smoke.Speed = NumberRange.new(4, 7)
+	smoke.SpreadAngle = Vector2.new(14, 14)
+	smoke.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 18) })
+	smoke.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+	smoke.Color = ColorSequence.new(Color3.fromRGB(70, 62, 66))
+	smoke.Acceleration = Vector3.new(3, 3, 0)
+	smoke.Rotation = NumberRange.new(0, 360)
+	smoke.RotSpeed = NumberRange.new(-25, 25)
+	smoke.EmissionDirection = Enum.NormalId.Top
+	smoke.Parent = emit
+end
 
-	-- pedane squadra
-	local pads = folder(lobby, "Pads")
-	buildPad(pads, "RedPad", "Red", c.X - 35)
-	buildPad(pads, "BluePad", "Blue", c.X + 35)
-	-- cartelli
-	buildSign(lobby, at(0, 18, -48.8), Vector3.new(60, 12, 0.6), { "CALCIO FUORILEGGE", "Sali su una pedana per scegliere la squadra" })
-	local lb = buildSign(lobby, at(-45, 12, -48.8), Vector3.new(30, 14, 0.6), { "CLASSIFICHE", "(in arrivo)" })
-	lb.Name = "LeaderboardSign"
-	buildSign(lobby, at(45, 12, -48.8), Vector3.new(30, 14, 0.6), { "REGOLE", "4 contro 4", "Niente falli!" })
-
-	-- punto di spawn
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "LobbySpawn"
-	spawn.Anchored = true
-	spawn.Size = Vector3.new(10, 1, 10)
-	spawn.CFrame = at(0, 0.5, -20)
-	spawn.Transparency = 1
-	spawn.CanCollide = false
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.TopSurface = Enum.SurfaceType.Smooth
-	spawn.Parent = lobby
-	local decal = spawn:FindFirstChildOfClass("Decal")
-	if decal then
-		decal:Destroy()
+----------------------------------------------------------------------
+-- Mulini a vento (la ruota gira sul client)
+----------------------------------------------------------------------
+local function windmill(parent, x, z, rng)
+	local m = Util.model(parent, "Mulino")
+	local steel = Color3.fromRGB(150, 156, 170)
+	local wood = Color3.fromRGB(150, 104, 68)
+	local H = 30
+	local corners = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } }
+	for _, c in ipairs(corners) do
+		local a = Vector3.new(x + c[1] * 4, G, z + c[2] * 4)
+		local b = Vector3.new(x + c[1] * 1.3, G + H, z + c[2] * 1.3)
+		local leg = Util.beam(m, "Gamba", a, b, 0.8, 0.8, steel, Enum.Material.Metal, false, { shadow = false })
+		tag(leg, "Grappable")
 	end
-
-	-- mesas attorno alla lobby (panorama sul canyon)
-	local rng = Random.new(7)
-	for i = 1, 14 do
-		local ang = math.pi * 0.15 + (i / 14) * math.pi * 0.7
-		local dist = rng:NextNumber(260, 380)
-		buildMesa(lobby, rng, c.X + math.cos(ang) * dist * 1.2, c.Z + math.sin(ang) * dist + 120, rng:NextNumber(0.9, 1.6))
+	for _, y in ipairs({ 8, 16, 24 }) do
+		local k = 4 - y / H * 2.7
+		for i = 1, 4 do
+			local c1, c2 = corners[i], corners[i % 4 + 1]
+			Util.beam(m, "Traversa", Vector3.new(x + c1[1] * k, G + y, z + c1[2] * k), Vector3.new(x + c2[1] * k, G + y, z + c2[2] * k), 0.5, 0.5, steel, Enum.Material.Metal, false, { shadow = false })
+		end
 	end
-	return lobby
+	Util.D(m, "Piattaforma", Vector3.new(4.4, 0.8, 4.4), CFrame.new(x, G + H + 0.4, z), wood, Enum.Material.WoodPlanks)
+	Util.D(m, "Motore", Vector3.new(5, 3, 3), CFrame.new(x + 1, G + H + 2.3, z), steel, Enum.Material.Metal)
+	-- coda
+	Util.D(m, "Deriva", Vector3.new(11, 0.4, 3.6), CFrame.new(x + 8, G + H + 2.3, z), Color3.fromRGB(206, 52, 46), Enum.Material.Metal, 0, { shadow = false })
+	-- ruota: Model con centro, pale radiali
+	local wheel = Util.model(m, "Ruota")
+	local hubPos = Vector3.new(x - 2.2, G + H + 2.3, z)
+	local hub = Util.D(wheel, "Mozzo", Vector3.new(1.4, 2.4, 2.4), CFrame.new(hubPos), Color3.fromRGB(70, 74, 98), Enum.Material.Metal, 0, { shape = Enum.PartType.Cylinder, shadow = false })
+	wheel.PrimaryPart = hub
+	for i = 0, 11 do
+		local ang = i * math.pi / 6
+		Util.D(wheel, "Pala", Vector3.new(0.35, 8.4, 1.5), CFrame.new(hubPos) * CFrame.Angles(ang, 0, 0) * CFrame.new(0, 6.2, 0), (i % 2 == 0) and Color3.fromRGB(240, 236, 226) or Color3.fromRGB(206, 52, 46), SM, 0, { shadow = false })
+	end
+	Util.tag(wheel, "Spin")
+	wheel:SetAttribute("SpinSpeed", rng.Range(0.8, 1.3))
+	wheel:SetAttribute("SpinAxis", "X")
+end
+
+----------------------------------------------------------------------
+-- Passerella dallo stadio al belvedere, ponte sul fiume, cartelli, lampioncini, ascensore
+----------------------------------------------------------------------
+local function walkway(root)
+	local f = Util.folder(root, "Passerella")
+	local stone = Color3.fromRGB(214, 180, 142)
+	local dark = Color3.fromRGB(150, 108, 84)
+	local z0, z1 = -Layout.PLAZA_Z - 3.2, -312
+	-- lastre del sentiero (rialzate di 2 stud sul terreno), interrotte dal ponte sul fiume
+	local zb = -226
+	local function strip(za, zb2)
+		local len = math.abs(zb2 - za)
+		Util.P(f, "Sentiero", Vector3.new(30, 4, len), CFrame.new(0, -2, (za + zb2) / 2), stone, Enum.Material.Concrete)
+		for _, sx in ipairs({ -1, 1 }) do
+			Util.D(f, "Bordo", Vector3.new(1.6, 0.5, len), CFrame.new(sx * 14.6, 0.25, (za + zb2) / 2), dark, Enum.Material.Concrete, 0, { shadow = false })
+		end
+		for z = za - 10, zb2 + 4, -20 do
+			Util.D(f, "Fuga", Vector3.new(28, 0.06, 0.3), CFrame.new(0, 0.04, z), dark, SM, 0.4, { shadow = false })
+		end
+	end
+	strip(z0, zb + 32)
+	strip(zb - 32, z1)
+	-- ponte: impalcato con parapetti luminosi e piloni sulle sponde
+	Util.P(f, "Ponte", Vector3.new(34, 1.6, 64), CFrame.new(0, -0.2, zb), Color3.fromRGB(190, 150, 118), Enum.Material.Concrete)
+	for _, sx in ipairs({ -1, 1 }) do
+		Util.P(f, "Parapetto", Vector3.new(1.4, 3.2, 64), CFrame.new(sx * 16.4, 2.2, zb), Color3.fromRGB(150, 108, 84), Enum.Material.Concrete)
+		Util.D(f, "ParapettoLuce", Vector3.new(0.5, 0.4, 62), CFrame.new(sx * 16.4, 3.9, zb), Color3.fromRGB(190, 132, 255), Enum.Material.Neon, 0, { shadow = false })
+		for _, dz in ipairs({ -22, 22 }) do
+			Util.P(f, "Pilone", Vector3.new(5, 9, 5), CFrame.new(sx * 14, -4.8, zb + dz), Color3.fromRGB(176, 136, 106), Enum.Material.Concrete)
+		end
+	end
+	-- lampioncini ai lati del sentiero
+	local n = 0
+	for z = z0 - 18, z1 + 8, -26 do
+		if math.abs(z - zb) > 36 then
+			for _, sx in ipairs({ -1, 1 }) do
+				n = n + 1
+				local p = Util.pillar(f, "Lampione", sx * 17, 0, z, 1.2, 5, Color3.fromRGB(46, 50, 74), Enum.Material.Metal, false, { shadow = false })
+				local lamp = Util.sphere(f, "Lampada", Vector3.new(sx * 17, 5.6, z), 1.8, Color3.fromRGB(255, 214, 140), Enum.Material.Neon, false, { shadow = false })
+				if n % 2 == 0 then
+					local l = Instance.new("PointLight")
+					l.Color = Color3.fromRGB(255, 200, 130)
+					l.Brightness = 1
+					l.Range = 16
+					l.Shadows = false
+					l.Parent = lamp
+				end
+			end
+		end
+	end
+	-- cartello all'inizio del sentiero
+	local post = Util.P(f, "PostoCartello", Vector3.new(1.2, 9, 1.2), CFrame.new(22, 4.5, -176), Color3.fromRGB(112, 78, 52), Enum.Material.Wood)
+	local b1 = Util.D(f, "Cartello", Vector3.new(10, 2.6, 0.5), CFrame.new(22, 8, -176.3) * CFrame.Angles(0, math.pi, 0) * CFrame.Angles(0, 0, 0.04), Color3.fromRGB(240, 226, 196), Enum.Material.WoodPlanks)
+	Util.label(b1, Enum.NormalId.Front, "BELVEDERE  >", { font = Enum.Font.GothamBlack, color = Color3.fromRGB(70, 44, 30), pps = 36 })
+	local b2 = Util.D(f, "Cartello", Vector3.new(10, 2.6, 0.5), CFrame.new(22, 5, -175.7) * CFrame.Angles(0, 0, -0.04), Color3.fromRGB(240, 226, 196), Enum.Material.WoodPlanks)
+	Util.label(b2, Enum.NormalId.Front, "<  STADIO", { font = Enum.Font.GothamBlack, color = Color3.fromRGB(70, 44, 30), pps = 36 })
+	post.Name = "Palo"
+
+	-- ascensore panoramico di vetro che sale al belvedere (solo scenografia)
+	local ex, ez = 120, Layout.LOBBY.Z + 78 + 8
+	local top = Layout.LOBBY.Y
+	local steel = Color3.fromRGB(46, 50, 74)
+	for _, c in ipairs({ { -5, -5 }, { 5, -5 }, { 5, 5 }, { -5, 5 } }) do
+		Util.pillar(f, "MontanteAscensore", ex + c[1], G, ez + c[2], 1.4, top - G, steel, Enum.Material.Metal, true)
+	end
+	for y = G + 10, top, 12 do
+		Util.D(f, "Cerchiatura", Vector3.new(11.4, 0.8, 11.4), CFrame.new(ex, y, ez), steel, Enum.Material.Metal, 0, { shadow = false })
+	end
+	Util.D(f, "Cabina", Vector3.new(7.6, 8, 7.6), CFrame.new(ex, G + 4.4, ez), Color3.fromRGB(190, 230, 255), Enum.Material.Glass, 0.45)
+	Util.D(f, "CabinaTetto", Vector3.new(8.2, 0.6, 8.2), CFrame.new(ex, G + 8.7, ez), steel, Enum.Material.Metal)
+	local sign = Util.D(f, "InsegnaAscensore", Vector3.new(11, 3, 0.5), CFrame.new(ex, top + 3.4, ez + 5.6), Color3.fromRGB(24, 20, 38), SM)
+	Util.label(sign, Enum.NormalId.Back, "LOBBY", { font = Enum.Font.GothamBlack, color = Color3.fromRGB(255, 205, 90), pps = 36 })
+end
+
+----------------------------------------------------------------------
+-- Bandiere sugli angoli della piazza
+----------------------------------------------------------------------
+local function flags(root)
+	local f = Util.folder(root, "Bandiere")
+	local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local x, z = sx * (Layout.PLAZA_X - 8), sz * (Layout.PLAZA_Z - 8)
+			local key = (sx < 0) and "Red" or "Blue"
+			Util.pillar(f, "Asta", x, 0, z, 0.9, 26, Color3.fromRGB(190, 194, 206), Enum.Material.Metal, false, { shadow = false })
+			Util.sphere(f, "PuntaAsta", Vector3.new(x, 26.4, z), 1.4, Color3.fromRGB(250, 210, 60), Enum.Material.Neon, false, { shadow = false })
+			Util.D(f, "Bandiera", Vector3.new(0.3, 5.5, 9), CFrame.new(x, 22.2, z - sz * 5), Config.Teams[key].Color, Enum.Material.Fabric, 0, { shadow = false })
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Avvoltoi che volteggiano sul canyon (si muovono sul client)
+----------------------------------------------------------------------
+local BIRDS = {
+	{ 120, 140, 120, 110, 0.16 },
+	{ -380, 40, 160, 140, -0.12 },
+	{ 520, -40, 110, 95, 0.2 },
+	{ -120, -120, 90, 92, -0.22 },
+	{ 760, 180, 150, 160, 0.1 },
+	{ -700, -60, 120, 120, -0.15 },
+}
+
+local function birds(root, rng)
+	local f = Util.folder(root, "Avvoltoi")
+	local dark = Color3.fromRGB(48, 38, 36)
+	for _, b in ipairs(BIRDS) do
+		local phase = rng.Range(0, 6.28)
+		local m = Util.model(f, "Avvoltoio")
+		local pos = Vector3.new(b[1] + b[3] * math.cos(phase), b[4], b[2] + b[3] * math.sin(phase))
+		local base = CFrame.new(pos)
+		local body = Util.D(m, "Corpo", Vector3.new(1.4, 0.8, 3.4), base, dark, SM, 0, { shadow = false })
+		Util.D(m, "AlaSx", Vector3.new(4.4, 0.2, 1.8), base * CFrame.new(-2.9, 0, 0), dark, SM, 0, { shadow = false })
+		Util.D(m, "AlaDx", Vector3.new(4.4, 0.2, 1.8), base * CFrame.new(2.9, 0, 0), dark, SM, 0, { shadow = false })
+		Util.D(m, "Testa", Vector3.new(0.9, 0.9, 1.2), base * CFrame.new(0, 0.1, -2.1), Color3.fromRGB(196, 74, 62), SM, 0, { shadow = false })
+		m.PrimaryPart = body
+		Util.tag(m, "Bird")
+		m:SetAttribute("Cx", b[1])
+		m:SetAttribute("Cz", b[2])
+		m:SetAttribute("Raggio", b[3])
+		m:SetAttribute("Quota", b[4])
+		m:SetAttribute("Velocita", b[5])
+		m:SetAttribute("Fase", phase)
+	end
+end
+
+function Props.Build(root)
+	local sc = Util.folder(root, "Scenario")
+	local rng = Util.Rng(31337)
+	local function try(name, fn, ...)
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			warn("[Mappa] " .. name .. " non riuscito: " .. tostring(err))
+		end
+	end
+	try("passerella", walkway, sc)
+	try("rocce", rocks, sc, rng)
+	try("piante", plants, sc, rng)
+	try("parabole", dishes, sc, rng)
+	try("linea elettrica", powerLine, sc)
+	try("aereo", plane, sc, rng)
+	try("mulini", function()
+		local f = Util.folder(sc, "Mulini")
+		windmill(f, -560, 120, rng)
+		windmill(f, 520, -120, rng)
+		windmill(f, 820, 140, rng)
+	end)
+	try("bandiere", flags, sc)
+	try("avvoltoi", birds, sc, rng)
+	return sc
+end
+
+return Props
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX18"><Properties><string name="Name">Terrain</string><ProtectedString name="Source"><![CDATA[-- Il canyon: pavimento di sabbia, pareti di roccia a strati rosso/arancio, torri isolate, dune, fiume e il
+-- belvedere della lobby. Tutto ricavato con le funzioni Fill* del Terrain, in modo ripetibile (niente Random).
+-- Il canyon corre lungo X, come il campo; il sole al tramonto sta in fondo al canyon (asse X), cosi' le pareti
+-- alte (lungo Z) non fanno ombra sullo stadio.
+local Util = require(script.Parent.Util)
+local Layout = require(script.Parent.Layout)
+
+local Terrain = {}
+
+local MAT = Enum.Material
+local G = Layout.GROUND_Y
+local T = workspace.Terrain
+
+local COLORS = {
+	[MAT.Sand] = Color3.fromRGB(238, 190, 128),
+	[MAT.Sandstone] = Color3.fromRGB(226, 104, 56),
+	[MAT.Rock] = Color3.fromRGB(176, 66, 48),
+	[MAT.Limestone] = Color3.fromRGB(246, 206, 162),
+	[MAT.Ground] = Color3.fromRGB(128, 76, 52),
+	[MAT.Mud] = Color3.fromRGB(122, 66, 86),
+	[MAT.Salt] = Color3.fromRGB(252, 224, 212),
+	[MAT.Basalt] = Color3.fromRGB(84, 48, 70),
+	[MAT.Slate] = Color3.fromRGB(132, 100, 142),
+}
+
+-- strati della roccia, dal basso: {quota inferiore, quota superiore, materiale}
+local STRATA = {
+	{ -20, 6, MAT.Sandstone },
+	{ 6, 14, MAT.Mud },
+	{ 14, 34, MAT.Rock },
+	{ 34, 40, MAT.Salt },
+	{ 40, 62, MAT.Sandstone },
+	{ 62, 70, MAT.Limestone },
+	{ 70, 96, MAT.Rock },
+	{ 96, 102, MAT.Salt },
+	{ 102, 132, MAT.Sandstone },
+	{ 132, 140, MAT.Mud },
+	{ 140, 164, MAT.Rock },
+	{ 164, 172, MAT.Limestone },
+	{ 172, 210, MAT.Sandstone },
+	{ 210, 220, MAT.Salt },
+	{ 220, 300, MAT.Rock },
+}
+
+local ops = 0
+local function pace()
+	ops = ops + 1
+	if ops % 20 == 0 then
+		task.wait()
+	end
+end
+local function block(cf, size, mat)
+	T:FillBlock(cf, size, mat)
+	pace()
+end
+local function ball(center, r, mat)
+	T:FillBall(center, r, mat)
+	pace()
+end
+local function cyl(cf, h, r, mat)
+	T:FillCylinder(cf, h, r, mat)
+	pace()
+end
+
+-- colonna di roccia a strati con la cima sabbiosa
+local function column(cx, cz, r, top)
+	for _, b in ipairs(STRATA) do
+		local y0, y1 = b[1], math.min(b[2], top)
+		if y1 > y0 then
+			cyl(CFrame.new(cx, (y0 + y1) / 2, cz), y1 - y0, r, b[3])
+		end
+	end
+	cyl(CFrame.new(cx, top - 2, cz), 4, r, MAT.Sand)
+end
+
+-- blocco rettangolare ruotato, stessi strati (da quota "from" in su, per sovrapporre terrazze)
+local function slab(cx, cz, sx, sz, yaw, top, from)
+	local cap = CFrame.new(cx, top - 2, cz) * CFrame.Angles(0, yaw, 0)
+	for _, b in ipairs(STRATA) do
+		local y0, y1 = math.max(b[1], from or -1000), math.min(b[2], top)
+		if y1 > y0 then
+			block(CFrame.new(cx, (y0 + y1) / 2, cz) * CFrame.Angles(0, yaw, 0), Vector3.new(sx, y1 - y0, sz), b[3])
+		end
+	end
+	block(cap, Vector3.new(sx, 4, sz), MAT.Sand)
+end
+
+local function smooth(t)
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+----------------------------------------------------------------------
+local function ground()
+	-- lastra di sabbia sottile: x da -1250 a 1250, z da -700 a 700, spessa 18 (da -20 a -2)
+	for cx = -1000, 1000, 500 do
+		for cz = -350, 350, 700 do
+			block(CFrame.new(cx, G - 9, cz), Vector3.new(500, 18, 700), MAT.Sand)
+		end
+	end
+	block(CFrame.new(-1375, G - 9, 0), Vector3.new(250, 18, 1400), MAT.Sand)
+	block(CFrame.new(1375, G - 9, 0), Vector3.new(250, 18, 1400), MAT.Sand)
+end
+
+-- Pareti nord e sud: tre file di lastroni di roccia che si sovrappongono, sempre piu' alti e lontani
+-- (prospettiva a strati), con terrazze sopra e falde di detriti ai piedi.
+local ROWS = {
+	{ face = 345, var = 55, len = 210, depth = 100, h = 90, hv = 80, hmax = 175 },
+	{ face = 470, var = 70, len = 290, depth = 120, h = 150, hv = 90, hmax = 235 },
+}
+
+local function walls(s, rng)
+	for ri, row in ipairs(ROWS) do
+		local x = -1400 + rng.Range(0, 60)
+		while x < 1400 do
+			local len = row.len * rng.Range(0.8, 1.3)
+			local depth = row.depth * rng.Range(0.85, 1.2)
+			local cx = x + len / 2
+			local face = row.face + row.var * Util.fbm(cx / 360 + ri * 3.7 + s * 5.1, ri * 1.9, 3)
+			local h = row.h + row.hv * Util.fbm(cx / 240 + ri * 7.3 + s * 2.2, 9.1 + ri, 3) + rng.Range(-14, 14)
+			-- la lobby (parete sud) sta incassata: la parete dietro il belvedere resta alta e arretrata
+			if s < 0 then
+				local blend = 1 - smooth((math.abs(cx) - 230) / 190)
+				face = face + (row.face + 150 - face) * blend
+				h = h + (row.h + row.hv * 0.75 - h) * blend * 0.8
+			end
+			h = math.clamp(h, 60, row.hmax)
+			local yaw = rng.Range(-0.12, 0.12)
+			slab(cx, s * (face + depth / 2), len, depth, yaw, h)
+			-- terrazza piu' alta, arretrata
+			if rng.Next() < 0.5 then
+				local th = math.min(h + rng.Range(16, 40), row.hmax + 30)
+				slab(cx + rng.Range(-len * 0.18, len * 0.18), s * (face + depth * 0.62), len * rng.Range(0.35, 0.6), depth * 0.55, yaw + rng.Range(-0.1, 0.1), th, h - 6)
+			end
+			-- detriti ai piedi della parete (solo la fila vicina)
+			if ri == 1 then
+				for k = -1, 1 do
+					local r = rng.Range(24, 40)
+					ball(Vector3.new(cx + k * len * 0.32 + rng.Range(-10, 10), G - r * 0.55, s * (face - 6 + rng.Range(0, 10))), r, (k == 0 and ri == 1 and rng.Next() < 0.5) and MAT.Sandstone or MAT.Sand)
+				end
+			end
+			x = x + len * 0.78
+		end
+	end
+end
+
+-- Belvedere della lobby: una terrazza a meta' parete (la quota del pavimento e' Layout.LOBBY.Y)
+local function ledge()
+	local c = Layout.LOBBY
+	local top = c.Y - 2
+	local front = c.Z + 78 -- z della faccia anteriore (negativa: siamo a sud)
+	slab(0, front - 70, 330, 140, 0, top)
+	-- spigoli arrotondati davanti
+	for _, dx in ipairs({ -165, 165 }) do
+		column(dx, front - 36, 36, top)
+	end
+	-- detriti di falda ai piedi del belvedere
+	for i = -5, 5 do
+		local x = i * 36 + ((i % 2 == 0) and 0 or 12)
+		if math.abs(x - 120) > 40 then -- lascia libero il punto dell'ascensore
+			ball(Vector3.new(x, G - 15, front + 16 + ((i % 3) * 5)), 30 + (i % 3) * 3, (i % 3 == 0) and MAT.Sandstone or MAT.Sand)
+		end
+	end
+end
+
+-- Torri di roccia isolate (stile Monument Valley) dentro la valle: x, z, raggio, altezza
+local BUTTES = {
+	{ -380, 255, 40, 112 },
+	{ -118, 290, 30, 86 },
+	{ 176, 262, 46, 138 },
+	{ 440, 238, 34, 102 },
+	{ 700, 282, 42, 126 },
+	{ -650, 268, 46, 122 },
+	{ -940, 210, 52, 100 },
+	{ 980, 190, 48, 96 },
+	{ -430, -262, 36, 96 },
+	{ -660, -236, 44, 118 },
+	{ 470, -256, 38, 106 },
+	{ 720, -276, 42, 114 },
+	{ 1010, -210, 50, 98 },
+	{ -1000, -170, 46, 90 },
+	{ 1180, 20, 60, 70 },
+	{ -1190, -10, 64, 76 },
+}
+
+local function buttes()
+	for i, b in ipairs(BUTTES) do
+		column(b[1], b[2], b[3], b[4])
+		-- falda di sabbia/arenaria ai piedi
+		ball(Vector3.new(b[1], G - b[3] * 0.4, b[2]), b[3] * 1.5, MAT.Sandstone)
+		if i % 3 == 0 then
+			-- seconda guglia accanto
+			column(b[1] + b[3] * 1.3, b[2] + b[3] * 0.6, b[3] * 0.45, b[4] * 0.7)
+		end
+	end
+end
+
+-- Fiume turchese che attraversa la valle tra stadio e belvedere
+local RIVER = {
+	{ -1400, -196 },
+	{ -980, -246 },
+	{ -620, -214 },
+	{ -300, -258 },
+	{ 0, -226 },
+	{ 300, -254 },
+	{ 640, -208 },
+	{ 980, -262 },
+	{ 1400, -200 },
+}
+
+local function river()
+	local depth = 8 -- il letto sta 8 stud sotto il terreno
+	for i = 1, #RIVER - 1 do
+		local a, b = RIVER[i], RIVER[i + 1]
+		local dx, dz = b[1] - a[1], b[2] - a[2]
+		local len = math.sqrt(dx * dx + dz * dz)
+		local yaw = -math.atan2(dz, dx)
+		local mid = Vector3.new((a[1] + b[1]) / 2, 0, (a[2] + b[2]) / 2)
+		local base = CFrame.new(mid) * CFrame.Angles(0, yaw, 0)
+		-- scavo, letto di fango e acqua (la superficie sta 1 stud sotto il terreno)
+		block(base * CFrame.new(0, G - depth / 2 + 1, 0), Vector3.new(len + 24, depth + 4, 38), MAT.Air)
+		block(base * CFrame.new(0, G - depth - 4, 0), Vector3.new(len + 24, 8, 38), MAT.Mud)
+		block(base * CFrame.new(0, G - depth + 2.5, 0), Vector3.new(len + 24, 5, 36), MAT.Water)
+	end
+	for i = 2, #RIVER - 1 do
+		local p = RIVER[i]
+		cyl(CFrame.new(p[1], G - depth / 2 + 1, p[2]), depth + 4, 22, MAT.Air)
+		cyl(CFrame.new(p[1], G - depth - 4, p[2]), 8, 22, MAT.Mud)
+		cyl(CFrame.new(p[1], G - depth + 2.5, p[2]), 5, 20, MAT.Water)
+	end
+end
+
+-- Macchie di terreno colorato: lago salato a est, fango secco a ovest, chiazze scure e chiare sparse
+local function patches(rng)
+	cyl(CFrame.new(790, G - 2, 40), 4, 140, MAT.Salt)
+	cyl(CFrame.new(880, G - 2, -40), 4, 90, MAT.Salt)
+	cyl(CFrame.new(-780, G - 2, -30), 4, 120, MAT.Mud)
+	cyl(CFrame.new(-700, G - 2, 70), 4, 70, MAT.Ground)
+	for i = 1, 22 do
+		local x = rng.Range(-1000, 1000)
+		local zs = (rng.Next() < 0.5) and -1 or 1
+		local z = zs * rng.Range(185, 330)
+		if not (zs < 0 and z > -300) and not (math.abs(x) < 230 and math.abs(z) < 260) then
+			local mat = (i % 3 == 0) and MAT.Ground or ((i % 3 == 1) and MAT.Limestone or MAT.Mud)
+			cyl(CFrame.new(x, G - 2, z), 4, rng.Range(26, 70), mat)
+		end
+	end
+end
+
+-- Dune: creste basse e lunghe (cilindri sdraiati mezzi sepolti)
+local function dunes(rng)
+	for i = 1, 26 do
+		local side = (i % 2 == 0) and 1 or -1
+		local x = rng.Range(-1100, 1100)
+		local z = side * rng.Range(205, 320)
+		-- tiene libero il passaggio tra stadio e belvedere e il letto del fiume
+		local clear = true
+		if side < 0 and z > -300 and z < -150 then
+			clear = false
+		end
+		if clear and math.abs(x) < 240 and math.abs(z) < 260 then
+			clear = false
+		end
+		if clear then
+			local r = rng.Range(14, 26)
+			local len = rng.Range(70, 160)
+			local rise = rng.Range(3, 8)
+			local yaw = rng.Range(-0.35, 0.35)
+			cyl(CFrame.new(x, G - r + rise, z) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, 0, math.pi / 2), len, r, MAT.Sand)
+		end
+	end
+end
+
+-- Massi sparsi (solo estetica; quelli agganciabili col rampino sono parti, vedi Props)
+local function rocks(rng)
+	for i = 1, 48 do
+		local x = rng.Range(-900, 900)
+		local zs = (rng.Next() < 0.5) and -1 or 1
+		local z = zs * rng.Range(190, 330)
+		if not (zs < 0 and z > -300) and not (math.abs(x) < 240 and math.abs(z) < 260) then
+			local r = rng.Range(3, 8)
+			ball(Vector3.new(x, G + r * 0.15, z), r, (i % 3 == 0) and MAT.Basalt or MAT.Rock)
+		end
+	end
+end
+
+function Terrain.Build()
+	local rng = Util.Rng(2024)
+	for mat, col in pairs(COLORS) do
+		T:SetMaterialColor(mat, col)
+	end
+	-- l'acqua ha impostazioni sue
+	T.WaterColor = Color3.fromRGB(64, 196, 208)
+	T.WaterTransparency = 0.55
+	T.WaterReflectance = 0.35
+	T.WaterWaveSize = 0.12
+	T.WaterWaveSpeed = 8
+	ground()
+	walls(-1, rng)
+	walls(1, rng)
+	ledge()
+	buttes()
+	patches(rng)
+	dunes(rng)
+	rocks(rng)
+	river()
+end
+
+return Terrain
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX19"><Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[-- Attrezzi comuni per costruire la mappa: parti, cilindri, testi, numeri casuali ripetibili.
+local CollectionService = game:GetService("CollectionService")
+
+local Util = {}
+
+local SMOOTH = Enum.Material.SmoothPlastic
+
+-- Crea una parte ancorata. opts: decor (niente collisioni/query/touch), shape, shadow (true/false), reflectance
+local function make(parent, name, size, cf, color, material, transparency, opts)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = material or SMOOTH
+	p.Transparency = transparency or 0
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	if opts then
+		if opts.shape then
+			p.Shape = opts.shape
+		end
+		if opts.decor then
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+		end
+		if opts.shadow ~= nil then
+			p.CastShadow = opts.shadow
+		elseif opts.decor and math.max(size.X, size.Y, size.Z) < 5 then
+			p.CastShadow = false
+		end
+		if opts.reflectance then
+			p.Reflectance = opts.reflectance
+		end
+	end
+	p.Parent = parent
+	return p
+end
+Util.make = make
+
+-- Parte solida (collide)
+function Util.P(parent, name, size, cf, color, material, transparency, opts)
+	return make(parent, name, size, cf, color, material, transparency, opts)
+end
+
+-- Parte decorativa: non collide, non interrogabile, non tocca
+function Util.D(parent, name, size, cf, color, material, transparency, opts)
+	local o = { decor = true }
+	if opts then
+		for k, v in pairs(opts) do
+			o[k] = v
+		end
+	end
+	return make(parent, name, size, cf, color, material, transparency, o)
+end
+
+function Util.folder(parent, name)
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = parent
+	return f
+end
+
+function Util.model(parent, name)
+	local m = Instance.new("Model")
+	m.Name = name
+	m.Parent = parent
+	return m
+end
+
+function Util.tag(inst, tag)
+	CollectionService:AddTag(inst, tag)
+	return inst
+end
+
+-- Colori
+function Util.shade(c, f)
+	return Color3.new(math.clamp(c.R * f, 0, 1), math.clamp(c.G * f, 0, 1), math.clamp(c.B * f, 0, 1))
+end
+
+function Util.mix(a, b, t)
+	return Color3.new(a.R + (b.R - a.R) * t, a.G + (b.G - a.G) * t, a.B + (b.B - a.B) * t)
+end
+
+-- Cilindro con asse lungo X (convenzione Roblox) tra due punti
+function Util.rod(parent, name, a, b, diameter, color, material, solid, opts)
+	local mid = (a + b) / 2
+	local len = (b - a).Magnitude
+	local cf = CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0)
+	local o = { shape = Enum.PartType.Cylinder, decor = not solid }
+	if opts then
+		for k, v in pairs(opts) do
+			o[k] = v
+		end
+	end
+	return make(parent, name, Vector3.new(len, diameter, diameter), cf, color, material, 0, o)
+end
+
+-- Cilindro verticale con base a y0 e altezza h
+function Util.pillar(parent, name, x, y0, z, diameter, h, color, material, solid, opts)
+	local o = { shape = Enum.PartType.Cylinder, decor = not solid }
+	if opts then
+		for k, v in pairs(opts) do
+			o[k] = v
+		end
+	end
+	return make(parent, name, Vector3.new(h, diameter, diameter), CFrame.new(x, y0 + h / 2, z) * CFrame.Angles(0, 0, math.pi / 2), color, material, 0, o)
+end
+
+-- Blocco lungo tra due punti (sezione w x h)
+function Util.beam(parent, name, a, b, w, h, color, material, solid, opts)
+	local mid = (a + b) / 2
+	local len = (b - a).Magnitude
+	local cf = CFrame.lookAt(mid, b) * CFrame.Angles(0, math.pi / 2, 0)
+	local o = { decor = not solid }
+	if opts then
+		for k, v in pairs(opts) do
+			o[k] = v
+		end
+	end
+	return make(parent, name, Vector3.new(len, h, w), cf, color, material, 0, o)
+end
+
+function Util.sphere(parent, name, center, diameter, color, material, solid, opts)
+	local o = { shape = Enum.PartType.Ball, decor = not solid }
+	if opts then
+		for k, v in pairs(opts) do
+			o[k] = v
+		end
+	end
+	return make(parent, name, Vector3.new(diameter, diameter, diameter), CFrame.new(center), color, material, 0, o)
+end
+
+-- Testo su una faccia di una parte (SurfaceGui + TextLabel). o: font, color, pps, scaled, size, name, light, stroke
+function Util.label(part, face, text, o)
+	o = o or {}
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = o.guiName or "Gui"
+	gui.Face = face
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = o.pps or 30
+	gui.LightInfluence = o.light or 0
+	gui.Parent = part
+	local l = Instance.new("TextLabel")
+	l.Name = o.name or "Text"
+	l.Size = UDim2.fromScale(1, 1)
+	l.BackgroundTransparency = 1
+	l.Font = o.font or Enum.Font.GothamBlack
+	l.TextScaled = true
+	l.TextColor3 = o.color or Color3.new(1, 1, 1)
+	l.Text = text
+	if o.stroke then
+		l.TextStrokeTransparency = 0.4
+		l.TextStrokeColor3 = o.stroke
+	end
+	if o.tt then
+		l.TextTransparency = o.tt
+	end
+	l.Parent = gui
+	return l
+end
+
+----------------------------------------------------------------------
+-- Numeri casuali ripetibili (stessi risultati su qualunque macchina: solo aritmetica intera esatta)
+----------------------------------------------------------------------
+function Util.Rng(seed)
+	local s = math.floor(seed) % 2147483647
+	if s <= 0 then
+		s = s + 2147483646
+	end
+	local r = {}
+	function r.Next()
+		s = (s * 48271) % 2147483647
+		return s / 2147483647
+	end
+	function r.Range(a, b)
+		return a + (b - a) * r.Next()
+	end
+	function r.Int(a, b)
+		return a + math.floor(r.Next() * (b - a + 1))
+	end
+	function r.Pick(t)
+		return t[r.Int(1, #t)]
+	end
+	function r.Sign()
+		return (r.Next() < 0.5) and -1 or 1
+	end
+	return r
+end
+
+-- Rumore di valore 2D ripetibile, 0..1
+local function hash2(ix, iz)
+	local h = (ix * 73856093 + iz * 19349663 + 83492791) % 2147483647
+	h = (h * 48271) % 2147483647
+	h = (h * 48271 + ix * 7) % 2147483647
+	return h / 2147483647
+end
+
+function Util.noise(x, z)
+	local ix, iz = math.floor(x), math.floor(z)
+	local fx, fz = x - ix, z - iz
+	local ux = fx * fx * (3 - 2 * fx)
+	local uz = fz * fz * (3 - 2 * fz)
+	local a, b = hash2(ix, iz), hash2(ix + 1, iz)
+	local c, d = hash2(ix, iz + 1), hash2(ix + 1, iz + 1)
+	return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz
+end
+
+function Util.fbm(x, z, octaves)
+	local amp, sum, norm = 1, 0, 0
+	for _ = 1, octaves or 3 do
+		sum = sum + Util.noise(x, z) * amp
+		norm = norm + amp
+		x, z = x * 2.03 + 11.7, z * 2.03 + 5.3
+		amp = amp * 0.5
+	end
+	return sum / norm
+end
+
+return Util
+]]></ProtectedString></Properties></Item></Item><Item class="ModuleScript" referent="RBX21"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[-- Costruisce da codice la mappa Canyon del Deserto (campo, stadio, canyon, lobby) e la luce da tramonto.
+-- Ogni parte "di contorno" e' protetta da pcall: se una decorazione fallisce il gioco parte lo stesso.
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+local Layout = require(script.Parent.Map.Layout)
+local Util = require(script.Parent.Map.Util)
+
+local MapBuilder = {}
+
+local function try(name, fn, ...)
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		warn("[Mappa] " .. name .. " non riuscito: " .. tostring(err))
+	end
+	return ok
 end
 
 function MapBuilder.Build()
 	local root = Instance.new("Folder")
 	root.Name = "World"
 	root.Parent = workspace
-	setupLighting()
-	buildField(root)
-	buildScenery(root)
-	buildLobby(root)
+
+	local Map = script.Parent.Map
+	try("atmosfera", function()
+		require(Map.Atmosphere).Build()
+	end)
+
+	-- campo: parte essenziale
+	local field = Util.folder(root, "Field")
+	require(Map.Pitch).Build(field)
+	require(Map.Goals).Build(field)
+	try("stadio", function()
+		require(Map.Arena).Build(root)
+	end)
+	try("lobby", function()
+		require(Map.LobbyBuilder).Build(root)
+	end)
+	try("scenario", function()
+		require(Map.Props).Build(root)
+	end)
+	-- il canyon (Terrain) richiede qualche secondo: lo costruiamo in parallelo, il resto e' gia' giocabile
+	task.spawn(function()
+		try("terreno", function()
+			require(Map.Terrain).Build()
+		end)
+	end)
 	return root
 end
 
 function MapBuilder.LobbySpawnCFrame()
-	local c = Config.Lobby.Center
-	return CFrame.new(c.X, c.Y + 4, c.Z - 20)
+	local c = Layout.LOBBY
+	local pos = Vector3.new(c.X, c.Y + 4, c.Z + 24)
+	return CFrame.lookAt(pos, pos + Vector3.new(0, 0, 1))
 end
 
 return MapBuilder
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX11"><Properties><string name="Name">Match</string><ProtectedString name="Source"><![CDATA[-- Ciclo di partita: intervallo -> calcio d'inizio -> partita -> goal/reset -> fine -> lobby.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX22"><Properties><string name="Name">Match</string><ProtectedString name="Source"><![CDATA[-- Ciclo di partita: intervallo -> calcio d'inizio -> partita -> goal/reset -> fine -> lobby.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -1870,7 +3617,7 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 return Match
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX12"><Properties><string name="Name">Ragdoll</string><ProtectedString name="Source"><![CDATA[-- Ragdoll fisico temporaneo per personaggi R15 (Motor6D e AnimationConstraint).
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX23"><Properties><string name="Name">Ragdoll</string><ProtectedString name="Source"><![CDATA[-- Ragdoll fisico temporaneo per personaggi R15 (Motor6D e AnimationConstraint).
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 
 local Ragdoll = {}
@@ -1991,7 +3738,7 @@ function Ragdoll.Apply(char, duration, impulse)
 end
 
 return Ragdoll
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX13"><Properties><string name="Name">Stamina</string><ProtectedString name="Source"><![CDATA[-- Stamina a 4 tacche: unico serbatoio per sprint, calci, scivolate, scatti e (poi) gadget.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX24"><Properties><string name="Name">Stamina</string><ProtectedString name="Source"><![CDATA[-- Stamina a 4 tacche: unico serbatoio per sprint, calci, scivolate, scatti e (poi) gadget.
 local Players = game:GetService("Players")
 
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
@@ -2089,7 +3836,7 @@ Players.PlayerRemoving:Connect(Stamina.Remove)
 
 return Stamina
 ]]></ProtectedString></Properties></Item></Item></Item>
-<Item class="StarterPlayer" referent="RBX21"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX20"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="LocalScript" referent="RBX16"><Properties><string name="Name">Client</string><bool name="Disabled">false</bool><ProtectedString name="Source"><![CDATA[-- Input del giocatore (PC): calcio con carica, passaggio, flick, lancio, scivolata, dribbling, sprint.
+<Item class="StarterPlayer" referent="RBX33"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX32"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="LocalScript" referent="RBX27"><Properties><string name="Name">Client</string><bool name="Disabled">false</bool><ProtectedString name="Source"><![CDATA[-- Input del giocatore (PC): calcio con carica, passaggio, flick, lancio, scivolata, dribbling, sprint.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -2100,12 +3847,14 @@ local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Net = require(ReplicatedStorage:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Modules"):WaitForChild("Hud"))
 local Effects = require(script.Parent.Modules:WaitForChild("Effects"))
+local Ambient = require(script.Parent.Modules:WaitForChild("Ambient"))
 
 local player = Players.LocalPlayer
 local C = Config.Controls
 
 Hud.Build()
 Effects.Start()
+Ambient.Start()
 
 local function camera()
 	return workspace.CurrentCamera
@@ -2275,7 +4024,257 @@ bind("LobbyAction", function(_, state)
 	end
 	return PASS
 end, C.Lobby)
-]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX19"><Properties><string name="Name">Modules</string></Properties><Item class="ModuleScript" referent="RBX17"><Properties><string name="Name">Effects</string><ProtectedString name="Source"><![CDATA[-- Effetti solo-client: anelli sotto giocatori e palla, indicatore palla libera, scia, barretta stamina.
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX31"><Properties><string name="Name">Modules</string></Properties><Item class="ModuleScript" referent="RBX28"><Properties><string name="Name">Ambient</string><ProtectedString name="Source"><![CDATA[-- Vita della mappa lato client: tifosi che saltellano (e impazziscono al goal), tabelloni segnapunti,
+-- pale e parabole che girano, luci di segnalazione che lampeggiano.
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+
+local Ambient = {}
+
+local fans = {}
+local fanParts = {}
+local fanFrames = {}
+local spinners = {}
+local blinkers = {}
+local boards = {}
+local birds = {}
+local birdParts = {}
+local birdFrames = {}
+local bursts = {}
+
+local FAN_RANGE = 420 -- oltre questa distanza dal centro del campo i tifosi restano fermi (risparmio)
+
+local function addFan(model)
+	if model.ClassName ~= "Model" then
+		return
+	end
+	local body = model:FindFirstChild("Corpo")
+	local head = model:FindFirstChild("Testa")
+	if not body or not head then
+		return
+	end
+	local n = #fanParts
+	fanParts[n + 1] = body
+	fanParts[n + 2] = head
+	fanFrames[n + 1] = body.CFrame
+	fanFrames[n + 2] = head.CFrame
+	fans[#fans + 1] = {
+		base1 = body.CFrame,
+		base2 = head.CFrame,
+		phase = model:GetAttribute("Fase") or 0,
+		jump = model:GetAttribute("Salto") or 1,
+	}
+end
+
+local function addSpinner(model)
+	spinners[#spinners + 1] = {
+		model = model,
+		base = model:GetPivot(),
+		speed = model:GetAttribute("SpinSpeed") or 0.1,
+		axisX = model:GetAttribute("SpinAxis") == "X",
+		angle = 0,
+	}
+end
+
+local function addBlinker(part)
+	blinkers[#blinkers + 1] = { part = part, offset = #blinkers * 0.37 }
+end
+
+local function addBoard(part)
+	local gui = part:FindFirstChild("Gui")
+	if not gui then
+		return
+	end
+	boards[#boards + 1] = {
+		red = gui:FindFirstChild("PunteggioRossi"),
+		blue = gui:FindFirstChild("PunteggioBlu"),
+		time = gui:FindFirstChild("Tempo"),
+		phase = gui:FindFirstChild("Fase"),
+	}
+end
+
+local function addBird(model)
+	local body = model:FindFirstChild("Corpo")
+	local wl, wr, head = model:FindFirstChild("AlaSx"), model:FindFirstChild("AlaDx"), model:FindFirstChild("Testa")
+	if not (body and wl and wr and head) then
+		return
+	end
+	local n = #birdParts
+	birdParts[n + 1] = body
+	birdParts[n + 2] = wl
+	birdParts[n + 3] = wr
+	birdParts[n + 4] = head
+	for i = 1, 4 do
+		birdFrames[n + i] = birdParts[n + i].CFrame
+	end
+	birds[#birds + 1] = {
+		cx = model:GetAttribute("Cx") or 0,
+		cz = model:GetAttribute("Cz") or 0,
+		r = model:GetAttribute("Raggio") or 100,
+		h = model:GetAttribute("Quota") or 100,
+		speed = model:GetAttribute("Velocita") or 0.15,
+		phase = model:GetAttribute("Fase") or 0,
+	}
+end
+
+local function addBurst(part)
+	bursts[#bursts + 1] = part
+end
+
+-- coriandoli: tutti i cannoncini sparano insieme, poi una seconda raffica
+local function fireBursts()
+	for _, part in ipairs(bursts) do
+		for _, e in ipairs(part:GetChildren()) do
+			if e:IsA("ParticleEmitter") then
+				e:Emit(26)
+			end
+		end
+	end
+end
+
+local function fmtTime(sec)
+	local s = math.max(0, math.ceil(sec))
+	return string.format("%d:%02d", math.floor(s / 60), s % 60)
+end
+
+local PHASE_TEXT = {
+	Intermission = "INTERVALLO",
+	Kickoff = "CALCIO D'INIZIO",
+	Playing = "IN GIOCO",
+	Goal = "GOAL!",
+	Ended = "FINITA",
+}
+
+local function updateBoards()
+	local phase = workspace:GetAttribute("Phase") or "Intermission"
+	local now = workspace:GetServerTimeNow()
+	local endAt = workspace:GetAttribute("PhaseEnd") or 0
+	local clock = workspace:GetAttribute("TimeLeft") or Config.Match.Duration
+	if phase == "Playing" then
+		clock = endAt - now
+	elseif phase == "Intermission" then
+		clock = endAt - now
+	end
+	local red = tostring(workspace:GetAttribute("ScoreRed") or 0)
+	local blue = tostring(workspace:GetAttribute("ScoreBlue") or 0)
+	for _, b in ipairs(boards) do
+		if b.red then
+			b.red.Text = red
+		end
+		if b.blue then
+			b.blue.Text = blue
+		end
+		if b.time then
+			b.time.Text = fmtTime(clock)
+		end
+		if b.phase then
+			b.phase.Text = PHASE_TEXT[phase] or ""
+		end
+	end
+end
+
+local function register(tagName, adder)
+	for _, inst in ipairs(CollectionService:GetTagged(tagName)) do
+		adder(inst)
+	end
+	CollectionService:GetInstanceAddedSignal(tagName):Connect(adder)
+end
+
+function Ambient.Start()
+	register("Fan", addFan)
+	register("Spin", addSpinner)
+	register("Blink", addBlinker)
+	register("Scoreboard", addBoard)
+	register("Bird", addBird)
+	register("GoalBurst", addBurst)
+
+	local lastPhase = workspace:GetAttribute("Phase")
+	workspace:GetAttributeChangedSignal("Phase"):Connect(function()
+		local phase = workspace:GetAttribute("Phase")
+		if phase == "Goal" and lastPhase ~= "Goal" then
+			fireBursts()
+			task.delay(1.1, fireBursts)
+		end
+		lastPhase = phase
+	end)
+
+	local t = 0
+	local acc = 0
+	local boardAcc = 0
+	RunService.RenderStepped:Connect(function(dt)
+		t = t + dt
+		local cam = workspace.CurrentCamera
+		local camPos = cam and cam.CFrame.Position
+
+		-- ruote e parabole
+		for _, s in ipairs(spinners) do
+			s.angle = s.angle + s.speed * dt
+			if s.axisX then
+				s.model:PivotTo(s.base * CFrame.Angles(s.angle, 0, 0))
+			else
+				s.model:PivotTo(CFrame.new(s.base.Position) * CFrame.Angles(0, s.angle, 0) * s.base.Rotation)
+			end
+		end
+
+		-- luci rosse che lampeggiano
+		for _, b in ipairs(blinkers) do
+			b.part.Transparency = (math.floor((t + b.offset) * 1.3) % 2 == 0) and 0 or 0.8
+		end
+
+		-- tifosi: 20 aggiornamenti al secondo, solo se la camera e' vicina allo stadio
+		acc = acc + dt
+		if acc >= 0.05 and camPos and camPos.Magnitude < FAN_RANGE and #fans > 0 then
+			acc = 0
+			local phase = workspace:GetAttribute("Phase")
+			local amp, freq = 0.18, 2.2
+			if phase == "Goal" then
+				amp, freq = 1.9, 6.5
+			elseif phase == "Playing" then
+				amp, freq = 0.3, 3
+			elseif phase == "Intermission" then
+				amp, freq = 0.1, 1.4
+			end
+			for i, f in ipairs(fans) do
+				local bob = math.abs(math.sin(t * freq * f.jump + f.phase)) * amp
+				local up = Vector3.new(0, bob, 0)
+				fanFrames[2 * i - 1] = f.base1 + up
+				fanFrames[2 * i] = f.base2 + up * 1.15
+			end
+			workspace:BulkMoveTo(fanParts, fanFrames, Enum.BulkMoveMode.FireCFrameChanged)
+		end
+
+		-- avvoltoi: volteggiano in cerchio sbattendo le ali
+		if #birds > 0 then
+			for i, b in ipairs(birds) do
+				local a = b.phase + t * b.speed
+				local pos = Vector3.new(b.cx + b.r * math.cos(a), b.h + 3 * math.sin(t * 0.6 + b.phase), b.cz + b.r * math.sin(a))
+				local dir = (b.speed >= 0) and 1 or -1
+				local ahead = Vector3.new(-math.sin(a) * dir, 0, math.cos(a) * dir)
+				local body = CFrame.lookAt(pos, pos + ahead) * CFrame.Angles(0, 0, -0.28 * dir)
+				local flap = math.sin(t * 2.6 + b.phase * 3) * 0.45
+				local o = 4 * (i - 1)
+				birdFrames[o + 1] = body
+				birdFrames[o + 2] = body * CFrame.new(-0.7, 0.1, 0) * CFrame.Angles(0, 0, -flap) * CFrame.new(-2.2, 0, 0)
+				birdFrames[o + 3] = body * CFrame.new(0.7, 0.1, 0) * CFrame.Angles(0, 0, flap) * CFrame.new(2.2, 0, 0)
+				birdFrames[o + 4] = body * CFrame.new(0, 0.1, -2.1)
+			end
+			workspace:BulkMoveTo(birdParts, birdFrames, Enum.BulkMoveMode.FireCFrameChanged)
+		end
+
+		-- tabelloni: 5 volte al secondo
+		boardAcc = boardAcc + dt
+		if boardAcc >= 0.2 then
+			boardAcc = 0
+			updateBoards()
+		end
+	end)
+end
+
+return Ambient
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX29"><Properties><string name="Name">Effects</string><ProtectedString name="Source"><![CDATA[-- Effetti solo-client: anelli sotto giocatori e palla, indicatore palla libera, scia, barretta stamina.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -2435,7 +4434,7 @@ function Effects.Start()
 end
 
 return Effects
-]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX18"><Properties><string name="Name">Hud</string><ProtectedString name="Source"><![CDATA[-- HUD pulito: bianco con testi scuri e angoli arrotondati.
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX30"><Properties><string name="Name">Hud</string><ProtectedString name="Source"><![CDATA[-- HUD pulito: bianco con testi scuri e angoli arrotondati.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")

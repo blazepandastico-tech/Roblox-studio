@@ -1,0 +1,529 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { edgeTable, triTable } from 'three/addons/objects/MarchingCubes.js';
+
+const W = window.VIEW_W || 1600, H = window.VIEW_H || 900;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, W / H, 0.5, 6000);
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(1); composer.setSize(W, H);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.6, 1.0);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+const srgb = (c) => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// --------------------------------------------------------------------------------------------
+// materiali Roblox -> approssimazione
+// --------------------------------------------------------------------------------------------
+const MATS = {
+  Plastic: { r: 0.55 }, SmoothPlastic: { r: 0.4 }, Neon: { emit: true }, Glass: { glass: true },
+  ForceField: { emit: true, alpha: 0.5 },
+  Metal: { r: 0.42, m: 0.8 }, DiamondPlate: { r: 0.45, m: 0.75 }, CorrugatedMetal: { r: 0.55, m: 0.6 }, Foil: { r: 0.3, m: 0.85 },
+  Wood: { r: 0.8 }, WoodPlanks: { r: 0.85 }, Rock: { r: 0.95 }, Slate: { r: 0.85 }, Basalt: { r: 0.95 }, Sandstone: { r: 0.95 },
+  Granite: { r: 0.6 }, Concrete: { r: 0.9 }, Brick: { r: 0.9 }, Cobblestone: { r: 0.9 }, Pebble: { r: 0.95 }, Sand: { r: 1.0 },
+  Ground: { r: 1.0 }, Grass: { r: 1.0 }, Mud: { r: 1.0 }, Salt: { r: 0.9 }, Snow: { r: 0.9 }, Ice: { r: 0.15 }, Fabric: { r: 1.0 },
+  Marble: { r: 0.3 }, Pavement: { r: 0.9 }, Asphalt: { r: 0.95 }, Limestone: { r: 0.9 }, Cardboard: { r: 1 }, Leather: { r: 0.7 },
+};
+const matInfo = (n) => MATS[n] || { r: 0.7 };
+
+// --------------------------------------------------------------------------------------------
+// geometrie unitarie (asse cilindro = X come in Roblox)
+// --------------------------------------------------------------------------------------------
+function unit(kind) {
+  let g;
+  if (kind === 'Ball') g = new THREE.SphereGeometry(0.5, 28, 18);
+  else if (kind === 'Cylinder') { g = new THREE.CylinderGeometry(0.5, 0.5, 1, 32, 1); g.rotateZ(Math.PI / 2); }
+  else if (kind === 'Wedge') {
+    // prisma triangolare: faccia verticale a +Z, pendenza verso -Z
+    const p = [[-.5, -.5, -.5], [.5, -.5, -.5], [-.5, -.5, .5], [.5, -.5, .5], [-.5, .5, .5], [.5, .5, .5]];
+    const idx = [[0, 1, 3, 2], [2, 3, 5, 4], [0, 4, 5, 1]]; // fondo, retro, pendenza (quad)
+    const tri = [[0, 1, 3], [0, 3, 2], [2, 3, 5], [2, 5, 4], [0, 4, 5], [0, 5, 1], [0, 2, 4], [1, 5, 3]];
+    g = new THREE.BufferGeometry();
+    const pos = [];
+    tri.forEach((t) => t.forEach((i) => pos.push(...p[i])));
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g.toNonIndexed();
+  } else g = new THREE.BoxGeometry(1, 1, 1);
+  return g.toNonIndexed();
+}
+const UNITS = {};
+const getUnit = (k) => UNITS[k] || (UNITS[k] = unit(k));
+
+function addGrain(mat, amp = 0.1) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vWP;
+      float gh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float gn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
+        return mix(mix(mix(gh(i), gh(i+vec3(1,0,0)), f.x), mix(gh(i+vec3(0,1,0)), gh(i+vec3(1,1,0)), f.x), f.y),
+                   mix(mix(gh(i+vec3(0,0,1)), gh(i+vec3(1,0,1)), f.x), mix(gh(i+vec3(0,1,1)), gh(i+vec3(1,1,1)), f.x), f.y), f.z); }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      float gr = gn(vWP * 0.9) * 0.55 + gn(vWP * 3.1) * 0.3 + gn(vWP * 11.0) * 0.15;
+      diffuseColor.rgb *= 1.0 + (gr - 0.5) * ${amp.toFixed(3)} * 2.0;`);
+  };
+  return mat;
+}
+
+// accumulatore di geometria per "bucket"
+class Bucket {
+  constructor() { this.pos = []; this.nor = []; this.col = []; this.alpha = false; }
+  add(g, M, N, color, alpha) {
+    const p = g.attributes.position.array, n = g.attributes.normal.array;
+    const v = new THREE.Vector3(), nn = new THREE.Vector3();
+    for (let i = 0; i < p.length; i += 3) {
+      v.set(p[i], p[i + 1], p[i + 2]).applyMatrix4(M);
+      this.pos.push(v.x, v.y, v.z);
+      nn.set(n[i], n[i + 1], n[i + 2]).applyMatrix3(N).normalize();
+      this.nor.push(nn.x, nn.y, nn.z);
+      this.col.push(color.r, color.g, color.b, alpha);
+    }
+  }
+  mesh(material, opts = {}) {
+    if (!this.pos.length) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 4));
+    const m = new THREE.Mesh(g, material);
+    m.castShadow = opts.cast !== false; m.receiveShadow = opts.receive !== false;
+    m.frustumCulled = false;
+    return m;
+  }
+}
+
+// --------------------------------------------------------------------------------------------
+// caricamento scena
+// --------------------------------------------------------------------------------------------
+const PARTS = new Set(['Part', 'WedgePart', 'MeshPart', 'SpawnLocation', 'TrussPart', 'Seat']);
+const stats = { parts: 0, texts: 0 };
+let SUN = new THREE.Vector3(0.5, 0.5, 0.2).normalize();
+let sunLight, sky, skyU, shadowCenter = new THREE.Vector3();
+
+function* walk(nodes) {
+  for (const n of nodes) { yield n; if (n.k) yield* walk(n.k); }
+}
+
+function partMatrix(n) {
+  const c = n.p.CFrame, s = n.p.Size;
+  const M = new THREE.Matrix4().set(c[3], c[4], c[5], c[0], c[6], c[7], c[8], c[1], c[9], c[10], c[11], c[2], 0, 0, 0, 1);
+  const S = new THREE.Matrix4().makeScale(s[0], s[1], s[2]);
+  return M.multiply(S);
+}
+
+function faceFrame(face) {
+  // asse uscente, "destra" e "su" del GUI per ogni faccia (convenzioni Roblox)
+  switch (face) {
+    case 'Front': return { n: [0, 0, -1], r: [-1, 0, 0], u: [0, 1, 0] };
+    case 'Back': return { n: [0, 0, 1], r: [1, 0, 0], u: [0, 1, 0] };
+    case 'Right': return { n: [1, 0, 0], r: [0, 0, -1], u: [0, 1, 0] };
+    case 'Left': return { n: [-1, 0, 0], r: [0, 0, 1], u: [0, 1, 0] };
+    case 'Top': return { n: [0, 1, 0], r: [1, 0, 0], u: [0, 0, -1] };
+    default: return { n: [0, -1, 0], r: [1, 0, 0], u: [0, 0, 1] };
+  }
+}
+
+function textPlane(part, gui, label) {
+  const s = part.p.Size;
+  const f = faceFrame(gui.p.Face || 'Front');
+  // dimensioni della faccia in stud
+  const dimR = Math.abs(f.r[0]) * s[0] + Math.abs(f.r[1]) * s[1] + Math.abs(f.r[2]) * s[2];
+  const dimU = Math.abs(f.u[0]) * s[0] + Math.abs(f.u[1]) * s[1] + Math.abs(f.u[2]) * s[2];
+  const depth = Math.abs(f.n[0]) * s[0] + Math.abs(f.n[1]) * s[1] + Math.abs(f.n[2]) * s[2];
+  const ppsRaw = gui.p.PixelsPerStud || 30;
+  const pps = Math.min(ppsRaw, 2048 / Math.max(dimR, dimU));
+  const cw = Math.max(16, Math.round(dimR * pps)), ch = Math.max(16, Math.round(dimU * pps));
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+  const x = cv.getContext('2d');
+  // rettangolo della label dentro la faccia (solo parte "scala")
+  const P = label.p.Position || [0, 0, 0, 0], S = label.p.Size || [1, 0, 1, 0];
+  const rx = P[0] * cw, ry = P[2] * ch, rw = S[0] * cw, rh = S[2] * ch;
+  const bgt = label.p.BackgroundTransparency ?? 0;
+  if (bgt < 1 && label.p.BackgroundColor3) {
+    const bc = label.p.BackgroundColor3;
+    x.fillStyle = `rgba(${bc[0] * 255 | 0},${bc[1] * 255 | 0},${bc[2] * 255 | 0},${1 - bgt})`; x.fillRect(rx, ry, rw, rh);
+  }
+  const tc = label.p.TextColor3 || [0, 0, 0];
+  const ttr = label.p.TextTransparency ?? 0;
+  x.fillStyle = `rgba(${tc[0] * 255 | 0},${tc[1] * 255 | 0},${tc[2] * 255 | 0},${1 - ttr})`;
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const lines = String(label.p.Text || '').split('\n');
+  const bold = /Bold|Black/.test(label.p.Font || '') ? '800' : '500';
+  let fs = label.p.TextScaled ? rh / lines.length * 0.82 : (label.p.TextSize || 14) * (pps / (gui.p.PixelsPerStud || 30));
+  const fam = 'Arial, Helvetica, sans-serif';
+  x.font = `${bold} ${fs}px ${fam}`;
+  let wmax = Math.max(...lines.map((l) => x.measureText(l).width));
+  if (label.p.TextScaled && wmax > rw * 0.94) { fs *= rw * 0.94 / wmax; x.font = `${bold} ${fs}px ${fam}`; }
+  const lh = fs * 1.05;
+  lines.forEach((l, i) => x.fillText(l, rx + rw / 2, ry + rh / 2 + (i - (lines.length - 1) / 2) * lh));
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const lit = (gui.p.LightInfluence ?? 1) > 0;
+  const mat = lit ? new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.6, side: THREE.DoubleSide, depthWrite: false })
+    : new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false, toneMapped: false });
+  if (!lit) mat.color.setScalar(1.3);
+  const geo = new THREE.PlaneGeometry(dimR, dimU);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 5;
+  // base locale: x=r, y=u, z=n
+  const rr = new THREE.Vector3(...f.r), uu = new THREE.Vector3(...f.u), nn = new THREE.Vector3(...f.n);
+  const B = new THREE.Matrix4().makeBasis(rr, uu, nn).setPosition(new THREE.Vector3(...f.n).multiplyScalar(depth / 2 + 0.03));
+  const c = part.p.CFrame;
+  const M = new THREE.Matrix4().set(c[3], c[4], c[5], c[0], c[6], c[7], c[8], c[1], c[9], c[10], c[11], c[2], 0, 0, 0, 1);
+  mesh.matrixAutoUpdate = false; mesh.matrix.copy(M.multiply(B));
+  scene.add(mesh); stats.texts++;
+}
+
+function buildParts(nodes) {
+  const B = {};
+  const bucket = (key) => B[key] || (B[key] = new Bucket());
+  const neonB = new Bucket(), neonAB = new Bucket(), glassB = new Bucket(), alphaB = new Bucket();
+  const tmpN = new THREE.Matrix3();
+  for (const n of walk(nodes)) {
+    if (!PARTS.has(n.c) || !n.p.Size || !n.p.CFrame) continue;
+    stats.parts++;
+    const mat = n.p.Material || 'Plastic';
+    const tr = n.p.Transparency || 0;
+    if (tr >= 0.999) { for (const k of (n.k || [])) if (k.c === 'SurfaceGui') for (const l of (k.k || [])) if (l.c === 'TextLabel') textPlane(n, k, l); continue; }
+    const col = srgb(n.p.Color || [0.6, 0.6, 0.6]);
+    let shape = n.p.Shape || 'Block';
+    if (n.c === 'WedgePart') shape = 'Wedge';
+    if (shape === 'Ball' || shape === 'Cylinder') {
+      // le sfere/cilindri di Roblox sono uniformi: uso la dimensione minore per evitare ellissoidi accidentali
+    }
+    const M = partMatrix(n);
+    tmpN.getNormalMatrix(M);
+    const g = getUnit(shape);
+    const mi = matInfo(mat);
+    if (mi.emit) { if (tr > 0.001) neonAB.add(g, M, tmpN, col.clone().multiplyScalar(1.3), Math.max(0.03, 1 - tr)); else neonB.add(g, M, tmpN, col.clone().multiplyScalar(mat === 'Neon' ? 1.8 : 1.2), 1); }
+    else if (mi.glass) glassB.add(g, M, tmpN, col, Math.max(0.04, 1 - tr));
+    else if (tr > 0.001) alphaB.add(g, M, tmpN, col, 1 - tr);
+    else bucket(`${mi.r ?? 0.7}|${mi.m ?? 0}|${n.p.CastShadow === false ? 0 : 1}`).add(g, M, tmpN, col, 1);
+    for (const k of (n.k || [])) if (k.c === 'SurfaceGui') for (const l of (k.k || [])) if (l.c === 'TextLabel') textPlane(n, k, l);
+  }
+  for (const [key, b] of Object.entries(B)) {
+    const [r, m, cs] = key.split('|').map(Number);
+    const mesh = b.mesh(addGrain(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: r, metalness: m, envMapIntensity: 0.9 }), r >= 0.8 ? 0.16 : 0.06), { cast: cs === 1 });
+    if (mesh) scene.add(mesh);
+  }
+  const nm = neonB.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, transparent: false }), { cast: false, receive: false });
+  if (nm) scene.add(nm);
+  const nam = neonAB.mesh(new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, transparent: true, depthWrite: false }), { cast: false, receive: false });
+  if (nam) { nam.renderOrder = 2; scene.add(nam); }
+  const am = alphaB.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, depthWrite: false, roughness: 0.6 }), { cast: false });
+  if (am) { am.renderOrder = 2; scene.add(am); }
+  const gm = glassB.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, depthWrite: false, roughness: 0.08, metalness: 0.0, envMapIntensity: 1.4 }), { cast: false });
+  if (gm) { gm.renderOrder = 3; scene.add(gm); }
+}
+
+// --------------------------------------------------------------------------------------------
+// Terrain: griglia di occupazione a celle da 4 stud + marching cubes
+// --------------------------------------------------------------------------------------------
+const CELL = 4;
+const TERRAIN_COLORS_DEFAULT = {
+  Sand: [0.80, 0.72, 0.50], Sandstone: [0.78, 0.45, 0.30], Rock: [0.45, 0.42, 0.40], Slate: [0.30, 0.34, 0.37], Ground: [0.40, 0.30, 0.20],
+  Mud: [0.30, 0.21, 0.15], Basalt: [0.20, 0.20, 0.22], Limestone: [0.76, 0.72, 0.64], Salt: [0.90, 0.88, 0.85], Grass: [0.38, 0.55, 0.25],
+  Water: [0.1, 0.4, 0.55], Snow: [0.95, 0.95, 0.97], Mud2: [0.3, 0.2, 0.15], Pavement: [0.55, 0.55, 0.55], Asphalt: [0.2, 0.2, 0.2],
+  Cobblestone: [0.6, 0.55, 0.5], Concrete: [0.6, 0.6, 0.6], Brick: [0.65, 0.3, 0.25], WoodPlanks: [0.6, 0.45, 0.3], Ice: [0.7, 0.85, 0.95],
+  Glacier: [0.8, 0.9, 0.95], LeafyGrass: [0.3, 0.55, 0.2], CrackedLava: [0.7, 0.2, 0.1],
+};
+function hash3(x, y, z) { let h = (x * 374761393 + y * 668265263 + z * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const a = hash3(xi, 0, zi), b = hash3(xi + 1, 0, zi), c = hash3(xi, 0, zi + 1), d = hash3(xi + 1, 0, zi + 1);
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  return lerp(lerp(a, b, u), lerp(c, d, u), v);
+}
+
+function buildTerrain(T) {
+  const ops = T.ops;
+  if (!ops.length) return;
+  const colors = Object.assign({}, TERRAIN_COLORS_DEFAULT, T.colors || {});
+  const matNames = []; const matIdx = (n) => { let i = matNames.indexOf(n); if (i < 0) { matNames.push(n); i = matNames.length - 1; } return i + 1; };
+  // bounds
+  const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+  const parsed = [];
+  const cfInfo = (a) => { const c = a; return { p: [c[0], c[1], c[2]], R: [[c[3], c[4], c[5]], [c[6], c[7], c[8]], [c[9], c[10], c[11]]] }; };
+  for (const op of ops) {
+    const a = op.a; let o = { name: op.op };
+    if (op.op === 'FillBlock') { o.cf = cfInfo(a[0]); o.size = a[1]; o.mat = a[2]; const h = o.size.map((v) => v / 2); const e = [0, 1, 2].map((i) => Math.abs(o.cf.R[i][0]) * h[0] + Math.abs(o.cf.R[i][1]) * h[1] + Math.abs(o.cf.R[i][2]) * h[2]); o.min = [0, 1, 2].map((i) => o.cf.p[i] - e[i]); o.max = [0, 1, 2].map((i) => o.cf.p[i] + e[i]); }
+    else if (op.op === 'FillBall') { o.c = a[0]; o.r = a[1]; o.mat = a[2]; o.min = o.c.map((v) => v - o.r); o.max = o.c.map((v) => v + o.r); }
+    else if (op.op === 'FillCylinder') { o.cf = cfInfo(a[0]); o.h = a[1]; o.r = a[2]; o.mat = a[3]; const hh = o.h / 2, rr = o.r; const ax = [o.cf.R[0][1], o.cf.R[1][1], o.cf.R[2][1]]; const e = [0, 1, 2].map((i) => Math.abs(ax[i]) * hh + rr * Math.sqrt(Math.max(0, 1 - ax[i] * ax[i]))); o.min = [0, 1, 2].map((i) => o.cf.p[i] - e[i]); o.max = [0, 1, 2].map((i) => o.cf.p[i] + e[i]); }
+    else if (op.op === 'Clear') { o.clear = true; }
+    else continue;
+    if (!o.clear && o.mat !== 'Air') for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], o.min[i]); hi[i] = Math.max(hi[i], o.max[i]); }
+    parsed.push(o);
+  }
+  const org = lo.map((v) => Math.floor(v / CELL) * CELL - CELL * 2 + CELL / 2); // centro del voxel 0
+  const dims = [0, 1, 2].map((i) => Math.ceil((hi[i] - lo[i]) / CELL) + 5);
+  const [NX, NY, NZ] = dims; const total = NX * NY * NZ;
+  console.log('terreno griglia', NX, NY, NZ, total);
+  const occ = new Uint8Array(total), mat = new Uint8Array(total);
+  const wocc = new Uint8Array(total); // acqua
+  const idx = (i, j, k) => i + NX * (j + NY * k);
+  for (const o of parsed) {
+    if (o.clear) { occ.fill(0); wocc.fill(0); continue; }
+    const i0 = Math.max(0, Math.floor((o.min[0] - org[0]) / CELL) - 1), i1 = Math.min(NX - 1, Math.ceil((o.max[0] - org[0]) / CELL) + 1);
+    const j0 = Math.max(0, Math.floor((o.min[1] - org[1]) / CELL) - 1), j1 = Math.min(NY - 1, Math.ceil((o.max[1] - org[1]) / CELL) + 1);
+    const k0 = Math.max(0, Math.floor((o.min[2] - org[2]) / CELL) - 1), k1 = Math.min(NZ - 1, Math.ceil((o.max[2] - org[2]) / CELL) + 1);
+    const isAir = o.mat === 'Air', isWater = o.mat === 'Water';
+    const mi = isAir ? 0 : matIdx(o.mat);
+    let R, p0, half;
+    if (o.cf) { R = o.cf.R; p0 = o.cf.p; }
+    if (o.name === 'FillBlock') half = o.size.map((v) => v / 2);
+    for (let k = k0; k <= k1; k++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const x = org[0] + i * CELL, y = org[1] + j * CELL, z = org[2] + k * CELL;
+      let sdf;
+      if (o.name === 'FillBall') { sdf = o.r - Math.hypot(x - o.c[0], y - o.c[1], z - o.c[2]); }
+      else {
+        const dx = x - p0[0], dy = y - p0[1], dz = z - p0[2];
+        const lx = R[0][0] * dx + R[1][0] * dy + R[2][0] * dz, ly = R[0][1] * dx + R[1][1] * dy + R[2][1] * dz, lz = R[0][2] * dx + R[1][2] * dy + R[2][2] * dz;
+        if (o.name === 'FillBlock') {
+          const qx = Math.abs(lx) - half[0], qy = Math.abs(ly) - half[1], qz = Math.abs(lz) - half[2];
+          const out = Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0));
+          sdf = -(out + Math.min(Math.max(qx, qy, qz), 0));
+        } else {
+          const d1 = o.r - Math.hypot(lx, lz), d2 = o.h / 2 - Math.abs(ly);
+          sdf = (d1 > 0 && d2 > 0) ? Math.min(d1, d2) : -Math.hypot(Math.max(-d1, 0), Math.max(-d2, 0));
+        }
+      }
+      const on = Math.min(1, Math.max(0, 0.5 + sdf / CELL));
+      if (on <= 0) continue;
+      const id = idx(i, j, k);
+      const on8 = Math.round(on * 255);
+      if (isAir) { occ[id] = Math.min(occ[id], 255 - on8); wocc[id] = Math.min(wocc[id], 255 - on8); }
+      else if (isWater) { if (on8 > wocc[id]) wocc[id] = on8; }
+      else { if (on8 >= occ[id] || on >= 0.5) mat[id] = mi; if (on8 > occ[id]) occ[id] = on8; wocc[id] = Math.min(wocc[id], 255 - on8); }
+    }
+  }
+  let filled = 0; for (let q = 0; q < total; q++) if (occ[q] > 127) filled++;
+  console.log('terreno voxel pieni', filled);
+  const matCols = matNames.map((n) => srgb(colors[n] || [0.5, 0.5, 0.5]));
+  const wcol = srgb((T.props && T.props.WaterColor) || colors.Water || TERRAIN_COLORS_DEFAULT.Water);
+
+  function march(field, colorFn, opts = {}) {
+    const pos = [], nor = [], col = [];
+    const cx = [0, 1, 1, 0, 0, 1, 1, 0], cy = [0, 0, 1, 1, 0, 0, 1, 1], cz = [0, 0, 0, 0, 1, 1, 1, 1];
+    const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+    const val = new Float64Array(8), ids = new Int32Array(8);
+    const vpos = new Array(12), vnor = new Array(12), vcol = new Array(12);
+    const grad = (id, i, j, k) => {
+      const f = (ii, jj, kk) => field[idx(Math.min(NX - 1, Math.max(0, ii)), Math.min(NY - 1, Math.max(0, jj)), Math.min(NZ - 1, Math.max(0, kk)))];
+      return [(f(i - 1, j, k) - f(i + 1, j, k)) / 255, (f(i, j - 1, k) - f(i, j + 1, k)) / 255, (f(i, j, k - 1) - f(i, j, k + 1)) / 255];
+    };
+    for (let k = 0; k < NZ - 1; k++) for (let j = 0; j < NY - 1; j++) for (let i = 0; i < NX - 1; i++) {
+      let ci = 0;
+      for (let c = 0; c < 8; c++) { const id = idx(i + cx[c], j + cy[c], k + cz[c]); ids[c] = id; val[c] = field[id] / 255; if (val[c] >= 0.5) ci |= 1 << c; }
+      if (ci === 0 || ci === 255) continue;
+      const bits = edgeTable[ci];
+      for (let e = 0; e < 12; e++) {
+        if (!(bits & (1 << e))) continue;
+        const a = E[e][0], b = E[e][1];
+        const va = val[a], vb = val[b];
+        const t = Math.abs(vb - va) < 1e-6 ? 0.5 : (0.5 - va) / (vb - va);
+        const ai = i + cx[a], aj = j + cy[a], ak = k + cz[a], bi = i + cx[b], bj = j + cy[b], bk = k + cz[b];
+        vpos[e] = [org[0] + (ai + (bi - ai) * t) * CELL, org[1] + (aj + (bj - aj) * t) * CELL, org[2] + (ak + (bk - ak) * t) * CELL];
+        const ga = grad(ids[a], ai, aj, ak), gb = grad(ids[b], bi, bj, bk);
+        const gx = ga[0] + (gb[0] - ga[0]) * t, gy = ga[1] + (gb[1] - ga[1]) * t, gz = ga[2] + (gb[2] - ga[2]) * t;
+        const gl = Math.hypot(gx, gy, gz) || 1;
+        vnor[e] = [gx / gl, gy / gl, gz / gl];
+        vcol[e] = colorFn(va >= 0.5 ? ids[a] : ids[b], vpos[e]);
+      }
+      const base = ci << 4;
+      for (let t = 0; triTable[base + t] !== -1; t += 3) {
+        const e0 = triTable[base + t], e1 = triTable[base + t + 1], e2 = triTable[base + t + 2];
+        // orientamento: la normale geometrica deve concordare con il gradiente
+        const A = vpos[e0], Bv = vpos[e1], Cv = vpos[e2];
+        const ux = Bv[0] - A[0], uy = Bv[1] - A[1], uz = Bv[2] - A[2], wx = Cv[0] - A[0], wy = Cv[1] - A[1], wz = Cv[2] - A[2];
+        const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+        const avg = [(vnor[e0][0] + vnor[e1][0] + vnor[e2][0]), (vnor[e0][1] + vnor[e1][1] + vnor[e2][1]), (vnor[e0][2] + vnor[e1][2] + vnor[e2][2])];
+        const order = (nx * avg[0] + ny * avg[1] + nz * avg[2] >= 0) ? [e0, e1, e2] : [e0, e2, e1];
+        for (const e of order) { pos.push(...vpos[e]); nor.push(...vnor[e]); col.push(...vcol[e]); }
+      }
+    }
+    return { pos, nor, col };
+  }
+  const solid = march(occ, (id, p) => {
+    const m = mat[id]; const c = m ? matCols[m - 1] : new THREE.Color(0.5, 0.5, 0.5);
+    const n = 0.88 + 0.24 * (vnoise(p[0] * 0.09, p[2] * 0.09) * 0.6 + vnoise(p[0] * 0.31 + 7, p[2] * 0.31 + 3) * 0.4) + 0.1 * vnoise(p[1] * 0.2 + p[0] * 0.05, p[2] * 0.05);
+    return [c.r * n, c.g * n, c.b * n];
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(solid.pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(solid.nor, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(solid.col, 3));
+  const tm = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.7 }));
+  tm.castShadow = true; tm.receiveShadow = true; tm.frustumCulled = false; scene.add(tm);
+  stats.terrainTris = solid.pos.length / 9;
+  if (wocc.some((v) => v > 127)) {
+    const w = march(wocc, () => [wcol.r, wcol.g, wcol.b]);
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute('position', new THREE.Float32BufferAttribute(w.pos, 3));
+    wg.setAttribute('normal', new THREE.Float32BufferAttribute(w.nor, 3));
+    wg.setAttribute('color', new THREE.Float32BufferAttribute(w.col, 3));
+    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, metalness: 0.0, transparent: true, opacity: 0.8, envMapIntensity: 1.5 }));
+    wm.renderOrder = 1; scene.add(wm);
+  }
+}
+
+// --------------------------------------------------------------------------------------------
+// cielo, luce, nebbia
+// --------------------------------------------------------------------------------------------
+function sunDirection(clock, lat, flip) {
+  // modello della community: angolo orario H=(ora-6)*15 gradi, phi = latitudine - 23.5
+  const H = (clock - 6) * 15 * Math.PI / 180;
+  const phi = ((lat ?? 41.7) - 23.5) * Math.PI / 180;
+  const d = new THREE.Vector3(Math.cos(H) * Math.cos(phi), Math.sin(H), Math.cos(H) * Math.sin(phi));
+  if (flip) d.x = -d.x;
+  return d.normalize();
+}
+
+function buildSky(light, effects) {
+  const atm = effects.Atmosphere?.p || {};
+  const col = (a, d) => srgb(a || d);
+  const horizon = (window.PREVIEW?.horizon) ? srgb(window.PREVIEW.horizon) : col(atm.Color, [0.9, 0.7, 0.7]);
+  const zenith = (window.PREVIEW?.zenith) ? srgb(window.PREVIEW.zenith) : new THREE.Color().copy(col(atm.Decay, [0.4, 0.3, 0.5])).multiplyScalar(0.6);
+  const glow = (window.PREVIEW?.glow) ? srgb(window.PREVIEW.glow) : new THREE.Color(1.0, 0.55, 0.3);
+  skyU = {
+    uSun: { value: SUN.clone() }, uHor: { value: horizon }, uZen: { value: zenith }, uGlow: { value: glow },
+    uCloud: { value: window.PREVIEW?.cloudCover ?? 0.45 }, uTime: { value: 0 },
+  };
+  const m = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, uniforms: skyU,
+    vertexShader: 'varying vec3 vP; void main(){ vP = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }',
+    fragmentShader: `
+      varying vec3 vP; uniform vec3 uSun, uHor, uZen, uGlow; uniform float uCloud;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+      float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+      float fbm(vec2 p){ float a=.5, s=0.; for(int i=0;i<5;i++){ s+=a*n(p); p*=2.03; a*=.5; } return s; }
+      void main(){
+        vec3 d = normalize(vP);
+        float y = d.y;
+        float t = pow(clamp(y,0.,1.), 0.45);
+        vec3 c = mix(uHor, uZen, t);
+        float sd = max(dot(d, normalize(uSun)), 0.);
+        c += uGlow * (pow(sd, 6.) * 0.55 + pow(sd, 40.) * 0.9);
+        c += vec3(1.0,0.92,0.8) * pow(sd, 2200.) * 25.;
+        // nuvole
+        if (y > 0.02) {
+          vec2 uv = d.xz / (y + 0.18) * 1.6;
+          float c1 = fbm(uv * 1.2 + 3.1);
+          float cl = smoothstep(1.0 - uCloud, 1.0 - uCloud + 0.28, c1);
+          vec3 cc = mix(uHor * 1.15, vec3(1.0, 0.82, 0.78), 0.5) * (0.75 + 0.5 * pow(sd, 3.)) + uGlow * pow(sd, 4.) * 0.6;
+          c = mix(c, cc, cl * smoothstep(0.02, 0.2, y) * 0.85);
+        }
+        if (y < 0.) c = mix(uHor, uHor * 0.7, clamp(-y * 4., 0., 1.));
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  });
+  sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 24), m);
+  sky.renderOrder = -10; sky.frustumCulled = false;
+  scene.add(sky);
+  return { horizon, zenith };
+}
+
+function setupLighting(lighting, terrainKids) {
+  const L = lighting.p;
+  const effects = {};
+  for (const k of (lighting.k || [])) effects[k.c] = k;
+  for (const k of (terrainKids || [])) effects[k.c] = k;
+  const flip = window.PREVIEW?.flipSun ?? false;
+  SUN = window.PREVIEW?.sunDir ? new THREE.Vector3(...window.PREVIEW.sunDir).normalize() : sunDirection(L.ClockTime ?? 14, L.GeographicLatitude ?? 41.7, flip);
+  const { horizon } = buildSky(L, effects);
+  const bright = L.Brightness ?? 2;
+  const sunCol = (L.ColorShift_Top ? srgb(L.ColorShift_Top) : new THREE.Color(1, 1, 1)).lerp(new THREE.Color(1, 1, 1), 0.35);
+  sunLight = new THREE.DirectionalLight(sunCol, window.PREVIEW?.sunIntensity ?? bright * 1.35);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(4096, 4096);
+  sunLight.shadow.bias = -0.0004; sunLight.shadow.normalBias = 0.6;
+  scene.add(sunLight, sunLight.target);
+  const amb = L.Ambient ? srgb(L.Ambient) : new THREE.Color(0.4, 0.4, 0.4);
+  const oamb = L.OutdoorAmbient ? srgb(L.OutdoorAmbient) : new THREE.Color(0.5, 0.5, 0.5);
+  const hemi = new THREE.HemisphereLight(oamb.clone().lerp(new THREE.Color(1, 0.9, 0.95), 0.25), amb.clone().multiplyScalar(0.8), window.PREVIEW?.hemi ?? 1.15);
+  scene.add(hemi);
+  // ambiente IBL dal cielo
+  const pm = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene(); envScene.add(sky.clone());
+  scene.environment = pm.fromScene(envScene, 0.02).texture;
+  scene.environmentIntensity = window.PREVIEW?.envIntensity ?? 0.55;
+  // nebbia
+  const atm = effects.Atmosphere?.p;
+  const dens = atm ? (atm.Density ?? 0.3) : 0.1;
+  const fogCol = atm?.Color ? srgb(atm.Color).lerp(horizon, 0.5) : horizon;
+  scene.fog = new THREE.FogExp2(fogCol, window.PREVIEW?.fog ?? (0.0005 + 0.0016 * dens));
+  // bloom/colore
+  const b = effects.BloomEffect?.p;
+  if (b) { bloom.strength = window.PREVIEW?.bloom ?? 0.35; bloom.radius = 0.4; bloom.threshold = 1.0; }
+  if (window.PREVIEW?.exposure) renderer.toneMappingExposure = window.PREVIEW.exposure;
+}
+
+function placeSun(center, extent) {
+  sunLight.position.copy(center).addScaledVector(SUN, 1200);
+  sunLight.target.position.copy(center);
+  const s = sunLight.shadow.camera;
+  s.left = -extent; s.right = extent; s.top = extent; s.bottom = -extent; s.near = 100; s.far = 3000;
+  s.updateProjectionMatrix();
+  sunLight.target.updateMatrixWorld();
+}
+
+// --------------------------------------------------------------------------------------------
+// extra: manichini in scala (R15 ~ 5 stud), palla
+// --------------------------------------------------------------------------------------------
+function addDummy(pos, color, yaw = 0, s = 1) {
+  const g = new THREE.Group();
+  const mk = (sz, p, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(...sz), new THREE.MeshStandardMaterial({ color: srgb(c), roughness: 0.6 })); m.position.set(...p); m.castShadow = true; g.add(m); };
+  const skin = [0.95, 0.8, 0.62];
+  mk([0.9, 2, 1], [-0.5, 1.0, 0], [0.15, 0.15, 0.2]); mk([0.9, 2, 1], [0.5, 1.0, 0], [0.15, 0.15, 0.2]);
+  mk([2, 2, 1], [0, 3.0, 0], color); mk([1, 2, 1], [-1.5, 3.0, 0], color); mk([1, 2, 1], [1.5, 3.0, 0], color);
+  mk([1.2, 1.2, 1.2], [0, 4.6, 0], skin);
+  g.position.set(...pos); g.rotation.y = yaw; g.scale.setScalar(s);
+  scene.add(g);
+}
+function addBall(pos) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1.4, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }));
+  m.position.set(...pos); m.castShadow = true; scene.add(m);
+}
+
+// --------------------------------------------------------------------------------------------
+// API per il renderer
+// --------------------------------------------------------------------------------------------
+window.loadScene = async (url, extras = {}) => {
+  const data = await (await fetch(url)).json();
+  setupLighting(data.lighting, data.terrain.kids);
+  buildTerrain(data.terrain);
+  buildParts(data.workspace);
+  for (const d of (extras.dummies || [])) addDummy(d.pos, d.color || [0.9, 0.2, 0.2], d.yaw || 0, d.s || 1);
+  for (const b of (extras.balls || [])) addBall(b);
+  return { ...stats, sun: SUN.toArray().map((v) => +v.toFixed(3)) };
+};
+window.setView = (v) => {
+  camera.fov = v.fov || 60; camera.aspect = W / H; camera.updateProjectionMatrix();
+  camera.position.set(...v.pos); camera.lookAt(new THREE.Vector3(...v.target));
+  const c = new THREE.Vector3(...(v.shadowCenter || v.target));
+  placeSun(c, v.shadowExtent || 320);
+  if (v.exposure) renderer.toneMappingExposure = v.exposure;
+  if (v.fog !== undefined && scene.fog) scene.fog.density = v.fog;
+  if (v.bloom !== undefined) bloom.strength = v.bloom;
+  composer.render();
+};
+window.ready = true;
+</script>
+</body></html>

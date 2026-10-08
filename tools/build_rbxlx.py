@@ -74,6 +74,8 @@ def main():
     items.append(
         container_item("Players", "Players", "", '<bool name="CharacterAutoLoad">false</bool>')
     )
+    # Luce con ombre dal sole e dai faretti (ShadowMap = 3). Technology non si puo' impostare da script, solo dal file.
+    items.append(container_item("Lighting", "Lighting", "", '<token name="Technology">3</token>'))
     for folder, cls in SERVICES.items():
         path = os.path.join(SRC, folder)
         if os.path.isdir(path):

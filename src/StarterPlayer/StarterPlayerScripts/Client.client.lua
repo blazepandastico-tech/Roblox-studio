@@ -9,12 +9,14 @@ local Config = require(ReplicatedStorage:WaitForChild("Config"))
 local Net = require(ReplicatedStorage:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Modules"):WaitForChild("Hud"))
 local Effects = require(script.Parent.Modules:WaitForChild("Effects"))
+local Ambient = require(script.Parent.Modules:WaitForChild("Ambient"))
 
 local player = Players.LocalPlayer
 local C = Config.Controls
 
 Hud.Build()
 Effects.Start()
+Ambient.Start()
 
 local function camera()
 	return workspace.CurrentCamera

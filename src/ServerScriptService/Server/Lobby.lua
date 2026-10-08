@@ -9,6 +9,14 @@ local Net = require(ReplicatedStorage:WaitForChild("Net"))
 local Lobby = {}
 
 local teamObjects = {}
+local padCounters = {} -- [chiave squadra] = TextLabel sul contatore della pedana
+
+-- Aggiorna i contatori "n / 4" sulle pedane della lobby.
+function Lobby.RefreshPads()
+	for key, label in pairs(padCounters) do
+		label.Text = string.format("%d / %d", Lobby.Count(key), Config.Match.MaxPerTeam)
+	end
+end
 
 function Lobby.Init()
 	for key, t in pairs(Config.Teams) do
@@ -21,13 +29,27 @@ function Lobby.Init()
 		team.TeamColor = BrickColor.new(t.BrickColor)
 		team.AutoAssignable = false
 		teamObjects[key] = team
+		team.PlayerAdded:Connect(Lobby.RefreshPads)
+		team.PlayerRemoved:Connect(Lobby.RefreshPads)
 	end
 
-	local pads = workspace:WaitForChild("World"):WaitForChild("Lobby"):WaitForChild("Pads")
+	local world = workspace:WaitForChild("World", 15)
+	local lobby = world and world:WaitForChild("Lobby", 15)
+	local pads = lobby and lobby:WaitForChild("Pads", 15)
+	if not pads then
+		warn("[Calcio Fuorilegge] Pedane della lobby non trovate: la scelta della squadra e' disattivata (resta l'assegnazione automatica).")
+		return
+	end
 	local debounce = {}
 	for _, pad in ipairs(pads:GetChildren()) do
 		local key = pad:GetAttribute("TeamKey")
 		if key then
+			local counter = pad:FindFirstChild("Contatore")
+			local gui = counter and counter:FindFirstChild("Gui")
+			local label = gui and gui:FindFirstChild("Conteggio")
+			if label then
+				padCounters[key] = label
+			end
 			pad.Touched:Connect(function(other)
 				local plr = Players:GetPlayerFromCharacter(other.Parent)
 				if not plr then
@@ -44,7 +66,9 @@ function Lobby.Init()
 	end
 	Players.PlayerRemoving:Connect(function(plr)
 		debounce[plr] = nil
+		task.defer(Lobby.RefreshPads)
 	end)
+	Lobby.RefreshPads()
 end
 
 function Lobby.Count(key)

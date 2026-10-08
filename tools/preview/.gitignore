@@ -1,0 +1,5 @@
+node_modules/
+api_dump.json
+api_index.lua
+out/
+shots/

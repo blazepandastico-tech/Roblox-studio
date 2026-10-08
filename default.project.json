@@ -4,13 +4,27 @@
     "$className": "DataModel",
     "Players": {
       "$className": "Players",
-      "$properties": { "CharacterAutoLoad": false }
+      "$properties": {
+        "CharacterAutoLoad": false
+      }
     },
-    "ReplicatedStorage": { "$path": "src/ReplicatedStorage" },
-    "ServerScriptService": { "$path": "src/ServerScriptService" },
+    "ReplicatedStorage": {
+      "$path": "src/ReplicatedStorage"
+    },
+    "ServerScriptService": {
+      "$path": "src/ServerScriptService"
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
-      "StarterPlayerScripts": { "$path": "src/StarterPlayer/StarterPlayerScripts" }
+      "StarterPlayerScripts": {
+        "$path": "src/StarterPlayer/StarterPlayerScripts"
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "ShadowMap"
+      }
     }
   }
 }

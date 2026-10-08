@@ -35,8 +35,9 @@ Config.Field = {
 	},
 }
 
+-- Belvedere di legno sulla parete sud del canyon: Y e' la quota del pavimento, il campo si vede davanti (verso +Z).
 Config.Lobby = {
-	Center = Vector3.new(0, 0, -900),
+	Center = Vector3.new(0, 60, -420),
 }
 
 Config.Move = {
