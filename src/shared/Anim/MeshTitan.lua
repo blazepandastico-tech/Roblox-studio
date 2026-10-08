@@ -77,9 +77,11 @@ local function folder(): Instance?
 	return ReplicatedStorage:FindFirstChild(FOLDER)
 end
 
--- Cerca il modello importato: nella cartella ModelliGiganti (va bene anche "GiganteFuria")
+-- Cerca il modello importato: nella cartella ModelliGiganti (va bene anche "GiganteFuria").
+-- Il nome è controllato solo nelle lettere: "GiganteColosso (1)" o "GiganteColosso.glb" vanno bene
+-- (succede quando il browser rinomina il file scaricato due volte)
 local function matches(name: string, look: string): boolean
-	local lower = string.lower(name)
+	local lower = string.lower(name):gsub("%.glb$", ""):gsub("[^%a]", "")
 	local names = { look }
 	for _, alias in MeshTitan.Aliases[look] or {} do
 		table.insert(names, alias)
@@ -153,6 +155,8 @@ local function analyze(template: Instance)
 	return body, nil
 end
 
+local problems: { [string]: string } = {}
+
 local function getBody(look: string)
 	local hit = cache[look]
 	if hit ~= nil then
@@ -164,7 +168,9 @@ local function getBody(look: string)
 	end
 	local body, err = analyze(template)
 	if not body then
-		warn(("[Giganti 3D] Il modello '%s' non è valido: %s"):format(look, tostring(err)))
+		-- di solito: importato con "Unisci mesh" attivo (una sola parte) o il file .fbx originale
+		problems[look] = ("%s. Reimporta Gigante%s.glb con \"Unisci mesh\" DISATTIVATO"):format(tostring(err), look)
+		warn(("[Giganti 3D] Il modello '%s' non è valido: %s"):format(look, problems[look]))
 		cache[look] = false
 		return nil
 	end
@@ -174,6 +180,17 @@ end
 
 function MeshTitan.Has(look: string): boolean
 	return getBody(look) ~= nil
+end
+
+-- Perché un modello 3D è usato o no (per avvisare l'admin): ok, spiegazione
+function MeshTitan.Status(look: string): (boolean, string)
+	if getBody(look) then
+		return true, ("Modello 3D '%s' pronto"):format(look)
+	end
+	if problems[look] then
+		return false, ("Il modello Gigante%s c'è ma non è valido: %s"):format(look, problems[look])
+	end
+	return false, ("Modello 3D Gigante%s non importato: in Studio File → Importa 3D → Gigante%s.glb (\"Unisci mesh\" disattivato), poi Play"):format(look, look)
 end
 
 local function invisiblePart(model: Instance, name: string, size: Vector3, cf: CFrame, zone: string?): Part

@@ -18,6 +18,7 @@ local Util = require(Shared.Lib.Util)
 local Zones = require(Shared.Data.Zones)
 local Titans = require(Shared.Data.Titans)
 local AbuseEvents = require(Shared.Data.AbuseEvents)
+local MeshTitan = require(Shared.Anim.MeshTitan)
 
 local AbuseService = {}
 local S
@@ -355,7 +356,13 @@ function AbuseService.Launch(id: string, minutes: any): (boolean, string)
 		end
 	end
 	publish()
-	return true, ("%s %s: %d minut%s"):format(def.Icon, def.Name, mins, if mins == 1 then "o" else "i")
+	local message = ("%s %s: %d minut%s"):format(def.Icon, def.Name, mins, if mins == 1 then "o" else "i")
+	if id == "CadutaMuro" then
+		-- dice all'admin se il filmato userà il colosso 3D (Meshy) o quello costruito con le parti
+		local ok, why = MeshTitan.Status("Colosso")
+		message ..= if ok then " · colosso 3D ✔" else "\n⚠️ " .. why
+	end
+	return true, message
 end
 
 local function onTitanKilled(t, _killer, contributors)

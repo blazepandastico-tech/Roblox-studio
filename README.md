@@ -232,6 +232,13 @@ delle articolazioni e texture PBR). Si importa come la Furia:
 1. In Studio: **File → Importa 3D** → `GiganteColosso.glb` → "Unisci mesh" **disattivato** → **Importa**.
 2. Premi **Play**: il gioco sposta il modello in `ReplicatedStorage → ModelliGiganti` (Output:
    "[Giganti 3D] Modello 'Colosso' pronto"). Poi salvalo nel posto (o tasto destro → Salva su file).
+3. Prova: Pannello Admin (P) → 😈 Admin Abuse → 🎬 **La Caduta del Muro**. Il messaggio di avvio dice
+   "colosso 3D ✔" se il modello è usato, altrimenti spiega cosa manca (non importato, o importato con
+   "Unisci mesh" attivo). Va bene anche se il file scaricato si chiama "GiganteColosso (1).glb".
+
+Il file `.rbxlx` viene rigenerato dal codice e **non può contenere modelli 3D**: se apri un `.rbxlx` nuovo
+devi reimportarlo. Per evitarlo: dopo l'importazione, tasto destro sul modello → **Salva su file** (`.rbxm`)
+e mandalo: viene aggiunto al progetto e sarà incluso in tutti i `.rbxlx` successivi.
 
 Viene animato dallo stesso scheletro dei giganti (si alza oltre il Muro, ruggisce, cammina, calcia il cancello).
 Finché non è importato, i filmati usano il colosso costruito con le parti (`ColossoAnatomico.lua`). Il boss in

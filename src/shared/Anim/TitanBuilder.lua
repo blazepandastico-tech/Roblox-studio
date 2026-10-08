@@ -15,6 +15,8 @@
 local MeshTitan = require(script.Parent.MeshTitan)
 local ColossoAnatomico = require(script.Parent.ColossoAnatomico)
 
+local warnedColosso = false
+
 local TitanBuilder = {}
 
 local rad = math.rad
@@ -558,6 +560,10 @@ function TitanBuilder.Build(params): Model
 				return meshModel
 			end
 			warn("[Giganti 3D] Errore nel colosso dei filmati: " .. tostring(meshModel))
+		elseif not warnedColosso then
+			-- una volta sola, nella finestra Output: perché il filmato usa il colosso fatto con le parti
+			warnedColosso = true
+			print("[Giganti 3D] " .. select(2, MeshTitan.Status("Colosso")))
 		end
 		local ok, colosso = pcall(ColossoAnatomico.Build, params)
 		if ok and colosso then
