@@ -3,7 +3,7 @@
   python3 event.py renderall <modello Meshy> <cartella> <processo> <processi>   fotogrammi del video
   python3 event.py music <file.wav>                                               musica (con i botti sincronizzati)
   python3 event.py edit <cartella> <musica.wav> <video.mp4> [verticale.mp4]     montaggio
-  python3 event.py posters <modello Meshy> <cartella di uscita>                  locandine e miniature
+  python3 event.py posters <modello Meshy> <cartella di uscita> [cartella render]  locandine e miniature
 """
 import math
 import os
@@ -906,16 +906,29 @@ def _ribbon(img, text, cy, size, color=(176, 32, 28)):
     return badge(img, text, (int(img.width / 2 - w / 2), int(cy - size * 0.95)), size=size, fill=color)
 
 
-def cmd_posters(fbx_dir, out):
+def cmd_posters(fbx_dir, out, raw_dir=None):
     from compose import plaque, shade
     os.makedirs(out, exist_ok=True)
+    raw_dir = raw_dir or out
     m = load(fbx_dir)
+
+    def raw(name, shot, t, W, H, fov=None):
+        """Render 3D dell'immagine (salvato a parte: si possono ritoccare i testi senza rifarlo)."""
+        path = os.path.join(raw_dir, f"_render_{name}.png")
+        if os.path.exists(path):
+            return Image.open(path).convert("RGB")
+        ctx = globals()["build_" + shot](m)
+        if fov:
+            ctx["fov"] = fov
+        img = globals()["frame_" + shot](ctx, t, W, H)
+        img.save(path)
+        return img
+
     # 1) copertina 1920x1080: il Colosso d'Oro tra i fuochi
-    ctx = build_colosso(m)
-    img = frame_colosso(ctx, 0.8, 1920, 1080)
+    img = raw("copertina", "colosso", 0.8, 1920, 1080)
     img = shade(img, "top", 0.7, 0.4)
     img = shade(img, "bottom", 0.8, 0.38)
-    img = _poster_text(img, [("GRANDE INAUGURAZIONE", 128, (960, 120), "oro")])
+    img = _poster_text(img, [("GRANDE INAUGURAZIONE", 112, (960, 118), "oro")])
     img = _ribbon(img, "EVENTO DI LANCIO • FINO AL 25 OTTOBRE", 238, 34)
     img = plaque(img, 250, 935, 0.36)
     img = _poster_text(img, [("2x XP E ORO • COLOSSO D'ORO • FUOCHI D'ARTIFICIO", 40, (1150, 960), "semplice"),
@@ -923,9 +936,7 @@ def cmd_posters(fbx_dir, out):
     img.save(os.path.join(out, "Evento_Copertina_1920x1080.png"))
     print("copertina")
     # 2) storia 1080x1920: il gran finale sopra le mura
-    ctx = build_finale(m)
-    ctx["fov"] = 88
-    img = frame_finale(ctx, 0.62, 1080, 1920)
+    img = raw("storia", "finale", 0.62, 1080, 1920, fov=88)
     img = shade(img, "top", 0.6, 0.3)
     img = shade(img, "bottom", 0.85, 0.42)
     img = plaque(img, 540, 250, 0.62)
@@ -937,9 +948,7 @@ def cmd_posters(fbx_dir, out):
     img.save(os.path.join(out, "Evento_Storia_1080x1920.png"))
     print("storia")
     # 3) quadrata 1080x1080: fuochi sopra le mura
-    ctx = build_mura(m)
-    ctx["fov"] = 70
-    img = frame_mura(ctx, 0.62, 1080, 1080)
+    img = raw("quadrata", "mura", 0.62, 1080, 1080, fov=70)
     img = shade(img, "bottom", 0.85, 0.45)
     img = _poster_text(img, [("GRANDE", 120, (540, 720), "oro"), ("INAUGURAZIONE", 92, (540, 830), "oro")])
     img = _ribbon(img, "SIERI PERDUTI • FINO AL 25 OTTOBRE", 935, 32)
@@ -959,7 +968,7 @@ if __name__ == "__main__":
         a = sys.argv[2:]
         cmd_edit(a[0], a[1], a[2], a[3] if len(a) > 3 else None)
     elif cmd == "posters":
-        cmd_posters(sys.argv[2], sys.argv[3])
+        cmd_posters(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None)
     elif cmd == "frame":
         # anteprima di un fotogramma: frame <modello> <inquadratura> <t 0..1> <uscita.png>
         a = sys.argv[2:]
