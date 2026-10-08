@@ -67,11 +67,15 @@ local activeFoliage: { BasePart } = {}
 local function addFoliage(part: Instance)
 	if part:IsA("BasePart") and not foliage[part] then
 		local size = part.Size
+		-- le foglie dello stesso albero ruotano insieme attorno alla cima del tronco ("Perno", "Fase")
+		local pivot = part:GetAttribute("Perno")
+		local phase = part:GetAttribute("Fase")
+		local together = type(phase) == "number"
 		foliage[part] = {
 			Base = part.CFrame,
-			Pivot = part.Position - Vector3.new(0, size.Y * 0.55, 0),
-			Phase = rng:NextNumber(0, math.pi * 2),
-			Speed = rng:NextNumber(0.7, 1.2),
+			Pivot = if typeof(pivot) == "Vector3" then pivot else part.Position - Vector3.new(0, size.Y * 0.55, 0),
+			Phase = if together then phase :: number else rng:NextNumber(0, math.pi * 2),
+			Speed = if together then 0.8 + ((phase :: number) * 7.3) % 0.4 else rng:NextNumber(0.7, 1.2),
 		}
 	end
 end
@@ -80,7 +84,7 @@ local function removeFoliage(part: Instance)
 	foliage[part :: BasePart] = nil
 end
 
-local MAX_SWAYING = 220
+local MAX_SWAYING = 480
 
 local function refreshActiveFoliage()
 	table.clear(activeFoliage)

@@ -283,7 +283,9 @@ local function forest(st: Stage, avoid: (number, number) -> boolean)
 				part({ Name = "Tronco", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, r, r), CFrame = CFrame.new(base + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 50):Lerp(Color3.fromRGB(70, 52, 40), rng:NextNumber()) })
 				for j = 1, 3 do
 					local size = rng:NextNumber(90, 140)
-					part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = CFrame.new(base + Vector3.new(rng:NextNumber(-35, 35), h + (j - 2) * 34, rng:NextNumber(-35, 35))), Material = Enum.Material.Grass, Color = Color3.fromRGB(52, 98, 46):Lerp(Color3.fromRGB(88, 128, 58), rng:NextNumber()) })
+					-- foglie più scure in basso (in ombra), più chiare in cima (al sole)
+					local light = math.clamp((j - 1) / 2 + rng:NextNumber(-0.2, 0.2), 0, 1)
+					part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = CFrame.new(base + Vector3.new(rng:NextNumber(-35, 35), h + (j - 2) * 34, rng:NextNumber(-35, 35))), Material = Enum.Material.LeafyGrass, Color = Color3.fromRGB(46, 82, 42):Lerp(Color3.fromRGB(100, 138, 62), light) })
 				end
 			end
 			z += stepSize

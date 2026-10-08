@@ -43,7 +43,9 @@ local reserved: { { Pos: Vector3, Radius: number } } = {}
 
 local PALETTE = {
 	Plaster = { Color3.fromRGB(232, 222, 200), Color3.fromRGB(222, 210, 186), Color3.fromRGB(238, 230, 214), Color3.fromRGB(214, 200, 176) },
-	Roof = { Color3.fromRGB(168, 78, 52), Color3.fromRGB(150, 66, 46), Color3.fromRGB(176, 92, 60), Color3.fromRGB(128, 70, 52) },
+	Roof = { Color3.fromRGB(168, 78, 52), Color3.fromRGB(150, 66, 46), Color3.fromRGB(176, 92, 60), Color3.fromRGB(128, 70, 52), Color3.fromRGB(140, 84, 62) },
+	Slate = { Color3.fromRGB(74, 76, 84), Color3.fromRGB(64, 66, 72), Color3.fromRGB(86, 84, 88) },
+	GroundStone = { Color3.fromRGB(170, 162, 146), Color3.fromRGB(158, 150, 136), Color3.fromRGB(180, 172, 156) },
 	Timber = Color3.fromRGB(78, 54, 38),
 	Stone = Color3.fromRGB(176, 170, 156),
 	Wall = Color3.fromRGB(196, 188, 170),
@@ -121,6 +123,25 @@ local function isReserved(pos: Vector3, margin: number): boolean
 end
 
 -- TERRENO ------------------------------------------------------------------------------
+
+-- vero se il punto è lontano (almeno margin) da tutte le zone e dai luoghi riservati
+local function openLand(pos: Vector3, margin: number): boolean
+	for _, zone in Zones.List do
+		if not zone.Underground and Util.FlatDistance(pos, zone.Center) < zone.Radius + margin then
+			return false
+		end
+	end
+	return not isReserved(pos, margin)
+end
+
+-- quota del terreno in un punto (le colline ondulate non sono più a quota G)
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+local function groundAt(pos: Vector3): Vector3
+	groundParams.FilterDescendantsInstances = { workspace.Terrain }
+	local hit = workspace:Raycast(Vector3.new(pos.X, G + 80, pos.Z), Vector3.new(0, -140, 0), groundParams)
+	return Vector3.new(pos.X, if hit then hit.Position.Y else G, pos.Z)
+end
 
 local function buildTerrain()
 	local terrain = workspace.Terrain
@@ -204,8 +225,52 @@ local function buildTerrain()
 				local radius = rng:NextNumber(40, 100)
 				local zone = Zones.Find(Vector3.new(pos.X, G, pos.Z))
 				if not zone and (not wallR or math.abs(r - wallR) > radius + 30) then
-					local material = if rng:NextNumber() < 0.25 then Enum.Material.Rock else Enum.Material.Grass
-					terrain:FillBall(Vector3.new(pos.X, G - radius * 0.62, pos.Z), radius, material)
+					terrain:FillBall(Vector3.new(pos.X, G - radius * 0.62, pos.Z), radius, Enum.Material.Grass)
+					if rng:NextNumber() < 0.3 then
+						-- affioramento di roccia sulla cima: massi grigi che bucano l'erba
+						local top = Vector3.new(pos.X, G + radius * 0.38, pos.Z)
+						for _ = 1, rng:NextInteger(3, 5) do
+							local rs = rng:NextNumber(0.1, 0.2) * radius
+							local off = Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(0, radius * 0.4))
+							terrain:FillBall(top + off - Vector3.new(0, rs * 0.5 + off.Magnitude * 0.25, 0), rs, Enum.Material.Rock)
+						end
+					end
+				end
+			end
+		end
+	end
+	pause()
+
+	-- Prati ondulati (dossi larghi e bassi) e massi sparsi: il terreno non è più un disco piatto.
+	-- Lontano da zone, mura, spiagge e luoghi riservati, così niente finisce sepolto.
+	for _, id in W.IslandOrder do
+		local isl = W.Islands[id]
+		if not isl.Raid then
+			local wallR = wallRadiusOf(id)
+			for _ = 1, 46 do
+				local r = rng:NextNumber(60, isl.Land - 60)
+				local pos = isl.Center + Util.Polar(rng:NextNumber(0, 360), r)
+				local radius = rng:NextNumber(70, 150)
+				local rise = rng:NextNumber(2.5, 6.5)
+				local foot = math.sqrt(rise * (2 * radius - rise))
+				local probe = Vector3.new(pos.X, G, pos.Z)
+				local clearOfWall = not wallR or math.abs(r - wallR) > foot + 50
+				if clearOfWall and r < isl.Land - foot - 20 and openLand(probe, foot + 20) then
+					terrain:FillBall(Vector3.new(pos.X, G - radius + rise, pos.Z), radius, if id == "Cenere" then Enum.Material.Ground else Enum.Material.Grass)
+				end
+			end
+			for _ = 1, 30 do
+				local r = rng:NextNumber(60, isl.Land - 30)
+				local pos = isl.Center + Util.Polar(rng:NextNumber(0, 360), r)
+				local size = rng:NextNumber(2.5, 7)
+				local probe = Vector3.new(pos.X, G, pos.Z)
+				local clearOfWall = not wallR or math.abs(r - wallR) > 40
+				if clearOfWall and openLand(probe, 12) then
+					terrain:FillBall(Vector3.new(pos.X, G - size * 0.35, pos.Z), size, Enum.Material.Rock)
+					if rng:NextNumber() < 0.5 then
+						local s2 = size * rng:NextNumber(0.4, 0.7)
+						terrain:FillBall(Vector3.new(pos.X, G - s2 * 0.3, pos.Z) + Util.Polar(rng:NextNumber(0, 360), size * 0.9), s2, Enum.Material.Rock)
+					end
 				end
 			end
 		end
@@ -580,7 +645,17 @@ local function buildGate(center: Vector3, outward: Vector3, height: number, thic
 		end
 	elseif kind == "Boulder" then
 		-- il masso che sigilla il cancello
-		part({ Name = "Masso", Shape = Enum.PartType.Ball, Size = Vector3.new(66, 66, 66), CFrame = cf * CFrame.new(0, 30, -thickness / 2 - 14), Material = Enum.Material.Rock, Color = Color3.fromRGB(130, 120, 106) })
+		local boulder = cf * CFrame.new(0, 30, -thickness / 2 - 14)
+		local rockColor = Color3.fromRGB(130, 120, 106)
+		part({ Name = "Masso", Shape = Enum.PartType.Ball, Size = Vector3.new(66, 66, 66), CFrame = boulder, Material = Enum.Material.Rock, Color = rockColor })
+		-- bozze irregolari (non è una sfera perfetta), muschio in cima e terra alla base
+		for _ = 1, 6 do
+			local s = rng:NextNumber(28, 42)
+			local dir = Util.SafeUnit(Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(-0.4, 1), rng:NextNumber(-1, 0.3)), Vector3.yAxis)
+			part({ Name = "Masso", Shape = Enum.PartType.Ball, Size = Vector3.one * s, CFrame = boulder * CFrame.new(dir * (33 - s * 0.32)), Material = Enum.Material.Rock, Color = tint(rockColor, rng:NextNumber(0.84, 1.08)) })
+		end
+		part({ Name = "Muschio", Shape = Enum.PartType.Ball, Size = Vector3.one * 44, CFrame = boulder * CFrame.new(0, 13, -2), Material = Enum.Material.Grass, Color = Color3.fromRGB(98, 106, 62), CastShadow = false })
+		part({ Name = "Terra", Shape = Enum.PartType.Cylinder, Size = Vector3.new(6, 70, 70), CFrame = cf * CFrame.new(0, -1.6, -thickness / 2 - 14) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Ground, Color = Color3.fromRGB(104, 90, 70), CastShadow = false })
 		for _ = 1, 5 do
 			local s = rng:NextNumber(4, 9)
 			part({ Name = "Frammento", Size = Vector3.new(s, s * 0.7, s), CFrame = cf * CFrame.new(rng:NextNumber(-width, width), s * 0.3, -thickness / 2 - rng:NextNumber(30, 55)) * CFrame.Angles(rng:NextNumber(-0.6, 0.6), rng:NextNumber(0, 6), rng:NextNumber(-0.6, 0.6)), Material = Enum.Material.Rock, Color = Color3.fromRGB(122, 112, 98) })
@@ -805,11 +880,28 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 
 	part({ Name = "Zoccolo", Size = Vector3.new(width + 0.8, plinthH, depth + 0.8), CFrame = cf * CFrame.new(0, plinthH / 2, 0), Material = Enum.Material.Cobblestone, Color = if isValdoria then Color3.fromRGB(150, 144, 134) else Color3.fromRGB(132, 126, 116), CastShadow = false })
 
+	-- molte case a graticcio hanno il piano terra in pietra e i piani di sopra intonacati
+	local stoneBase = not isValdoria and not enterable and not ruined and floors >= 2 and rng:NextNumber() < 0.45
+	if stoneBase then
+		part({ Name = "PianoTerra", Size = Vector3.new(width + 0.2, floorH - plinthH, depth + 0.2), CFrame = cf * CFrame.new(0, plinthH + (floorH - plinthH) / 2, 0), Material = Enum.Material.Limestone, Color = pick(PALETTE.GroundStone), CastShadow = false })
+	elseif not enterable then
+		-- umidità che risale dal terreno: l'intonaco è più scuro alla base
+		part({ Name = "Umidita", Size = Vector3.new(width + 0.12, 2.4, depth + 0.12), CFrame = cf * CFrame.new(0, plinthH + 1.2, 0), Material = material, Color = tint(wallColor, 0.84), CastShadow = false, CanCollide = false })
+	end
+
 	if not isValdoria then
 		-- travi a vista: montanti agli angoli, fasce ai piani e croci di Sant'Andrea in facciata
+		local beamFrom = if stoneBase then floorH else 0
 		for _, sx in { -1, 1 } do
 			for _, sz in { -1, 1 } do
-				part({ Name = "Trave", Size = Vector3.new(1.2, height, 1.2), CFrame = cf * CFrame.new(sx * width / 2, height / 2, sz * depth / 2), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+				part({ Name = "Trave", Size = Vector3.new(1.2, height - beamFrom, 1.2), CFrame = cf * CFrame.new(sx * width / 2, beamFrom + (height - beamFrom) / 2, sz * depth / 2), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+			end
+		end
+		if not ruined and floors >= 2 then
+			-- montanti in facciata tra le colonne di finestre dei piani alti
+			for c = 1, cols - 1 do
+				local x = -width / 2 + width * c / cols
+				part({ Name = "Montante", Size = Vector3.new(0.8, height - floorH, 0.5), CFrame = cf * CFrame.new(x, floorH + (height - floorH) / 2, -depth / 2 - 0.15), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
 			end
 		end
 		for f = 1, floors - 1 do
@@ -891,18 +983,62 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			part({ Name = "Parapetto", Size = Vector3.new(width + 1.2, 2.2, 0.8), CFrame = cf * CFrame.new(0, height + 2.5, -depth / 2 - 0.2), Material = Enum.Material.Limestone, Color = Color3.fromRGB(196, 188, 172), CastShadow = false })
 		else
 			local roofH = math.min(width, depth) * 0.45
-			local roofColor = pick(PALETTE.Roof)
-			local overhang = 2
-			local roofTop = height + roofH / 2
-			local w1 = wedge({ Name = "Tetto", Size = Vector3.new(width + overhang, roofH, depth / 2 + overhang / 2), CFrame = cf * CFrame.new(0, roofTop, -depth / 4 - overhang / 4), Material = Enum.Material.ClayRoofTiles, Color = roofColor })
-			local w2 = wedge({ Name = "Tetto", Size = Vector3.new(width + overhang, roofH, depth / 2 + overhang / 2), CFrame = cf * CFrame.new(0, roofTop, depth / 4 + overhang / 4) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.ClayRoofTiles, Color = roofColor })
-			w1.CollisionGroup = Config.CollisionGroups.Buildings
-			w2.CollisionGroup = Config.CollisionGroups.Buildings
+			local slate = rng:NextNumber() < 0.28
+			local roofColor = if slate then pick(PALETTE.Slate) else pick(PALETTE.Roof)
+			local roofMat = if slate then Enum.Material.Slate else Enum.Material.ClayRoofTiles
+			local eave, gableOh, slabT = 1.8, 1.2, 0.9
+			local run = depth / 2
+			-- sottotetto: i timpani sono muro come la casa (non tegole)
+			for _, side in { -1, 1 } do
+				local g = wedge({ Name = "Timpano", Size = Vector3.new(width, roofH, run), CFrame = cf * CFrame.new(0, height + roofH / 2, side * depth / 4) * CFrame.Angles(0, if side > 0 then math.pi else 0, 0), Material = material, Color = wallColor })
+				g.CollisionGroup = Config.CollisionGroups.Buildings
+			end
+			-- falde vere, con lo spessore, che sporgono oltre i muri (gronda davanti e dietro, timpani ai lati)
+			local theta = math.atan2(roofH, run)
+			local slabLen = math.sqrt(run * run + roofH * roofH) + eave / math.cos(theta) + 0.4
+			local down = Vector3.new(0, -math.sin(theta), -math.cos(theta))
+			local normal = Vector3.new(0, math.cos(theta), -math.sin(theta))
+			local ridge = Vector3.new(0, height + roofH, 0)
+			local slabCF = CFrame.fromMatrix(ridge + down * (slabLen / 2 - 0.4) + normal * (slabT / 2), Vector3.xAxis, normal)
+			for _, side in { -1, 1 } do
+				local slab = part({ Name = "Tetto", Size = Vector3.new(width + gableOh * 2, slabT, slabLen), CFrame = cf * CFrame.Angles(0, if side > 0 then math.pi else 0, 0) * slabCF, Material = roofMat, Color = roofColor })
+				slab.CollisionGroup = Config.CollisionGroups.Buildings
+			end
 			-- colmo
-			part({ Name = "Colmo", Size = Vector3.new(width + overhang + 0.4, 0.9, 1.2), CFrame = cf * CFrame.new(0, height + roofH + 0.2, 0), Material = Enum.Material.ClayRoofTiles, Color = Color3.new(roofColor.R * 0.8, roofColor.G * 0.8, roofColor.B * 0.8), CastShadow = false })
+			part({ Name = "Colmo", Size = Vector3.new(width + gableOh * 2 + 0.3, 0.9, 1.5), CFrame = cf * CFrame.new(0, height + roofH + slabT * math.cos(theta) + 0.15, 0), Material = roofMat, Color = tint(roofColor, 0.8), CastShadow = false })
+			if not isValdoria and not ruined then
+				-- catena e monaco di legno sui timpani
+				for _, sx in { -1, 1 } do
+					part({ Name = "Catena", Size = Vector3.new(0.5, 0.9, depth + 0.6), CFrame = cf * CFrame.new(sx * (width / 2 + 0.25), height + 0.45, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
+					part({ Name = "Monaco", Size = Vector3.new(0.5, roofH * 0.9, 0.8), CFrame = cf * CFrame.new(sx * (width / 2 + 0.25), height + roofH * 0.45, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
+				end
+				-- abbaino sulla falda davanti (solo le case larghe)
+				if width >= 16 and depth >= 12 and rng:NextNumber() < 0.45 then
+					local dw = 5.2
+					local dx = rng:NextNumber(-width * 0.22, width * 0.22)
+					local zf = -run + 1.2
+					local bottom = height + roofH * (1 - math.abs(zf) / run) - 0.3
+					local dh = 4.2
+					local back = -1
+					local dd = back - zf
+					local zc = (zf + back) / 2
+					part({ Name = "Abbaino", Size = Vector3.new(dw, dh, dd), CFrame = cf * CFrame.new(dx, bottom + dh / 2, zc), Material = material, Color = wallColor })
+					part({ Name = "Cornice", Size = Vector3.new(3.3, 3.2, 0.25), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.05), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
+					part({ Name = "Finestra", Size = Vector3.new(2.6, 2.6, 0.3), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+					for _, sx in { -1, 1 } do
+						wedge({ Name = "TettoAbbaino", Size = Vector3.new(dd + 0.8, 1.7, dw / 2 + 0.5), CFrame = cf * CFrame.new(dx + sx * (dw / 2 + 0.5) / 2, bottom + dh + 0.85, zc - 0.4) * CFrame.Angles(0, -sx * math.pi / 2, 0), Material = roofMat, Color = roofColor })
+					end
+				end
+				-- macchie di muschio sulle tegole più vecchie
+				if not slate and rng:NextNumber() < 0.4 then
+					local mossCF = cf * CFrame.Angles(0, if rng:NextNumber() < 0.5 then math.pi else 0, 0) * slabCF
+					part({ Name = "Muschio", Size = Vector3.new(rng:NextNumber(3, width * 0.4), 0.2, rng:NextNumber(2, 4)), CFrame = mossCF * CFrame.new(rng:NextNumber(-width * 0.3, width * 0.3), slabT / 2 + 0.05, slabLen * rng:NextNumber(-0.05, 0.35)), Material = Enum.Material.Grass, Color = Color3.fromRGB(96, 104, 58), CastShadow = false, CanCollide = false })
+				end
+			end
 		end
 		if rng:NextNumber() < 0.65 then
-			local chimneyH = if isValdoria then 6 else 8
+			-- il comignolo deve uscire bene dalla falda (che ora ha lo spessore)
+			local chimneyH = if isValdoria then 6 else math.max(8, math.min(width, depth) * 0.34 + 4.5)
 			local chimneyY = height + chimneyH / 2
 			part({ Name = "Comignolo", Size = Vector3.new(2.6, chimneyH, 2.6), CFrame = cf * CFrame.new(width * 0.3, chimneyY, depth * 0.15), Material = Enum.Material.Brick, Color = Color3.fromRGB(120, 70, 56), CastShadow = false })
 			part({ Name = "CappelloComignolo", Size = Vector3.new(3.3, 0.6, 3.3), CFrame = cf * CFrame.new(width * 0.3, chimneyY + chimneyH / 2 + 0.3, depth * 0.15), Material = Enum.Material.Slate, Color = Color3.fromRGB(70, 66, 62), CastShadow = false })
@@ -1328,13 +1464,149 @@ end
 
 -- ALBERI -------------------------------------------------------------------------------
 
-local function tree(pos: Vector3, scale: number?)
-	local s = scale or rng:NextNumber(0.8, 1.3)
-	local h = 20 * s
-	part({ Name = "Tronco", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, 2.4 * s, 2.4 * s), CFrame = CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 48) })
+-- ALBERI ------------------------------------------------------------------------------------
+-- Più specie fatte di più pezzi: il tronco si assottiglia verso l'alto, ha i rami e una chioma
+-- irregolare di più "nuvole" di foglie (più scure sotto, in ombra, più chiare in cima, al sole).
+-- Le foglie si chiamano "Chioma" (NatureController le fa ondeggiare): "Perno" è il punto attorno a
+-- cui ruota tutta la chioma e "Fase" fa muovere insieme le foglie dello stesso albero.
+local BARK = { Color3.fromRGB(94, 74, 56), Color3.fromRGB(82, 66, 52), Color3.fromRGB(106, 84, 62), Color3.fromRGB(74, 60, 50) }
+local LEAF_SHADE = { Color3.fromRGB(50, 86, 44), Color3.fromRGB(44, 78, 42), Color3.fromRGB(58, 92, 46), Color3.fromRGB(52, 84, 52) }
+local LEAF_SUN = { Color3.fromRGB(96, 138, 62), Color3.fromRGB(108, 144, 68), Color3.fromRGB(86, 130, 58), Color3.fromRGB(118, 146, 66) }
+local FIR = { Color3.fromRGB(40, 68, 50), Color3.fromRGB(34, 60, 46), Color3.fromRGB(46, 76, 54), Color3.fromRGB(38, 66, 58) }
+
+-- Cilindro da a a b (tronchi e rami)
+local function stick(name: string, a: Vector3, b: Vector3, d: number, color: Color3, shadow: boolean?): Part
+	local axis = b - a
+	local dir = Util.SafeUnit(axis, Vector3.yAxis)
+	local side = dir:Cross(Vector3.zAxis)
+	if side.Magnitude < 0.1 then
+		side = dir:Cross(Vector3.xAxis)
+	end
+	return part({ Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(axis.Magnitude, d, d), CFrame = CFrame.fromMatrix((a + b) / 2, dir, side.Unit), Material = Enum.Material.Wood, Color = color, CastShadow = shadow ~= false })
+end
+
+local function swayInfo(p: BasePart, pivot: Vector3, phase: number)
+	p:SetAttribute("Perno", pivot)
+	p:SetAttribute("Fase", phase)
+end
+
+-- Nuvola di foglie sferica
+local function leafBall(center: Vector3, size: number, color: Color3, pivot: Vector3, phase: number, shadow: boolean): Part
+	local p = part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = CFrame.new(center), Material = Enum.Material.LeafyGrass, Color = color, CastShadow = shadow })
+	swayInfo(p, pivot, phase)
+	return p
+end
+
+-- Ellissoide (palco di rami degli abeti): solo grafica, i rampini si agganciano al tronco
+local function leafEllipsoid(cf: CFrame, size: Vector3, color: Color3, pivot: Vector3, phase: number, shadow: boolean): Part
+	local p = part({ Name = "Chioma", Size = size, CFrame = cf, Material = Enum.Material.LeafyGrass, Color = color, CastShadow = shadow, CanCollide = false, CanQuery = false })
+	local mesh = Instance.new("SpecialMesh")
+	mesh.MeshType = Enum.MeshType.Sphere
+	mesh.Parent = p
+	swayInfo(p, pivot, phase)
+	return p
+end
+
+-- Latifoglia (quercia, faggio): opts.Birch = betulla, chiara e slanciata
+local function broadleaf(pos: Vector3, s: number, birch: boolean?)
+	local bark = if birch then Color3.fromRGB(214, 210, 200) else pick(BARK)
+	local h = (if birch then 23 else 19) * s
+	local thick = if birch then 0.7 else 1
+	local lean = Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)) * 0.7 * s
+	local p1 = pos + Vector3.new(0, h * 0.5, 0) + lean * 0.45
+	local p2 = pos + Vector3.new(0, h * 0.8, 0) + lean
+	-- colletto delle radici, tronco in due pezzi sempre più sottili
+	stick("Radici", pos - Vector3.new(0, 0.8, 0), pos + Vector3.new(0, 0.9 * s, 0), 3.3 * s * thick, bark, false)
+	stick("Tronco", pos - Vector3.new(0, 1, 0), p1, 2.6 * s * thick, bark)
+	stick("Tronco", p1, p2 + Vector3.new(0, 1.5 * s, 0), 1.75 * s * thick, bark, false)
+	local phase = rng:NextNumber(0, math.pi * 2)
+	local crown = p2 + Vector3.new(0, 3.2 * s, 0)
+	local spread = if birch then 0.75 else 1
+	-- due rami che escono dal tronco verso la chioma
+	local a0 = rng:NextNumber(0, math.pi * 2)
 	for i = 1, 2 do
-		local size = rng:NextNumber(11, 15) * s
-		part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.new(size, size, size), CFrame = CFrame.new(pos + Vector3.new(rng:NextNumber(-2, 2) * s, h + (i - 1) * 4 * s, rng:NextNumber(-2, 2) * s)), Material = Enum.Material.LeafyGrass, Color = pick(PALETTE.Leaf), CastShadow = i == 1 })
+		local a = a0 + i * math.pi + rng:NextNumber(-0.5, 0.5)
+		local from = p1:Lerp(p2, rng:NextNumber(0.15, 0.55))
+		local to = from + Vector3.new(math.cos(a) * 5.5 * s * spread, 4.5 * s, math.sin(a) * 5.5 * s * spread)
+		stick("Ramo", from, to, 0.85 * s * thick, bark, false)
+	end
+	-- chioma: una nuvola grande, tre più piccole attorno (in ombra) e una in cima (al sole)
+	local main = rng:NextNumber(11, 13) * s * spread
+	local shade = pick(LEAF_SHADE)
+	local sun = pick(LEAF_SUN)
+	if birch then
+		shade = shade:Lerp(Color3.fromRGB(110, 150, 70), 0.35)
+		sun = sun:Lerp(Color3.fromRGB(150, 176, 84), 0.3)
+	end
+	leafBall(crown, main, shade:Lerp(sun, 0.4), p2, phase, true)
+	local a1 = rng:NextNumber(0, math.pi * 2)
+	for i = 1, 3 do
+		local a = a1 + i * math.pi * 2 / 3 + rng:NextNumber(-0.4, 0.4)
+		local r = rng:NextNumber(4.2, 5.4) * s * spread
+		local size = rng:NextNumber(7.5, 9.5) * s * spread
+		leafBall(crown + Vector3.new(math.cos(a) * r, rng:NextNumber(-1.8, 1.2) * s, math.sin(a) * r), size, shade, p2, phase, false)
+	end
+	leafBall(crown + Vector3.new(rng:NextNumber(-1.5, 1.5) * s, main * 0.42, rng:NextNumber(-1.5, 1.5) * s), main * 0.66, sun, p2, phase, false)
+end
+
+-- Abete: tronco dritto e palchi di rami sempre più stretti verso la punta
+local function conifer(pos: Vector3, s: number)
+	local h = 30 * s
+	local bark = tint(pick(BARK), 0.85)
+	stick("Tronco", pos - Vector3.new(0, 1, 0), pos + Vector3.new(0, h * 0.86, 0), 1.7 * s, bark)
+	stick("Radici", pos - Vector3.new(0, 0.8, 0), pos + Vector3.new(0, 0.8 * s, 0), 2.5 * s, bark, false)
+	local color = pick(FIR)
+	local phase = rng:NextNumber(0, math.pi * 2)
+	local pivot = pos + Vector3.new(0, h * 0.2, 0)
+	local tiers = 4
+	for i = 0, tiers - 1 do
+		local k = i / tiers
+		local r = (8.6 - i * 1.85) * s
+		local th = (7.4 - i * 0.9) * s
+		local y = h * (0.24 + k * 0.6)
+		leafEllipsoid(CFrame.new(pos + Vector3.new(0, y, 0)) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0), Vector3.new(r * 2, th, r * 2 * rng:NextNumber(0.9, 1)), color:Lerp(Color3.fromRGB(74, 106, 70), k * 0.45), pivot, phase, i == 0)
+	end
+	leafEllipsoid(CFrame.new(pos + Vector3.new(0, h * 0.93, 0)), Vector3.new(2.8 * s, 8 * s, 2.8 * s), color:Lerp(Color3.fromRGB(80, 112, 74), 0.5), pivot, phase, false)
+end
+
+-- Albero morto (isola di Cenere): tronco annerito e rami spogli
+local function deadTree(pos: Vector3, s: number)
+	local bark = Color3.fromRGB(58, 50, 46)
+	local h = 17 * s
+	local lean = Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1)) * 1.2 * s
+	local top = pos + Vector3.new(0, h, 0) + lean
+	stick("Tronco", pos - Vector3.new(0, 1, 0), top, 2 * s, bark)
+	for _ = 1, 3 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local from = pos:Lerp(top, rng:NextNumber(0.45, 0.9))
+		stick("Ramo", from, from + Vector3.new(math.cos(a) * 6 * s, rng:NextNumber(2, 5) * s, math.sin(a) * 6 * s), 0.7 * s, bark, false)
+	end
+end
+
+-- Cespuglio basso (tra gli alberi e lungo i sentieri)
+local function bush(pos: Vector3, s: number)
+	local color = pick(LEAF_SHADE)
+	for i = 1, 2 do
+		local size = rng:NextNumber(3.6, 5.2) * s
+		local b = part({ Name = "Cespuglio", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = CFrame.new(pos + Vector3.new(rng:NextNumber(-2, 2) * s, size * 0.25, rng:NextNumber(-2, 2) * s)), Material = Enum.Material.LeafyGrass, Color = if i == 1 then color else color:Lerp(pick(LEAF_SUN), 0.5), CastShadow = false })
+		b.CanCollide = false
+	end
+end
+
+-- species: "Latifoglia" | "Abete" | "Betulla" | "Morto" (se manca, a caso: soprattutto latifoglie)
+local function tree(pos: Vector3, scale: number?, species: string?)
+	local s = scale or rng:NextNumber(0.8, 1.3)
+	local kind = species
+	if not kind then
+		local roll = rng:NextNumber()
+		kind = if roll < 0.62 then "Latifoglia" elseif roll < 0.88 then "Abete" else "Betulla"
+	end
+	if kind == "Abete" then
+		conifer(pos, s)
+	elseif kind == "Morto" then
+		deadTree(pos, s)
+	else
+		broadleaf(pos, s, kind == "Betulla")
 	end
 end
 
@@ -1342,15 +1614,23 @@ local function giantTree(pos: Vector3)
 	local h = rng:NextNumber(230, 330)
 	local d = rng:NextNumber(18, 30)
 	local bark = Color3.fromRGB(rng:NextInteger(88, 104), rng:NextInteger(64, 76), rng:NextInteger(44, 54))
-	local trunkCF = CFrame.new(pos + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	part({ Name = "TroncoGigante", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, d, d), CFrame = trunkCF, Material = Enum.Material.Wood, Color = bark })
+	-- tronco in due pezzi: largo alla base, più sottile verso la cima
+	local split = pos + Vector3.new(0, h * 0.58, 0)
+	local trunkCF = CFrame.new(pos + Vector3.new(0, h * 0.29, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	part({ Name = "TroncoGigante", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h * 0.58 + 2, d, d), CFrame = trunkCF, Material = Enum.Material.Wood, Color = bark })
+	stick("TroncoGigante", split - Vector3.new(0, 4, 0), pos + Vector3.new(0, h, 0), d * 0.74, tint(bark, 1.04))
+	-- anello di corteccia più scura dove il tronco si restringe
+	stick("Corteccia", split - Vector3.new(0, 5, 0), split + Vector3.new(0, 3, 0), d * 0.86, tint(bark, 0.82), false)
 	-- radici
-	for i = 0, 3 do
-		local a = i * math.pi / 2 + rng:NextNumber(-0.3, 0.3)
+	local roots = rng:NextInteger(5, 6)
+	for i = 0, roots - 1 do
+		local a = i * math.pi * 2 / roots + rng:NextNumber(-0.25, 0.25)
 		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
-		wedge({ Name = "Radice", Size = Vector3.new(d * 0.35, d * 0.9, d * 0.9), CFrame = CFrame.lookAt(pos + dir * (d * 0.62) + Vector3.new(0, d * 0.45, 0), pos + dir * (d * 2) + Vector3.new(0, d * 0.45, 0)), Material = Enum.Material.Wood, Color = bark })
+		local rs = rng:NextNumber(0.75, 1.05)
+		wedge({ Name = "Radice", Size = Vector3.new(d * 0.32, d * 0.9 * rs, d * 0.95 * rs), CFrame = CFrame.lookAt(pos + dir * (d * 0.6) + Vector3.new(0, d * 0.45 * rs, 0), pos + dir * (d * 2) + Vector3.new(0, d * 0.45 * rs, 0)), Material = Enum.Material.Wood, Color = tint(bark, 0.92) })
 	end
-	-- rami con fogliame
+	-- rami con ciuffi di fogliame (scuri sotto, chiari sopra)
+	local phase = rng:NextNumber(0, math.pi * 2)
 	local branches = rng:NextInteger(3, 5)
 	for i = 1, branches do
 		local y = h * rng:NextNumber(0.45, 0.85)
@@ -1358,18 +1638,32 @@ local function giantTree(pos: Vector3)
 		local len = rng:NextNumber(45, 80)
 		local dir = Vector3.new(math.cos(a), 0.45, math.sin(a)).Unit
 		local start = pos + Vector3.new(0, y, 0)
-		local mid = start + dir * (len / 2)
-		local bd = rng:NextNumber(5, 9)
-		part({ Name = "Ramo", Shape = Enum.PartType.Cylinder, Size = Vector3.new(len, bd, bd), CFrame = CFrame.lookAt(mid, mid + dir) * CFrame.Angles(0, math.rad(90), 0), Material = Enum.Material.Wood, Color = bark })
 		local tip = start + dir * len
-		local leaf = rng:NextNumber(40, 64)
-		part({ Name = "Fogliame", Shape = Enum.PartType.Ball, Size = Vector3.new(leaf, leaf, leaf), CFrame = CFrame.new(tip), Material = Enum.Material.LeafyGrass, Color = pick(PALETTE.Leaf), CastShadow = i <= 2 })
-		if i == 1 then
-			part({ Name = "Fogliame", Shape = Enum.PartType.Ball, Size = Vector3.new(leaf * 0.8, leaf * 0.8, leaf * 0.8), CFrame = CFrame.new(tip + Vector3.new(rng:NextNumber(-15, 15), 12, rng:NextNumber(-15, 15))), Material = Enum.Material.LeafyGrass, Color = pick(PALETTE.Leaf), CastShadow = false })
+		local bd = rng:NextNumber(5, 9)
+		stick("Ramo", start, tip, bd, bark)
+		local leaf = rng:NextNumber(40, 60)
+		local shade = pick(LEAF_SHADE)
+		local f = part({ Name = "Fogliame", Shape = Enum.PartType.Ball, Size = Vector3.one * leaf, CFrame = CFrame.new(tip), Material = Enum.Material.LeafyGrass, Color = shade:Lerp(pick(LEAF_SUN), 0.35), CastShadow = i <= 3 })
+		local branchPivot = tip - dir * leaf * 0.6
+		swayInfo(f, branchPivot, phase)
+		for j = 1, 2 do
+			local side = dir:Cross(Vector3.yAxis)
+			local off = Util.SafeUnit(side, Vector3.xAxis) * (if j == 1 then 1 else -1) * leaf * 0.38 + Vector3.new(0, (j - 1) * leaf * 0.28 - leaf * 0.08, 0) + dir * leaf * 0.12
+			local sat = part({ Name = "Fogliame", Shape = Enum.PartType.Ball, Size = Vector3.one * leaf * rng:NextNumber(0.6, 0.72), CFrame = CFrame.new(tip + off), Material = Enum.Material.LeafyGrass, Color = if j == 1 then shade else pick(LEAF_SUN), CastShadow = false })
+			swayInfo(sat, branchPivot, phase)
 		end
 	end
-	local crown = rng:NextNumber(70, 100)
-	part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.new(crown, crown, crown), CFrame = CFrame.new(pos + Vector3.new(0, h + crown * 0.25, 0)), Material = Enum.Material.LeafyGrass, Color = pick(PALETTE.Leaf) })
+	-- chioma in cima: una grande nuvola e tre attorno
+	local crown = rng:NextNumber(70, 96)
+	local top = pos + Vector3.new(0, h + crown * 0.2, 0)
+	local crownPivot = pos + Vector3.new(0, h - crown * 0.3, 0)
+	local c = part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * crown, CFrame = CFrame.new(top), Material = Enum.Material.LeafyGrass, Color = pick(LEAF_SHADE):Lerp(pick(LEAF_SUN), 0.4) })
+	swayInfo(c, crownPivot, phase)
+	for j = 1, 3 do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local sat = part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * crown * rng:NextNumber(0.5, 0.65), CFrame = CFrame.new(top + Vector3.new(math.cos(a) * crown * 0.42, (j - 2) * crown * 0.16, math.sin(a) * crown * 0.42)), Material = Enum.Material.LeafyGrass, Color = if j == 3 then pick(LEAF_SUN) else pick(LEAF_SHADE), CastShadow = false })
+		swayInfo(sat, crownPivot, phase)
+	end
 end
 
 -- LUOGHI SPECIALI ------------------------------------------------------------------------
@@ -1831,7 +2125,12 @@ local function buildForest()
 		local r = math.sqrt(rng:NextNumber()) * zone.Radius
 		local pos = zone.Center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 		if not isReserved(pos, 6) then
-			tree(Vector3.new(pos.X, G, pos.Z), rng:NextNumber(0.6, 1))
+			local ground = Vector3.new(pos.X, G, pos.Z)
+			if rng:NextNumber() < 0.35 then
+				bush(ground, rng:NextNumber(0.9, 1.5))
+			else
+				tree(ground, rng:NextNumber(0.6, 1), if rng:NextNumber() < 0.45 then "Abete" else "Latifoglia")
+			end
 		end
 	end
 end
@@ -1860,10 +2159,22 @@ local function scatterTrees()
 				local zone = Zones.Find(probe)
 				local blockedByZone = zone ~= nil and (zone.Safe or zone.Id == "Calaneth" or zone.Id == "Halvar" or zone.Id == "Recinto" or zone.Id == "Foresta" or zone.Id == "Stohlberg")
 				if not nearWall and not insideCapital and not blockedByZone and not isReserved(probe, 10) then
-					-- piccoli boschetti
+					-- piccoli boschetti della stessa specie (a Edenia più abeti, a Cenere alberi morti)
+					local species: string? = nil
+					local roll = rng:NextNumber()
+					if id == "Cenere" then
+						species = if roll < 0.6 then "Morto" else "Abete"
+					elseif id == "Edenia" then
+						species = if roll < 0.5 then "Abete" elseif roll < 0.85 then "Latifoglia" else "Betulla"
+					elseif roll < 0.7 then
+						species = if rng:NextNumber() < 0.75 then "Latifoglia" else "Abete"
+					end
 					local clump = rng:NextInteger(1, 4)
 					for _ = 1, clump do
-						tree(probe + Vector3.new(rng:NextNumber(-14, 14), 0, rng:NextNumber(-14, 14)))
+						tree(groundAt(probe + Vector3.new(rng:NextNumber(-15, 15), 0, rng:NextNumber(-15, 15))), nil, species)
+					end
+					if id ~= "Cenere" and rng:NextNumber() < 0.5 then
+						bush(groundAt(probe + Vector3.new(rng:NextNumber(-18, 18), 0, rng:NextNumber(-18, 18))), rng:NextNumber(0.8, 1.3))
 					end
 					count += 1
 				end

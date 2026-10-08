@@ -87,7 +87,7 @@ def fbm(p, octaves=4, seed=0, lac=2.03, gain=0.5):
 # ---------------------------------------------------------------------------------------------
 
 # materiali
-M_TEX, M_COLOR, M_STONE, M_PLASTER, M_ROOF, M_GROUND, M_METAL, M_WOOD, M_SKIN, M_CLOTH, M_WATER, M_GLOW, M_FACE = range(13)
+M_TEX, M_COLOR, M_STONE, M_PLASTER, M_ROOF, M_GROUND, M_METAL, M_WOOD, M_SKIN, M_CLOTH, M_WATER, M_GLOW, M_FACE, M_GRAIN = range(14)
 
 
 class Scene:
@@ -605,6 +605,12 @@ def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light
     if sel.any():
         g = fbm(P[sel] * 8, 2, seed=61)
         alb[sel] = col[sel] * (0.88 + 0.2 * g[:, None])
+    sel = mat == M_GRAIN
+    if sel.any():
+        # superficie con grana (intonaco, erba, terra): rumore fine + macchie larghe
+        g = fbm(P[sel] * 0.8, 3, seed=81)
+        g2 = fbm(P[sel] * 0.07, 3, seed=83)
+        alb[sel] = col[sel] * (0.82 + 0.26 * g[:, None]) * (0.86 + 0.26 * g2[:, None])
 
     # ombre
     shade = np.ones(len(P))

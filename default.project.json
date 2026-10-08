@@ -54,7 +54,7 @@
         "ClockTime": 14.5,
         "GeographicLatitude": 38,
         "GlobalShadows": true,
-        "ShadowSoftness": 0.25,
+        "ShadowSoftness": 0.18,
         "EnvironmentDiffuseScale": 1,
         "EnvironmentSpecularScale": 1,
         "Ambient": [
@@ -68,6 +68,12 @@
           0.47
         ],
         "ExposureCompensation": 0.1
+      }
+    },
+    "MaterialService": {
+      "$className": "MaterialService",
+      "$properties": {
+        "Use2022Materials": true
       }
     },
     "Workspace": {

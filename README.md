@@ -114,6 +114,13 @@ Se vai in un'isola troppo forte per te, il gioco ti avvisa, ma non ti ferma.
   si sceglie il meteo all'istante, utile per provarlo.
 - **Natura**: erba 3D che si muove col vento sui prati, chiome degli alberi che ondeggiano, macchie di fiori
   colorati, stormi di uccelli di giorno, farfalle col sereno e lucciole di notte.
+- **Mondo realistico**: materiali realistici di Roblox (MaterialService → *Use2022Materials*), alberi di più
+  specie (querce con chioma a più strati, abeti a palchi, betulle, alberi morti sull'isola di Cenere e cespugli),
+  prati ondulati con massi e affioramenti di roccia, case con falde del tetto spesse e sporgenti, timpani in
+  muratura, abbaini, tetti di coppi o di ardesia con il muschio, piani terra in pietra e travi a vista.
+- **Giganti più veri**: dita delle mani e dei piedi, rotule, gomiti, clavicole, scapole, muscoli del collo,
+  palpebre pesanti, zigomi, narici e mento, costole sui giganti magri e pelle con sfumature (mani e ginocchia
+  più rosate, piedi più scuri).
 - **Città vive**: cittadini che passeggiano per le strade (meno di notte), banchi del mercato con i tendoni
   a strisce, carretti, festoni colorati sopra il viale e fumo che esce dai camini. Le città in rovina restano deserte.
 - **Musica dinamica**: cambia da sola con una dissolvenza tra *calma* (giorno), *città*, *notte*, *battaglia*

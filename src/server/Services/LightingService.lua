@@ -102,7 +102,7 @@ function LightingService.Setup()
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 1
 	Lighting.GlobalShadows = true
-	Lighting.ShadowSoftness = 0.25
+	Lighting.ShadowSoftness = 0.18 -- ombre del sole più nette, come alla luce vera
 	Lighting.Ambient = Color3.fromRGB(70, 64, 60)
 	Lighting.OutdoorAmbient = Color3.fromRGB(132, 128, 120)
 	Lighting.ExposureCompensation = 0.1

@@ -475,6 +475,11 @@ function TitanBuilder.Build(params): Model
 	local p = makeProfile(look, rng)
 	local skin = p.Skin
 	local muscleColor = if p.Skinless then Color3.fromRGB(200, 96, 78) else darker(skin, 0.86)
+	-- la pelle non è di un colore solo: ginocchia, gomiti e mani più rosati, piedi e stinchi più scuri
+	local flush = Color3.new(math.min(1, skin.R * 1.03), skin.G * 0.9, skin.B * 0.87)
+	local handSkin = skin:Lerp(flush, 0.5)
+	local footSkin = skin:Lerp(darker(skin, 0.86), 0.6)
+	local shinSkin = skin:Lerp(darker(skin, 0.92), 0.5)
 
 	local model = Instance.new("Model")
 	model.Name = params.Name or "Gigante"
@@ -559,9 +564,18 @@ function TitanBuilder.Build(params): Model
 
 		local wristC0 = CFrame.new(0, -lowerArm * 0.5, 0)
 		local wristC1 = CFrame.new(0, handLen * 0.5, 0)
-		local hand = newPart(model, prefix .. "Hand", Vector3.new(armT * 0.82, handLen * 1.2, armT * 0.5), skin, lower.CFrame * wristC0 * wristC1:Inverse(), { Zone = limb, Limb = limb })
+		local hand = newPart(model, prefix .. "Hand", Vector3.new(armT * 0.82, handLen * 1.2, armT * 0.5), handSkin, lower.CFrame * wristC0 * wristC1:Inverse(), { Zone = limb, Limb = limb })
 		motor(prefix .. "Wrist", lower, hand, wristC0, wristC1)
-		decor(model, hand, prefix .. "Pollice", Vector3.new(armT * 0.25, handLen * 0.6, armT * 0.25), skin, CFrame.new(-side * armT * 0.3, handLen * 0.1, -armT * 0.2) * CFrame.Angles(0, 0, rad(-25 * side)))
+		decor(model, hand, prefix .. "Pollice", Vector3.new(armT * 0.25, handLen * 0.6, armT * 0.25), handSkin, CFrame.new(-side * armT * 0.3, handLen * 0.1, -armT * 0.2) * CFrame.Angles(0, 0, rad(-25 * side)))
+		-- quattro dita un po' piegate verso il palmo (il medio è il più lungo)
+		for i, len in { 0.5, 0.58, 0.54, 0.42 } do
+			local fl = handLen * len
+			decor(model, hand, prefix .. "Dito" .. i, Vector3.new(armT * 0.17, fl, armT * 0.19), handSkin, CFrame.new(side * (-0.29 + (i - 1) * 0.19) * armT, -handLen * 0.42 - fl * 0.36, -armT * 0.04) * CFrame.Angles(rad(14), 0, 0))
+		end
+		-- gomito sporgente, avambraccio più largo vicino al gomito, tricipite dietro il braccio
+		decor(model, lower, prefix .. "Gomito", Vector3.new(armT * 0.5, armT * 0.5, armT * 0.45), flush, CFrame.new(0, lowerArm * 0.46, armT * 0.3))
+		decor(model, lower, prefix .. "MassaAvambraccio", Vector3.new(armT * 0.98, lowerArm * 0.52, armT * 0.92), skin, CFrame.new(0, lowerArm * 0.2, 0))
+		decor(model, upper, prefix .. "Tricipite", Vector3.new(armT * 0.72, upperArm * 0.58, armT * 0.6), skin, CFrame.new(0, upperArm * 0.02, armT * 0.24))
 		local att = Instance.new("Attachment")
 		att.Name = prefix .. "HandAtt"
 		att.Position = Vector3.new(0, -handLen * 0.3, 0)
@@ -608,14 +622,20 @@ function TitanBuilder.Build(params): Model
 
 		local kneeC0 = CFrame.new(0, -upperLeg * 0.5, 0)
 		local kneeC1 = CFrame.new(0, lowerLeg * 0.5, 0)
-		local lower = newPart(model, prefix .. "LowerLeg", Vector3.new(legT * 0.8, lowerLeg * 1.12, legT * 0.8), skin, upper.CFrame * kneeC0 * kneeC1:Inverse(), { Zone = limb, Limb = limb })
+		local lower = newPart(model, prefix .. "LowerLeg", Vector3.new(legT * 0.8, lowerLeg * 1.12, legT * 0.8), shinSkin, upper.CFrame * kneeC0 * kneeC1:Inverse(), { Zone = limb, Limb = limb })
 		motor(prefix .. "Knee", upper, lower, kneeC0, kneeC1)
 		decor(model, lower, prefix .. "Polpaccio", Vector3.new(legT * 0.7, lowerLeg * 0.55, legT * 0.6), if p.Muscle then muscleColor else skin, CFrame.new(0, lowerLeg * 0.15, legT * 0.18), { Query = true, Zone = limb })
 
 		local ankleC0 = CFrame.new(0, -lowerLeg * 0.5, 0)
 		local ankleC1 = CFrame.new(0, footH * 0.5, footLen * 0.28)
-		local foot = newPart(model, prefix .. "Foot", Vector3.new(legT * 0.78, footH * 1.6, footLen), skin, lower.CFrame * ankleC0 * ankleC1:Inverse(), { Zone = limb, Limb = limb })
+		local foot = newPart(model, prefix .. "Foot", Vector3.new(legT * 0.78, footH * 1.6, footLen), footSkin, lower.CFrame * ankleC0 * ankleC1:Inverse(), { Zone = limb, Limb = limb })
 		motor(prefix .. "Ankle", lower, foot, ankleC0, ankleC1)
+		-- rotula, coscia, tallone e dita dei piedi (l'alluce sta dalla parte interna)
+		decor(model, lower, prefix .. "Rotula", Vector3.new(legT * 0.42, legT * 0.44, legT * 0.32), flush, CFrame.new(0, lowerLeg * 0.47, -legT * 0.32))
+		decor(model, upper, prefix .. "Quadricipite", Vector3.new(legT * 0.82, upperLeg * 0.62, legT * 0.62), if p.Muscle then muscleColor else skin, CFrame.new(0, -upperLeg * 0.04, -legT * 0.24))
+		decor(model, foot, prefix .. "Tallone", Vector3.new(legT * 0.58, footH * 1.5, footLen * 0.34), footSkin, CFrame.new(0, footH * 0.1, footLen * 0.36))
+		decor(model, foot, prefix .. "Alluce", Vector3.new(legT * 0.24, footH * 1.05, footLen * 0.24), footSkin, CFrame.new(-side * legT * 0.2, -footH * 0.2, -footLen * 0.45))
+		decor(model, foot, prefix .. "DitaPiede", Vector3.new(legT * 0.46, footH * 0.9, footLen * 0.2), footSkin, CFrame.new(side * legT * 0.1, -footH * 0.25, -footLen * 0.42))
 
 		if p.Armor then
 			local plate = Color3.fromRGB(232, 222, 202)
@@ -645,12 +665,32 @@ function TitanBuilder.Build(params): Model
 		end
 	end
 	decor(model, torso, "Schiena", Vector3.new(torsoW * 0.9, torsoH * 0.7, torsoD * 0.55), if p.Muscle then muscleColor else skin, CFrame.new(0, torsoH * 0.12, torsoD * 0.22), { Query = true, Zone = "Body" })
+	-- clavicole, trapezi, scapole, muscoli del collo e glutei: la sagoma di un corpo vero
+	for _, side in { -1, 1 } do
+		decor(model, torso, "Clavicola" .. side, Vector3.new(torsoW * 0.26, torsoH * 0.07, torsoD * 0.12), skin, CFrame.new(side * torsoW * 0.15, torsoH * 0.41, -torsoD * 0.27) * CFrame.Angles(0, 0, rad(side * 6)))
+		decor(model, torso, "Trapezio" .. side, Vector3.new(torsoW * 0.34, torsoH * 0.2, torsoD * 0.5), if p.Muscle then muscleColor else skin, CFrame.new(side * torsoW * 0.18, torsoH * 0.47, torsoD * 0.06) * CFrame.Angles(0, 0, rad(-side * 22)))
+		decor(model, torso, "Scapola" .. side, Vector3.new(torsoW * 0.3, torsoH * 0.32, torsoD * 0.22), skin, CFrame.new(side * torsoW * 0.21, torsoH * 0.18, torsoD * 0.4))
+		decor(model, torso, "Sternocleido" .. side, Vector3.new(headW * 0.12, headH * 0.62, headD * 0.14), skin, CFrame.new(side * headW * 0.17, torsoH * 0.56, -headD * 0.22) * CFrame.Angles(rad(-18), 0, rad(side * 16)))
+		decor(model, hips, "Gluteo" .. side, Vector3.new(hipsW * 0.5, hipsH * 1.45, torsoD * 0.5), skin, CFrame.new(side * hipsW * 0.21, -hipsH * 0.15, torsoD * 0.28))
+	end
+	-- ombelico
+	local navelZ = if p.Belly > 0 then -torsoD * (0.5 + 0.37 * p.Belly) else -torsoD * 0.47
+	decor(model, torso, "Ombelico", Vector3.new(headH * 0.05, headH * 0.06, headH * 0.04), darker(skin, 0.62), CFrame.new(0, -torsoH * 0.2, navelZ))
+	-- costole che si vedono sotto la pelle dei giganti magri
+	if p.ThickMul < 0.8 and p.Belly == 0 and not p.Muscle then
+		for _, side in { -1, 1 } do
+			for i = 0, 2 do
+				decor(model, torso, "Costa" .. side .. i, Vector3.new(torsoW * 0.26, torsoH * 0.045, torsoD * 0.5), darker(skin, 0.93), CFrame.new(side * torsoW * 0.3, torsoH * (0.02 - i * 0.11), -torsoD * 0.22) * CFrame.Angles(0, 0, rad(-side * 18)))
+			end
+		end
+	end
 
 	if p.Skinless then
 		-- fasce muscolari chiare (Vulcano, Grande Marcia)
-		local stripe = Color3.fromRGB(222, 140, 116)
+		local stripe = skin:Lerp(Color3.fromRGB(236, 150, 120), 0.35)
+		local groove = darker(skin, 0.7)
 		for i = 0, 3 do
-			decor(model, torso, "Fibra" .. i, Vector3.new(torsoW * 0.08, torsoH * 0.9, torsoD * 0.2), stripe, CFrame.new((i - 1.5) * torsoW * 0.18, 0, -torsoD * 0.44))
+			decor(model, torso, "Fibra" .. i, Vector3.new(torsoW * 0.05, torsoH * 0.8, torsoD * 0.16), if i % 2 == 0 then stripe else groove, CFrame.new((i - 1.5) * torsoW * 0.2, -torsoH * 0.05, -torsoD * 0.44))
 		end
 		decor(model, head, "FibraTesta", Vector3.new(headW * 0.85, headH * 0.15, headD * 0.95), stripe, CFrame.new(0, headH * 0.25, 0))
 	end
@@ -726,8 +766,16 @@ function TitanBuilder.Build(params): Model
 			decor(model, head, name .. "Occhiaia", Vector3.new(eyeSize * 1.35, eyeSize * 1.2, eyeSize * 0.45), darker(skin, 0.72), CFrame.new(side * headW * 0.2, headH * 0.06, front + eyeSize * 0.05))
 		end
 		decor(model, head, name .. "Sopracciglio", Vector3.new(eyeSize * 1.3, eyeSize * 0.22, eyeSize * 0.4), darker(p.Hair, 0.9), CFrame.new(side * headW * 0.2, headH * 0.08 + eyeSize * 0.62, front + eyeSize * 0.05) * CFrame.Angles(0, 0, rad(side * rng:NextNumber(-12, 18))))
-		-- orecchie
+		-- palpebre pesanti: coprono la parte alta dell'occhio (lo sguardo assente dei giganti)
+		if not p.EyeGlow and not p.Iris then
+			decor(model, head, name .. "Palpebra", Vector3.new(eyeSize * 1.12, eyeSize * 0.52, eyeSize * 0.78), darker(skin, 0.96), CFrame.new(side * headW * 0.2, headH * 0.08 + eyeSize * 0.31, front + eyeSize * 0.1))
+		end
+		-- zigomi e pieghe ai lati della bocca
+		decor(model, head, name .. "Zigomo", Vector3.new(headW * 0.22, headH * 0.12, headD * 0.22), skin:Lerp(flush, 0.3), CFrame.new(side * headW * 0.3, -headH * 0.02, front + headD * 0.1))
+		decor(model, head, name .. "Piega", Vector3.new(headW * 0.04, headH * 0.18, headD * 0.06), darker(skin, 0.84), CFrame.new(side * headW * 0.17, -headH * 0.15, front + headD * 0.02) * CFrame.Angles(0, 0, rad(-side * 20)))
+		-- orecchie (con l'incavo più scuro)
 		decor(model, head, name .. "Orecchio", Vector3.new(headW * 0.12, headH * 0.26 * p.Ears, headD * 0.22), skin, CFrame.new(side * headW * 0.5, 0, headD * 0.05))
+		decor(model, head, name .. "Conca", Vector3.new(headW * 0.05, headH * 0.16 * p.Ears, headD * 0.12), darker(skin, 0.74), CFrame.new(side * headW * 0.545, 0, headD * 0.02))
 	end
 	if look == "Cacciatrice" or p.Muscle and not p.Armor and not p.Skinless then
 		-- muscoli scoperti intorno agli occhi (tipico dei mutaforma)
@@ -737,14 +785,19 @@ function TitanBuilder.Build(params): Model
 	end
 	-- naso
 	decor(model, head, "Naso", Vector3.new(headW * 0.13, headH * 0.2, headD * 0.18), darker(skin, 0.95), CFrame.new(0, -headH * 0.04, front - headD * 0.03))
+	decor(model, head, "PuntaNaso", Vector3.new(headW * 0.14, headH * 0.09, headD * 0.12), skin:Lerp(flush, 0.4), CFrame.new(0, -headH * 0.11, front - headD * 0.08))
+	for _, side in { -1, 1 } do
+		decor(model, head, "Narice" .. side, Vector3.new(headW * 0.045, headH * 0.03, headD * 0.05), darker(skin, 0.45), CFrame.new(side * headW * 0.035, -headH * 0.15, front - headD * 0.07))
+	end
+	decor(model, jaw, "Mento", Vector3.new(headW * 0.3, headH * 0.14, headD * 0.2), skin, CFrame.new(0, -headH * 0.1, -headD * 0.32))
 
 	-- bocca: interno scuro + denti
 	local mouthW = headW * p.MouthWidth
 	local mouthY = -headH * 0.22
 	decor(model, jaw, "Bocca", Vector3.new(mouthW, headH * (if p.Gape then 0.3 else 0.16), headD * 0.12), Color3.fromRGB(70, 22, 24), CFrame.new(0, headH * (if p.Gape then 0.12 else 0.06), -headD * 0.3))
 	local teeth = Color3.fromRGB(244, 238, 222)
-	decor(model, head, "DentiSu", Vector3.new(mouthW * 0.96, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, mouthY + headH * 0.04, front + headD * 0.03), { Shape = "Block" })
-	decor(model, jaw, "DentiGiu", Vector3.new(mouthW * 0.92, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, headH * 0.1, -headD * 0.33), { Shape = "Block" })
+	decor(model, head, "DentiSu", Vector3.new(mouthW * 0.96, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, mouthY + headH * 0.04, front + headD * 0.03))
+	decor(model, jaw, "DentiGiu", Vector3.new(mouthW * 0.92, headH * 0.06, headD * 0.08), teeth, CFrame.new(0, headH * 0.1, -headD * 0.33))
 	if p.BigTeeth then
 		-- fila di denti squadrati ben visibili
 		local n = 7
@@ -776,6 +829,13 @@ function TitanBuilder.Build(params): Model
 	local style = p.HairStyle
 	if style == "Corto" or style == "Lungo" or style == "Caschetto" or style == "Pelo" then
 		decor(model, head, "Capelli", Vector3.new(headW * 1.06, headH * 0.6, headD * 1.06), hair, CFrame.new(0, headH * 0.26, headD * 0.04))
+	end
+	if style == "Corto" or style == "Lungo" or style == "Caschetto" or style == "Riga" or style == "Spettinato" then
+		for i, a in { 50, 110, 180, 250, 310 } do
+			local s0 = headW * rng:NextNumber(0.26, 0.34)
+			local ar = rad(a)
+			decor(model, head, "CioccaBordo" .. i, Vector3.new(s0, s0 * 0.9, s0 * 1.2), hair:Lerp(darker(hair, 0.7), rng:NextNumber(0, 0.6)), CFrame.new(math.sin(ar) * headW * 0.47, headH * rng:NextNumber(0.14, 0.24), -math.cos(ar) * headD * 0.45 + headD * 0.04) * CFrame.Angles(rad(rng:NextNumber(-25, 25)), ar, rad(rng:NextNumber(-25, 25))))
+		end
 	end
 	if style == "Lungo" then
 		decor(model, head, "CapelliLunghi", Vector3.new(headW * 1.02, headH * 0.95, headD * 0.5), hair, CFrame.new(0, -headH * 0.12, headD * 0.34))

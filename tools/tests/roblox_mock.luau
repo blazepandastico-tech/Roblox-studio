@@ -947,35 +947,43 @@ local function checkMaterial(m)
 		fail("Terreno: serve un Enum.Material")
 	end
 end
+-- il terreno disegnato viene anche registrato (per le foto del mondo: tools/world_photo.py)
+MOCK_TERRAIN = {}
+MOCK_TERRAIN_COLORS = {}
 function Methods.FillBlock(_self, cf, size, material)
 	if not isCF(cf) or not isV3(size) then
 		fail("Terrain:FillBlock(CFrame, Vector3, Material)")
 	end
 	checkMaterial(material)
+	table.insert(MOCK_TERRAIN, { Kind = "Block", CFrame = cf, Size = size, Material = material })
 end
 function Methods.FillBall(_self, center, radius, material)
 	if not isV3(center) or type(radius) ~= "number" then
 		fail("Terrain:FillBall(Vector3, number, Material)")
 	end
 	checkMaterial(material)
+	table.insert(MOCK_TERRAIN, { Kind = "Ball", Center = center, Radius = radius, Material = material })
 end
 function Methods.FillCylinder(_self, cf, height, radius, material)
 	if not isCF(cf) or type(height) ~= "number" or type(radius) ~= "number" then
 		fail("Terrain:FillCylinder(CFrame, number, number, Material)")
 	end
 	checkMaterial(material)
+	table.insert(MOCK_TERRAIN, { Kind = "Cylinder", CFrame = cf, Height = height, Radius = radius, Material = material })
 end
 function Methods.FillWedge(_self, cf, size, material)
 	if not isCF(cf) or not isV3(size) then
 		fail("Terrain:FillWedge(CFrame, Vector3, Material)")
 	end
 	checkMaterial(material)
+	table.insert(MOCK_TERRAIN, { Kind = "Wedge", CFrame = cf, Size = size, Material = material })
 end
 function Methods.SetMaterialColor(_self, material, color)
 	checkMaterial(material)
 	if typeOf(color) ~= "Color3" then
 		fail("Terrain:SetMaterialColor: serve un Color3")
 	end
+	MOCK_TERRAIN_COLORS[material.Name] = color
 end
 -- mondo: un raggio verso il basso trova il terreno a quota 8 (o il fondo delle grotte)
 function Methods.Raycast(self, origin, direction, _params)
