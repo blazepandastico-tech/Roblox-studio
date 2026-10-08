@@ -1,0 +1,2880 @@
+<?xml version="1.0" encoding="utf-8"?>
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<Meta name="ExplicitAutoJoints">true</Meta>
+<Item class="Workspace" referent="RBX1"><Properties><string name="Name">Workspace</string></Properties></Item>
+<Item class="Players" referent="RBX2"><Properties><string name="Name">Players</string><bool name="CharacterAutoLoad">false</bool></Properties></Item>
+<Item class="ReplicatedStorage" referent="RBX5"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="ModuleScript" referent="RBX3"><Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[-- Tutti i numeri di bilanciamento del gioco stanno qui.
+local Config = {}
+
+Config.GameName = "Calcio Fuorilegge"
+
+Config.Teams = {
+	Red = { Name = "Rossi", Color = Color3.fromRGB(235, 64, 52), BrickColor = "Really red" },
+	Blue = { Name = "Blu", Color = Color3.fromRGB(41, 160, 255), BrickColor = "Bright blue" },
+}
+
+Config.Match = {
+	Duration = 360, -- 6:00
+	Intermission = 15,
+	MinPlayers = 1, -- metti 2 per il gioco vero; 1 permette di provare da soli
+	MaxPerTeam = 4,
+	KickoffCountdown = 3,
+	GoalCelebration = 4.5,
+	ResumeCountdown = 2,
+	EndScreen = 9,
+}
+
+Config.Field = {
+	Length = 220, -- asse X, linea di porta - linea di porta
+	Width = 140, -- asse Z
+	GoalWidth = 26,
+	GoalHeight = 10,
+	GoalDepth = 9,
+	WallHeight = 45,
+	-- distanze dal centro (stud) degli slot di calcio d'inizio: portiere, 2 mediani, attaccante
+	KickoffSlots = {
+		{ x = 95, z = 0 },
+		{ x = 45, z = -26 },
+		{ x = 45, z = 26 },
+		{ x = 12, z = 0 },
+	},
+}
+
+Config.Lobby = {
+	Center = Vector3.new(0, 0, -900),
+}
+
+Config.Move = {
+	WalkSpeed = 18,
+	SprintSpeed = 27,
+	JumpPower = 0, -- Spazio e' il dribbling: niente salto normale (il jetpack arriva con i gadget)
+}
+
+Config.Stamina = {
+	Pips = 4,
+	SprintDrainPerSec = 1 / 1.2, -- 1 tacca ogni 1,2 s
+	KickTap = 0.25,
+	KickChargedMin = 0.5,
+	KickChargedMax = 1.0,
+	Pass = 0.25,
+	Flick = 0.25,
+	Lob = 0.35,
+	Tackle = 0.5,
+	Dash = 0.3,
+	RegenDelay = 1.0,
+	RegenPerSec = 1 / 1.5, -- 1 tacca ogni 1,5 s
+	ExhaustedRecover = 0.5, -- dopo lo zero serve questo livello per rimettersi a correre
+	WeakKickMultiplier = 0.45,
+}
+
+Config.Kick = {
+	ChargeTime = 1.0,
+	TapThreshold = 0.18,
+	MinPower = 55,
+	MaxPower = 125,
+	Reach = 7.5,
+	Cooldown = 0.3,
+	ArcBase = 0.07, -- radianti, leggero arco
+	MaxPitch = math.rad(38),
+	MinPitch = math.rad(-4),
+	PowerShotThreshold = 0.95,
+	PowerHitSpeed = 55,
+	PowerHitImpulse = 62,
+	PassBase = 28,
+	PassPerStud = 1.5,
+	PassMin = 42,
+	PassMax = 95,
+	PassMinDot = 0.45,
+	FlickForward = 24,
+	FlickUp = 32,
+	LobForward = 62,
+	LobUp = 80,
+	CallBallDuration = 3,
+}
+
+Config.Ball = {
+	Diameter = 2.8,
+	ControlRadius = 4.4,
+	ReleaseRadius = 6.4,
+	CarryDistance = 3.7,
+	CarryDistanceTight = 3.0,
+	MinControlSpeed = 1.5,
+	FollowRate = 15,
+	MaxCarrySpeed = 70,
+	GroundDrag = 0.38, -- frazione di velocita' persa al secondo a terra
+	AirDrag = 0.03,
+	TouchLockAfterKick = 0.35,
+	Magnus = 0.2, -- accelerazione laterale = Magnus * velocita' * effetto
+	SpinDecay = 0.45, -- frazione di effetto persa al secondo
+}
+
+Config.Tackle = {
+	Duration = 0.65,
+	Speed = 52,
+	Reach = 5.6,
+	Cooldown = 1.2,
+	BallKnock = 46,
+	BallKnockUp = 16,
+	VictimImpulse = 34,
+}
+
+Config.Dash = {
+	Speed = 46,
+	Duration = 0.22,
+	Cooldown = 0.9,
+	EvadeTime = 0.4,
+}
+
+Config.Ragdoll = {
+	Duration = 1.2,
+}
+
+-- Tasti di default (la rimappatura da menu arriva in Fase 6)
+Config.Controls = {
+	Flick = Enum.KeyCode.Q,
+	Lob = Enum.KeyCode.F,
+	Tackle = Enum.KeyCode.E,
+	Dribble = Enum.KeyCode.Space,
+	Sprint = Enum.KeyCode.LeftShift,
+	CallBall = Enum.KeyCode.R,
+	Lobby = Enum.KeyCode.L,
+	Gadget1 = Enum.KeyCode.One,
+	Gadget2 = Enum.KeyCode.Two,
+}
+
+return Config
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">Net</string><ProtectedString name="Source"><![CDATA[-- Crea (server) e recupera (client) tutti i RemoteEvent del gioco.
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local NAMES = {
+	"Kick", -- client -> server: (kind, charge, aimDir, curve)
+	"Tackle", -- (dir)
+	"Dash", -- (dir)
+	"Control", -- (bool) controllo stretto palla
+	"Sprint", -- (bool)
+	"CallBall",
+	"ReturnLobby",
+	"JoinQueue",
+	"GoalScored", -- server -> client: (teamKey, scorerName, assistName, ownGoal)
+	"Notify", -- server -> client: (text)
+}
+
+local folder
+if RunService:IsServer() then
+	folder = ReplicatedStorage:FindFirstChild("Remotes")
+	if not folder then
+		folder = Instance.new("Folder")
+		folder.Name = "Remotes"
+		folder.Parent = ReplicatedStorage
+	end
+	for _, name in ipairs(NAMES) do
+		if not folder:FindFirstChild(name) then
+			local r = Instance.new("RemoteEvent")
+			r.Name = name
+			r.Parent = folder
+		end
+	end
+else
+	folder = ReplicatedStorage:WaitForChild("Remotes")
+end
+
+local Net = {}
+
+function Net.Get(name)
+	return folder:WaitForChild(name)
+end
+
+return Net
+]]></ProtectedString></Properties></Item></Item>
+<Item class="ServerScriptService" referent="RBX15"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBX6"><Properties><string name="Name">Main</string><bool name="Disabled">false</bool><ProtectedString name="Source"><![CDATA[-- Punto d'ingresso del server di Calcio Fuorilegge.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+local Server = script.Parent:WaitForChild("Server")
+local MapBuilder = require(Server:WaitForChild("MapBuilder"))
+local Stamina = require(Server:WaitForChild("Stamina"))
+local Ball = require(Server:WaitForChild("Ball"))
+local Actions = require(Server:WaitForChild("Actions"))
+local Lobby = require(Server:WaitForChild("Lobby"))
+local Match = require(Server:WaitForChild("Match"))
+
+Players.CharacterAutoLoad = false
+
+MapBuilder.Build()
+Lobby.Init()
+Ball.Create()
+Actions.Init(Match.IsPlaying)
+
+Net.Get("JoinQueue").OnServerEvent:Connect(function(plr)
+	if Match.GetPhase() == "Intermission" then
+		Lobby.AutoAssign(plr)
+		Net.Get("Notify"):FireClient(plr, "Sei nella lista: la partita sta per iniziare!")
+	end
+end)
+
+Net.Get("ReturnLobby").OnServerEvent:Connect(function(plr)
+	Match.Leave(plr)
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+	Stamina.Step(dt)
+	Ball.Step(dt)
+end)
+
+Players.PlayerAdded:Connect(Match.OnPlayerAdded)
+for _, plr in ipairs(Players:GetPlayers()) do
+	task.spawn(Match.OnPlayerAdded, plr)
+end
+
+task.spawn(Match.Run)
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX14"><Properties><string name="Name">Server</string></Properties><Item class="ModuleScript" referent="RBX7"><Properties><string name="Name">Actions</string><ProtectedString name="Source"><![CDATA[-- Gestione dei RemoteEvent di gioco: calci, scivolata, scatto, sprint, chiedi palla.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+local Stamina = require(script.Parent.Stamina)
+local Ragdoll = require(script.Parent.Ragdoll)
+local Ball = require(script.Parent.Ball)
+
+local Actions = {}
+
+local cooldowns = {} -- [plr] = { tackle = t, dash = t, call = t }
+
+local function cd(plr)
+	local c = cooldowns[plr]
+	if not c then
+		c = { tackle = 0, dash = 0, call = 0 }
+		cooldowns[plr] = c
+	end
+	return c
+end
+
+local function parts(plr)
+	local char = plr.Character
+	if not char then
+		return nil
+	end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp or hum.Health <= 0 then
+		return nil
+	end
+	return char, hum, hrp
+end
+
+local function flat(v)
+	return Vector3.new(v.X, 0, v.Z)
+end
+
+local function validDir(v)
+	return typeof(v) == "Vector3" and v.X == v.X and v.Y == v.Y and v.Z == v.Z and flat(v).Magnitude > 0.05
+end
+
+local function stat(plr, name, delta)
+	local stats = plr:FindFirstChild("leaderstats")
+	local v = stats and stats:FindFirstChild(name)
+	if v then
+		v.Value = v.Value + delta
+	end
+end
+
+function Actions.Init(isPlaying)
+	Net.Get("Kick").OnServerEvent:Connect(function(plr, kind, charge, aim, curve)
+		if not isPlaying() or typeof(kind) ~= "string" then
+			return
+		end
+		Ball.Kick(plr, kind, charge, aim, curve)
+	end)
+
+	Net.Get("Control").OnServerEvent:Connect(function(plr, on)
+		Ball.SetTight(plr, on == true)
+	end)
+
+	Net.Get("Sprint").OnServerEvent:Connect(function(plr, on)
+		Stamina.SetSprinting(plr, on == true)
+	end)
+
+	Net.Get("Tackle").OnServerEvent:Connect(function(plr, dir)
+		if not isPlaying() then
+			return
+		end
+		local char, hum, hrp = parts(plr)
+		if not char or Ragdoll.IsRagdolled(char) or char:GetAttribute("Sliding") then
+			return
+		end
+		local c = cd(plr)
+		local now = os.clock()
+		if now < c.tackle or Stamina.Get(plr) < 0.05 then
+			return
+		end
+		c.tackle = now + Config.Tackle.Cooldown
+		Stamina.Spend(plr, Config.Stamina.Tackle)
+		local d = validDir(dir) and flat(dir).Unit or flat(hrp.CFrame.LookVector).Unit
+
+		char:SetAttribute("Sliding", true)
+		hum.AutoRotate = false
+		task.spawn(function()
+			local T = Config.Tackle
+			local t0 = os.clock()
+			local hit = {}
+			local ballHit = false
+			while true do
+				local el = os.clock() - t0
+				if el >= T.Duration or not char.Parent or hum.Health <= 0 or Ragdoll.IsRagdolled(char) then
+					break
+				end
+				local speed = T.Speed * (1 - 0.7 * el / T.Duration)
+				hrp.AssemblyLinearVelocity = Vector3.new(d.X * speed, hrp.AssemblyLinearVelocity.Y, d.Z * speed)
+				hrp.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + d)
+
+				for _, other in ipairs(Players:GetPlayers()) do
+					if other ~= plr and not hit[other] then
+						local oc, _, ohrp = parts(other)
+						if oc and not Ragdoll.IsRagdolled(oc) and not oc:GetAttribute("Evading") and not oc:GetAttribute("Shielded") then
+							local to = flat(ohrp.Position - hrp.Position)
+							if to.Magnitude < T.Reach and (to.Magnitude < 1.5 or to.Unit:Dot(d) > -0.2) then
+								hit[other] = true
+								Ragdoll.Apply(oc, Config.Ragdoll.Duration, d * T.VictimImpulse + Vector3.new(0, 20, 0))
+								Net.Get("Notify"):FireClient(plr, "Contrasto!")
+								Net.Get("Notify"):FireClient(other, "Sei stato contrastato!")
+								stat(plr, "Contrasti", 1)
+							end
+						end
+					end
+				end
+				if not ballHit then
+					local ball = Ball.Part
+					local rel = ball.Position - hrp.Position
+					if flat(rel).Magnitude < T.Reach and rel.Y < 5 and not ball.Anchored then
+						ballHit = true
+						Ball.SetToucher(plr)
+						Ball.Knock(d * T.BallKnock + Vector3.new(0, T.BallKnockUp, 0))
+					end
+				end
+				RunService.Heartbeat:Wait()
+			end
+			if char.Parent then
+				char:SetAttribute("Sliding", nil)
+				hum.AutoRotate = true
+			end
+		end)
+	end)
+
+	Net.Get("Dash").OnServerEvent:Connect(function(plr, dir)
+		if not isPlaying() then
+			return
+		end
+		local char, hum, hrp = parts(plr)
+		if not char or Ragdoll.IsRagdolled(char) or char:GetAttribute("Sliding") or char:GetAttribute("Dashing") then
+			return
+		end
+		local c = cd(plr)
+		local now = os.clock()
+		if now < c.dash or Stamina.Get(plr) < 0.05 then
+			return
+		end
+		c.dash = now + Config.Dash.Cooldown
+		Stamina.Spend(plr, Config.Stamina.Dash)
+		local d = validDir(dir) and flat(dir).Unit or flat(hrp.CFrame.RightVector).Unit
+
+		char:SetAttribute("Dashing", true)
+		char:SetAttribute("Evading", true)
+		task.spawn(function()
+			local t0 = os.clock()
+			while os.clock() - t0 < Config.Dash.Duration and char.Parent and hum.Health > 0 and not Ragdoll.IsRagdolled(char) do
+				hrp.AssemblyLinearVelocity = Vector3.new(d.X * Config.Dash.Speed, hrp.AssemblyLinearVelocity.Y, d.Z * Config.Dash.Speed)
+				RunService.Heartbeat:Wait()
+			end
+			if char.Parent then
+				char:SetAttribute("Dashing", nil)
+			end
+		end)
+		task.delay(Config.Dash.EvadeTime, function()
+			if char.Parent then
+				char:SetAttribute("Evading", nil)
+			end
+		end)
+	end)
+
+	Net.Get("CallBall").OnServerEvent:Connect(function(plr)
+		if not isPlaying() then
+			return
+		end
+		local char = plr.Character
+		local head = char and char:FindFirstChild("Head")
+		if not head then
+			return
+		end
+		local c = cd(plr)
+		local now = os.clock()
+		if now < c.call then
+			return
+		end
+		c.call = now + 1.5
+		local old = head:FindFirstChild("CallSign")
+		if old then
+			old:Destroy()
+		end
+		local gui = Instance.new("BillboardGui")
+		gui.Name = "CallSign"
+		gui.Size = UDim2.fromOffset(120, 40)
+		gui.StudsOffset = Vector3.new(0, 4.2, 0)
+		gui.AlwaysOnTop = true
+		gui.Parent = head
+		local lbl = Instance.new("TextLabel")
+		lbl.Size = UDim2.fromScale(1, 1)
+		lbl.BackgroundColor3 = Color3.fromRGB(255, 214, 64)
+		lbl.TextColor3 = Color3.fromRGB(40, 30, 10)
+		lbl.Font = Enum.Font.GothamBlack
+		lbl.TextScaled = true
+		lbl.Text = "PASSA!"
+		lbl.Parent = gui
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 10)
+		corner.Parent = lbl
+		task.delay(Config.Kick.CallBallDuration, function()
+			if gui.Parent then
+				gui:Destroy()
+			end
+		end)
+	end)
+end
+
+Players.PlayerRemoving:Connect(function(plr)
+	cooldowns[plr] = nil
+end)
+
+return Actions
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX8"><Properties><string name="Name">Ball</string><ProtectedString name="Source"><![CDATA[-- Palla: fisica autorevole sul server, conduzione, calci, effetto, goal.
+local Players = game:GetService("Players")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+local Stamina = require(script.Parent.Stamina)
+local Ragdoll = require(script.Parent.Ragdoll)
+
+local K = Config.Kick
+local B = Config.Ball
+local F = Config.Field
+local RADIUS = B.Diameter / 2
+
+local Ball = {}
+Ball.Part = nil
+Ball.Active = false
+
+local state = {
+	spin = 0,
+	possessor = nil,
+	lastToucher = nil,
+	prevToucher = nil, -- candidato assist
+	prevTime = 0,
+	powerShot = nil,
+}
+local lockUntil = {} -- [plr] = os.clock() entro cui non puo' ri-controllare la palla
+local lastKick = {}
+local tight = {} -- [plr] = true se tiene Spazio
+
+local function charParts(plr)
+	local char = plr.Character
+	if not char then
+		return nil
+	end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp or hum.Health <= 0 then
+		return nil
+	end
+	return char, hum, hrp
+end
+
+local function flat(v)
+	return Vector3.new(v.X, 0, v.Z)
+end
+
+local function validVector(v)
+	return typeof(v) == "Vector3" and v.X == v.X and v.Y == v.Y and v.Z == v.Z and v.Magnitude > 0.05 and v.Magnitude < 1e4
+end
+
+local function teamKeyOf(plr)
+	if plr.Team then
+		for key, t in pairs(Config.Teams) do
+			if t.Name == plr.Team.Name then
+				return key
+			end
+		end
+	end
+	return nil
+end
+Ball.TeamKeyOf = teamKeyOf
+
+local function setToucher(plr)
+	if state.lastToucher == plr then
+		return
+	end
+	local old = state.lastToucher
+	if old and plr and teamKeyOf(old) == teamKeyOf(plr) then
+		state.prevToucher = old
+		state.prevTime = os.clock()
+	else
+		state.prevToucher = nil
+	end
+	state.lastToucher = plr
+end
+
+function Ball.ClearPossession()
+	state.possessor = nil
+	Ball.Part:SetAttribute("Possessor", nil)
+end
+
+function Ball.SetToucher(plr)
+	setToucher(plr)
+end
+
+function Ball.Create()
+	local part = Instance.new("Part")
+	part.Name = "Ball"
+	part.Shape = Enum.PartType.Ball
+	part.Size = Vector3.new(B.Diameter, B.Diameter, B.Diameter)
+	part.Color = Color3.fromRGB(250, 250, 250)
+	part.Material = Enum.Material.SmoothPlastic
+	part.CustomPhysicalProperties = PhysicalProperties.new(0.55, 0.5, 0.7, 1, 1)
+	part.Anchored = true
+	part.Position = Vector3.new(0, RADIUS + 0.3, 0)
+
+	-- pezze nere (icosaedro: 12 direzioni)
+	local phi = (1 + math.sqrt(5)) / 2
+	local dirs = {}
+	for _, a in ipairs({ -1, 1 }) do
+		for _, b in ipairs({ -phi, phi }) do
+			table.insert(dirs, Vector3.new(0, a, b))
+			table.insert(dirs, Vector3.new(a, b, 0))
+			table.insert(dirs, Vector3.new(b, 0, a))
+		end
+	end
+	for _, d in ipairs(dirs) do
+		local patch = Instance.new("Part")
+		patch.Name = "Patch"
+		patch.Shape = Enum.PartType.Ball
+		patch.Size = Vector3.new(1.05, 1.05, 1.05)
+		patch.Color = Color3.fromRGB(25, 25, 30)
+		patch.Material = Enum.Material.SmoothPlastic
+		patch.CanCollide = false
+		patch.CanQuery = false
+		patch.CanTouch = false
+		patch.Massless = true
+		patch.Anchored = false
+		patch.CFrame = part.CFrame + d.Unit * (RADIUS - 0.02)
+		local w = Instance.new("WeldConstraint")
+		w.Part0 = part
+		w.Part1 = patch
+		w.Parent = patch
+		patch.Parent = part
+	end
+
+	-- scia
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, RADIUS * 0.8, 0)
+	a0.Parent = part
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, -RADIUS * 0.8, 0)
+	a1.Parent = part
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.35
+	trail.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+	trail.Transparency = NumberSequence.new(0.3, 1)
+	trail.LightEmission = 0.6
+	trail.Enabled = false
+	trail.Parent = part
+
+	part.Parent = workspace
+	Ball.Part = part
+
+	part.Touched:Connect(function(other)
+		if not Ball.Active then
+			return
+		end
+		local char = other.Parent
+		local plr = char and Players:GetPlayerFromCharacter(char)
+		if not plr then
+			return
+		end
+		setToucher(plr)
+		-- tiro a carica piena che colpisce un avversario/compagno: lo butta a terra
+		local ps = state.powerShot
+		local vel = part.AssemblyLinearVelocity
+		if ps and ps.by ~= plr and os.clock() - ps.t < 2.5 and vel.Magnitude > K.PowerHitSpeed then
+			if not Ragdoll.IsRagdolled(char) and not char:GetAttribute("Shielded") then
+				state.powerShot = nil
+				Ragdoll.Apply(char, Config.Ragdoll.Duration, vel.Unit * K.PowerHitImpulse + Vector3.new(0, 18, 0))
+				part.AssemblyLinearVelocity = vel * 0.35 + Vector3.new(0, 14, 0)
+				Net.Get("Notify"):FireClient(ps.by, "Colpo diretto!")
+				Net.Get("Notify"):FireClient(plr, "Sei stato colpito!")
+				local stats = ps.by:FindFirstChild("leaderstats")
+				if stats and stats:FindFirstChild("Colpi") then
+					stats.Colpi.Value = stats.Colpi.Value + 1
+				end
+			end
+		end
+	end)
+	return part
+end
+
+function Ball.Reset(position)
+	local p = Ball.Part
+	p.Anchored = true
+	p.AssemblyLinearVelocity = Vector3.zero
+	p.AssemblyAngularVelocity = Vector3.zero
+	p.CFrame = CFrame.new(position or Vector3.new(0, RADIUS + 0.3, 0))
+	state.spin = 0
+	state.powerShot = nil
+	state.lastToucher = nil
+	state.prevToucher = nil
+	Ball.ClearPossession()
+end
+
+function Ball.Release()
+	local p = Ball.Part
+	p.Anchored = false
+	p:SetNetworkOwner(nil)
+end
+
+function Ball.SetActive(on)
+	Ball.Active = on
+end
+
+function Ball.SetTight(plr, on)
+	tight[plr] = on and true or nil
+end
+
+function Ball.GetScorers()
+	return state.lastToucher, state.prevToucher, state.prevTime
+end
+
+-- ritorna "Red" / "Blue" = la squadra che ha segnato, oppure nil
+function Ball.CheckGoal()
+	local p = Ball.Part.Position
+	local gw = F.GoalWidth / 2
+	if math.abs(p.Z) < gw - 0.5 and p.Y < F.GoalHeight - 0.5 then
+		if p.X > F.Length / 2 + RADIUS then
+			return "Red" -- palla nella porta dei Blu (+X)
+		elseif p.X < -F.Length / 2 - RADIUS then
+			return "Blue"
+		end
+	end
+	return nil
+end
+
+function Ball.OutOfBounds()
+	local p = Ball.Part.Position
+	return p.Y < -30 or math.abs(p.X) > F.Length / 2 + 40 or math.abs(p.Z) > F.Width / 2 + 40 or p.Y > 80
+end
+
+----------------------------------------------------------------------
+-- Calci
+----------------------------------------------------------------------
+local function applyKick(plr, hrp, velocity, spin, charged)
+	local part = Ball.Part
+	part.Anchored = false
+	part.AssemblyLinearVelocity = velocity + flat(hrp.AssemblyLinearVelocity) * 0.25
+	part.AssemblyAngularVelocity = Vector3.new(math.random(-6, 6), math.random(-6, 6), math.random(-6, 6))
+	state.spin = spin
+	state.powerShot = charged and { by = plr, t = os.clock() } or nil
+	Ball.ClearPossession()
+	lockUntil[plr] = os.clock() + B.TouchLockAfterKick
+	setToucher(plr)
+	part:SetNetworkOwner(nil)
+end
+
+local function aimBasis(hrp, aim)
+	local h = flat(aim)
+	if h.Magnitude < 0.05 then
+		h = flat(hrp.CFrame.LookVector)
+	end
+	h = h.Unit
+	local pitch = math.asin(math.clamp(aim.Unit.Y, -1, 1))
+	pitch = math.clamp(pitch, K.MinPitch, K.MaxPitch)
+	return h, pitch
+end
+
+local function findPassTarget(plr, hrp, h)
+	local best, bestDot
+	local myTeam = plr.Team
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other ~= plr and other.Team ~= nil and other.Team == myTeam then
+			local oc, _, ohrp = charParts(other)
+			if oc and not Ragdoll.IsRagdolled(oc) then
+				local to = flat(ohrp.Position - hrp.Position)
+				if to.Magnitude > 3 then
+					local dot = to.Unit:Dot(h)
+					if dot > K.PassMinDot and (not bestDot or dot > bestDot) then
+						best, bestDot = ohrp, dot
+					end
+				end
+			end
+		end
+	end
+	return best
+end
+
+function Ball.Kick(plr, kind, charge, aim, curve)
+	if not Ball.Active or Ball.Part.Anchored then
+		return false
+	end
+	if not validVector(aim) then
+		return false
+	end
+	local char, hum, hrp = charParts(plr)
+	if not char or Ragdoll.IsRagdolled(char) then
+		return false
+	end
+	local now = os.clock()
+	if lastKick[plr] and now - lastKick[plr] < K.Cooldown then
+		return false
+	end
+	local part = Ball.Part
+	if (part.Position - hrp.Position).Magnitude > K.Reach then
+		return false
+	end
+	charge = math.clamp(tonumber(charge) or 0, 0, 1)
+	curve = math.clamp(tonumber(curve) or 0, -1, 1)
+	aim = aim.Unit
+
+	local cost
+	if kind == "normal" then
+		cost = (charge < 0.15) and Config.Stamina.KickTap or (Config.Stamina.KickChargedMin + (Config.Stamina.KickChargedMax - Config.Stamina.KickChargedMin) * charge)
+	elseif kind == "pass" then
+		cost = Config.Stamina.Pass
+	elseif kind == "flick" then
+		cost = Config.Stamina.Flick
+	elseif kind == "lob" then
+		cost = Config.Stamina.Lob
+	else
+		return false
+	end
+	local strong = Stamina.Spend(plr, cost)
+	local weak = Config.Stamina.WeakKickMultiplier
+	lastKick[plr] = now
+
+	local h, pitch = aimBasis(hrp, aim)
+
+	if kind == "normal" then
+		local power = K.MinPower + (K.MaxPower - K.MinPower) * charge
+		local p = pitch + K.ArcBase
+		if not strong then
+			power = power * weak
+			p = 0
+			charge = 0
+		end
+		local dir = h * math.cos(p) + Vector3.new(0, math.sin(p), 0)
+		local spin = (charge > 0.1 and strong) and curve or 0
+		applyKick(plr, hrp, dir * power, spin, charge >= K.PowerShotThreshold and strong)
+	elseif kind == "pass" then
+		local target = findPassTarget(plr, hrp, h)
+		local dir, speed
+		if target then
+			local lead = target.Position + flat(target.AssemblyLinearVelocity) * 0.35
+			local to = flat(lead - part.Position)
+			local dist = to.Magnitude
+			speed = math.clamp(dist * K.PassPerStud + K.PassBase, K.PassMin, K.PassMax)
+			dir = (to.Unit * math.cos(0.05) + Vector3.new(0, math.sin(0.05), 0))
+		else
+			speed = 55
+			dir = h * math.cos(0.05) + Vector3.new(0, math.sin(0.05), 0)
+		end
+		if not strong then
+			speed = speed * weak
+		end
+		applyKick(plr, hrp, dir * speed, 0, false)
+	elseif kind == "flick" then
+		local m = strong and 1 or weak
+		applyKick(plr, hrp, (h * K.FlickForward + Vector3.new(0, K.FlickUp, 0)) * m, 0, false)
+	elseif kind == "lob" then
+		local m = strong and 1 or weak
+		applyKick(plr, hrp, (h * K.LobForward + Vector3.new(0, K.LobUp, 0)) * m, 0, false)
+	end
+	return true
+end
+
+----------------------------------------------------------------------
+-- Step: attrito, effetto Magnus, conduzione
+----------------------------------------------------------------------
+function Ball.Step(dt)
+	local part = Ball.Part
+	if not Ball.Active or part.Anchored then
+		return
+	end
+	local vel = part.AssemblyLinearVelocity
+	local hv = flat(vel)
+	local grounded = part.Position.Y <= RADIUS + 0.4
+
+	-- effetto: forza laterale sulla velocita' orizzontale
+	if math.abs(state.spin) > 0.01 and hv.Magnitude > 8 then
+		local side = hv:Cross(Vector3.yAxis) -- a destra del moto
+		vel = vel + side * (state.spin * B.Magnus * dt)
+		state.spin = state.spin * math.max(0, 1 - B.SpinDecay * dt)
+		if grounded then
+			state.spin = state.spin * 0.9
+		end
+	end
+
+	-- attrito
+	local drag = grounded and B.GroundDrag or B.AirDrag
+	local k = math.max(0, 1 - drag * dt)
+	vel = Vector3.new(vel.X * k, vel.Y, vel.Z * k)
+
+	-- conduzione
+	local now = os.clock()
+	local possessor = state.possessor
+	if possessor then
+		local char, _, hrp = charParts(possessor)
+		if not char or Ragdoll.IsRagdolled(char) or flat(part.Position - hrp.Position).Magnitude > B.ReleaseRadius then
+			Ball.ClearPossession()
+			possessor = nil
+		end
+	end
+	if not possessor then
+		local bestD = B.ControlRadius
+		for _, plr in ipairs(Players:GetPlayers()) do
+			local char, _, hrp = charParts(plr)
+			if char and plr.Team and not Ragdoll.IsRagdolled(char) and (lockUntil[plr] or 0) < now then
+				local rel = part.Position - hrp.Position
+				if flat(rel).Magnitude < bestD and rel.Y < 4 and rel.Y > -3.5 then
+					bestD = flat(rel).Magnitude
+					possessor = plr
+				end
+			end
+		end
+		if possessor then
+			state.possessor = possessor
+			part:SetAttribute("Possessor", possessor.UserId)
+			setToucher(possessor)
+		end
+	end
+	if possessor then
+		local _, _, hrp = charParts(possessor)
+		local pv = flat(hrp.AssemblyLinearVelocity)
+		if pv.Magnitude > B.MinControlSpeed then
+			local fwd = flat(hrp.CFrame.LookVector)
+			if fwd.Magnitude > 0.05 then
+				local dist = tight[possessor] and B.CarryDistanceTight or B.CarryDistance
+				local target = hrp.Position + fwd.Unit * dist
+				local err = flat(target - part.Position)
+				local desired = pv + err * B.FollowRate
+				if desired.Magnitude > B.MaxCarrySpeed then
+					desired = desired.Unit * B.MaxCarrySpeed
+				end
+				local blend = 1 - math.exp(-14 * dt)
+				local nh = hv:Lerp(desired, blend)
+				vel = Vector3.new(nh.X, vel.Y, nh.Z)
+			end
+		end
+	end
+
+	part.AssemblyLinearVelocity = vel
+
+	-- rotolamento senza slittamento a terra
+	if grounded then
+		local h2 = flat(vel)
+		part.AssemblyAngularVelocity = h2:Cross(Vector3.yAxis) / RADIUS
+	end
+
+	-- il colpo potente smette di essere "potente" quando rallenta
+	if state.powerShot and (vel.Magnitude < K.PowerHitSpeed * 0.8 or now - state.powerShot.t > 2.5) then
+		state.powerShot = nil
+	end
+end
+
+function Ball.Knock(velocity)
+	local part = Ball.Part
+	part.Anchored = false
+	part.AssemblyLinearVelocity = velocity
+	state.powerShot = nil
+	state.spin = 0
+	Ball.ClearPossession()
+	part:SetNetworkOwner(nil)
+end
+
+function Ball.ForgetPlayer(plr)
+	lockUntil[plr] = nil
+	lastKick[plr] = nil
+	tight[plr] = nil
+	if state.possessor == plr then
+		Ball.ClearPossession()
+	end
+	if state.lastToucher == plr then
+		state.lastToucher = nil
+	end
+	if state.prevToucher == plr then
+		state.prevToucher = nil
+	end
+end
+
+Players.PlayerRemoving:Connect(function(plr)
+	if Ball.Part then
+		Ball.ForgetPlayer(plr)
+	end
+end)
+
+return Ball
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX9"><Properties><string name="Name">Lobby</string><ProtectedString name="Source"><![CDATA[-- Squadre (servizio Teams), pedane della lobby e assegnazione automatica.
+local Players = game:GetService("Players")
+local Teams = game:GetService("Teams")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+
+local Lobby = {}
+
+local teamObjects = {}
+
+function Lobby.Init()
+	for key, t in pairs(Config.Teams) do
+		local team = Teams:FindFirstChild(t.Name)
+		if not team then
+			team = Instance.new("Team")
+			team.Name = t.Name
+			team.Parent = Teams
+		end
+		team.TeamColor = BrickColor.new(t.BrickColor)
+		team.AutoAssignable = false
+		teamObjects[key] = team
+	end
+
+	local pads = workspace:WaitForChild("World"):WaitForChild("Lobby"):WaitForChild("Pads")
+	local debounce = {}
+	for _, pad in ipairs(pads:GetChildren()) do
+		local key = pad:GetAttribute("TeamKey")
+		if key then
+			pad.Touched:Connect(function(other)
+				local plr = Players:GetPlayerFromCharacter(other.Parent)
+				if not plr then
+					return
+				end
+				local now = os.clock()
+				if debounce[plr] and now - debounce[plr] < 1 then
+					return
+				end
+				debounce[plr] = now
+				Lobby.JoinTeam(plr, key, true)
+			end)
+		end
+	end
+	Players.PlayerRemoving:Connect(function(plr)
+		debounce[plr] = nil
+	end)
+end
+
+function Lobby.Count(key)
+	local n = 0
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr.Team == teamObjects[key] then
+			n = n + 1
+		end
+	end
+	return n
+end
+
+function Lobby.TeamKey(plr)
+	for key, team in pairs(teamObjects) do
+		if plr.Team == team then
+			return key
+		end
+	end
+	return nil
+end
+
+function Lobby.JoinTeam(plr, key, announce)
+	if plr.Team == teamObjects[key] then
+		return true
+	end
+	if Lobby.Count(key) >= Config.Match.MaxPerTeam then
+		if announce then
+			Net.Get("Notify"):FireClient(plr, "Squadra " .. Config.Teams[key].Name .. " al completo!")
+		end
+		return false
+	end
+	plr.Team = teamObjects[key]
+	if announce then
+		Net.Get("Notify"):FireClient(plr, "Sei nella squadra " .. Config.Teams[key].Name)
+	end
+	return true
+end
+
+-- Mette in squadra chi non l'ha scelta, bilanciando i numeri.
+function Lobby.AutoAssign(plr)
+	if Lobby.TeamKey(plr) then
+		return
+	end
+	local r, b = Lobby.Count("Red"), Lobby.Count("Blue")
+	local first, second = "Red", "Blue"
+	if b < r then
+		first, second = "Blue", "Red"
+	end
+	if not Lobby.JoinTeam(plr, first, false) then
+		Lobby.JoinTeam(plr, second, false)
+	end
+end
+
+function Lobby.AutoAssignAll()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		Lobby.AutoAssign(plr)
+	end
+end
+
+function Lobby.ClearTeams()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		plr.Team = nil
+	end
+end
+
+return Lobby
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX10"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[-- Costruisce da codice illuminazione, campo (Canyon del Deserto) e lobby.
+local Lighting = game:GetService("Lighting")
+local CollectionService = game:GetService("CollectionService")
+
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+
+local MapBuilder = {}
+
+local F = Config.Field
+local HL = F.Length / 2
+local HW = F.Width / 2
+
+local function P(parent, name, size, cf, color, material, transparency, collide)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.Transparency = transparency or 0
+	p.CanCollide = collide ~= false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = parent
+	return p
+end
+
+local function decor(p)
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	return p
+end
+
+local function folder(parent, name)
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = parent
+	return f
+end
+
+local function setupLighting()
+	Lighting.ClockTime = 17.4
+	Lighting.Brightness = 2.4
+	Lighting.Ambient = Color3.fromRGB(120, 92, 110)
+	Lighting.OutdoorAmbient = Color3.fromRGB(150, 110, 125)
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 170, 120)
+	Lighting.EnvironmentDiffuseScale = 0.6
+	Lighting.EnvironmentSpecularScale = 0.4
+	Lighting.GlobalShadows = true
+
+	local atm = Instance.new("Atmosphere")
+	atm.Density = 0.28
+	atm.Offset = 0.2
+	atm.Color = Color3.fromRGB(255, 190, 175)
+	atm.Decay = Color3.fromRGB(190, 110, 170)
+	atm.Glare = 0.5
+	atm.Haze = 1.2
+	atm.Parent = Lighting
+
+	local bloom = Instance.new("BloomEffect")
+	bloom.Intensity = 0.4
+	bloom.Size = 24
+	bloom.Threshold = 1.1
+	bloom.Parent = Lighting
+
+	local cc = Instance.new("ColorCorrectionEffect")
+	cc.Saturation = 0.25
+	cc.Contrast = 0.1
+	cc.TintColor = Color3.fromRGB(255, 240, 235)
+	cc.Parent = Lighting
+
+	local rays = Instance.new("SunRaysEffect")
+	rays.Intensity = 0.08
+	rays.Spread = 0.6
+	rays.Parent = Lighting
+end
+
+-- linea piatta tra due punti del campo (coordinate X,Z)
+local function line(parent, x1, z1, x2, z2, thick)
+	local dx, dz = x2 - x1, z2 - z1
+	local len = math.sqrt(dx * dx + dz * dz)
+	local mid = Vector3.new((x1 + x2) / 2, 0.14, (z1 + z2) / 2)
+	local p = P(
+		parent,
+		"Line",
+		Vector3.new(len + (thick or 0.7), 0.06, thick or 0.7),
+		CFrame.new(mid) * CFrame.Angles(0, -math.atan2(dz, dx), 0),
+		Color3.fromRGB(232, 222, 255),
+		Enum.Material.Neon
+	)
+	return decor(p)
+end
+
+-- rete a nido d'api (esagoni) su un pannello; origin: X locale = larghezza, Y locale = altezza
+local function hexNet(parent, origin, width, height, color)
+	local r = 1.7
+	local dx = math.sqrt(3) * r
+	local dy = 1.5 * r
+	local row = 0
+	local v = -height / 2 + r
+	while v <= height / 2 - r * 0.5 do
+		local offset = (row % 2 == 0) and 0 or dx / 2
+		local u = -width / 2 + r * 0.9 + offset
+		while u <= width / 2 - r * 0.8 do
+			for k = 0, 5 do
+				local a1 = math.rad(30 + 60 * k)
+				local a2 = math.rad(30 + 60 * (k + 1))
+				local x1, y1 = u + r * math.cos(a1), v + r * math.sin(a1)
+				local x2, y2 = u + r * math.cos(a2), v + r * math.sin(a2)
+				local ex, ey = x2 - x1, y2 - y1
+				local len = math.sqrt(ex * ex + ey * ey)
+				local cf = origin * CFrame.new((x1 + x2) / 2, (y1 + y2) / 2, 0) * CFrame.Angles(0, 0, math.atan2(ey, ex))
+				decor(P(parent, "NetEdge", Vector3.new(len, 0.16, 0.16), cf, color, Enum.Material.Neon))
+			end
+			u = u + dx
+		end
+		v = v + dy
+		row = row + 1
+	end
+end
+
+local function buildGoal(parent, sign, teamKey)
+	local color = Config.Teams[teamKey].Color
+	local netColor = (teamKey == "Red") and Color3.fromRGB(255, 70, 150) or Color3.fromRGB(70, 190, 255)
+	local g = folder(parent, "Goal_" .. teamKey)
+	local stone = Color3.fromRGB(150, 145, 138)
+	local gw, gh, gd = F.GoalWidth, F.GoalHeight, F.GoalDepth
+	local x = sign * HL
+
+	-- pali spessi color pietra
+	for _, s in ipairs({ -1, 1 }) do
+		local post = P(g, "Post", Vector3.new(2.2, gh, 2.2), CFrame.new(x, gh / 2, s * gw / 2), stone, Enum.Material.Slate)
+		post.CustomPhysicalProperties = PhysicalProperties.new(1, 0.3, 0.8, 100, 1)
+	end
+	local bar = P(g, "Crossbar", Vector3.new(2.2, 2.2, gw + 2.2), CFrame.new(x, gh, 0), stone, Enum.Material.Slate)
+	bar.CustomPhysicalProperties = PhysicalProperties.new(1, 0.3, 0.8, 100, 1)
+
+	-- pannelli di collisione (quasi invisibili) + esagoni luminosi
+	local backX = sign * (HL + gd)
+	local netProps = PhysicalProperties.new(1, 0.5, 0.35, 100, 1)
+	local back = P(g, "NetBack", Vector3.new(0.5, gh, gw), CFrame.new(backX, gh / 2, 0), netColor, Enum.Material.Neon, 0.85)
+	back.CustomPhysicalProperties = netProps
+	hexNet(g, CFrame.new(backX, gh / 2, 0) * CFrame.Angles(0, math.pi / 2, 0), gw, gh, netColor)
+
+	for _, s in ipairs({ -1, 1 }) do
+		local cx = sign * (HL + gd / 2)
+		local side = P(g, "NetSide", Vector3.new(gd, gh, 0.5), CFrame.new(cx, gh / 2, s * gw / 2), netColor, Enum.Material.Neon, 0.85)
+		side.CustomPhysicalProperties = netProps
+		hexNet(g, CFrame.new(cx, gh / 2, s * gw / 2), gd, gh, netColor)
+	end
+
+	local cx = sign * (HL + gd / 2)
+	local top = P(g, "NetTop", Vector3.new(gd, 0.5, gw), CFrame.new(cx, gh, 0), netColor, Enum.Material.Neon, 0.85)
+	top.CustomPhysicalProperties = netProps
+	hexNet(g, CFrame.new(cx, gh, 0) * CFrame.Angles(math.pi / 2, 0, 0), gd, gw, netColor)
+
+	-- striscia colorata della squadra che difende, a terra davanti alla porta
+	decor(P(g, "GoalMark", Vector3.new(1.2, 0.07, gw), CFrame.new(x - sign * 1.5, 0.15, 0), color, Enum.Material.Neon))
+end
+
+local function buildField(root)
+	local field = folder(root, "Field")
+	local L, W, GD = F.Length, F.Width, F.GoalDepth
+
+	-- terreno desertico enorme
+	local base = P(field, "DesertFloor", Vector3.new(2400, 4, 2400), CFrame.new(0, -2.1, 0), Color3.fromRGB(196, 140, 96), Enum.Material.Sand)
+	base.Name = "DesertFloor"
+
+	-- campo di terra a strisce
+	local totalLen = L + 2 * GD + 8
+	local stripes = 12
+	local sw = totalLen / stripes
+	for i = 0, stripes - 1 do
+		local c = (i % 2 == 0) and Color3.fromRGB(150, 98, 62) or Color3.fromRGB(168, 114, 74)
+		local s = P(
+			field,
+			"Stripe",
+			Vector3.new(sw, 0.2, W + 6),
+			CFrame.new(-totalLen / 2 + sw * (i + 0.5), 0.05, 0),
+			c,
+			Enum.Material.Ground
+		)
+		s.CustomPhysicalProperties = PhysicalProperties.new(1, 0.55, 0.45, 50, 1)
+	end
+
+	-- righe del campo
+	local lines = folder(field, "Lines")
+	line(lines, -HL, -HW, HL, -HW)
+	line(lines, -HL, HW, HL, HW)
+	line(lines, -HL, -HW, -HL, HW)
+	line(lines, HL, -HW, HL, HW)
+	line(lines, 0, -HW, 0, HW)
+	local radius, segs = 18, 40
+	for i = 0, segs - 1 do
+		local a1 = (i / segs) * math.pi * 2
+		local a2 = ((i + 1) / segs) * math.pi * 2
+		line(lines, radius * math.cos(a1), radius * math.sin(a1), radius * math.cos(a2), radius * math.sin(a2), 0.6)
+	end
+	for _, s in ipairs({ -1, 1 }) do
+		local px, pw = s * (HL - 22), 29
+		line(lines, s * HL, -pw, px, -pw)
+		line(lines, s * HL, pw, px, pw)
+		line(lines, px, -pw, px, pw)
+		local gx, gz = s * (HL - 8), 14
+		line(lines, s * HL, -gz, gx, -gz)
+		line(lines, s * HL, gz, gx, gz)
+		line(lines, gx, -gz, gx, gz)
+		decor(P(lines, "Spot", Vector3.new(1.4, 0.06, 1.4), CFrame.new(s * (HL - 15), 0.14, 0), Color3.fromRGB(232, 222, 255), Enum.Material.Neon))
+	end
+	decor(P(lines, "CenterSpot", Vector3.new(1.6, 0.06, 1.6), CFrame.new(0, 0.14, 0), Color3.fromRGB(232, 222, 255), Enum.Material.Neon))
+
+	-- porte: Rossi difendono -X, Blu difendono +X
+	buildGoal(field, -1, "Red")
+	buildGoal(field, 1, "Blue")
+
+	-- pareti di vetro trasparenti (e soffitto invisibile)
+	local walls = folder(field, "Walls")
+	local wh = F.WallHeight
+	local glass = Color3.fromRGB(235, 240, 255)
+	local wallProps = PhysicalProperties.new(0.7, 0.2, 0.85, 100, 100)
+	local xb = HL + GD + 2
+	local function wall(size, pos)
+		local w = P(walls, "Glass", size, CFrame.new(pos), glass, Enum.Material.Glass, 0.88)
+		w.CustomPhysicalProperties = wallProps
+		w.CanQuery = false
+		return w
+	end
+	wall(Vector3.new(2 * xb + 4, wh, 2), Vector3.new(0, wh / 2, -HW - 1))
+	wall(Vector3.new(2 * xb + 4, wh, 2), Vector3.new(0, wh / 2, HW + 1))
+	wall(Vector3.new(2, wh, W + 4), Vector3.new(-xb - 1, wh / 2, 0))
+	wall(Vector3.new(2, wh, W + 4), Vector3.new(xb + 1, wh / 2, 0))
+	local roof = P(walls, "Roof", Vector3.new(2 * xb + 4, 2, W + 4), CFrame.new(0, wh + 15, 0), glass, Enum.Material.Glass, 1)
+	roof.CustomPhysicalProperties = wallProps
+	roof.CanQuery = false
+	return field
+end
+
+----------------------------------------------------------------------
+-- Scenario: mesas, colline, parabole, pali della luce, torri faro, aereo
+----------------------------------------------------------------------
+local ROCK_COLORS = {
+	Color3.fromRGB(196, 88, 50),
+	Color3.fromRGB(214, 120, 64),
+	Color3.fromRGB(170, 72, 46),
+	Color3.fromRGB(226, 150, 86),
+}
+
+local function outsideField(x, z, margin)
+	return math.abs(x) > HL + F.GoalDepth + margin or math.abs(z) > HW + margin
+end
+
+local function buildMesa(parent, rng, x, z, scale)
+	local layers = rng:NextInteger(3, 5)
+	local w = rng:NextNumber(60, 120) * scale
+	local d = rng:NextNumber(60, 120) * scale
+	local y = 0
+	for i = 1, layers do
+		local h = rng:NextNumber(14, 30) * scale
+		local c = ROCK_COLORS[rng:NextInteger(1, #ROCK_COLORS)]
+		local shrink = 1 - (i - 1) * 0.12
+		local p = P(
+			parent,
+			"Mesa",
+			Vector3.new(w * shrink, h, d * shrink),
+			CFrame.new(x, y + h / 2 - 2, z) * CFrame.Angles(0, rng:NextNumber(0, 0.3), 0),
+			c,
+			Enum.Material.Rock
+		)
+		CollectionService:AddTag(p, "Grappable")
+		y = y + h
+	end
+end
+
+local function buildScenery(root)
+	local sc = folder(root, "Scenery")
+	local rng = Random.new(42)
+
+	for i = 1, 26 do
+		local ang = (i / 26) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		local dist = rng:NextNumber(300, 520)
+		local x, z = math.cos(ang) * dist, math.sin(ang) * dist * 0.8
+		buildMesa(sc, rng, x, z, rng:NextNumber(0.8, 1.5))
+	end
+	-- rocce agganciabili vicino al campo
+	for i = 1, 14 do
+		local x = rng:NextNumber(-260, 260)
+		local z = rng:NextNumber(-200, 200)
+		if outsideField(x, z, 30) then
+			local s = rng:NextNumber(8, 22)
+			local r = P(
+				sc,
+				"Rock",
+				Vector3.new(s, s * rng:NextNumber(0.8, 1.6), s * 0.9),
+				CFrame.new(x, s * 0.4, z) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 6), rng:NextNumber(-0.2, 0.2)),
+				ROCK_COLORS[rng:NextInteger(1, #ROCK_COLORS)],
+				Enum.Material.Rock
+			)
+			CollectionService:AddTag(r, "Grappable")
+		end
+	end
+	-- colline di sabbia
+	for i = 1, 16 do
+		local ang = rng:NextNumber(0, math.pi * 2)
+		local dist = rng:NextNumber(220, 420)
+		local s = rng:NextNumber(60, 130)
+		local hill = P(sc, "Dune", Vector3.new(s, s * 0.28, s * 0.8), CFrame.new(math.cos(ang) * dist, 0, math.sin(ang) * dist), Color3.fromRGB(226, 178, 116), Enum.Material.Sand)
+		hill.Shape = Enum.PartType.Ball
+		hill.Size = Vector3.new(s, s * 0.3, s * 0.8)
+	end
+	-- cespugli secchi
+	for i = 1, 70 do
+		local x = rng:NextNumber(-300, 300)
+		local z = rng:NextNumber(-220, 220)
+		if outsideField(x, z, 10) then
+			local s = rng:NextNumber(2, 4.5)
+			local b = P(sc, "Bush", Vector3.new(s, s * 0.7, s), CFrame.new(x, s * 0.3, z), Color3.fromRGB(135, 110, 60), Enum.Material.Grass)
+			b.Shape = Enum.PartType.Ball
+			decor(b)
+		end
+	end
+	-- parabole satellitari giganti
+	for i = 1, 3 do
+		local x, z = -190 + i * 140, 215 + (i % 2) * 30
+		local base = P(sc, "DishBase", Vector3.new(6, 24, 6), CFrame.new(x, 12, z), Color3.fromRGB(200, 200, 205), Enum.Material.Metal)
+		local dish = P(sc, "Dish", Vector3.new(46, 12, 46), CFrame.new(x, 28, z) * CFrame.Angles(0.5, i, 0.35), Color3.fromRGB(240, 240, 245), Enum.Material.SmoothPlastic)
+		dish.Shape = Enum.PartType.Ball
+		local feed = P(sc, "DishFeed", Vector3.new(1.2, 16, 1.2), dish.CFrame * CFrame.new(0, 10, 0), Color3.fromRGB(120, 120, 128), Enum.Material.Metal)
+		feed.CanCollide = false
+		CollectionService:AddTag(base, "Grappable")
+	end
+	-- pali della luce con cavi
+	local prevTop
+	for i = -5, 5 do
+		local x, z = i * 60, -190
+		local pole = P(sc, "Pole", Vector3.new(2, 38, 2), CFrame.new(x, 19, z), Color3.fromRGB(110, 78, 52), Enum.Material.Wood)
+		P(sc, "CrossArm", Vector3.new(16, 1.5, 1.5), CFrame.new(x, 36, z), Color3.fromRGB(110, 78, 52), Enum.Material.Wood).CanCollide = false
+		CollectionService:AddTag(pole, "Grappable")
+		local top = Vector3.new(x, 35, z)
+		if prevTop then
+			local mid = (top + prevTop) / 2 - Vector3.new(0, 1.5, 0)
+			local len = (top - prevTop).Magnitude
+			decor(P(sc, "Cable", Vector3.new(0.2, 0.2, len), CFrame.lookAt(mid, top), Color3.fromRGB(30, 30, 30), Enum.Material.Metal))
+		end
+		prevTop = top
+	end
+	-- torri faro dello stadio ai quattro angoli
+	for _, sx in ipairs({ -1, 1 }) do
+		for _, sz in ipairs({ -1, 1 }) do
+			local x = sx * (HL + F.GoalDepth + 16)
+			local z = sz * (HW + 16)
+			local tower = P(sc, "FloodTower", Vector3.new(3, 70, 3), CFrame.new(x, 35, z), Color3.fromRGB(120, 124, 132), Enum.Material.Metal)
+			CollectionService:AddTag(tower, "Grappable")
+			local panel = P(sc, "FloodLamp", Vector3.new(14, 8, 2), CFrame.lookAt(Vector3.new(x, 72, z), Vector3.new(0, 10, 0)), Color3.fromRGB(255, 244, 210), Enum.Material.Neon)
+			panel.CanCollide = false
+			local spot = Instance.new("SpotLight")
+			spot.Face = Enum.NormalId.Front
+			spot.Brightness = 3
+			spot.Range = 150
+			spot.Angle = 80
+			spot.Color = Color3.fromRGB(255, 236, 200)
+			spot.Parent = panel
+		end
+	end
+	-- relitto d'aereo
+	local plane = folder(sc, "CrashedPlane")
+	local origin = CFrame.new(-330, 7, 130) * CFrame.Angles(0.12, 0.6, 0.2)
+	local fus = P(plane, "Fuselage", Vector3.new(46, 10, 10), origin, Color3.fromRGB(235, 235, 240), Enum.Material.Metal)
+	fus.Shape = Enum.PartType.Cylinder
+	P(plane, "Nose", Vector3.new(8, 10, 10), origin * CFrame.new(-27, 0, 0), Color3.fromRGB(200, 60, 50), Enum.Material.Metal).Shape = Enum.PartType.Ball
+	P(plane, "WingL", Vector3.new(10, 1.4, 34), origin * CFrame.new(2, -1, 22) * CFrame.Angles(0, 0, 0.1), Color3.fromRGB(215, 215, 222), Enum.Material.Metal)
+	P(plane, "WingR", Vector3.new(10, 1.4, 20), origin * CFrame.new(2, -2, -16) * CFrame.Angles(0.5, 0.2, -0.3), Color3.fromRGB(215, 215, 222), Enum.Material.Metal)
+	P(plane, "TailFin", Vector3.new(8, 14, 1.4), origin * CFrame.new(22, 8, 0) * CFrame.Angles(0, 0, 0.2), Color3.fromRGB(200, 60, 50), Enum.Material.Metal)
+	for _, d in ipairs(plane:GetChildren()) do
+		CollectionService:AddTag(d, "Grappable")
+	end
+end
+
+----------------------------------------------------------------------
+-- Lobby: baita di legno con vetrate sul canyon, due pedane squadra
+----------------------------------------------------------------------
+local function buildSign(parent, cf, size, lines)
+	local board = P(parent, "Sign", size, cf, Color3.fromRGB(245, 245, 250), Enum.Material.SmoothPlastic)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 40
+	gui.Parent = board
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(35, 35, 50)
+	label.Text = table.concat(lines, "\n")
+	label.Parent = gui
+	return board
+end
+
+local function buildPad(parent, name, teamKey, x)
+	local t = Config.Teams[teamKey]
+	local pad = P(parent, name, Vector3.new(26, 0.6, 26), CFrame.new(x, 0.3, 10), t.Color, Enum.Material.SmoothPlastic)
+	pad:SetAttribute("TeamKey", teamKey)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Top
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 30
+	gui.Parent = pad
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.fromScale(1, 1)
+	lbl.BackgroundTransparency = 1
+	lbl.Font = Enum.Font.GothamBlack
+	lbl.TextScaled = true
+	lbl.TextColor3 = Color3.new(1, 1, 1)
+	lbl.Text = "⚽\n" .. string.upper(t.Name) .. "\n▲ ▲ ▲"
+	lbl.Parent = gui
+	-- cornice chiara
+	decor(P(parent, name .. "Rim", Vector3.new(28, 0.4, 28), CFrame.new(x, 0.2, 10), Color3.fromRGB(245, 245, 250)))
+	return pad
+end
+
+local function buildLobby(root)
+	local c = Config.Lobby.Center
+	local lobby = folder(root, "Lobby")
+	local wood = Color3.fromRGB(150, 98, 58)
+	local darkWood = Color3.fromRGB(104, 66, 38)
+
+	-- pavimento di assi
+	for i = 0, 13 do
+		local col = (i % 2 == 0) and wood or Color3.fromRGB(138, 90, 52)
+		P(lobby, "Floor", Vector3.new(10, 2, 100), CFrame.new(c.X - 65 + i * 10, -1, c.Z), col, Enum.Material.WoodPlanks)
+	end
+	local function at(x, y, z)
+		return CFrame.new(c.X + x, c.Y + y, c.Z + z)
+	end
+	-- pareti: dietro, lati; davanti vetrata
+	P(lobby, "BackWall", Vector3.new(140, 30, 2), at(0, 15, -50), wood, Enum.Material.WoodPlanks)
+	P(lobby, "WallL", Vector3.new(2, 30, 100), at(-70, 15, 0), wood, Enum.Material.WoodPlanks)
+	P(lobby, "WallR", Vector3.new(2, 30, 100), at(70, 15, 0), wood, Enum.Material.WoodPlanks)
+	P(lobby, "Roof", Vector3.new(146, 2, 106), at(0, 31, 0), darkWood, Enum.Material.WoodPlanks)
+	local glassCol = Color3.fromRGB(190, 225, 255)
+	P(lobby, "FrontGlass", Vector3.new(136, 26, 1), at(0, 14, 50), glassCol, Enum.Material.Glass, 0.7)
+	for i = -3, 3 do
+		P(lobby, "Beam", Vector3.new(2, 30, 2), at(i * 22, 15, 50), darkWood, Enum.Material.Wood)
+	end
+	P(lobby, "BeamTop", Vector3.new(140, 3, 2), at(0, 28.5, 50), darkWood, Enum.Material.Wood)
+	-- terrazza esterna
+	P(lobby, "Terrace", Vector3.new(140, 2, 30), at(0, -1, 65), wood, Enum.Material.WoodPlanks)
+	P(lobby, "Rail", Vector3.new(140, 1.2, 1), at(0, 3, 79.5), darkWood, Enum.Material.Wood)
+
+	-- pedane squadra
+	local pads = folder(lobby, "Pads")
+	buildPad(pads, "RedPad", "Red", c.X - 35)
+	buildPad(pads, "BluePad", "Blue", c.X + 35)
+	-- cartelli
+	buildSign(lobby, at(0, 18, -48.8), Vector3.new(60, 12, 0.6), { "CALCIO FUORILEGGE", "Sali su una pedana per scegliere la squadra" })
+	local lb = buildSign(lobby, at(-45, 12, -48.8), Vector3.new(30, 14, 0.6), { "CLASSIFICHE", "(in arrivo)" })
+	lb.Name = "LeaderboardSign"
+	buildSign(lobby, at(45, 12, -48.8), Vector3.new(30, 14, 0.6), { "REGOLE", "4 contro 4", "Niente falli!" })
+
+	-- punto di spawn
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "LobbySpawn"
+	spawn.Anchored = true
+	spawn.Size = Vector3.new(10, 1, 10)
+	spawn.CFrame = at(0, 0.5, -20)
+	spawn.Transparency = 1
+	spawn.CanCollide = false
+	spawn.Neutral = true
+	spawn.Duration = 0
+	spawn.TopSurface = Enum.SurfaceType.Smooth
+	spawn.Parent = lobby
+	local decal = spawn:FindFirstChildOfClass("Decal")
+	if decal then
+		decal:Destroy()
+	end
+
+	-- mesas attorno alla lobby (panorama sul canyon)
+	local rng = Random.new(7)
+	for i = 1, 14 do
+		local ang = math.pi * 0.15 + (i / 14) * math.pi * 0.7
+		local dist = rng:NextNumber(260, 380)
+		buildMesa(lobby, rng, c.X + math.cos(ang) * dist * 1.2, c.Z + math.sin(ang) * dist + 120, rng:NextNumber(0.9, 1.6))
+	end
+	return lobby
+end
+
+function MapBuilder.Build()
+	local root = Instance.new("Folder")
+	root.Name = "World"
+	root.Parent = workspace
+	setupLighting()
+	buildField(root)
+	buildScenery(root)
+	buildLobby(root)
+	return root
+end
+
+function MapBuilder.LobbySpawnCFrame()
+	local c = Config.Lobby.Center
+	return CFrame.new(c.X, c.Y + 4, c.Z - 20)
+end
+
+return MapBuilder
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX11"><Properties><string name="Name">Match</string><ProtectedString name="Source"><![CDATA[-- Ciclo di partita: intervallo -> calcio d'inizio -> partita -> goal/reset -> fine -> lobby.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+local Stamina = require(script.Parent.Stamina)
+local Ball = require(script.Parent.Ball)
+local Lobby = require(script.Parent.Lobby)
+local MapBuilder = require(script.Parent.MapBuilder)
+
+local M = Config.Match
+local F = Config.Field
+
+local Match = {}
+
+local phase = "Intermission"
+local participants = nil -- [plr] = { team = "Red"/"Blue", slot = n }
+local scores = { Red = 0, Blue = 0 }
+local BALL_START = Vector3.new(0, Config.Ball.Diameter / 2 + 0.3, 0)
+
+local function setPhase(name, duration)
+	phase = name
+	workspace:SetAttribute("PhaseEnd", duration and (workspace:GetServerTimeNow() + duration) or 0)
+	workspace:SetAttribute("Phase", name)
+end
+
+local function setScores()
+	workspace:SetAttribute("ScoreRed", scores.Red)
+	workspace:SetAttribute("ScoreBlue", scores.Blue)
+end
+
+function Match.IsPlaying()
+	return phase == "Playing"
+end
+
+function Match.GetPhase()
+	return phase
+end
+
+local function inMatch(plr)
+	return participants ~= nil and participants[plr] ~= nil and (phase == "Kickoff" or phase == "Playing" or phase == "Goal")
+end
+
+local function kickoffCFrame(info)
+	local slot = F.KickoffSlots[math.min(info.slot, #F.KickoffSlots)]
+	local sx = (info.team == "Red") and -1 or 1
+	local pos = Vector3.new(sx * slot.x, 4, slot.z)
+	return CFrame.lookAt(pos, pos + Vector3.new(-sx, 0, 0))
+end
+
+local function addStats(plr)
+	local stats = Instance.new("Folder")
+	stats.Name = "leaderstats"
+	for _, n in ipairs({ "Goals", "Assists", "Contrasti", "Colpi" }) do
+		local v = Instance.new("IntValue")
+		v.Name = n
+		v.Value = 0
+		v.Parent = stats
+	end
+	stats.Parent = plr
+end
+
+local function stat(plr, name, delta)
+	local stats = plr:FindFirstChild("leaderstats")
+	local v = stats and stats:FindFirstChild(name)
+	if v then
+		v.Value = v.Value + delta
+	end
+end
+
+local function resetStats()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local stats = plr:FindFirstChild("leaderstats")
+		if stats then
+			for _, v in ipairs(stats:GetChildren()) do
+				v.Value = 0
+			end
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Spawn / posizionamento
+----------------------------------------------------------------------
+function Match.Spawn(plr)
+	task.spawn(function()
+		if not plr.Parent then
+			return
+		end
+		plr:LoadCharacter()
+		local char = plr.Character
+		if not char then
+			return
+		end
+		local hrp = char:WaitForChild("HumanoidRootPart", 8)
+		local hum = char:WaitForChild("Humanoid", 8)
+		if not hrp or not hum then
+			return
+		end
+		if hum.RigType ~= Enum.HumanoidRigType.R15 then
+			warn("[Calcio Fuorilegge] Il personaggio non e' R15: imposta Game Settings > Avatar > R15.")
+		end
+		hum.UseJumpPower = true
+		hum.JumpPower = Config.Move.JumpPower
+		hum.WalkSpeed = Config.Move.WalkSpeed
+		if inMatch(plr) then
+			char:PivotTo(kickoffCFrame(participants[plr]))
+			if phase == "Kickoff" then
+				char:SetAttribute("SpeedMult", 0)
+			end
+		else
+			char:PivotTo(MapBuilder.LobbySpawnCFrame())
+		end
+		hum.Died:Connect(function()
+			task.wait(2.5)
+			if plr.Parent then
+				Match.Spawn(plr)
+			end
+		end)
+	end)
+end
+
+local function placeAll(freeze)
+	for plr, info in pairs(participants) do
+		if plr.Parent then
+			Stamina.Refill(plr)
+			local char = plr.Character
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
+			if not char or not hum or hum.Health <= 0 or char:GetAttribute("Ragdolled") then
+				Match.Spawn(plr)
+			else
+				char:PivotTo(kickoffCFrame(info))
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					hrp.AssemblyLinearVelocity = Vector3.zero
+				end
+				char:SetAttribute("Sliding", nil)
+				char:SetAttribute("SpeedMult", freeze and 0 or nil)
+			end
+		end
+	end
+end
+
+local function unfreeze()
+	for plr in pairs(participants) do
+		local char = plr.Character
+		if char then
+			char:SetAttribute("SpeedMult", nil)
+		end
+	end
+end
+
+local function anyParticipants()
+	if not participants then
+		return false
+	end
+	for plr in pairs(participants) do
+		if plr.Parent then
+			return true
+		end
+	end
+	return false
+end
+
+function Match.Leave(plr)
+	if participants and participants[plr] then
+		participants[plr] = nil
+	end
+	plr.Team = nil
+	Match.Spawn(plr)
+end
+
+----------------------------------------------------------------------
+-- Eventi di gioco
+----------------------------------------------------------------------
+local function handleGoal(team)
+	scores[team] = scores[team] + 1
+	setScores()
+	local scorer, assist, atime = Ball.GetScorers()
+	local scorerName, assistName, own = "", "", false
+	if scorer and scorer.Parent then
+		scorerName = scorer.DisplayName
+		if Lobby.TeamKey(scorer) == team then
+			stat(scorer, "Goals", 1)
+			if assist and assist ~= scorer and assist.Parent and os.clock() - atime < 8 then
+				assistName = assist.DisplayName
+				stat(assist, "Assists", 1)
+			end
+		else
+			own = true
+		end
+	end
+	Net.Get("GoalScored"):FireAllClients(team, scorerName, assistName, own)
+end
+
+local function runMatch()
+	Lobby.AutoAssignAll()
+	participants = {}
+	local slots = { Red = 0, Blue = 0 }
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local key = Lobby.TeamKey(plr)
+		if key then
+			slots[key] = slots[key] + 1
+			participants[plr] = { team = key, slot = slots[key] }
+		end
+	end
+	if not anyParticipants() then
+		participants = nil
+		return
+	end
+
+	scores.Red, scores.Blue = 0, 0
+	setScores()
+	resetStats()
+	Ball.SetActive(false)
+	Ball.Reset(BALL_START)
+	workspace:SetAttribute("TimeLeft", M.Duration)
+
+	-- calcio d'inizio
+	setPhase("Kickoff", M.KickoffCountdown)
+	placeAll(true)
+	task.wait(M.KickoffCountdown)
+
+	local remaining = M.Duration
+	while remaining > 0 and anyParticipants() do
+		unfreeze()
+		Ball.Release()
+		Ball.SetActive(true)
+		workspace:SetAttribute("TimeLeft", remaining)
+		setPhase("Playing", remaining)
+		local segStart = os.clock()
+		local scored = nil
+		while true do
+			RunService.Heartbeat:Wait()
+			local elapsed = os.clock() - segStart
+			if elapsed >= remaining then
+				remaining = 0
+				break
+			end
+			if Ball.OutOfBounds() then
+				Ball.Reset(BALL_START)
+				Ball.Release()
+			end
+			local team = Ball.CheckGoal()
+			if team then
+				scored = team
+				remaining = remaining - elapsed
+				break
+			end
+			if not anyParticipants() then
+				break
+			end
+		end
+
+		if scored then
+			workspace:SetAttribute("TimeLeft", remaining)
+			Ball.SetActive(false)
+			setPhase("Goal", M.GoalCelebration)
+			handleGoal(scored)
+			task.wait(M.GoalCelebration)
+			if remaining > 0 and anyParticipants() then
+				Ball.Reset(BALL_START)
+				setPhase("Kickoff", M.ResumeCountdown)
+				placeAll(true)
+				task.wait(M.ResumeCountdown)
+			end
+		end
+	end
+
+	-- fine partita
+	Ball.SetActive(false)
+	local result
+	if scores.Red > scores.Blue then
+		result = "Vincono i " .. Config.Teams.Red.Name .. "!  " .. scores.Red .. " - " .. scores.Blue
+	elseif scores.Blue > scores.Red then
+		result = "Vincono i " .. Config.Teams.Blue.Name .. "!  " .. scores.Blue .. " - " .. scores.Red
+	else
+		result = "Pareggio!  " .. scores.Red .. " - " .. scores.Blue
+	end
+	workspace:SetAttribute("ResultText", result)
+	setPhase("Ended", M.EndScreen)
+	task.wait(M.EndScreen)
+
+	local old = participants
+	participants = nil
+	Lobby.ClearTeams()
+	for plr in pairs(old) do
+		if plr.Parent then
+			Match.Spawn(plr)
+		end
+	end
+	Ball.Reset(BALL_START)
+end
+
+function Match.Run()
+	while true do
+		scores.Red, scores.Blue = 0, 0
+		setScores()
+		workspace:SetAttribute("TimeLeft", M.Duration)
+		workspace:SetAttribute("ResultText", "")
+		setPhase("Intermission", M.Intermission)
+		task.wait(M.Intermission)
+		if #Players:GetPlayers() >= M.MinPlayers then
+			local ok, err = pcall(runMatch)
+			if not ok then
+				warn("[Match] errore nel ciclo partita: " .. tostring(err))
+				participants = nil
+				Ball.SetActive(false)
+			end
+		end
+	end
+end
+
+function Match.OnPlayerAdded(plr)
+	addStats(plr)
+	Stamina.Init(plr)
+	Match.Spawn(plr)
+end
+
+Players.PlayerRemoving:Connect(function(plr)
+	if participants then
+		participants[plr] = nil
+	end
+end)
+
+return Match
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX12"><Properties><string name="Name">Ragdoll</string><ProtectedString name="Source"><![CDATA[-- Ragdoll fisico temporaneo per personaggi R15 (Motor6D e AnimationConstraint).
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+
+local Ragdoll = {}
+
+local COLLIDE_PARTS = {
+	UpperTorso = true,
+	LowerTorso = true,
+	Head = true,
+	LeftUpperLeg = true,
+	RightUpperLeg = true,
+	LeftLowerLeg = true,
+	RightLowerLeg = true,
+}
+
+function Ragdoll.IsRagdolled(char)
+	return char:GetAttribute("Ragdolled") == true
+end
+
+function Ragdoll.Apply(char, duration, impulse)
+	if not char or not char.Parent then
+		return
+	end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not hrp or hum.Health <= 0 then
+		return
+	end
+	if char:GetAttribute("Ragdolled") then
+		return
+	end
+	duration = duration or Config.Ragdoll.Duration
+	char:SetAttribute("Ragdolled", true)
+	char:SetAttribute("Sliding", nil)
+
+	local disabled = {}
+	local created = {}
+	local collideRestore = {}
+
+	for _, d in ipairs(char:GetDescendants()) do
+		local a0, a1
+		if d:IsA("Motor6D") and d.Name ~= "Root" and d.Name ~= "RootJoint" then
+			a0 = d.Part0 and d.Part0:FindFirstChild(d.Name .. "RigAttachment")
+			a1 = d.Part1 and d.Part1:FindFirstChild(d.Name .. "RigAttachment")
+		elseif d:IsA("AnimationConstraint") and d.Name ~= "Root" and d.Name ~= "RootJoint" then
+			a0, a1 = d.Attachment0, d.Attachment1
+		end
+		if a0 and a1 and a0:IsA("Attachment") and a1:IsA("Attachment") then
+			d.Enabled = false
+			table.insert(disabled, d)
+			local bs = Instance.new("BallSocketConstraint")
+			bs.Name = "RagdollSocket"
+			bs.Attachment0 = a0
+			bs.Attachment1 = a1
+			bs.LimitsEnabled = true
+			bs.UpperAngle = 65
+			bs.TwistLimitsEnabled = true
+			bs.TwistLowerAngle = -45
+			bs.TwistUpperAngle = 45
+			bs.Parent = a0.Parent
+			table.insert(created, bs)
+			local nc = Instance.new("NoCollisionConstraint")
+			nc.Name = "RagdollNoCollide"
+			nc.Part0 = a0.Parent
+			nc.Part1 = a1.Parent
+			nc.Parent = a0.Parent
+			table.insert(created, nc)
+		end
+	end
+	for name in pairs(COLLIDE_PARTS) do
+		local part = char:FindFirstChild(name)
+		if part then
+			collideRestore[part] = part.CanCollide
+			part.CanCollide = true
+		end
+	end
+
+	hum.PlatformStand = true
+	hum:ChangeState(Enum.HumanoidStateType.Physics)
+	if impulse then
+		hrp.AssemblyLinearVelocity = impulse
+		hrp.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-4, 4), math.random(-8, 8))
+	end
+
+	task.delay(duration, function()
+		if not char.Parent then
+			return
+		end
+		for _, c in ipairs(created) do
+			if c.Parent then
+				c:Destroy()
+			end
+		end
+		for _, j in ipairs(disabled) do
+			if j.Parent then
+				j.Enabled = true
+			end
+		end
+		for part, was in pairs(collideRestore) do
+			if part.Parent then
+				part.CanCollide = was
+			end
+		end
+		if hum.Health > 0 and hrp.Parent then
+			local look = hrp.CFrame.LookVector
+			local flat = Vector3.new(look.X, 0, look.Z)
+			if flat.Magnitude < 0.01 then
+				flat = Vector3.new(0, 0, -1)
+			end
+			local pos = hrp.Position + Vector3.new(0, 3, 0)
+			char:PivotTo(CFrame.lookAt(pos, pos + flat.Unit))
+			hrp.AssemblyLinearVelocity = Vector3.zero
+			hrp.AssemblyAngularVelocity = Vector3.zero
+			hum.PlatformStand = false
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+		char:SetAttribute("Ragdolled", nil)
+	end)
+end
+
+return Ragdoll
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX13"><Properties><string name="Name">Stamina</string><ProtectedString name="Source"><![CDATA[-- Stamina a 4 tacche: unico serbatoio per sprint, calci, scivolate, scatti e (poi) gadget.
+local Players = game:GetService("Players")
+
+local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
+local S = Config.Stamina
+
+local Stamina = {}
+
+local data = {}
+
+function Stamina.Init(plr)
+	data[plr] = { value = S.Pips, last = 0, wants = false, exhausted = false, sent = -1 }
+	plr:SetAttribute("Stamina", S.Pips)
+end
+
+function Stamina.Remove(plr)
+	data[plr] = nil
+end
+
+function Stamina.Get(plr)
+	local d = data[plr]
+	return d and d.value or 0
+end
+
+-- Consuma stamina. Ritorna true se ce n'era abbastanza (altrimenti il colpo e' debole).
+function Stamina.Spend(plr, amount)
+	local d = data[plr]
+	if not d then
+		return true
+	end
+	local had = d.value >= amount - 0.001
+	d.value = math.max(0, d.value - amount)
+	d.last = os.clock()
+	return had
+end
+
+function Stamina.Refill(plr)
+	local d = data[plr]
+	if d then
+		d.value = S.Pips
+		d.exhausted = false
+	end
+end
+
+function Stamina.SetSprinting(plr, on)
+	local d = data[plr]
+	if d then
+		d.wants = on and true or false
+	end
+end
+
+function Stamina.IsSprinting(plr)
+	local d = data[plr]
+	return d ~= nil and d.wants and not d.exhausted
+end
+
+function Stamina.Step(dt)
+	local now = os.clock()
+	for plr, d in pairs(data) do
+		local char = plr.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum and hum.Health > 0 then
+			local moving = hum.MoveDirection.Magnitude > 0.1
+			local sprinting = d.wants and not d.exhausted and moving
+			if sprinting then
+				d.value = math.max(0, d.value - S.SprintDrainPerSec * dt)
+				d.last = now
+				if d.value <= 0 then
+					d.exhausted = true
+				end
+			elseif now - d.last >= S.RegenDelay then
+				d.value = math.min(S.Pips, d.value + S.RegenPerSec * dt)
+			end
+			if d.exhausted and d.value >= S.ExhaustedRecover then
+				d.exhausted = false
+			end
+
+			-- velocita': non toccarla durante scivolate/ragdoll/scatti
+			if not (char:GetAttribute("Sliding") or char:GetAttribute("Ragdolled") or char:GetAttribute("Dashing")) then
+				local mult = char:GetAttribute("SpeedMult") or 1
+				local speed = sprinting and Config.Move.SprintSpeed or Config.Move.WalkSpeed
+				hum.WalkSpeed = speed * mult
+			end
+			hum.JumpPower = Config.Move.JumpPower
+			hum.UseJumpPower = true
+
+			if math.abs(d.value - d.sent) > 0.02 then
+				d.sent = d.value
+				plr:SetAttribute("Stamina", d.value)
+			end
+		end
+	end
+end
+
+Players.PlayerRemoving:Connect(Stamina.Remove)
+
+return Stamina
+]]></ProtectedString></Properties></Item></Item></Item>
+<Item class="StarterPlayer" referent="RBX21"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX20"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="LocalScript" referent="RBX16"><Properties><string name="Name">Client</string><bool name="Disabled">false</bool><ProtectedString name="Source"><![CDATA[-- Input del giocatore (PC): calcio con carica, passaggio, flick, lancio, scivolata, dribbling, sprint.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+local Hud = require(script.Parent:WaitForChild("Modules"):WaitForChild("Hud"))
+local Effects = require(script.Parent.Modules:WaitForChild("Effects"))
+
+local player = Players.LocalPlayer
+local C = Config.Controls
+
+Hud.Build()
+Effects.Start()
+
+local function camera()
+	return workspace.CurrentCamera
+end
+
+local function aimDir()
+	return camera().CFrame.LookVector
+end
+
+local function flat(v)
+	return Vector3.new(v.X, 0, v.Z)
+end
+
+local function moveDir()
+	-- direzione del movimento in coordinate mondo (da tasti A/D rispetto alla camera)
+	local right = flat(camera().CFrame.RightVector)
+	if right.Magnitude < 0.01 then
+		return nil
+	end
+	right = right.Unit
+	local x = 0
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+		x = x + 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+		x = x - 1
+	end
+	if x ~= 0 then
+		return right * x
+	end
+	return nil
+end
+
+----------------------------------------------------------------------
+-- Calcio con carica e tiro a effetto
+----------------------------------------------------------------------
+local charging = false
+local chargeStart = 0
+local curve = 0
+
+local function startCharge()
+	charging = true
+	chargeStart = os.clock()
+	curve = 0
+end
+
+local function releaseCharge()
+	if not charging then
+		return
+	end
+	charging = false
+	Hud.SetCharge(nil)
+	local held = os.clock() - chargeStart
+	local charge = 0
+	if held >= Config.Kick.TapThreshold then
+		charge = math.clamp(held / Config.Kick.ChargeTime, 0, 1)
+	end
+	Net.Get("Kick"):FireServer("normal", charge, aimDir(), curve)
+end
+
+RunService.RenderStepped:Connect(function()
+	if charging then
+		local held = os.clock() - chargeStart
+		if held >= Config.Kick.TapThreshold then
+			Hud.SetCharge(math.clamp(held / Config.Kick.ChargeTime, 0, 1))
+		end
+		-- effetto: direzione perpendicolare al tiro (A = sinistra, D = destra)
+		local a = UserInputService:IsKeyDown(Enum.KeyCode.A)
+		local d = UserInputService:IsKeyDown(Enum.KeyCode.D)
+		if d and not a then
+			curve = 1
+		elseif a and not d then
+			curve = -1
+		end
+	end
+end)
+
+----------------------------------------------------------------------
+-- Azioni (tramite ContextActionService, cosi' Spazio non fa saltare)
+----------------------------------------------------------------------
+local spaceStart = 0
+local PASS = Enum.ContextActionResult.Pass
+local SINK = Enum.ContextActionResult.Sink
+
+local function bind(name, handler, ...)
+	ContextActionService:BindActionAtPriority(name, handler, false, Enum.ContextActionPriority.High.Value, ...)
+end
+
+bind("KickAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		startCharge()
+	elseif state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+		releaseCharge()
+	end
+	return PASS
+end, Enum.UserInputType.MouseButton1)
+
+bind("PassAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		Net.Get("Kick"):FireServer("pass", 0, aimDir(), 0)
+	end
+	return PASS
+end, Enum.UserInputType.MouseButton2)
+
+bind("FlickAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		Net.Get("Kick"):FireServer("flick", 0, aimDir(), 0)
+	end
+	return PASS
+end, C.Flick)
+
+bind("LobAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		Net.Get("Kick"):FireServer("lob", 0, aimDir(), 0)
+	end
+	return PASS
+end, C.Lob)
+
+bind("TackleAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local dir = hrp and flat(hrp.CFrame.LookVector) or flat(aimDir())
+		Net.Get("Tackle"):FireServer(dir)
+	end
+	return PASS
+end, C.Tackle)
+
+bind("DribbleAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		spaceStart = os.clock()
+		Net.Get("Control"):FireServer(true)
+	elseif state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+		Net.Get("Control"):FireServer(false)
+		if os.clock() - spaceStart < 0.2 then
+			local d = moveDir()
+			if not d then
+				local char = player.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				d = hrp and flat(hrp.CFrame.RightVector) or flat(camera().CFrame.RightVector)
+			end
+			Net.Get("Dash"):FireServer(d)
+		end
+	end
+	return SINK
+end, C.Dribble)
+
+bind("SprintAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		Net.Get("Sprint"):FireServer(true)
+	elseif state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+		Net.Get("Sprint"):FireServer(false)
+	end
+	return PASS
+end, C.Sprint)
+
+bind("CallBallAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		Net.Get("CallBall"):FireServer()
+	end
+	return PASS
+end, C.CallBall)
+
+bind("LobbyAction", function(_, state)
+	if state == Enum.UserInputState.Begin then
+		Net.Get("ReturnLobby"):FireServer()
+	end
+	return PASS
+end, C.Lobby)
+]]></ProtectedString></Properties></Item><Item class="Folder" referent="RBX19"><Properties><string name="Name">Modules</string></Properties><Item class="ModuleScript" referent="RBX17"><Properties><string name="Name">Effects</string><ProtectedString name="Source"><![CDATA[-- Effetti solo-client: anelli sotto giocatori e palla, indicatore palla libera, scia, barretta stamina.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+
+local player = Players.LocalPlayer
+
+local Effects = {}
+
+local ringFolder
+local rings = {} -- [character] = part
+local ballRing, ballGui
+local GROUND_Y = 0.22
+
+local function makeRing(diameter, color, transparency)
+	local p = Instance.new("Part")
+	p.Shape = Enum.PartType.Cylinder
+	p.Size = Vector3.new(0.12, diameter, diameter)
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = Enum.Material.Neon
+	p.Color = color
+	p.Transparency = transparency
+	p.Parent = ringFolder
+	return p
+end
+
+local function flatCF(x, z)
+	return CFrame.new(x, GROUND_Y, z) * CFrame.Angles(0, 0, math.pi / 2)
+end
+
+local function teamColorOf(plr)
+	if plr.Team then
+		for _, t in pairs(Config.Teams) do
+			if t.Name == plr.Team.Name then
+				return t.Color
+			end
+		end
+	end
+	return nil
+end
+
+local staminaGui
+
+local function ensureStaminaBar(char)
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		return
+	end
+	if staminaGui and staminaGui.Parent == hrp then
+		return
+	end
+	if staminaGui then
+		staminaGui:Destroy()
+	end
+	staminaGui = Instance.new("BillboardGui")
+	staminaGui.Name = "StaminaBar"
+	staminaGui.Size = UDim2.fromOffset(64, 6)
+	staminaGui.StudsOffset = Vector3.new(0, -3.4, 0)
+	staminaGui.AlwaysOnTop = false
+	staminaGui.Adornee = hrp
+	staminaGui.Parent = hrp
+	local bg = Instance.new("Frame")
+	bg.Name = "Bg"
+	bg.Size = UDim2.fromScale(1, 1)
+	bg.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+	bg.BackgroundTransparency = 0.4
+	bg.Parent = staminaGui
+	Instance.new("UICorner", bg).CornerRadius = UDim.new(1, 0)
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(70, 214, 100)
+	fill.Parent = bg
+	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+end
+
+function Effects.Start()
+	ringFolder = Instance.new("Folder")
+	ringFolder.Name = "LocalRings"
+	ringFolder.Parent = workspace
+
+	RunService.RenderStepped:Connect(function()
+		-- anelli giocatori
+		local seen = {}
+		for _, plr in ipairs(Players:GetPlayers()) do
+			local char = plr.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			local color = teamColorOf(plr)
+			if hrp and color then
+				seen[char] = true
+				local ring = rings[char]
+				if not ring then
+					ring = makeRing(7, color, 0.15)
+					rings[char] = ring
+				end
+				ring.Color = color
+				ring.CFrame = flatCF(hrp.Position.X, hrp.Position.Z)
+			end
+		end
+		for char, ring in pairs(rings) do
+			if not seen[char] then
+				ring:Destroy()
+				rings[char] = nil
+			end
+		end
+
+		-- palla
+		local ball = workspace:FindFirstChild("Ball")
+		if ball then
+			if not ballRing then
+				ballRing = makeRing(6, Color3.fromRGB(255, 255, 255), 0.25)
+				ballGui = Instance.new("BillboardGui")
+				ballGui.Size = UDim2.fromOffset(40, 40)
+				ballGui.StudsOffset = Vector3.new(0, 3.6, 0)
+				ballGui.AlwaysOnTop = true
+				local lbl = Instance.new("TextLabel")
+				lbl.Size = UDim2.fromScale(1, 1)
+				lbl.BackgroundTransparency = 1
+				lbl.Text = "▼"
+				lbl.TextScaled = true
+				lbl.Font = Enum.Font.GothamBlack
+				lbl.TextColor3 = Color3.fromRGB(255, 220, 60)
+				lbl.Parent = ballGui
+				ballGui.Adornee = ball
+				ballGui.Parent = ball
+			end
+			local p = ball.Position
+			ballRing.CFrame = flatCF(p.X, p.Z)
+			ballRing.Transparency = math.clamp(0.25 + p.Y / 40, 0.25, 0.9)
+			ballGui.Enabled = ball:GetAttribute("Possessor") == nil
+			local trail = ball:FindFirstChildOfClass("Trail")
+			if trail then
+				trail.Enabled = ball.AssemblyLinearVelocity.Magnitude > 55
+			end
+		end
+
+		-- barretta stamina sotto il personaggio
+		local char = player.Character
+		if char then
+			ensureStaminaBar(char)
+			if staminaGui then
+				local st = player:GetAttribute("Stamina") or Config.Stamina.Pips
+				local frac = st / Config.Stamina.Pips
+				staminaGui.Enabled = frac < 0.999
+				local fill = staminaGui:FindFirstChild("Bg") and staminaGui.Bg:FindFirstChild("Fill")
+				if fill then
+					fill.Size = UDim2.fromScale(math.clamp(frac, 0, 1), 1)
+				end
+			end
+		end
+	end)
+end
+
+return Effects
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX18"><Properties><string name="Name">Hud</string><ProtectedString name="Source"><![CDATA[-- HUD pulito: bianco con testi scuri e angoli arrotondati.
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage:WaitForChild("Config"))
+local Net = require(ReplicatedStorage:WaitForChild("Net"))
+
+local player = Players.LocalPlayer
+
+local Hud = {}
+
+local DARK = Color3.fromRGB(32, 34, 48)
+local WHITE = Color3.fromRGB(250, 250, 252)
+
+local function new(class, props, children)
+	local inst = Instance.new(class)
+	for k, v in pairs(props or {}) do
+		if k ~= "Parent" then
+			inst[k] = v
+		end
+	end
+	for _, c in ipairs(children or {}) do
+		c.Parent = inst
+	end
+	if props and props.Parent then
+		inst.Parent = props.Parent
+	end
+	return inst
+end
+
+local function corner(r)
+	return new("UICorner", { CornerRadius = UDim.new(0, r) })
+end
+
+local function text(props)
+	props.BackgroundTransparency = props.BackgroundTransparency or 1
+	props.Font = props.Font or Enum.Font.GothamBold
+	props.TextColor3 = props.TextColor3 or DARK
+	return new("TextLabel", props)
+end
+
+local gui, scoreRed, scoreBlue, timerLabel, bigLabel, subLabel, introLabel, playBtn
+local pips, chargeFill, chargeBar, notifBox, tipLabel, slotFrames
+local chargeValue = nil
+local lastPhase = nil
+local bigUntil = 0
+
+local function showBig(msg, color, duration)
+	bigLabel.Text = msg
+	bigLabel.TextColor3 = color or WHITE
+	bigLabel.Visible = true
+	bigUntil = os.clock() + (duration or 1.2)
+end
+
+function Hud.Notify(msg)
+	local lbl = text({
+		Size = UDim2.fromOffset(230, 30),
+		BackgroundTransparency = 0.05,
+		BackgroundColor3 = WHITE,
+		Text = msg,
+		TextSize = 16,
+		Parent = notifBox,
+	})
+	corner(10).Parent = lbl
+	task.delay(3, function()
+		local tw = TweenService:Create(lbl, TweenInfo.new(0.4), { BackgroundTransparency = 1, TextTransparency = 1 })
+		tw:Play()
+		tw.Completed:Wait()
+		lbl:Destroy()
+	end)
+end
+
+function Hud.SetCharge(v)
+	chargeValue = v
+end
+
+local function fmtTime(sec)
+	sec = math.max(0, math.ceil(sec))
+	return string.format("%d:%02d", math.floor(sec / 60), sec % 60)
+end
+
+function Hud.Build()
+	gui = new("ScreenGui", {
+		Name = "CalcioHud",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = false,
+		Parent = player:WaitForChild("PlayerGui"),
+	})
+
+	-- tabellone
+	local board = new("Frame", {
+		Size = UDim2.fromOffset(250, 52),
+		Position = UDim2.new(0.5, 0, 0, 10),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = WHITE,
+		Parent = gui,
+	})
+	corner(16).Parent = board
+	new("Frame", {
+		Size = UDim2.fromOffset(18, 18),
+		Position = UDim2.new(0, 22, 0.5, -9),
+		BackgroundColor3 = Config.Teams.Red.Color,
+		Parent = board,
+	}, { corner(4) })
+	new("Frame", {
+		Size = UDim2.fromOffset(18, 18),
+		Position = UDim2.new(1, -40, 0.5, -9),
+		BackgroundColor3 = Config.Teams.Blue.Color,
+		Parent = board,
+	}, { corner(4) })
+	scoreRed = text({ Size = UDim2.fromOffset(60, 40), Position = UDim2.new(0, 48, 0.5, -20), Text = "0", TextSize = 34, Parent = board })
+	scoreBlue = text({ Size = UDim2.fromOffset(60, 40), Position = UDim2.new(1, -108, 0.5, -20), Text = "0", TextSize = 34, Parent = board })
+	text({ Size = UDim2.fromOffset(30, 40), Position = UDim2.new(0.5, -15, 0.5, -20), Text = "-", TextSize = 34, Parent = board })
+
+	local pill = new("Frame", {
+		Size = UDim2.fromOffset(120, 30),
+		Position = UDim2.new(0.5, 0, 0, 68),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = DARK,
+		Parent = gui,
+	}, { corner(15) })
+	timerLabel = text({
+		Size = UDim2.fromScale(1, 1),
+		Text = "⏱ 6:00",
+		TextSize = 20,
+		TextColor3 = WHITE,
+		Parent = pill,
+	})
+
+	-- messaggio grande centrale (conto alla rovescia, GOAL!)
+	bigLabel = text({
+		Size = UDim2.fromOffset(700, 140),
+		Position = UDim2.new(0.5, 0, 0.3, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Text = "",
+		TextSize = 110,
+		TextColor3 = WHITE,
+		Visible = false,
+		Parent = gui,
+	})
+	new("UIStroke", { Thickness = 5, Color = DARK, Parent = bigLabel })
+	subLabel = text({
+		Size = UDim2.fromOffset(700, 40),
+		Position = UDim2.new(0.5, 0, 0.3, 80),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Text = "",
+		TextSize = 28,
+		TextColor3 = WHITE,
+		Visible = false,
+		Parent = gui,
+	})
+	new("UIStroke", { Thickness = 3, Color = DARK, Parent = subLabel })
+
+	-- lobby: intervallo e GIOCA
+	introLabel = text({
+		Size = UDim2.fromOffset(400, 34),
+		Position = UDim2.new(0.5, 0, 0, 104),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Text = "",
+		TextSize = 22,
+		TextColor3 = WHITE,
+		Parent = gui,
+	})
+	new("UIStroke", { Thickness = 2, Color = DARK, Parent = introLabel })
+	playBtn = new("TextButton", {
+		Size = UDim2.fromOffset(200, 54),
+		Position = UDim2.new(0.5, 0, 1, -150),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = Color3.fromRGB(70, 200, 110),
+		Text = "GIOCA",
+		Font = Enum.Font.GothamBlack,
+		TextSize = 28,
+		TextColor3 = WHITE,
+		Visible = false,
+		Parent = gui,
+	}, { corner(16) })
+	playBtn.Activated:Connect(function()
+		Net.Get("JoinQueue"):FireServer()
+	end)
+
+	local sideBtns = { { "Negozio", 0 }, { "Inventario", 1 }, { "Amici", 2 } }
+	for _, b in ipairs(sideBtns) do
+		local btn = new("TextButton", {
+			Size = UDim2.fromOffset(110, 36),
+			Position = UDim2.new(0, 14 + b[2] * 118, 0.5, 0),
+			BackgroundColor3 = WHITE,
+			Text = b[1],
+			Font = Enum.Font.GothamBold,
+			TextSize = 16,
+			TextColor3 = DARK,
+			Name = "LobbyOnly",
+			Visible = false,
+			Parent = gui,
+		}, { corner(10) })
+		btn.Activated:Connect(function()
+			Hud.Notify(b[1] .. ": disponibile nella Fase 5")
+		end)
+	end
+
+	-- barra carica + slot gadget + tacche stamina (basso al centro)
+	local bottom = new("Frame", {
+		Size = UDim2.fromOffset(200, 130),
+		Position = UDim2.new(0.5, 0, 1, -14),
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	})
+	chargeBar = new("Frame", {
+		Size = UDim2.fromOffset(150, 7),
+		Position = UDim2.new(0.5, 0, 0, 2),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0.4,
+		Visible = false,
+		Parent = bottom,
+	}, { corner(4) })
+	chargeFill = new("Frame", {
+		Size = UDim2.fromScale(0, 1),
+		BackgroundColor3 = Color3.fromRGB(255, 190, 40),
+		Parent = chargeBar,
+	}, { corner(4) })
+
+	slotFrames = {}
+	for i = 1, 2 do
+		local slot = new("Frame", {
+			Size = UDim2.fromOffset(60, 60),
+			Position = UDim2.new(0.5, (i - 1.5) * 70, 0, 18),
+			AnchorPoint = Vector2.new(0.5, 0),
+			BackgroundColor3 = WHITE,
+			BackgroundTransparency = 0.45,
+			Parent = bottom,
+		}, { corner(12), new("UIStroke", { Thickness = 2, Color = DARK, Transparency = 0.3 }) })
+		text({ Size = UDim2.fromOffset(22, 22), Position = UDim2.fromOffset(4, 2), Text = tostring(i), TextSize = 16, Parent = slot })
+		slotFrames[i] = slot
+	end
+
+	local pipRow = new("Frame", {
+		Size = UDim2.fromOffset(200, 10),
+		Position = UDim2.new(0.5, 0, 0, 90),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundTransparency = 1,
+		Parent = bottom,
+	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 6) }) })
+	pips = {}
+	for i = 1, Config.Stamina.Pips do
+		local bg = new("Frame", {
+			Size = UDim2.fromOffset(40, 9),
+			BackgroundColor3 = Color3.fromRGB(40, 44, 58),
+			BackgroundTransparency = 0.35,
+			LayoutOrder = i,
+			Parent = pipRow,
+		}, { corner(4) })
+		pips[i] = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(70, 214, 100), Parent = bg }, { corner(4) })
+	end
+
+	-- suggerimenti tasti (colonna a destra)
+	local hints = {
+		"Calcio  [Clic]  (tieni = carica)",
+		"Passaggio  [Clic dx]",
+		"Colpo sotto  [Q]",
+		"Lancio alto  [F]",
+		"Scivolata  [E]",
+		"Dribbling  [Spazio]",
+		"Sprint  [Shift]",
+		"Chiedi palla  [R]",
+	}
+	local col = new("Frame", {
+		Size = UDim2.fromOffset(240, #hints * 26),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		BackgroundTransparency = 1,
+		Name = "Hints",
+		Parent = gui,
+	}, { new("UIListLayout", { Padding = UDim.new(0, 4), HorizontalAlignment = Enum.HorizontalAlignment.Right }) })
+	for i, h in ipairs(hints) do
+		local l = text({
+			Size = UDim2.fromOffset(#h * 8 + 20, 22),
+			BackgroundTransparency = 0.15,
+			BackgroundColor3 = WHITE,
+			Text = h,
+			TextSize = 13,
+			LayoutOrder = i,
+			Parent = col,
+		})
+		corner(8).Parent = l
+	end
+
+	-- basso a sinistra
+	text({
+		Size = UDim2.fromOffset(240, 24),
+		Position = UDim2.new(0, 14, 1, -58),
+		Text = "Torna in lobby [L]",
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = WHITE,
+		Parent = gui,
+	})
+	text({
+		Size = UDim2.fromOffset(240, 24),
+		Position = UDim2.new(0, 14, 1, -34),
+		Text = "Classifica [Tab]",
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = WHITE,
+		Parent = gui,
+	})
+
+	-- notifiche (alto a destra)
+	notifBox = new("Frame", {
+		Size = UDim2.fromOffset(240, 300),
+		Position = UDim2.new(1, -12, 0, 12),
+		AnchorPoint = Vector2.new(1, 0),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	}, { new("UIListLayout", { Padding = UDim.new(0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Right }) })
+
+	-- suggerimento contestuale
+	tipLabel = text({
+		Size = UDim2.fromOffset(620, 28),
+		Position = UDim2.new(0.5, 0, 1, -158),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Text = "",
+		TextSize = 18,
+		TextColor3 = WHITE,
+		Parent = gui,
+	})
+	new("UIStroke", { Thickness = 2, Color = DARK, Parent = tipLabel })
+
+	Net.Get("Notify").OnClientEvent:Connect(Hud.Notify)
+	Net.Get("GoalScored").OnClientEvent:Connect(function(teamKey, scorer, assist, own)
+		local t = Config.Teams[teamKey]
+		showBig(own and "AUTOGOL!" or "GOAL!", t.Color, Config.Match.GoalCelebration - 0.5)
+		local line = scorer ~= "" and ("Segna " .. scorer) or ""
+		if assist ~= "" then
+			line = line .. "  (assist " .. assist .. ")"
+		end
+		subLabel.Text = line
+		subLabel.Visible = line ~= ""
+		task.delay(Config.Match.GoalCelebration - 0.5, function()
+			subLabel.Visible = false
+		end)
+	end)
+
+	local tips = {
+		"Collabora con la squadra per segnare! Segna 3 goal!",
+		"Carica il tiro: a carica piena butti giù l'avversario!",
+		"Tieni premuto il calcio e premi A o D per il tiro a effetto.",
+		"Finisci la stamina e i calci diventano deboli: gestiscila!",
+	}
+	task.spawn(function()
+		local i = 1
+		while true do
+			if workspace:GetAttribute("Phase") == "Playing" then
+				tipLabel.Text = tips[i]
+				i = i % #tips + 1
+			else
+				tipLabel.Text = ""
+			end
+			task.wait(9)
+		end
+	end)
+
+	RunService.RenderStepped:Connect(Hud.Update)
+end
+
+function Hud.Update()
+	local phase = workspace:GetAttribute("Phase") or "Intermission"
+	local now = workspace:GetServerTimeNow()
+	local endAt = workspace:GetAttribute("PhaseEnd") or 0
+	local left = workspace:GetAttribute("TimeLeft") or Config.Match.Duration
+
+	scoreRed.Text = tostring(workspace:GetAttribute("ScoreRed") or 0)
+	scoreBlue.Text = tostring(workspace:GetAttribute("ScoreBlue") or 0)
+
+	local clock = left
+	if phase == "Playing" then
+		clock = endAt - now
+	end
+	timerLabel.Text = "⏱ " .. fmtTime(clock)
+
+	-- fasi
+	if phase ~= lastPhase then
+		if phase == "Playing" and lastPhase == "Kickoff" then
+			showBig("VIA!", Color3.fromRGB(255, 220, 80), 0.9)
+		elseif phase == "Ended" then
+			showBig(workspace:GetAttribute("ResultText") or "", WHITE, Config.Match.EndScreen - 0.5)
+			bigLabel.TextSize = 54
+		end
+		if phase ~= "Ended" then
+			bigLabel.TextSize = 110
+		end
+		lastPhase = phase
+	end
+	if phase == "Kickoff" then
+		local n = math.ceil(endAt - now)
+		if n > 0 then
+			bigLabel.Text = tostring(n)
+			bigLabel.TextColor3 = WHITE
+			bigLabel.Visible = true
+			bigUntil = os.clock() + 0.3
+		end
+	end
+	if bigLabel.Visible and os.clock() > bigUntil and phase ~= "Ended" then
+		bigLabel.Visible = false
+	end
+	if phase == "Ended" then
+		bigLabel.Text = workspace:GetAttribute("ResultText") or ""
+		bigLabel.Visible = true
+	end
+
+	local lobby = phase == "Intermission"
+	introLabel.Visible = lobby
+	playBtn.Visible = lobby
+	if lobby then
+		introLabel.Text = "Intervallo  " .. fmtTime(endAt - now) .. "   -   La partita sta per iniziare!"
+	end
+	for _, c in ipairs(gui:GetChildren()) do
+		if c.Name == "LobbyOnly" then
+			c.Visible = lobby
+		end
+	end
+
+	-- stamina
+	local st = player:GetAttribute("Stamina") or Config.Stamina.Pips
+	for i, pip in ipairs(pips) do
+		pip.Size = UDim2.fromScale(math.clamp(st - (i - 1), 0, 1), 1)
+	end
+
+	-- barra di carica
+	if chargeValue then
+		chargeBar.Visible = true
+		chargeFill.Size = UDim2.fromScale(chargeValue, 1)
+		chargeFill.BackgroundColor3 = (chargeValue >= Config.Kick.PowerShotThreshold) and Color3.fromRGB(255, 80, 60) or Color3.fromRGB(255, 190, 40)
+	else
+		chargeBar.Visible = false
+	end
+end
+
+return Hud
+]]></ProtectedString></Properties></Item></Item></Item></Item>
+</roblox>
