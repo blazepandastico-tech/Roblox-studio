@@ -114,6 +114,18 @@ view("giganti", slot(6.5) + outward * 430 + right * 20 + Vector3.new(0, G + 40, 
 -- da vicino: i giganti puri (posti 1-4) e il volto di quello da 32 metri (posto 3)
 view("giganti_vicino", slot(2.6) + outward * 120 - right * 12 + Vector3.new(0, G + 20, 0), slot(2.6) + Vector3.new(0, G + 17, 0))
 view("volto", slot(3) + outward * 30 - right * 9 + Vector3.new(0, G + 28, 0), slot(3) + Vector3.new(0, G + 27.5, 0))
+-- seconda fila: otto giganti puri della stessa altezza, per vedere quanto sono diversi tra loro
+local VARIETY = 8
+local varietyRow = lineFront + outward * 130
+local function varietySlot(i: number): Vector3
+	return varietyRow + right * ((i - (VARIETY + 1) / 2) * 18)
+end
+for i = 1, VARIETY do
+	local q = varietySlot(i)
+	emit("TP", tostring(10 + i), f(q.X), f(G), f(q.Z), f(math.atan2(outward.X, outward.Z)))
+end
+view("varieta", varietySlot(4.5) + outward * 118 + Vector3.new(0, G + 14, 0), varietySlot(4.5) + Vector3.new(0, G + 11, 0))
+view("varieta_volti", varietySlot(1.5) + outward * 30 + Vector3.new(0, G + 18, 0), varietySlot(1.5) + Vector3.new(0, G + 16.5, 0))
 -- le case di Calaneth viste dall'alto delle mura interne del distretto
 view("calaneth_case", calaneth - outward * 35 + right * 55 + Vector3.new(0, G + 46, 0), calaneth + outward * 25 - right * 30 + Vector3.new(0, G + 8, 0))
 -- un boschetto in campagna (il primo albero a 650-800 studs dal centro di Vermiglia, lontano dalle mura)
@@ -172,6 +184,30 @@ for i, look in LOOKS do
 		emit("GE", look)
 	else
 		emit("GX", look, tostring(model))
+	end
+end
+-- semi scelti in modo che ognuno abbia una pettinatura diversa (così si vede anche il calvo)
+local usedHair = {}
+local seedTry = 5000
+for i = 1, VARIETY do
+	local okT, model
+	repeat
+		seedTry += 1
+		okT, model = pcall(TitanBuilder.Build, { Height = 20, Look = "Puro", Seed = seedTry, Name = "Puro" })
+		local hairStyle = if okT and model then string.split(tostring(model:GetAttribute("Aspetto")), "/")[1] else ""
+	until not okT or not usedHair[hairStyle] and (i > 1 or hairStyle == "Calvo") and (i ~= 2 or string.find(tostring(model:GetAttribute("Aspetto")), "storta") ~= nil)
+	if okT and model then
+		usedHair[string.split(tostring(model:GetAttribute("Aspetto")), "/")[1]] = true
+		emit("G", "Puro", f(20), tostring(10 + i))
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 0.98 then
+				emitPart(d)
+			end
+		end
+		emit("GE", "Puro")
+		LOG("ASPETTO\t" .. tostring(model:GetAttribute("Aspetto")))
+	else
+		emit("GX", "Puro", tostring(model))
 	end
 end
 

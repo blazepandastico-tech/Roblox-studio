@@ -99,12 +99,13 @@ local function weldPart(folder: Instance, parent: BasePart, name: string, size: 
 	part.CastShadow = false
 	if props then
 		for k, v in props do
-			if k ~= "Block" then
+			if k ~= "Block" and k ~= "Round" then
 				(part :: any)[k] = v
 			end
 		end
 	end
-	if not (props and props.Block) then
+	-- stile Roblox: blocchi (la forma tonda solo se chiesta con Round)
+	if props and props.Round then
 		local mesh = Instance.new("SpecialMesh")
 		mesh.MeshType = Enum.MeshType.Sphere
 		mesh.Parent = part

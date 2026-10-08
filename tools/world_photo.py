@@ -8,7 +8,7 @@ Le foto mostrano il mondo vero del gioco: utili per vedere le modifiche prima di
   python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file]
 
 Inquadrature: calaneth_tetti, calaneth_strada, calaneth_case, muro_esterno, vermiglia_alto, campo, aurion,
-bosco, giganti, giganti_vicino, volto
+bosco, giganti, giganti_vicino, volto, varieta, varieta_volti
 (senza nomi le fa tutte). Serve il programma 'luau' (variabile LUAU o nel PATH).
 """
 import math
@@ -336,7 +336,7 @@ DAY = dict(
 def photo(data, name, out_path, width):
     cam_pos, target = data["views"][name]
     reach = 4200 if name == "vermiglia_alto" else 2600
-    with_titans = name in ("giganti", "giganti_vicino", "volto")
+    with_titans = name in ("giganti", "giganti_vicino", "volto", "varieta", "varieta_volti")
     sc, origin = build_scene(data, cam_pos, target, reach, clear_view=with_titans)
     if with_titans:
         add_titans(sc, data, origin)

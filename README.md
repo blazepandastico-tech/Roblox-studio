@@ -118,9 +118,13 @@ Se vai in un'isola troppo forte per te, il gioco ti avvisa, ma non ti ferma.
   specie (querce con chioma a più strati, abeti a palchi, betulle, alberi morti sull'isola di Cenere e cespugli),
   prati ondulati con massi e affioramenti di roccia, case con falde del tetto spesse e sporgenti, timpani in
   muratura, abbaini, tetti di coppi o di ardesia con il muschio, piani terra in pietra e travi a vista.
-- **Giganti più veri**: dita delle mani e dei piedi, rotule, gomiti, clavicole, scapole, muscoli del collo,
-  palpebre pesanti, zigomi, narici e mento, costole sui giganti magri e pelle con sfumature (mani e ginocchia
-  più rosate, piedi più scuri).
+- **Giganti in stile Roblox**: corpo fatto di blocchi come gli avatar. Ogni gigante puro è diverso: pesca dal
+  suo seme pelle, capelli (calvo, corti, lunghi, cresta, ciuffo, caschetto, spettinati, codino, riga, chierica,
+  afro, rasati, ricci), occhi (normali, occhioni, occhietti, diversi, strabici, socchiusi, occhiolino, vuoti),
+  sopracciglia, naso, bocca (ghigno, sorrisetto, urlo, dentoni, lingua fuori, storta, sdentata...), orecchie e
+  dettagli (barba, baffi, cicatrice, lentiggini, guance rosse, occhiaie, nei, macchie, rughe), e uno su quattro ha
+  la **faccia storta**: centinaia di migliaia di combinazioni. È solo l'aspetto: abilità, nuca, occhi da accecare, arti da
+  tagliare e animazioni restano identici. I mutaforma tengono il loro aspetto riconoscibile (a blocchi).
 - Le foto PRIMA/DOPO sono in `assets/realismo/`. Si rifanno con `python3 tools/world_photo.py <cartella>`:
   costruisce il mondo vero dal codice del gioco e lo fotografa da più punti (case, bosco, mura, giganti).
 - **Città vive**: cittadini che passeggiano per le strade (meno di notte), banchi del mercato con i tendoni
