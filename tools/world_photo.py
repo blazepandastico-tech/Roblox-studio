@@ -7,7 +7,8 @@ Le foto mostrano il mondo vero del gioco: utili per vedere le modifiche prima di
 
   python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file]
 
-Inquadrature: calaneth_tetti, calaneth_strada, muro_esterno, vermiglia_alto, campo, aurion, giganti
+Inquadrature: calaneth_tetti, calaneth_strada, calaneth_case, muro_esterno, vermiglia_alto, campo, aurion,
+bosco, giganti, giganti_vicino, volto
 (senza nomi le fa tutte). Serve il programma 'luau' (variabile LUAU o nel PATH).
 """
 import math

@@ -121,6 +121,8 @@ Se vai in un'isola troppo forte per te, il gioco ti avvisa, ma non ti ferma.
 - **Giganti più veri**: dita delle mani e dei piedi, rotule, gomiti, clavicole, scapole, muscoli del collo,
   palpebre pesanti, zigomi, narici e mento, costole sui giganti magri e pelle con sfumature (mani e ginocchia
   più rosate, piedi più scuri).
+- Le foto PRIMA/DOPO sono in `assets/realismo/`. Si rifanno con `python3 tools/world_photo.py <cartella>`:
+  costruisce il mondo vero dal codice del gioco e lo fotografa da più punti (case, bosco, mura, giganti).
 - **Città vive**: cittadini che passeggiano per le strade (meno di notte), banchi del mercato con i tendoni
   a strisce, carretti, festoni colorati sopra il viale e fumo che esce dai camini. Le città in rovina restano deserte.
 - **Musica dinamica**: cambia da sola con una dissolvenza tra *calma* (giorno), *città*, *notte*, *battaglia*

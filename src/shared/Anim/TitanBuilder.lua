@@ -307,6 +307,7 @@ local function makeProfile(look: string, rng: Random)
 		p.Skinless = true
 		p.Muscle = true
 		p.Lips = false
+		p.BigTeeth = true
 		p.MouthWidth = 0.75
 		p.Grin = true
 		p.Steam = true
@@ -478,8 +479,8 @@ function TitanBuilder.Build(params): Model
 	-- la pelle non è di un colore solo: ginocchia, gomiti e mani più rosati, piedi e stinchi più scuri
 	local flush = Color3.new(math.min(1, skin.R * 1.03), skin.G * 0.9, skin.B * 0.87)
 	local handSkin = skin:Lerp(flush, 0.5)
-	local footSkin = skin:Lerp(darker(skin, 0.86), 0.6)
-	local shinSkin = skin:Lerp(darker(skin, 0.92), 0.5)
+	local footSkin = skin:Lerp(darker(skin, 0.86), 0.3)
+	local shinSkin = skin:Lerp(darker(skin, 0.92), 0.2)
 
 	local model = Instance.new("Model")
 	model.Name = params.Name or "Gigante"
@@ -584,6 +585,13 @@ function TitanBuilder.Build(params): Model
 		if p.Muscle then
 			decor(model, upper, prefix .. "Bicipite", Vector3.new(armT * 0.6, upperArm * 0.6, armT * 0.5), muscleColor, CFrame.new(0, 0, -armT * 0.3))
 			decor(model, lower, prefix .. "Avambraccio", Vector3.new(armT * 0.55, lowerArm * 0.7, armT * 0.5), muscleColor, CFrame.new(0, lowerArm * 0.1, -armT * 0.22))
+		end
+		if p.Skinless then
+			-- fasci muscolari chiari lungo il braccio (si vedono i tendini)
+			for _, sx in { -1, 1 } do
+				decor(model, upper, prefix .. "Fascio" .. sx, Vector3.new(armT * 0.12, upperArm * 0.85, armT * 0.12), skin:Lerp(Color3.fromRGB(236, 150, 120), 0.4), CFrame.new(sx * armT * 0.3, 0, -armT * 0.42))
+				decor(model, lower, prefix .. "Tendine" .. sx, Vector3.new(armT * 0.1, lowerArm * 0.8, armT * 0.1), skin:Lerp(Color3.fromRGB(240, 200, 180), 0.45), CFrame.new(sx * armT * 0.2, -lowerArm * 0.05, -armT * 0.46))
+			end
 		end
 		if p.Armor then
 			local plate = Color3.fromRGB(232, 222, 202)
