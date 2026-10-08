@@ -376,7 +376,7 @@ function MonetizationService.Start()
 			end
 		end
 	end)
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.spawn(function()
 			refreshPasses(player)
 			dailyGifts(player)

@@ -479,6 +479,12 @@ local function updateHold(t)
 	end
 end
 
+-- Il gigante uid sta davvero tenendo in mano questo giocatore?
+function TitanService.IsHolding(uid: any, player: Player): boolean
+	local t = titans[uid]
+	return t ~= nil and t.Holding == player and t.State ~= "Dead"
+end
+
 function TitanService.EscapePress(player: Player)
 	local state = S.PlayerService.GetState(player)
 	local t = state.GrabbedBy and titans[state.GrabbedBy]
@@ -960,6 +966,10 @@ local function think(t, roots, dt: number)
 		return
 	end
 	if t.Temporary and now > t.Temporary then
+		-- un gigante a tempo che sparisce deve lasciare andare chi teneva in mano
+		if t.Holding then
+			releaseHold(t, "Escaped")
+		end
 		t.State = "Dead"
 		setAttr(t, "State", "Dead")
 		S.EventService.Effect("TitanDeath", { Model = t.Model }, t.Position, 900)
@@ -1516,6 +1526,13 @@ local function spawnZones()
 			for _, bossId in zone.Bosses do
 				bossStates[bossId] = { Alive = nil, NextSpawn = os.clock() + rng:NextNumber(15, 60) }
 			end
+		end
+	end
+	-- tutti i boss del mondo (non solo quelli elencati nelle zone) devono comparire nella loro zona,
+	-- altrimenti i passi "Sconfiggi il boss" della storia resterebbero bloccati
+	for bossId, def in Titans.Bosses do
+		if not def.Raid and not bossStates[bossId] and Zones.Get(def.Zone) then
+			bossStates[bossId] = { Alive = nil, NextSpawn = os.clock() + rng:NextNumber(15, 60) }
 		end
 	end
 end

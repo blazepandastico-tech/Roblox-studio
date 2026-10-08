@@ -207,7 +207,7 @@ function LeaderboardService.Start()
 			pcall(buildSign, board, CFrame.lookAt(pos, Vector3.new(c.X, c.Y, pos.Z)))
 		end
 	end
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.delay(3, function()
 			if player.Parent then
 				broadcast(player)

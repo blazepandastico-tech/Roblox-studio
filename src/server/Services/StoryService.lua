@@ -211,6 +211,15 @@ end
 local function spawnPickups()
 	local interactive = workspace:WaitForChild(Config.Folders.Interactive)
 	local rng = Random.new(Config.WorldSeed + 7)
+	-- gli oggetti vanno appoggiati sul terreno vero (le zone non sono tutte piatte)
+	local groundParams = RaycastParams.new()
+	groundParams.FilterType = Enum.RaycastFilterType.Include
+	local map = workspace:FindFirstChild(Config.Folders.Map)
+	groundParams.FilterDescendantsInstances = if map then { workspace.Terrain, map } else { workspace.Terrain }
+	local function onGround(pos: Vector3): Vector3
+		local hit = workspace:Raycast(pos + Vector3.new(0, 250, 0), Vector3.new(0, -500, 0), groundParams)
+		return if hit then hit.Position + Vector3.new(0, 1.2, 0) else pos
+	end
 	for _, chapter in Story.Chapters do
 		for _, step in chapter.Steps do
 			if step.Type == "Collect" then
@@ -219,7 +228,7 @@ local function spawnPickups()
 					for i = 1, (step.Count or 1) + 3 do
 						local a = rng:NextNumber(0, math.pi * 2)
 						local r = rng:NextNumber(10, zone.Radius * 0.8)
-						local pos = zone.Center + Vector3.new(math.cos(a) * r, 1.5, math.sin(a) * r)
+						local pos = onGround(zone.Center + Vector3.new(math.cos(a) * r, 1.5, math.sin(a) * r))
 						local item = Items.Get(step.Item)
 						local can = Instance.new("Part")
 						can.Name = "Raccoglibile_" .. step.Item .. "_" .. i
@@ -281,15 +290,23 @@ local function spawnPickups()
 	end
 end
 
--- Controllo periodico dei passi "Reach" con una posizione precisa
+-- Controllo periodico dei passi che si completano "da soli": posizione raggiunta, zona in cui
+-- ti trovi già, livello già raggiunto (anche con il pannello admin o i comandi di prova).
+-- Così nessun passo può restare bloccato.
 local function checkReach()
 	while true do
 		task.wait(0.5)
 		for _, player in Players:GetPlayers() do
-			local _, step = StoryService.Current(player)
-			if step and step.Type == "Reach" and step.Position then
-				local root = Util.GetRoot(player.Character)
-				if root and (root.Position - step.Position).Magnitude <= (step.Radius or 20) then
+			local _, step, profile = StoryService.Current(player)
+			if step and profile then
+				if step.Type == "Reach" and step.Position then
+					local root = Util.GetRoot(player.Character)
+					if root and (root.Position - step.Position).Magnitude <= (step.Radius or 20) then
+						StoryService.Advance(player)
+					end
+				elseif step.Type == "Reach" and step.Zone and player:GetAttribute("Zone") == step.Zone then
+					StoryService.Advance(player)
+				elseif step.Type == "Level" and profile.Level >= (step.Level or 1) then
 					StoryService.Advance(player)
 				end
 			end

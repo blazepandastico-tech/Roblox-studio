@@ -741,8 +741,13 @@ function ShifterService.Start()
 			player:SetAttribute("Transformed", false)
 			Net.Event("TitanForm"):FireClient(player, { On = false, Reason = "Morto" })
 		end
+		-- gli accessori messi da parte durante la trasformazione non servono più (il nuovo personaggio ha i suoi)
+		local holder = ServerStorage:FindFirstChild("Custodia_" .. player.UserId)
+		if holder then
+			holder:ClearAllChildren()
+		end
 	end)
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.defer(ShifterService.ResetEnergy, player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)

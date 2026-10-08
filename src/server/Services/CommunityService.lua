@@ -105,7 +105,7 @@ end
 
 function CommunityService.Start()
 	ReplicatedStorage:SetAttribute("GroupId", Config.GroupId)
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.spawn(checkGroup, player, false)
 		task.defer(updateFriends)
 	end)

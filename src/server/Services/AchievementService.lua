@@ -62,7 +62,7 @@ function AchievementService.Init(services)
 end
 
 function AchievementService.Start()
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.delay(6, function()
 			if player.Parent then
 				AchievementService.Check(player)

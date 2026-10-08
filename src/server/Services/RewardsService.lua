@@ -231,7 +231,7 @@ function RewardsService.Start()
 		lastRequest[player] = now
 		spin(player)
 	end)
-	S.DataService.Loaded:Connect(function(player, profile)
+	S.DataService.OnLoaded(function(player, profile)
 		playState(profile)
 		player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
 		task.spawn(checkPolicy, player)

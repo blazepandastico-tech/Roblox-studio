@@ -33,6 +33,7 @@ local startClock = os.clock()
 local orbitAngle = math.random() * math.pi * 2
 local renderConnection: RBXScriptConnection? = nil
 local nextFlash = os.clock() + 4
+local nextCharacterRequest = os.clock() + 20
 
 type Ember = { Frame: Frame, X: number, Y: number, Speed: number, Sway: number, Phase: number, Size: number }
 local embers: { Ember } = {}
@@ -424,6 +425,12 @@ local function step(dt: number)
 	else
 		local dots = string.rep(".", 1 + math.floor(now * 2) % 3)
 		ui.Status.Text = (if C.ClientData.Ready then "Arrivo al campo di addestramento" else "Caricamento dei progressi") .. dots
+		-- il personaggio non arriva: chiediamo al server di ricrearlo (ogni 15 secondi)
+		if not characterReady() and now >= nextCharacterRequest then
+			nextCharacterRequest = now + 15
+			ui.Status.Text = "Il caricamento sta impiegando più del solito, riprovo" .. dots
+			Net.Event("ClientReady"):FireServer("NoCharacter")
+		end
 	end
 	if C.ClientData.Ready and ui.Welcome.Text == "" then
 		ui.Welcome.Text = welcomeText()

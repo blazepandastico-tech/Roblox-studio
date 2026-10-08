@@ -525,7 +525,13 @@ function PlayerService.UpdateKillStat(player: Player)
 	end
 end
 
+local handled: { [Player]: boolean } = {}
+
 local function onProfileLoaded(player: Player, profile)
+	if handled[player] then
+		return
+	end
+	handled[player] = true
 	setupLeaderstats(player, profile)
 	player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
@@ -557,6 +563,16 @@ local function trackZones()
 					S.EventService.Notify(player, "Sei caduto nel vuoto: ti abbiamo riportato alla base.", "Info", 3)
 				end
 			elseif root and profile then
+				-- sicurezza: "afferrato" da un gigante che non esiste più (o che non ti tiene) → liberato
+				local grabState = PlayerService.GetState(player)
+				if grabState.GrabbedBy and S.TitanService and not S.TitanService.IsHolding(grabState.GrabbedBy, player) then
+					grabState.GrabbedBy = nil
+					player:SetAttribute("Grabbed", false)
+					Net.Event("Grab"):FireClient(player, false, nil, "Lost")
+				elseif not grabState.GrabbedBy and player:GetAttribute("Grabbed") == true then
+					player:SetAttribute("Grabbed", false)
+					Net.Event("Grab"):FireClient(player, false, nil, "Lost")
+				end
 				local zone = Zones.Find(root.Position)
 				local id = zone and zone.Id or ""
 				local state = PlayerService.GetState(player)
@@ -635,15 +651,27 @@ function PlayerService.Init(services)
 end
 
 function PlayerService.Start()
-	S.DataService.Loaded:Connect(onProfileLoaded)
+	S.DataService.OnLoaded(onProfileLoaded)
 	Players.PlayerRemoving:Connect(function(player)
 		descriptions[player] = nil
 		states[player] = nil
 		statsCache[player] = nil
+		handled[player] = nil
 	end)
 
 	Net.Event("AllocateStat").OnServerEvent:Connect(allocate)
-	Net.Event("ClientReady").OnServerEvent:Connect(function(player)
+	Net.Event("ClientReady").OnServerEvent:Connect(function(player, request)
+		-- la schermata iniziale aspetta da troppo il personaggio: lo creiamo di nuovo
+		if request == "NoCharacter" then
+			local root = Util.GetRoot(player.Character)
+			local humanoid = getHumanoid(player)
+			if S.DataService.Get(player) and handled[player] and (not root or not humanoid or humanoid.Health <= 0) then
+				warn("[PlayerService] Personaggio mancante per " .. player.Name .. ": lo ricreo")
+				task.spawn(spawnCharacter, player)
+			end
+			S.DataService.SyncNow(player)
+			return
+		end
 		S.DataService.SyncNow(player)
 		if S.StoryService then
 			S.StoryService.OnClientReady(player)

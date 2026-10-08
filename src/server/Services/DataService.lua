@@ -82,13 +82,14 @@ local TEMPLATE = {
 
 DataService.Template = TEMPLATE
 
+local function isStudio(): boolean
+	return RunService:IsStudio()
+end
+
 local function keyFor(player: Player): string
 	return "Giocatore_" .. player.UserId
 end
 
-local function isStudio(): boolean
-	return RunService:IsStudio()
-end
 
 local function newProfile()
 	local profile = Util.DeepCopy(TEMPLATE)
@@ -159,6 +160,10 @@ local function loadFromStore(player: Player)
 		end
 		if not ok then
 			warn(("[DataService] Caricamento fallito per %s (tentativo %d): %s"):format(player.Name, attempt, tostring(err)))
+			-- in Studio senza accesso alle API non ha senso riprovare: si gioca subito senza salvare
+			if isStudio() then
+				return nil, "failed"
+			end
 		end
 		task.wait(if lockedByOther then 4 else 2 * attempt)
 	end
@@ -177,19 +182,23 @@ local function saveToStore(player: Player, release: boolean): boolean
 	local data = sanitize(snapshot(profile))
 	local key = keyFor(player)
 	for attempt = 1, 3 do
+		local written = false
 		local ok, err = pcall(function()
 			(store :: DataStore):UpdateAsync(key, function(old)
+				written = false
 				if type(old) == "table" and type(old.Lock) == "table" and old.Lock.Job ~= game.JobId then
 					-- un altro server ha preso il controllo: non sovrascrivere
 					if os.time() - (old.Lock.Time or 0) < SESSION_TIMEOUT then
 						return nil
 					end
 				end
+				written = true
 				return { Data = data, Lock = if release then nil else { Job = game.JobId, Time = os.time() } }
 			end)
 		end)
 		if ok then
-			return true
+			-- "riuscito" solo se i dati sono stati scritti davvero (non bloccati da un altro server)
+			return written
 		end
 		warn(("[DataService] Salvataggio fallito per %s (tentativo %d): %s"):format(player.Name, attempt, tostring(err)))
 		task.wait(1.5 * attempt)
@@ -240,6 +249,18 @@ end
 
 function DataService.Get(player: Player)
 	return profiles[player]
+end
+
+-- Come Loaded:Connect, ma chiama subito fn anche per i giocatori già caricati
+-- (così nessun servizio "perde" un giocatore entrato prima che fosse pronto)
+function DataService.OnLoaded(fn: (Player, any) -> ())
+	local connection = DataService.Loaded:Connect(fn)
+	for player, profile in profiles do
+		if player.Parent then
+			task.spawn(fn, player, profile)
+		end
+	end
+	return connection
 end
 
 function DataService.WaitFor(player: Player, timeout: number?)

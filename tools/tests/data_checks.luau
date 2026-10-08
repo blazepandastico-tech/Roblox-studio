@@ -343,12 +343,44 @@ for ci, chapter in Story.Chapters do
 			end
 			check(isNumber(step.Count) and step.Count > 0, "%s: Count non valido", w)
 		elseif step.Type == "Boss" then
-			check(Titans.Bosses[step.Boss] ~= nil, "%s: boss '%s' inesistente", w, step.Boss)
+			local boss = Titans.Bosses[step.Boss]
+			check(boss ~= nil, "%s: boss '%s' inesistente", w, step.Boss)
+			if boss and boss.Raid then
+				-- un boss da raid deve esistere in almeno un raid
+				local inRaid = false
+				for _, raid in Raids.List or Raids do
+					if type(raid) == "table" and raid.Boss and raid.Boss.Id == step.Boss then
+						inRaid = true
+					end
+				end
+				check(inRaid, "%s: il boss '%s' è solo da raid ma nessun raid lo contiene", w, step.Boss)
+			elseif boss then
+				check(Zones.Get(boss.Zone) ~= nil, "%s: il boss '%s' non ha una zona dove comparire", w, step.Boss)
+			end
 		elseif step.Type == "HumanBoss" then
 			check(Enemies.Bosses[step.Boss] ~= nil, "%s: boss umano '%s' inesistente", w, step.Boss)
+			local spawnsSomewhere = false
+			for _, zone in Zones.List do
+				for _, id in zone.HumanBosses or {} do
+					if id == step.Boss then
+						spawnsSomewhere = true
+					end
+				end
+			end
+			check(spawnsSomewhere, "%s: il boss umano '%s' non compare in nessuna zona", w, step.Boss)
 		elseif step.Type == "Enemy" then
 			check(Enemies.Types[step.Enemy] ~= nil, "%s: nemico '%s' inesistente", w, step.Enemy)
-			check(Zones.Get(step.Zone) ~= nil, "%s: zona '%s' inesistente", w, step.Zone)
+			local zone = Zones.Get(step.Zone)
+			check(zone ~= nil, "%s: zona '%s' inesistente", w, step.Zone)
+			if zone then
+				local spawns = false
+				for _, spawn in zone.Enemies or {} do
+					if (spawn.Type or spawn.Enemy) == step.Enemy then
+						spawns = true
+					end
+				end
+				check(spawns, "%s: nella zona %s non nascono nemici '%s'", w, step.Zone, step.Enemy)
+			end
 		elseif step.Type == "Level" then
 			check(isNumber(step.Level) and step.Level <= Config.MaxLevel, "%s: livello non valido", w)
 		elseif step.Type == "Cutscene" then
