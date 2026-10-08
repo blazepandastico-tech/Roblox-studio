@@ -3396,16 +3396,17 @@ return Enemies
 	  Start = 0           → l'evento è attivo da subito (appena pubblichi il gioco)
 	  End   = 1792969200  → finisce il 26 ottobre 2026 alle 00:00 (ora italiana)
 	Per cambiare le date usa https://www.epochconverter.com (incolla il numero che ti dà).
-	Dal Pannello Admin (P → 📢 Server → 🎉 Grande Inaugurazione) si può accendere o spegnere l'evento in ogni momento.
 
-	Durante l'evento:
+	Durante l'evento (sempre):
 	  - esperienza e oro DOPPI per tutti
 	  - regalo di benvenuto (gemme + Medaglia dell'Inaugurazione)
-	  - la cerimonia d'apertura (scena animata) la prima volta che entri
-	  - il COLOSSO D'ORO cade dal cielo ogni 30 minuti nelle Pianure Meridionali
-	  - spettacoli di fuochi d'artificio sopra le città ogni 10 minuti
 	  - 8 sfide: completale tutte per il Mantello dell'Inaugurazione (esclusivo)
 	  - addobbi di festa nelle città e il codice regalo INAUGURAZIONE
+
+	Le ANIMAZIONI dell'evento (Colosso d'Oro che cade dal cielo, fuochi d'artificio, coriandoli,
+	cerimonia d'apertura) partono dal Pannello Admin: P → 😈 Admin Abuse.
+	Con AutoShows = true partono anche da sole (Colosso ogni 30 minuti, fuochi ogni 10,
+	cerimonia al primo ingresso); si può cambiare anche dal pannello, solo per quel server.
 ]]
 
 local Festival = {}
@@ -3421,6 +3422,10 @@ Festival.WelcomeGems = 100
 Festival.WelcomeItem = "MedagliaInaugurazione"
 Festival.FinalItem = "MantelloInaugurazione"
 Festival.FinalGems = 150
+
+-- false = Colosso, fuochi e cerimonia solo quando li lancia un admin (😈 Admin Abuse)
+-- true  = partono anche da soli (Colosso ogni Boss.Interval, fuochi ogni Fireworks.Interval)
+Festival.AutoShows = false
 
 -- Colosso d'Oro: cade dal cielo, il livello si adatta ai giocatori presenti
 Festival.Boss = {
@@ -3454,7 +3459,7 @@ Festival.Challenges = {
 	{ Id = "Colosso", Icon = "👑", Name = "Contro il Colosso d'Oro", Text = "Aiuta a sconfiggere il Colosso d'Oro", Stat = "Colossus", Goal = 1, Gems = 40, Gold = 40000 },
 	{ Id = "Forzieri", Icon = "📦", Name = "Cacciatore di tesori", Text = "Apri 3 forzieri nascosti", Stat = "Treasures", Goal = 3, Gems = 20, Gold = 20000 },
 	{ Id = "Isolotti", Icon = "⛵", Name = "Lupo di mare", Text = "Visita 3 isolotti del mare aperto", Stat = "Islets", Goal = 3, Gems = 20, Gold = 20000 },
-	{ Id = "Fuochi", Icon = "🎆", Name = "Lo spettacolo", Text = "Guarda uno spettacolo di fuochi d'artificio in città", Stat = "Fireworks", Goal = 1, Gems = 10, Gold = 10000 },
+	{ Id = "Fuochi", Icon = "🎆", Name = "Lo spettacolo", Text = "Guarda uno spettacolo di fuochi d'artificio", Stat = "Fireworks", Goal = 1, Gems = 10, Gold = 10000 },
 	{ Id = "Taverna", Icon = "🍺", Name = "Un brindisi", Text = "Mangia un pasto caldo in una taverna", Stat = "Meal", Goal = 1, Gems = 10, Gold = 10000 },
 	{ Id = "Duello", Icon = "🤺", Name = "Gloria nell'arena", Text = "Vinci un duello (Arena dei Duelli o PvP)", Stat = "PvPKills", Goal = 1, Gems = 15, Gold = 15000 },
 }
@@ -6919,7 +6924,7 @@ Titans.Bosses = {
 			{ Id = "MidolloGigante", Chance = 1, Min = 8, Max = 14 },
 		},
 	},
-	-- Boss dell'evento Grande Inaugurazione: cade dal cielo ogni 30 minuti (FestivalService),
+	-- Boss dell'evento Grande Inaugurazione: cade dal cielo con Admin Abuse o ogni 30 minuti (FestivalService),
 	-- il livello e la vita si adattano ai giocatori presenti nel server
 	ColossoDorato = {
 		Id = "ColossoDorato",
@@ -9438,8 +9443,17 @@ ACTIONS.DoubleXP = function()
 	return if on then "Esperienza doppia per tutti ATTIVA" else "Esperienza doppia disattivata"
 end
 
--- Evento della Grande Inaugurazione (prove e gestione dal pannello)
-ACTIONS.Festival = function(admin, target, value)
+-- 😈 ADMIN ABUSE: l'evento della Grande Inaugurazione e le sue animazioni (Pannello Admin → Admin Abuse)
+local function adminRoot(admin: Player): BasePart?
+	return admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function inFront(admin: Player, distance: number): Vector3?
+	local root = adminRoot(admin)
+	return root and (root.Position + root.CFrame.LookVector * distance) or nil
+end
+
+ACTIONS.Festival = function(_, _, value)
 	local fest = S.FestivalService
 	if not fest then
 		return "Evento non disponibile"
@@ -9453,25 +9467,69 @@ ACTIONS.Festival = function(admin, target, value)
 	elseif value == "auto" then
 		fest.SetOverride(nil)
 		return "Evento: segue le date di Shared/Data/Festival"
-	elseif value == "boss" then
-		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local spot = root and (root.Position + root.CFrame.LookVector * 140) or nil
-		task.spawn(fest.SpawnColossus, spot)
-		return "Il Colosso d'Oro sta cadendo davanti a te!"
-	elseif value == "fireworks" then
-		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if root then
-			fest.FireworksAt(root.Position + root.CFrame.LookVector * 80, 30)
+	elseif value == "showsOn" then
+		fest.SetAutoShows(true)
+		return "Spettacoli automatici ACCESI: Colosso ogni 30 minuti, fuochi ogni 10"
+	elseif value == "showsOff" then
+		fest.SetAutoShows(false)
+		return "Spettacoli automatici SPENTI: Colosso e fuochi solo con Admin Abuse"
+	end
+	return nil
+end
+
+ACTIONS.Abuse = function(admin, target, value)
+	local fest = S.FestivalService
+	if not fest then
+		return "Evento non disponibile"
+	end
+	if value == "announce" then
+		S.EventService.Announce("😈 ADMIN ABUSE!", "Un amministratore è nel server: fuochi d'artificio, il Colosso d'Oro e tante sorprese!", "Raro")
+		return "Admin Abuse annunciato a tutti"
+	elseif value == "boss" or value == "bossZone" then
+		if not fest.CanSpawnColossus() then
+			return "Il Colosso d'Oro è già in campo (o sta già cadendo)"
 		end
-		return "Fuochi d'artificio!"
+		if value == "boss" then
+			task.spawn(fest.SpawnColossus, inFront(admin, 140))
+			return "Il Colosso d'Oro sta cadendo davanti a te!"
+		end
+		fest.ColossusWithWarning()
+		return "Colosso d'Oro annunciato: cade tra 30 secondi nelle Pianure Meridionali"
+	elseif value == "meteor" then
+		local spot = inFront(admin, 160)
+		if not spot then
+			return "Ti serve un personaggio in campo"
+		end
+		fest.Meteor(spot)
+		return "Meteora d'oro!"
+	elseif value == "fireworks" then
+		local spot = inFront(admin, 80)
+		if not spot then
+			return "Ti serve un personaggio in campo"
+		end
+		fest.FireworksAt(spot, 30)
+		return "Fuochi d'artificio davanti a te!"
+	elseif value == "fireworksCities" then
+		fest.FireworksShow()
+		return "Spettacolo di fuochi sopra tutte le città!"
+	elseif value == "fireworksPlayers" then
+		local count = 0
+		for _, p in Players:GetPlayers() do
+			local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root then
+				fest.FireworksAt(root.Position, 15)
+				count += 1
+			end
+		end
+		return ("Fuochi d'artificio sopra %d giocatori!"):format(count)
+	elseif value == "confetti" then
+		fest.ConfettiAll()
+		return "Coriandoli per tutti!"
 	elseif value == "ceremony" then
 		fest.Ceremony(target, true)
 		return "Cerimonia d'apertura per " .. target.DisplayName
-	elseif value == "confetti" then
-		for _, p in Players:GetPlayers() do
-			S.EventService.EffectTo(p, "Confetti", { Big = true })
-		end
-		return "Coriandoli per tutti!"
+	elseif value == "ceremonyAll" then
+		return ("Cerimonia d'apertura per %d giocatori"):format(fest.CeremonyAll())
 	end
 	return nil
 end
@@ -11727,11 +11785,12 @@ return ExploreService
             <string name="Name">FestivalService</string>
             <string name="Source"><![CDATA[--[[
 	FestivalService - l'evento "Grande Inaugurazione" (date e premi in Shared/Data/Festival)
-	  - esperienza e oro doppi, regalo di benvenuto, cerimonia d'apertura (scena animata)
-	  - il Colosso d'Oro che cade dal cielo ogni 30 minuti nelle Pianure Meridionali
-	  - spettacoli di fuochi d'artificio sopra le città ogni 10 minuti
+	  - esperienza e oro doppi, regalo di benvenuto
 	  - 8 sfide con premi e il Mantello dell'Inaugurazione per chi le completa tutte
 	  - addobbi di festa nelle città (archi, bandiere, festoni di luci, coriandoli)
+	  - le animazioni (Colosso d'Oro dal cielo, fuochi d'artificio, coriandoli, cerimonia d'apertura)
+	    le lancia un admin dal Pannello Admin (😈 Admin Abuse); con gli spettacoli automatici accesi
+	    partono anche da sole (Colosso ogni 30 minuti, fuochi ogni 10, cerimonia al primo ingresso)
 	Il client legge lo stato dagli attributi di ReplicatedStorage (FestaAttiva, FestaFine, ...).
 ]]
 
@@ -11752,11 +11811,14 @@ local S
 
 local active = false
 local override: boolean? = nil -- scelta dell'admin (nil = segue le date)
+local autoShows = Festival.AutoShows == true -- Colosso, fuochi e cerimonia anche senza admin
 local colossus: any = nil
 local decorations: Folder? = nil
 local rng = Random.new()
 local nextBossClock = 0
 local nextFireworksClock = 0
+local bossWarned = false -- avviso "il Colosso sta arrivando" già dato per il prossimo arrivo automatico
+local colossusComing = false -- un Colosso sta già cadendo (o è stato annunciato)
 
 local function clockToUnix(clockTime: number): number
 	return math.floor(os.time() + (clockTime - os.clock()))
@@ -11766,8 +11828,9 @@ local function publish()
 	ReplicatedStorage:SetAttribute("FestaAttiva", active)
 	ReplicatedStorage:SetAttribute("FestaNome", Festival.Name)
 	ReplicatedStorage:SetAttribute("FestaFine", if override == true then 0 else Festival.End)
-	ReplicatedStorage:SetAttribute("FestaProssimoBoss", clockToUnix(nextBossClock))
-	ReplicatedStorage:SetAttribute("FestaProssimiFuochi", clockToUnix(nextFireworksClock))
+	ReplicatedStorage:SetAttribute("FestaSpettacoliAuto", autoShows)
+	ReplicatedStorage:SetAttribute("FestaProssimoBoss", if autoShows then clockToUnix(nextBossClock) else nil)
+	ReplicatedStorage:SetAttribute("FestaProssimiFuochi", if autoShows then clockToUnix(nextFireworksClock) else nil)
 end
 
 function FestivalService.IsActive(): boolean
@@ -11932,8 +11995,16 @@ local function goldenAura(model: Model)
 	sparkles.Parent = torso
 end
 
+local function colossusInField(): boolean
+	return colossus ~= nil and colossus.State ~= "Dead" and colossus.Model.Parent ~= nil
+end
+
+function FestivalService.CanSpawnColossus(): boolean
+	return not colossusInField() and not colossusComing
+end
+
 function FestivalService.SpawnColossus(position: Vector3?): boolean
-	if colossus and colossus.State ~= "Dead" and colossus.Model.Parent then
+	if colossusInField() or colossusComing then
 		return false
 	end
 	local def = Titans.Bosses[Festival.Boss.Id]
@@ -11945,8 +12016,10 @@ function FestivalService.SpawnColossus(position: Vector3?): boolean
 	local ground = groundAt(spot)
 	local level = colossusLevel()
 	-- arriva dal cielo come una meteora d'oro: prima l'effetto, poi il gigante all'impatto
+	colossusComing = true
 	S.EventService.Effect("ColossusArrival", { Position = ground, Height = def.Height }, ground, 4000)
 	task.wait(2.2)
+	colossusComing = false
 	local players = math.max(1, #Players:GetPlayers())
 	local t = S.TitanService.Spawn({
 		Boss = def.Id,
@@ -11969,7 +12042,7 @@ function FestivalService.SpawnColossus(position: Vector3?): boolean
 			S.TitanService.Despawn(t)
 			colossus = nil
 			ReplicatedStorage:SetAttribute("FestaBossPos", nil)
-			S.EventService.Announce("Il Colosso d'Oro è tornato nel cielo...", "Tornerà tra poco: preparatevi meglio!", "Info")
+			S.EventService.Announce("Il Colosso d'Oro è tornato nel cielo...", "Tornerà: preparatevi meglio!", "Info")
 		end
 	end)
 	return true
@@ -12001,30 +12074,72 @@ local function onTitanKilled(t, _killer, contributors)
 		FestivalService.Add(player, "Colossus", 1)
 	end
 	S.EventService.Effect("Fireworks", { Center = t.Position, Duration = 12, Seed = rng:NextInteger(1, 1e6) }, t.Position, 2000)
-	S.EventService.NotifyAll("👑 Il Colosso d'Oro è stato sconfitto! Tornerà tra 30 minuti.", "Raro", 6)
+	S.EventService.NotifyAll(if autoShows then "👑 Il Colosso d'Oro è stato sconfitto! Tornerà tra 30 minuti." else "👑 Il Colosso d'Oro è stato sconfitto!", "Raro", 6)
 end
 
 -- FUOCHI D'ARTIFICIO ---------------------------------------------------------------------------------------
 
+-- Fuochi sopra un punto: chi è abbastanza vicino li vede (e completa la sfida "Lo spettacolo")
 function FestivalService.FireworksAt(center: Vector3, duration: number?)
-	S.EventService.Effect("Fireworks", { Center = center, Duration = duration or Festival.Fireworks.Duration, Seed = rng:NextInteger(1, 1e6) }, center, Festival.Fireworks.Range)
+	local range = Festival.Fireworks.Range
+	S.EventService.Effect("Fireworks", { Center = center, Duration = duration or Festival.Fireworks.Duration, Seed = rng:NextInteger(1, 1e6) }, center, range)
+	for _, player in Players:GetPlayers() do
+		local root = Util.GetRoot(player.Character)
+		if root and Util.FlatDistance(root.Position, center) < range then
+			FestivalService.Add(player, "Fireworks", 1)
+		end
+	end
 end
 
-local function fireworksShow()
-	local range = Festival.Fireworks.Range
+-- Spettacolo sopra tutte le città insieme
+function FestivalService.FireworksShow()
 	for _, zoneId in Festival.Fireworks.Zones do
 		local zone = Zones.Get(zoneId)
 		if zone then
 			FestivalService.FireworksAt(zone.Center)
-			for _, player in Players:GetPlayers() do
-				local root = Util.GetRoot(player.Character)
-				if root and Util.FlatDistance(root.Position, zone.Center) < range then
-					FestivalService.Add(player, "Fireworks", 1)
-					S.EventService.Notify(player, "🎆 Spettacolo di fuochi d'artificio! Guarda il cielo sopra la città.", "Raro", 4)
-				end
-			end
 		end
 	end
+	S.EventService.NotifyAll("🎆 Spettacolo di fuochi d'artificio sopra le città! Guarda il cielo.", "Raro", 5)
+end
+
+-- Solo la meteora d'oro (fulmini, onde d'urto e colonna di luce) senza il Colosso
+function FestivalService.Meteor(position: Vector3)
+	local ground = groundAt(position)
+	S.EventService.Effect("ColossusArrival", { Position = ground, Height = 70 }, ground, 4000)
+end
+
+-- Pioggia di coriandoli per tutti i giocatori del server
+function FestivalService.ConfettiAll()
+	for _, player in Players:GetPlayers() do
+		S.EventService.EffectTo(player, "Confetti", { Big = true })
+	end
+end
+
+-- Cerimonia d'apertura per tutti i giocatori del server
+function FestivalService.CeremonyAll(): number
+	local count = 0
+	for _, player in Players:GetPlayers() do
+		if S.DataService.Get(player) then
+			FestivalService.Ceremony(player, true)
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Avviso del Colosso nelle Pianure Meridionali (un minuto di attesa come negli spettacoli automatici)
+function FestivalService.ColossusWithWarning(): boolean
+	if colossusInField() or colossusComing then
+		return false
+	end
+	colossusComing = true
+	local zone = Zones.Get(Festival.Boss.Zone)
+	S.EventService.Announce("👑 Il Colosso d'Oro sta arrivando!", ("Tra 30 secondi cadrà dal cielo: %s, isola di Vermiglia"):format(zone and zone.Name or "Vermiglia"), "Pericolo")
+	task.delay(30, function()
+		colossusComing = false
+		FestivalService.SpawnColossus()
+	end)
+	return true
 end
 
 -- ADDOBBI -------------------------------------------------------------------------------------------------
@@ -12204,6 +12319,7 @@ local function setActive(on: boolean)
 	end
 	active = on
 	if on then
+		bossWarned = false
 		nextBossClock = os.clock() + Festival.Boss.FirstDelay
 		nextFireworksClock = os.clock() + Festival.Fireworks.FirstDelay
 		buildDecorations()
@@ -12234,6 +12350,19 @@ function FestivalService.SetOverride(value: boolean?)
 	publish()
 end
 
+-- Admin: spettacoli automatici (Colosso ogni 30 minuti, fuochi ogni 10, cerimonia al primo ingresso)
+function FestivalService.SetAutoShows(on: boolean)
+	autoShows = on
+	bossWarned = false
+	nextBossClock = os.clock() + Festival.Boss.FirstDelay
+	nextFireworksClock = os.clock() + Festival.Fireworks.FirstDelay
+	publish()
+end
+
+function FestivalService.AutoShows(): boolean
+	return autoShows
+end
+
 function FestivalService.Init(services)
 	S = services
 end
@@ -12246,10 +12375,10 @@ function FestivalService.Start()
 		applyBonus(player)
 		-- il regalo arriva dopo la cerimonia d'apertura (se la deve ancora vedere)
 		local f = festivalData(profile)
-		task.delay(if active and not f.Ceremony then 40 else 8, welcome, player, profile)
+		task.delay(if active and autoShows and not f.Ceremony then 40 else 8, welcome, player, profile)
 	end)
 	Net.Event("ClientReady").OnServerEvent:Connect(function(player, request)
-		if request == nil and active then
+		if request == nil and active and autoShows then
 			task.delay(0.5, function()
 				if player.Parent then
 					FestivalService.Ceremony(player)
@@ -12270,30 +12399,29 @@ function FestivalService.Start()
 		end
 	end)
 	-- orologio dell'evento
-	local warned = false
 	while true do
 		task.wait(1)
 		local shouldBe = Festival.IsActive(os.time(), override)
 		if shouldBe ~= active then
 			setActive(shouldBe)
 		end
-		if active then
+		if active and autoShows then
 			local now = os.clock()
-			if not warned and nextBossClock - now <= Festival.Boss.Warning then
-				warned = true
+			if not bossWarned and nextBossClock - now <= Festival.Boss.Warning then
+				bossWarned = true
 				local zone = Zones.Get(Festival.Boss.Zone)
 				S.EventService.Announce("👑 Il Colosso d'Oro sta arrivando!", ("Tra 1 minuto cadrà dal cielo: %s, isola di Vermiglia"):format(zone and zone.Name or "Vermiglia"), "Pericolo")
 			end
 			if now >= nextBossClock then
 				nextBossClock = now + Festival.Boss.Interval
-				warned = false
+				bossWarned = false
 				publish()
 				task.spawn(FestivalService.SpawnColossus)
 			end
 			if now >= nextFireworksClock then
 				nextFireworksClock = now + Festival.Fireworks.Interval
 				publish()
-				task.spawn(fireworksShow)
+				task.spawn(FestivalService.FireworksShow)
 			end
 		end
 	end
@@ -31431,7 +31559,7 @@ end
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
 	AdminPanel - Pannello Admin (tasto P o pulsante 🛠️, visibile solo agli amministratori)
-	Categorie: Progressione • Oggetti • Sieri • Poteri • Mondo • Storia • Server
+	Categorie: Progressione • Oggetti • Sieri • Poteri • Mondo • Storia • Server • Admin Abuse
 	In alto si sceglie il BERSAGLIO (tu o un altro giocatore) e si può scrivere un VALORE
 	(numero o testo) usato dai pulsanti che lo richiedono.
 	Tutte le azioni vengono controllate dal server (AdminService).
@@ -31474,6 +31602,7 @@ local CATEGORIES = {
 	{ Id = "Mondo", Icon = "🌍" },
 	{ Id = "Storia", Icon = "📜" },
 	{ Id = "Server", Icon = "📢" },
+	{ Id = "Admin Abuse", Icon = "😈" },
 }
 
 local function isAdmin(): boolean
@@ -31774,7 +31903,65 @@ local function showServer()
 	button(r, "⭐ Esperienza doppia (tutti)", GREEN, function()
 		send("DoubleXP")
 	end)
-	section("🎉 Grande Inaugurazione", "L'evento segue le date scritte in Shared/Data/Festival; qui puoi accenderlo, spegnerlo o provarne i pezzi.")
+	section("Moderazione", "Scegli il giocatore come BERSAGLIO in alto.")
+	r = row(220, 44)
+	button(r, "🚫 Espelli il bersaglio", RED, function()
+		if target() ~= player then
+			send("Kick")
+		end
+	end)
+	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro nome in Config.lua → AdminNames (o l'UserId in Admins). Ora ci sono %d admin extra."):format(#Config.Admins + #(Config.AdminNames or {})))
+end
+
+-- 😈 ADMIN ABUSE: le animazioni dell'evento quando vuoi tu, più i comandi dell'evento
+local function showAbuse()
+	section("😈 Admin Abuse", "Le animazioni dell'evento partono quando vuoi tu: annuncia l'Admin Abuse e scatenati!")
+	local r = row(220, 44)
+	button(r, "😈 Annuncia ADMIN ABUSE", RED, function()
+		send("Abuse", "announce")
+	end)
+	section("👑 Colosso d'Oro", "Cade dal cielo come una meteora d'oro. Con l'evento acceso, chi aiuta a sconfiggerlo riceve gemme e oro (e completa la sfida).")
+	r = row(220, 44)
+	button(r, "👑 Colosso d'Oro qui", PURPLE, function()
+		send("Abuse", "boss")
+	end)
+	button(r, "👑 Colosso nelle Pianure (tra 30 s)", PURPLE, function()
+		send("Abuse", "bossZone")
+	end)
+	button(r, "☄️ Solo la meteora qui", nil, function()
+		send("Abuse", "meteor")
+	end)
+	section("🎆 Fuochi d'artificio e festa", "Chi vede i fuochi completa la sfida \"Lo spettacolo\" (con l'evento acceso).")
+	r = row(220, 44)
+	button(r, "🎆 Fuochi davanti a te", BLUE, function()
+		send("Abuse", "fireworks")
+	end)
+	button(r, "🏙️ Fuochi su tutte le città", BLUE, function()
+		send("Abuse", "fireworksCities")
+	end)
+	button(r, "🚀 Fuochi sopra ogni giocatore", BLUE, function()
+		send("Abuse", "fireworksPlayers")
+	end)
+	button(r, "🎊 Coriandoli a tutti", nil, function()
+		send("Abuse", "confetti")
+	end)
+	section("🎬 Cerimonia d'apertura", "La scena animata dell'inaugurazione con i fuochi sopra la città.")
+	r = row(220, 44)
+	button(r, "🎬 Cerimonia al bersaglio", nil, function()
+		send("Abuse", "ceremony")
+	end)
+	button(r, "🎬 Cerimonia a TUTTI", nil, function()
+		send("Abuse", "ceremonyAll")
+	end)
+	local on = ReplicatedStorage:GetAttribute("FestaAttiva") == true
+	local auto = ReplicatedStorage:GetAttribute("FestaSpettacoliAuto") == true
+	section(
+		"🎉 Evento Grande Inaugurazione",
+		("Evento: %s • spettacoli automatici: %s. L'evento (2x XP e oro, regalo, sfide, addobbi) segue le date in Shared/Data/Festival. Con gli spettacoli automatici il Colosso arriva da solo ogni 30 minuti, i fuochi ogni 10 e la cerimonia al primo ingresso."):format(
+			if on then "ACCESO" else "SPENTO",
+			if auto then "ACCESI" else "SPENTI"
+		)
+	)
 	r = row(220, 44)
 	button(r, "🎉 Accendi evento", GREEN, function()
 		send("Festival", "on")
@@ -31786,26 +31973,12 @@ local function showServer()
 		send("Festival", "auto")
 	end)
 	r = row(220, 44)
-	button(r, "👑 Colosso d'Oro qui", PURPLE, function()
-		send("Festival", "boss")
+	button(r, "▶️ Spettacoli automatici ON", if auto then Colors.Green else nil, function()
+		send("Festival", "showsOn")
 	end)
-	button(r, "🎆 Fuochi d'artificio qui", BLUE, function()
-		send("Festival", "fireworks")
+	button(r, "⏸️ Spettacoli automatici OFF", if auto then nil else Colors.Green, function()
+		send("Festival", "showsOff")
 	end)
-	button(r, "🎬 Cerimonia (bersaglio)", nil, function()
-		send("Festival", "ceremony")
-	end)
-	button(r, "🎊 Coriandoli a tutti", nil, function()
-		send("Festival", "confetti")
-	end)
-	section("Moderazione", "Scegli il giocatore come BERSAGLIO in alto.")
-	r = row(220, 44)
-	button(r, "🚫 Espelli il bersaglio", RED, function()
-		if target() ~= player then
-			send("Kick")
-		end
-	end)
-	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro nome in Config.lua → AdminNames (o l'UserId in Admins). Ora ci sono %d admin extra."):format(#Config.Admins + #(Config.AdminNames or {})))
 end
 
 local RENDER = {
@@ -31816,6 +31989,7 @@ local RENDER = {
 	Mondo = showWorld,
 	Storia = showStory,
 	Server = showServer,
+	["Admin Abuse"] = showAbuse,
 }
 
 local function updateTarget()
@@ -31940,6 +32114,14 @@ function AdminPanel.Start()
 			render()
 		end
 	end)
+	-- stato dell'evento aggiornato nella sezione Admin Abuse
+	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto" } do
+		ReplicatedStorage:GetAttributeChangedSignal(attribute):Connect(function()
+			if C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
+				render()
+			end
+		end)
+	end
 	Players.PlayerRemoving:Connect(function(p)
 		if p.UserId == targetUserId then
 			targetUserId = player.UserId
@@ -32771,7 +32953,7 @@ return Dialogue
               <string name="Name">Festival</string>
               <string name="Source"><![CDATA[--[[
 	Festival - interfaccia dell'evento "Grande Inaugurazione"
-	  - striscione sotto la bussola: bonus attivi, quando arriva il Colosso d'Oro, quando finisce l'evento
+	  - striscione sotto la bussola: bonus attivi, il Colosso d'Oro (in campo o quando arriva), quando finisce l'evento
 	  - pannello (clic sullo striscione): le 8 sfide con i progressi, i premi e il codice regalo
 	Lo stato arriva dagli attributi di ReplicatedStorage (li scrive FestivalService).
 ]]
@@ -32903,13 +33085,19 @@ local function update(dt: number)
 	local fine = ReplicatedStorage:GetAttribute("FestaFine")
 	local ends = if type(fine) == "number" and fine > 0 then ("  •  fine tra " .. Festival.FormatTime(fine - serverNow())) else ""
 	local bossHere = ReplicatedStorage:GetAttribute("FestaBossPos") ~= nil
-	local boss = if bossHere then "👑 COLOSSO D'ORO IN CAMPO!" else ("👑 Colosso tra " .. timeUntil("FestaProssimoBoss"))
-	bannerText.Text = ("🎉 GRANDE INAUGURAZIONE  •  2x XP e ORO  •  %s%s"):format(boss, ends)
+	-- senza spettacoli automatici il Colosso arriva solo con gli Admin Abuse: niente conto alla rovescia
+	local auto = ReplicatedStorage:GetAttribute("FestaSpettacoliAuto") == true
+	local boss = if bossHere then "  •  👑 COLOSSO D'ORO IN CAMPO!" elseif auto then ("  •  👑 Colosso tra " .. timeUntil("FestaProssimoBoss")) else ""
+	bannerText.Text = ("🎉 GRANDE INAUGURAZIONE  •  2x XP e ORO%s%s"):format(boss, ends)
 	if not C.UIController.IsOpen("Inaugurazione") then
 		return
 	end
 	subtitle.Text = "Esperienza e oro doppi per tutti" .. (if ends ~= "" then ends else "")
-	timers.Text = ("👑 Colosso d'Oro: %s (Pianure Meridionali, Vermiglia)\n🎆 Prossimi fuochi d'artificio sopra le città: tra %s"):format(if bossHere then "in campo ORA!" else "tra " .. timeUntil("FestaProssimoBoss"), timeUntil("FestaProssimiFuochi"))
+	if auto then
+		timers.Text = ("👑 Colosso d'Oro: %s (segui la 👑 sulla mappa)\n🎆 Prossimi fuochi d'artificio sopra le città: tra %s"):format(if bossHere then "in campo ORA!" else "tra " .. timeUntil("FestaProssimoBoss"), timeUntil("FestaProssimiFuochi"))
+	else
+		timers.Text = ("👑 Colosso d'Oro: %s\n🎆 Fuochi d'artificio e cerimonia: durante gli 😈 ADMIN ABUSE, resta connesso!"):format(if bossHere then "in campo ORA! (segui la 👑 sulla mappa)" else "cade dal cielo durante gli 😈 ADMIN ABUSE")
+	end
 	local f = festivalData()
 	local done = 0
 	for _, c in Festival.Challenges do

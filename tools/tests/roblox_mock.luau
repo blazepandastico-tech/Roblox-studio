@@ -924,6 +924,9 @@ end
 function Methods.GetPlayerFromCharacter(_self, _model)
 	return nil
 end
+function Methods.GetPlayerByUserId(_self, _userId)
+	return nil
+end
 function Methods.RequestStreamAroundAsync(_self) end
 -- terreno
 local function checkMaterial(m)

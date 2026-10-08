@@ -5,16 +5,17 @@
 	  Start = 0           → l'evento è attivo da subito (appena pubblichi il gioco)
 	  End   = 1792969200  → finisce il 26 ottobre 2026 alle 00:00 (ora italiana)
 	Per cambiare le date usa https://www.epochconverter.com (incolla il numero che ti dà).
-	Dal Pannello Admin (P → 📢 Server → 🎉 Grande Inaugurazione) si può accendere o spegnere l'evento in ogni momento.
 
-	Durante l'evento:
+	Durante l'evento (sempre):
 	  - esperienza e oro DOPPI per tutti
 	  - regalo di benvenuto (gemme + Medaglia dell'Inaugurazione)
-	  - la cerimonia d'apertura (scena animata) la prima volta che entri
-	  - il COLOSSO D'ORO cade dal cielo ogni 30 minuti nelle Pianure Meridionali
-	  - spettacoli di fuochi d'artificio sopra le città ogni 10 minuti
 	  - 8 sfide: completale tutte per il Mantello dell'Inaugurazione (esclusivo)
 	  - addobbi di festa nelle città e il codice regalo INAUGURAZIONE
+
+	Le ANIMAZIONI dell'evento (Colosso d'Oro che cade dal cielo, fuochi d'artificio, coriandoli,
+	cerimonia d'apertura) partono dal Pannello Admin: P → 😈 Admin Abuse.
+	Con AutoShows = true partono anche da sole (Colosso ogni 30 minuti, fuochi ogni 10,
+	cerimonia al primo ingresso); si può cambiare anche dal pannello, solo per quel server.
 ]]
 
 local Festival = {}
@@ -30,6 +31,10 @@ Festival.WelcomeGems = 100
 Festival.WelcomeItem = "MedagliaInaugurazione"
 Festival.FinalItem = "MantelloInaugurazione"
 Festival.FinalGems = 150
+
+-- false = Colosso, fuochi e cerimonia solo quando li lancia un admin (😈 Admin Abuse)
+-- true  = partono anche da soli (Colosso ogni Boss.Interval, fuochi ogni Fireworks.Interval)
+Festival.AutoShows = false
 
 -- Colosso d'Oro: cade dal cielo, il livello si adatta ai giocatori presenti
 Festival.Boss = {
@@ -63,7 +68,7 @@ Festival.Challenges = {
 	{ Id = "Colosso", Icon = "👑", Name = "Contro il Colosso d'Oro", Text = "Aiuta a sconfiggere il Colosso d'Oro", Stat = "Colossus", Goal = 1, Gems = 40, Gold = 40000 },
 	{ Id = "Forzieri", Icon = "📦", Name = "Cacciatore di tesori", Text = "Apri 3 forzieri nascosti", Stat = "Treasures", Goal = 3, Gems = 20, Gold = 20000 },
 	{ Id = "Isolotti", Icon = "⛵", Name = "Lupo di mare", Text = "Visita 3 isolotti del mare aperto", Stat = "Islets", Goal = 3, Gems = 20, Gold = 20000 },
-	{ Id = "Fuochi", Icon = "🎆", Name = "Lo spettacolo", Text = "Guarda uno spettacolo di fuochi d'artificio in città", Stat = "Fireworks", Goal = 1, Gems = 10, Gold = 10000 },
+	{ Id = "Fuochi", Icon = "🎆", Name = "Lo spettacolo", Text = "Guarda uno spettacolo di fuochi d'artificio", Stat = "Fireworks", Goal = 1, Gems = 10, Gold = 10000 },
 	{ Id = "Taverna", Icon = "🍺", Name = "Un brindisi", Text = "Mangia un pasto caldo in una taverna", Stat = "Meal", Goal = 1, Gems = 10, Gold = 10000 },
 	{ Id = "Duello", Icon = "🤺", Name = "Gloria nell'arena", Text = "Vinci un duello (Arena dei Duelli o PvP)", Stat = "PvPKills", Goal = 1, Gems = 15, Gold = 15000 },
 }

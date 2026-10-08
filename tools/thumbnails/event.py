@@ -794,10 +794,10 @@ def cmd_edit(frames_dir, music, out_path, vertical_path=None):
                   plain("Città in festa • Regalo di benvenuto per tutti", 0.042, 0.27, 0.5, 3.4)],
         "meteora": [Title("QUALCOSA CADE DAL CIELO...", int(H * 0.075), H * 0.84, 0.25, 2.25, W, H, *white)],
         "colosso": [Title("IL COLOSSO D'ORO", int(H * 0.12), H * 0.80, 0.5, 3.9, W, H, *gold),
-                    plain("Il boss dell'evento arriva ogni 30 minuti", 0.042, 0.91, 0.8, 3.9)],
+                    plain("Il boss dell'evento cade dal cielo durante gli Admin Abuse", 0.042, 0.91, 0.8, 3.9)],
         "volo": [Title("8 SFIDE • PREMI ESCLUSIVI", int(H * 0.095), H * 0.16, 0.25, 3.4, W, H, *gold),
                  plain("Mantello dell'Inaugurazione • Medaglia • Gemme", 0.042, 0.27, 0.5, 3.4)],
-        "finale": [Title("FUOCHI D'ARTIFICIO OGNI 10 MINUTI", int(H * 0.075), H * 0.84, 0.25, LOGO_AT - 0.15, W, H, *gold)],
+        "finale": [Title("FUOCHI D'ARTIFICIO E ADMIN ABUSE!", int(H * 0.075), H * 0.84, 0.25, LOGO_AT - 0.15, W, H, *gold)],
     }
     logo = _logo_layer(W, H, W / 2, H * 0.37, 0.95 * W / 1920 * 1.25)
     end_titles = [

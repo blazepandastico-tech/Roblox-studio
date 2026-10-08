@@ -61,11 +61,11 @@ C.AmbienceController = { RegionName = "Mare Aperto", ZoneId = nil }
 C.Intro = { IsShowing = function()
 	return false
 end }
-for _, entry in { { "Controllers", "CutsceneController" }, { "Controllers", "EffectsController" }, { "Controllers", "FireworksController" }, { "Controllers", "BoatController" }, { "Controllers", "HorseController" }, { "Controllers", "ExploreController" }, { "UI", "WorldMap" }, { "UI", "Festival" } } do
+for _, entry in { { "Controllers", "CutsceneController" }, { "Controllers", "EffectsController" }, { "Controllers", "FireworksController" }, { "Controllers", "BoatController" }, { "Controllers", "HorseController" }, { "Controllers", "ExploreController" }, { "UI", "WorldMap" }, { "UI", "Festival" }, { "UI", "AdminPanel" } } do
 	load(entry[1], entry[2])
 end
 
-local order = { "ClientData", "UIController", "InputController", "CutsceneController", "EffectsController", "FireworksController", "BoatController", "HorseController", "ExploreController", "WorldMap", "Festival" }
+local order = { "ClientData", "UIController", "InputController", "CutsceneController", "EffectsController", "FireworksController", "BoatController", "HorseController", "ExploreController", "WorldMap", "Festival", "AdminPanel" }
 for _, name in order do
 	local m = C[name]
 	if m and m.Init then
@@ -143,6 +143,40 @@ if C.Festival then
 	check(okP, "apertura del pannello dell'evento: " .. tostring(errP))
 	RunService.RenderStepped:Fire(0.6)
 	RunService.RenderStepped:Fire(0.6)
+	replicated:SetAttribute("FestaSpettacoliAuto", false)
+	replicated:SetAttribute("FestaProssimoBoss", nil)
+	RunService.RenderStepped:Fire(0.6)
+end
+-- pannello admin: la sezione 😈 Admin Abuse con tutti i pulsanti dell'evento
+if C.AdminPanel then
+	player:SetAttribute("Admin", true)
+	local okA, errA = pcall(C.UIController.Open, "Admin")
+	check(okA, "apertura del pannello admin: " .. tostring(errA))
+	local gui = player:FindFirstChild("PlayerGui")
+	local abuseButton, buttons = nil, 0
+	for _, d in (gui :: Instance):GetDescendants() do
+		if d:IsA("TextButton") and d.Text == "😈 Admin Abuse" then
+			abuseButton = d
+		end
+	end
+	check(abuseButton ~= nil, "manca la categoria 😈 Admin Abuse nel pannello admin")
+	if abuseButton then
+		local before = #WARNINGS
+		abuseButton.Activated:Fire()
+		check(#WARNINGS == before, "la sezione Admin Abuse ha dato un errore: " .. tostring(WARNINGS[#WARNINGS]))
+		for _, d in (gui :: Instance):GetDescendants() do
+			if d:IsA("TextButton") then
+				for _, word in { "Colosso", "meteora", "Fuochi", "Coriandoli", "Cerimonia", "ADMIN ABUSE", "evento", "date", "Spettacoli automatici" } do
+					if d.Text:find(word, 1, true) then
+						buttons += 1
+						break
+					end
+				end
+			end
+		end
+		check(buttons == 15, ("nella sezione Admin Abuse ci sono %d pulsanti dell'evento invece di 15"):format(buttons))
+		LOG(("Pannello admin: sezione 😈 Admin Abuse con %d pulsanti"):format(buttons))
+	end
 end
 
 for _, w in WARNINGS do

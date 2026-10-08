@@ -1,10 +1,11 @@
 --[[
 	FestivalService - l'evento "Grande Inaugurazione" (date e premi in Shared/Data/Festival)
-	  - esperienza e oro doppi, regalo di benvenuto, cerimonia d'apertura (scena animata)
-	  - il Colosso d'Oro che cade dal cielo ogni 30 minuti nelle Pianure Meridionali
-	  - spettacoli di fuochi d'artificio sopra le città ogni 10 minuti
+	  - esperienza e oro doppi, regalo di benvenuto
 	  - 8 sfide con premi e il Mantello dell'Inaugurazione per chi le completa tutte
 	  - addobbi di festa nelle città (archi, bandiere, festoni di luci, coriandoli)
+	  - le animazioni (Colosso d'Oro dal cielo, fuochi d'artificio, coriandoli, cerimonia d'apertura)
+	    le lancia un admin dal Pannello Admin (😈 Admin Abuse); con gli spettacoli automatici accesi
+	    partono anche da sole (Colosso ogni 30 minuti, fuochi ogni 10, cerimonia al primo ingresso)
 	Il client legge lo stato dagli attributi di ReplicatedStorage (FestaAttiva, FestaFine, ...).
 ]]
 
@@ -25,11 +26,14 @@ local S
 
 local active = false
 local override: boolean? = nil -- scelta dell'admin (nil = segue le date)
+local autoShows = Festival.AutoShows == true -- Colosso, fuochi e cerimonia anche senza admin
 local colossus: any = nil
 local decorations: Folder? = nil
 local rng = Random.new()
 local nextBossClock = 0
 local nextFireworksClock = 0
+local bossWarned = false -- avviso "il Colosso sta arrivando" già dato per il prossimo arrivo automatico
+local colossusComing = false -- un Colosso sta già cadendo (o è stato annunciato)
 
 local function clockToUnix(clockTime: number): number
 	return math.floor(os.time() + (clockTime - os.clock()))
@@ -39,8 +43,9 @@ local function publish()
 	ReplicatedStorage:SetAttribute("FestaAttiva", active)
 	ReplicatedStorage:SetAttribute("FestaNome", Festival.Name)
 	ReplicatedStorage:SetAttribute("FestaFine", if override == true then 0 else Festival.End)
-	ReplicatedStorage:SetAttribute("FestaProssimoBoss", clockToUnix(nextBossClock))
-	ReplicatedStorage:SetAttribute("FestaProssimiFuochi", clockToUnix(nextFireworksClock))
+	ReplicatedStorage:SetAttribute("FestaSpettacoliAuto", autoShows)
+	ReplicatedStorage:SetAttribute("FestaProssimoBoss", if autoShows then clockToUnix(nextBossClock) else nil)
+	ReplicatedStorage:SetAttribute("FestaProssimiFuochi", if autoShows then clockToUnix(nextFireworksClock) else nil)
 end
 
 function FestivalService.IsActive(): boolean
@@ -205,8 +210,16 @@ local function goldenAura(model: Model)
 	sparkles.Parent = torso
 end
 
+local function colossusInField(): boolean
+	return colossus ~= nil and colossus.State ~= "Dead" and colossus.Model.Parent ~= nil
+end
+
+function FestivalService.CanSpawnColossus(): boolean
+	return not colossusInField() and not colossusComing
+end
+
 function FestivalService.SpawnColossus(position: Vector3?): boolean
-	if colossus and colossus.State ~= "Dead" and colossus.Model.Parent then
+	if colossusInField() or colossusComing then
 		return false
 	end
 	local def = Titans.Bosses[Festival.Boss.Id]
@@ -218,8 +231,10 @@ function FestivalService.SpawnColossus(position: Vector3?): boolean
 	local ground = groundAt(spot)
 	local level = colossusLevel()
 	-- arriva dal cielo come una meteora d'oro: prima l'effetto, poi il gigante all'impatto
+	colossusComing = true
 	S.EventService.Effect("ColossusArrival", { Position = ground, Height = def.Height }, ground, 4000)
 	task.wait(2.2)
+	colossusComing = false
 	local players = math.max(1, #Players:GetPlayers())
 	local t = S.TitanService.Spawn({
 		Boss = def.Id,
@@ -242,7 +257,7 @@ function FestivalService.SpawnColossus(position: Vector3?): boolean
 			S.TitanService.Despawn(t)
 			colossus = nil
 			ReplicatedStorage:SetAttribute("FestaBossPos", nil)
-			S.EventService.Announce("Il Colosso d'Oro è tornato nel cielo...", "Tornerà tra poco: preparatevi meglio!", "Info")
+			S.EventService.Announce("Il Colosso d'Oro è tornato nel cielo...", "Tornerà: preparatevi meglio!", "Info")
 		end
 	end)
 	return true
@@ -274,30 +289,72 @@ local function onTitanKilled(t, _killer, contributors)
 		FestivalService.Add(player, "Colossus", 1)
 	end
 	S.EventService.Effect("Fireworks", { Center = t.Position, Duration = 12, Seed = rng:NextInteger(1, 1e6) }, t.Position, 2000)
-	S.EventService.NotifyAll("👑 Il Colosso d'Oro è stato sconfitto! Tornerà tra 30 minuti.", "Raro", 6)
+	S.EventService.NotifyAll(if autoShows then "👑 Il Colosso d'Oro è stato sconfitto! Tornerà tra 30 minuti." else "👑 Il Colosso d'Oro è stato sconfitto!", "Raro", 6)
 end
 
 -- FUOCHI D'ARTIFICIO ---------------------------------------------------------------------------------------
 
+-- Fuochi sopra un punto: chi è abbastanza vicino li vede (e completa la sfida "Lo spettacolo")
 function FestivalService.FireworksAt(center: Vector3, duration: number?)
-	S.EventService.Effect("Fireworks", { Center = center, Duration = duration or Festival.Fireworks.Duration, Seed = rng:NextInteger(1, 1e6) }, center, Festival.Fireworks.Range)
+	local range = Festival.Fireworks.Range
+	S.EventService.Effect("Fireworks", { Center = center, Duration = duration or Festival.Fireworks.Duration, Seed = rng:NextInteger(1, 1e6) }, center, range)
+	for _, player in Players:GetPlayers() do
+		local root = Util.GetRoot(player.Character)
+		if root and Util.FlatDistance(root.Position, center) < range then
+			FestivalService.Add(player, "Fireworks", 1)
+		end
+	end
 end
 
-local function fireworksShow()
-	local range = Festival.Fireworks.Range
+-- Spettacolo sopra tutte le città insieme
+function FestivalService.FireworksShow()
 	for _, zoneId in Festival.Fireworks.Zones do
 		local zone = Zones.Get(zoneId)
 		if zone then
 			FestivalService.FireworksAt(zone.Center)
-			for _, player in Players:GetPlayers() do
-				local root = Util.GetRoot(player.Character)
-				if root and Util.FlatDistance(root.Position, zone.Center) < range then
-					FestivalService.Add(player, "Fireworks", 1)
-					S.EventService.Notify(player, "🎆 Spettacolo di fuochi d'artificio! Guarda il cielo sopra la città.", "Raro", 4)
-				end
-			end
 		end
 	end
+	S.EventService.NotifyAll("🎆 Spettacolo di fuochi d'artificio sopra le città! Guarda il cielo.", "Raro", 5)
+end
+
+-- Solo la meteora d'oro (fulmini, onde d'urto e colonna di luce) senza il Colosso
+function FestivalService.Meteor(position: Vector3)
+	local ground = groundAt(position)
+	S.EventService.Effect("ColossusArrival", { Position = ground, Height = 70 }, ground, 4000)
+end
+
+-- Pioggia di coriandoli per tutti i giocatori del server
+function FestivalService.ConfettiAll()
+	for _, player in Players:GetPlayers() do
+		S.EventService.EffectTo(player, "Confetti", { Big = true })
+	end
+end
+
+-- Cerimonia d'apertura per tutti i giocatori del server
+function FestivalService.CeremonyAll(): number
+	local count = 0
+	for _, player in Players:GetPlayers() do
+		if S.DataService.Get(player) then
+			FestivalService.Ceremony(player, true)
+			count += 1
+		end
+	end
+	return count
+end
+
+-- Avviso del Colosso nelle Pianure Meridionali (un minuto di attesa come negli spettacoli automatici)
+function FestivalService.ColossusWithWarning(): boolean
+	if colossusInField() or colossusComing then
+		return false
+	end
+	colossusComing = true
+	local zone = Zones.Get(Festival.Boss.Zone)
+	S.EventService.Announce("👑 Il Colosso d'Oro sta arrivando!", ("Tra 30 secondi cadrà dal cielo: %s, isola di Vermiglia"):format(zone and zone.Name or "Vermiglia"), "Pericolo")
+	task.delay(30, function()
+		colossusComing = false
+		FestivalService.SpawnColossus()
+	end)
+	return true
 end
 
 -- ADDOBBI -------------------------------------------------------------------------------------------------
@@ -477,6 +534,7 @@ local function setActive(on: boolean)
 	end
 	active = on
 	if on then
+		bossWarned = false
 		nextBossClock = os.clock() + Festival.Boss.FirstDelay
 		nextFireworksClock = os.clock() + Festival.Fireworks.FirstDelay
 		buildDecorations()
@@ -507,6 +565,19 @@ function FestivalService.SetOverride(value: boolean?)
 	publish()
 end
 
+-- Admin: spettacoli automatici (Colosso ogni 30 minuti, fuochi ogni 10, cerimonia al primo ingresso)
+function FestivalService.SetAutoShows(on: boolean)
+	autoShows = on
+	bossWarned = false
+	nextBossClock = os.clock() + Festival.Boss.FirstDelay
+	nextFireworksClock = os.clock() + Festival.Fireworks.FirstDelay
+	publish()
+end
+
+function FestivalService.AutoShows(): boolean
+	return autoShows
+end
+
 function FestivalService.Init(services)
 	S = services
 end
@@ -519,10 +590,10 @@ function FestivalService.Start()
 		applyBonus(player)
 		-- il regalo arriva dopo la cerimonia d'apertura (se la deve ancora vedere)
 		local f = festivalData(profile)
-		task.delay(if active and not f.Ceremony then 40 else 8, welcome, player, profile)
+		task.delay(if active and autoShows and not f.Ceremony then 40 else 8, welcome, player, profile)
 	end)
 	Net.Event("ClientReady").OnServerEvent:Connect(function(player, request)
-		if request == nil and active then
+		if request == nil and active and autoShows then
 			task.delay(0.5, function()
 				if player.Parent then
 					FestivalService.Ceremony(player)
@@ -543,30 +614,29 @@ function FestivalService.Start()
 		end
 	end)
 	-- orologio dell'evento
-	local warned = false
 	while true do
 		task.wait(1)
 		local shouldBe = Festival.IsActive(os.time(), override)
 		if shouldBe ~= active then
 			setActive(shouldBe)
 		end
-		if active then
+		if active and autoShows then
 			local now = os.clock()
-			if not warned and nextBossClock - now <= Festival.Boss.Warning then
-				warned = true
+			if not bossWarned and nextBossClock - now <= Festival.Boss.Warning then
+				bossWarned = true
 				local zone = Zones.Get(Festival.Boss.Zone)
 				S.EventService.Announce("👑 Il Colosso d'Oro sta arrivando!", ("Tra 1 minuto cadrà dal cielo: %s, isola di Vermiglia"):format(zone and zone.Name or "Vermiglia"), "Pericolo")
 			end
 			if now >= nextBossClock then
 				nextBossClock = now + Festival.Boss.Interval
-				warned = false
+				bossWarned = false
 				publish()
 				task.spawn(FestivalService.SpawnColossus)
 			end
 			if now >= nextFireworksClock then
 				nextFireworksClock = now + Festival.Fireworks.Interval
 				publish()
-				task.spawn(fireworksShow)
+				task.spawn(FestivalService.FireworksShow)
 			end
 		end
 	end

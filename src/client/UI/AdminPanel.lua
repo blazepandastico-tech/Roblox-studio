@@ -1,6 +1,6 @@
 --[[
 	AdminPanel - Pannello Admin (tasto P o pulsante 🛠️, visibile solo agli amministratori)
-	Categorie: Progressione • Oggetti • Sieri • Poteri • Mondo • Storia • Server
+	Categorie: Progressione • Oggetti • Sieri • Poteri • Mondo • Storia • Server • Admin Abuse
 	In alto si sceglie il BERSAGLIO (tu o un altro giocatore) e si può scrivere un VALORE
 	(numero o testo) usato dai pulsanti che lo richiedono.
 	Tutte le azioni vengono controllate dal server (AdminService).
@@ -43,6 +43,7 @@ local CATEGORIES = {
 	{ Id = "Mondo", Icon = "🌍" },
 	{ Id = "Storia", Icon = "📜" },
 	{ Id = "Server", Icon = "📢" },
+	{ Id = "Admin Abuse", Icon = "😈" },
 }
 
 local function isAdmin(): boolean
@@ -343,7 +344,65 @@ local function showServer()
 	button(r, "⭐ Esperienza doppia (tutti)", GREEN, function()
 		send("DoubleXP")
 	end)
-	section("🎉 Grande Inaugurazione", "L'evento segue le date scritte in Shared/Data/Festival; qui puoi accenderlo, spegnerlo o provarne i pezzi.")
+	section("Moderazione", "Scegli il giocatore come BERSAGLIO in alto.")
+	r = row(220, 44)
+	button(r, "🚫 Espelli il bersaglio", RED, function()
+		if target() ~= player then
+			send("Kick")
+		end
+	end)
+	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro nome in Config.lua → AdminNames (o l'UserId in Admins). Ora ci sono %d admin extra."):format(#Config.Admins + #(Config.AdminNames or {})))
+end
+
+-- 😈 ADMIN ABUSE: le animazioni dell'evento quando vuoi tu, più i comandi dell'evento
+local function showAbuse()
+	section("😈 Admin Abuse", "Le animazioni dell'evento partono quando vuoi tu: annuncia l'Admin Abuse e scatenati!")
+	local r = row(220, 44)
+	button(r, "😈 Annuncia ADMIN ABUSE", RED, function()
+		send("Abuse", "announce")
+	end)
+	section("👑 Colosso d'Oro", "Cade dal cielo come una meteora d'oro. Con l'evento acceso, chi aiuta a sconfiggerlo riceve gemme e oro (e completa la sfida).")
+	r = row(220, 44)
+	button(r, "👑 Colosso d'Oro qui", PURPLE, function()
+		send("Abuse", "boss")
+	end)
+	button(r, "👑 Colosso nelle Pianure (tra 30 s)", PURPLE, function()
+		send("Abuse", "bossZone")
+	end)
+	button(r, "☄️ Solo la meteora qui", nil, function()
+		send("Abuse", "meteor")
+	end)
+	section("🎆 Fuochi d'artificio e festa", "Chi vede i fuochi completa la sfida \"Lo spettacolo\" (con l'evento acceso).")
+	r = row(220, 44)
+	button(r, "🎆 Fuochi davanti a te", BLUE, function()
+		send("Abuse", "fireworks")
+	end)
+	button(r, "🏙️ Fuochi su tutte le città", BLUE, function()
+		send("Abuse", "fireworksCities")
+	end)
+	button(r, "🚀 Fuochi sopra ogni giocatore", BLUE, function()
+		send("Abuse", "fireworksPlayers")
+	end)
+	button(r, "🎊 Coriandoli a tutti", nil, function()
+		send("Abuse", "confetti")
+	end)
+	section("🎬 Cerimonia d'apertura", "La scena animata dell'inaugurazione con i fuochi sopra la città.")
+	r = row(220, 44)
+	button(r, "🎬 Cerimonia al bersaglio", nil, function()
+		send("Abuse", "ceremony")
+	end)
+	button(r, "🎬 Cerimonia a TUTTI", nil, function()
+		send("Abuse", "ceremonyAll")
+	end)
+	local on = ReplicatedStorage:GetAttribute("FestaAttiva") == true
+	local auto = ReplicatedStorage:GetAttribute("FestaSpettacoliAuto") == true
+	section(
+		"🎉 Evento Grande Inaugurazione",
+		("Evento: %s • spettacoli automatici: %s. L'evento (2x XP e oro, regalo, sfide, addobbi) segue le date in Shared/Data/Festival. Con gli spettacoli automatici il Colosso arriva da solo ogni 30 minuti, i fuochi ogni 10 e la cerimonia al primo ingresso."):format(
+			if on then "ACCESO" else "SPENTO",
+			if auto then "ACCESI" else "SPENTI"
+		)
+	)
 	r = row(220, 44)
 	button(r, "🎉 Accendi evento", GREEN, function()
 		send("Festival", "on")
@@ -355,26 +414,12 @@ local function showServer()
 		send("Festival", "auto")
 	end)
 	r = row(220, 44)
-	button(r, "👑 Colosso d'Oro qui", PURPLE, function()
-		send("Festival", "boss")
+	button(r, "▶️ Spettacoli automatici ON", if auto then Colors.Green else nil, function()
+		send("Festival", "showsOn")
 	end)
-	button(r, "🎆 Fuochi d'artificio qui", BLUE, function()
-		send("Festival", "fireworks")
+	button(r, "⏸️ Spettacoli automatici OFF", if auto then nil else Colors.Green, function()
+		send("Festival", "showsOff")
 	end)
-	button(r, "🎬 Cerimonia (bersaglio)", nil, function()
-		send("Festival", "ceremony")
-	end)
-	button(r, "🎊 Coriandoli a tutti", nil, function()
-		send("Festival", "confetti")
-	end)
-	section("Moderazione", "Scegli il giocatore come BERSAGLIO in alto.")
-	r = row(220, 44)
-	button(r, "🚫 Espelli il bersaglio", RED, function()
-		if target() ~= player then
-			send("Kick")
-		end
-	end)
-	section("Amministratori", ("Per aggiungere altri admin nel gioco pubblicato, metti il loro nome in Config.lua → AdminNames (o l'UserId in Admins). Ora ci sono %d admin extra."):format(#Config.Admins + #(Config.AdminNames or {})))
 end
 
 local RENDER = {
@@ -385,6 +430,7 @@ local RENDER = {
 	Mondo = showWorld,
 	Storia = showStory,
 	Server = showServer,
+	["Admin Abuse"] = showAbuse,
 }
 
 local function updateTarget()
@@ -509,6 +555,14 @@ function AdminPanel.Start()
 			render()
 		end
 	end)
+	-- stato dell'evento aggiornato nella sezione Admin Abuse
+	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto" } do
+		ReplicatedStorage:GetAttributeChangedSignal(attribute):Connect(function()
+			if C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
+				render()
+			end
+		end)
+	end
 	Players.PlayerRemoving:Connect(function(p)
 		if p.UserId == targetUserId then
 			targetUserId = player.UserId

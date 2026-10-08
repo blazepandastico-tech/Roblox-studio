@@ -189,6 +189,25 @@ check(okA, "FestivalService.Add: " .. tostring(errA))
 check(profile.Festival and profile.Festival.Done and profile.Festival.Done.Giganti == true, "la sfida dei giganti non si completa")
 local okR, errR = pcall(Fest.Ceremony, player, true)
 check(okR, "FestivalService.Ceremony: " .. tostring(errR))
+-- 😈 Admin Abuse: animazioni lanciate dal pannello e spettacoli automatici
+check(replicated:GetAttribute("FestaSpettacoliAuto") == false, "gli spettacoli automatici dovrebbero partire spenti")
+check(replicated:GetAttribute("FestaProssimoBoss") == nil, "senza spettacoli automatici non deve esserci il conto alla rovescia del Colosso")
+check(Fest.CanSpawnColossus() == false, "il Colosso risulta libero anche se è già in campo")
+for _, entry in {
+	{ "FireworksShow", Fest.FireworksShow },
+	{ "Meteor", Fest.Meteor, Vector3.new(100, 8, 100) },
+	{ "ConfettiAll", Fest.ConfettiAll },
+	{ "CeremonyAll", Fest.CeremonyAll },
+	{ "ColossusWithWarning", Fest.ColossusWithWarning },
+} do
+	local okX, errX = pcall(entry[2], entry[3])
+	check(okX, "FestivalService." .. entry[1] .. ": " .. tostring(errX))
+end
+local okS, errS = pcall(Fest.SetAutoShows, true)
+check(okS, "FestivalService.SetAutoShows: " .. tostring(errS))
+check(replicated:GetAttribute("FestaSpettacoliAuto") == true and type(replicated:GetAttribute("FestaProssimoBoss")) == "number", "gli spettacoli automatici non si accendono")
+pcall(Fest.SetAutoShows, false)
+LOG("Admin Abuse: Colosso, meteora, fuochi, coriandoli e cerimonia lanciati senza errori")
 local okO, errO = pcall(Fest.SetOverride, false)
 check(okO, "FestivalService.SetOverride(false): " .. tostring(errO))
 check(workspace:FindFirstChild("Festa") == nil, "gli addobbi non vengono tolti a fine evento")

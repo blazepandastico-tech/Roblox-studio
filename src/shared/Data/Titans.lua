@@ -286,7 +286,7 @@ Titans.Bosses = {
 			{ Id = "MidolloGigante", Chance = 1, Min = 8, Max = 14 },
 		},
 	},
-	-- Boss dell'evento Grande Inaugurazione: cade dal cielo ogni 30 minuti (FestivalService),
+	-- Boss dell'evento Grande Inaugurazione: cade dal cielo con Admin Abuse o ogni 30 minuti (FestivalService),
 	-- il livello e la vita si adattano ai giocatori presenti nel server
 	ColossoDorato = {
 		Id = "ColossoDorato",

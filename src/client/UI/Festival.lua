@@ -1,6 +1,6 @@
 --[[
 	Festival - interfaccia dell'evento "Grande Inaugurazione"
-	  - striscione sotto la bussola: bonus attivi, quando arriva il Colosso d'Oro, quando finisce l'evento
+	  - striscione sotto la bussola: bonus attivi, il Colosso d'Oro (in campo o quando arriva), quando finisce l'evento
 	  - pannello (clic sullo striscione): le 8 sfide con i progressi, i premi e il codice regalo
 	Lo stato arriva dagli attributi di ReplicatedStorage (li scrive FestivalService).
 ]]
@@ -132,13 +132,19 @@ local function update(dt: number)
 	local fine = ReplicatedStorage:GetAttribute("FestaFine")
 	local ends = if type(fine) == "number" and fine > 0 then ("  •  fine tra " .. Festival.FormatTime(fine - serverNow())) else ""
 	local bossHere = ReplicatedStorage:GetAttribute("FestaBossPos") ~= nil
-	local boss = if bossHere then "👑 COLOSSO D'ORO IN CAMPO!" else ("👑 Colosso tra " .. timeUntil("FestaProssimoBoss"))
-	bannerText.Text = ("🎉 GRANDE INAUGURAZIONE  •  2x XP e ORO  •  %s%s"):format(boss, ends)
+	-- senza spettacoli automatici il Colosso arriva solo con gli Admin Abuse: niente conto alla rovescia
+	local auto = ReplicatedStorage:GetAttribute("FestaSpettacoliAuto") == true
+	local boss = if bossHere then "  •  👑 COLOSSO D'ORO IN CAMPO!" elseif auto then ("  •  👑 Colosso tra " .. timeUntil("FestaProssimoBoss")) else ""
+	bannerText.Text = ("🎉 GRANDE INAUGURAZIONE  •  2x XP e ORO%s%s"):format(boss, ends)
 	if not C.UIController.IsOpen("Inaugurazione") then
 		return
 	end
 	subtitle.Text = "Esperienza e oro doppi per tutti" .. (if ends ~= "" then ends else "")
-	timers.Text = ("👑 Colosso d'Oro: %s (Pianure Meridionali, Vermiglia)\n🎆 Prossimi fuochi d'artificio sopra le città: tra %s"):format(if bossHere then "in campo ORA!" else "tra " .. timeUntil("FestaProssimoBoss"), timeUntil("FestaProssimiFuochi"))
+	if auto then
+		timers.Text = ("👑 Colosso d'Oro: %s (segui la 👑 sulla mappa)\n🎆 Prossimi fuochi d'artificio sopra le città: tra %s"):format(if bossHere then "in campo ORA!" else "tra " .. timeUntil("FestaProssimoBoss"), timeUntil("FestaProssimiFuochi"))
+	else
+		timers.Text = ("👑 Colosso d'Oro: %s\n🎆 Fuochi d'artificio e cerimonia: durante gli 😈 ADMIN ABUSE, resta connesso!"):format(if bossHere then "in campo ORA! (segui la 👑 sulla mappa)" else "cade dal cielo durante gli 😈 ADMIN ABUSE")
+	end
 	local f = festivalData()
 	local done = 0
 	for _, c in Festival.Challenges do

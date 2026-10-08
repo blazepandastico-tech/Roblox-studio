@@ -2,6 +2,8 @@
 
 L'evento di lancio di **Sieri Perduti: L'Arcipelago dei Giganti**. È già dentro al gioco: parte da solo appena pubblichi e finisce il **26 ottobre 2026 alle 00:00** (ora italiana).
 
+Le animazioni dell'evento (il Colosso d'Oro che cade dal cielo, i fuochi d'artificio, i coriandoli e la cerimonia d'apertura) le lanci tu dal Pannello Admin, nella sezione **😈 Admin Abuse**.
+
 ## Video e immagini pronti (`assets/evento/`)
 
 | File | Formato | Dove usarlo |
@@ -41,14 +43,16 @@ Per fare prima, avvia `renderall` più volte in parallelo con `0 4`, `1 4`, `2 4
 |---|---|
 | ⭐ **2x esperienza e oro** | per tutti, per tutta la durata dell'evento |
 | 🎁 **Regalo di benvenuto** | 100 💎 + Medaglia dell'Inaugurazione (una volta per giocatore) |
-| 🎬 **Cerimonia d'apertura** | scena animata con fuochi la prima volta che entri durante l'evento |
-| 👑 **Colosso d'Oro** | boss dell'evento: cade dal cielo come una meteora nelle Pianure Meridionali (Vermiglia) ogni 30 minuti, con un avviso un minuto prima. Diventa più forte se nel server ci sono più giocatori. Premio: 15 💎 + 50.000 oro a chi aiuta |
-| 🎆 **Fuochi d'artificio** | spettacolo di 40 secondi sopra tutte le città ogni 10 minuti |
 | 🏮 **Città addobbate** | archi d'oro con la scritta, festoni di luci, stendardi e coriandoli |
+| 👑 **Colosso d'Oro** | boss dell'evento: cade dal cielo come una meteora quando lo lanci da 😈 Admin Abuse. Diventa più forte se nel server ci sono più giocatori. Premio: 15 💎 + 50.000 oro a chi aiuta |
+| 🎆 **Fuochi d'artificio** | quando li lanci da 😈 Admin Abuse: davanti a te, sopra tutte le città o sopra ogni giocatore |
+| 🎬 **Cerimonia d'apertura** | la scena animata con i fuochi, da 😈 Admin Abuse (a un giocatore o a tutti) |
 | 🏆 **8 sfide** | vedi sotto. Completarle tutte dà il **Mantello dell'Inaugurazione** (leggendario, esclusivo) + 150 💎 |
 | 🎟️ **Codice regalo** | `INAUGURAZIONE` → 25.000 oro + 50 💎 + 2 Pergamene dell'esperienza |
 
-Lo striscione in alto nello schermo mostra il bonus, quando arriva il Colosso e quanto manca alla fine. Cliccandolo si apre il pannello con le sfide.
+Lo striscione in alto nello schermo mostra il bonus, quanto manca alla fine e "👑 COLOSSO D'ORO IN CAMPO!" quando il Colosso è arrivato. Cliccandolo si apre il pannello con le sfide.
+
+Le sfide "Contro il Colosso d'Oro" e "Lo spettacolo" si completano durante gli Admin Abuse, quindi organizzane qualcuno durante l'evento.
 
 ### Le 8 sfide
 
@@ -77,17 +81,28 @@ Il numero si ottiene da [epochconverter.com](https://www.epochconverter.com):
 
 Se cambi la data di fine, ricordati di cambiare anche la scritta **"fino al 25 ottobre"** in video e immagini (in `tools/thumbnails/event.py`).
 
-## Comandi admin (Pannello Admin: tasto P → 📢 Server → 🎉 Grande Inaugurazione)
+## 😈 Admin Abuse (Pannello Admin: tasto P → 😈 Admin Abuse)
+
+Tutti i comandi e le animazioni dell'evento sono in questa sezione del pannello. Valgono solo per il server in cui sei.
 
 | Pulsante | Cosa fa |
 |---|---|
-| 🎉 Accendi evento | Accende l'evento in questo server, anche fuori dalle date |
-| ⛔ Spegni evento | Lo spegne in questo server |
+| 😈 Annuncia ADMIN ABUSE | Grande avviso a tutti: "ADMIN ABUSE! Un amministratore è nel server" |
+| 👑 Colosso d'Oro qui | Il Colosso cade dal cielo come una meteora davanti a te (perfetto per dirette e video) |
+| 👑 Colosso nelle Pianure (tra 30 s) | Avvisa tutti e dopo 30 secondi lo fa cadere nelle Pianure Meridionali |
+| ☄️ Solo la meteora qui | Solo l'animazione della meteora d'oro (fulmini, onde d'urto, colonna di luce), senza boss |
+| 🎆 Fuochi davanti a te | Spettacolo di fuochi di 30 secondi davanti a te |
+| 🏙️ Fuochi su tutte le città | Spettacolo sopra tutte le città insieme |
+| 🚀 Fuochi sopra ogni giocatore | Ogni giocatore si ritrova uno spettacolo sopra la testa |
+| 🎊 Coriandoli a tutti | Pioggia di coriandoli sullo schermo di tutti |
+| 🎬 Cerimonia al bersaglio / a TUTTI | La scena animata dell'inaugurazione al giocatore scelto o a tutto il server |
+| 🎉 Accendi / ⛔ Spegni evento | Accende o spegne l'evento (2x XP e oro, sfide, addobbi) in questo server |
 | 📅 Segui le date | Torna alle date di `Festival.lua` |
-| 👑 Colosso d'Oro qui | Fa cadere il Colosso davanti a te (perfetto per le dirette e per registrare video) |
-| 🎆 Fuochi d'artificio qui | Spettacolo di fuochi davanti a te |
-| 🎬 Cerimonia (bersaglio) | Fa rivedere la cerimonia d'apertura al giocatore scelto |
-| 🎊 Coriandoli a tutti | Pioggia di coriandoli per tutti i giocatori del server |
+| ▶️ / ⏸️ Spettacoli automatici | Accesi: il Colosso arriva da solo ogni 30 minuti, i fuochi ogni 10 e la cerimonia al primo ingresso. Spenti (normale): tutto solo con Admin Abuse |
+
+Per avere gli spettacoli automatici in tutti i server, metti `Festival.AutoShows = true` in `src/shared/Data/Festival.lua`.
+
+**Idea:** annuncia su Discord e TikTok l'orario degli Admin Abuse (per esempio "sabato alle 18:00"), così i giocatori entrano tutti insieme. Nel gioco premi "😈 Annuncia ADMIN ABUSE", poi lancia fuochi, Colosso e cerimonia.
 
 ## Creare l'evento su Roblox (così appare nella pagina del gioco)
 
@@ -109,8 +124,8 @@ Se cambi la data di fine, ricordati di cambiare anche la scritta **"fino al 25 o
 ```
 L'Arcipelago dei Giganti apre le porte! Per festeggiare:
 ⭐ Esperienza e oro DOPPI per tutti
-👑 Il Colosso d'Oro cade dal cielo ogni 30 minuti: sconfiggilo insieme agli altri!
-🎆 Fuochi d'artificio sopra le città ogni 10 minuti
+👑 Il Colosso d'Oro cade dal cielo durante gli Admin Abuse: sconfiggilo insieme agli altri!
+🎆 Fuochi d'artificio e sorprese negli Admin Abuse
 🏆 8 sfide e il Mantello dell'Inaugurazione esclusivo
 🎁 Regalo di benvenuto e codice INAUGURAZIONE
 Solo fino al 25 ottobre!
@@ -124,8 +139,7 @@ Solo fino al 25 ottobre!
 
 Sieri Perduti è finalmente online e festeggiamo con un evento enorme:
 ⭐ **2x ESPERIENZA e ORO** per tutti
-👑 Il **COLOSSO D'ORO** cade dal cielo ogni 30 minuti nelle Pianure Meridionali
-🎆 **Fuochi d'artificio** sopra le città ogni 10 minuti
+😈 **ADMIN ABUSE**: il **COLOSSO D'ORO** cade dal cielo e fuochi d'artificio sopra le città (seguite gli annunci per gli orari!)
 🏆 **8 sfide**: completale tutte per il **Mantello dell'Inaugurazione** (esclusivo, non tornerà più!)
 🎁 Regalo di benvenuto: 100 💎 + Medaglia dell'Inaugurazione
 
@@ -146,14 +160,14 @@ IL COLOSSO D'ORO CADE DAL CIELO 👑🔥 Evento di lancio su Roblox: 2x XP, fuoc
 Titolo: SIERI PERDUTI – Grande Inaugurazione | Evento di lancio su Roblox (2x XP + Colosso d'Oro)
 
 Descrizione:
-L'Arcipelago dei Giganti apre le porte! Fino al 25 ottobre: esperienza e oro doppi, il Colosso d'Oro ogni 30 minuti, fuochi d'artificio, 8 sfide e il Mantello dell'Inaugurazione esclusivo.
+L'Arcipelago dei Giganti apre le porte! Fino al 25 ottobre: esperienza e oro doppi, Admin Abuse con il Colosso d'Oro e i fuochi d'artificio, 8 sfide e il Mantello dell'Inaugurazione esclusivo.
 🎁 Codice: INAUGURAZIONE
 ▶️ Gioca gratis: <link del gioco>
 ```
 
 **Da aggiungere in cima alla descrizione del gioco su Roblox (finché dura l'evento):**
 ```
-🎉 EVENTO GRANDE INAUGURAZIONE fino al 25/10: 2x XP e ORO, Colosso d'Oro, fuochi d'artificio e Mantello esclusivo! Codice: INAUGURAZIONE
+🎉 EVENTO GRANDE INAUGURAZIONE fino al 25/10: 2x XP e ORO, Admin Abuse con il Colosso d'Oro, fuochi d'artificio e Mantello esclusivo! Codice: INAUGURAZIONE
 ```
 
 ## Programma consigliato
@@ -163,7 +177,8 @@ L'Arcipelago dei Giganti apre le porte! Fino al 25 ottobre: esperienza e oro dop
 | 2 giorni prima | La storia `Evento_Storia_1080x1920.png` con scritto "Tra 2 giorni…" |
 | 1 giorno prima | Il trailer verticale su TikTok/Shorts; su Discord un avviso "Domani apriamo!" |
 | Giorno del lancio | Pubblica il gioco, crea l'evento su Roblox, il trailer su YouTube, l'annuncio su Discord e la `Evento_Quadrata_1080x1080.png` su Instagram |
-| Il giorno stesso, la sera | Entra nel gioco, usa "👑 Colosso d'Oro qui" quando ci sono tanti giocatori e registra lo scontro (clip perfetta per TikTok) |
+| Il giorno stesso, la sera | Primo **Admin Abuse**: annuncialo, poi lancia fuochi, Colosso d'Oro e cerimonia a tutti e registra tutto (clip perfette per TikTok) |
+| Ogni 2–3 giorni | Un Admin Abuse a un orario annunciato prima su Discord e TikTok |
 | Dopo 3–4 giorni | Una clip dei fuochi d'artificio sopra la città, con lo screenshot di chi ha già il Mantello |
 | Ultimi 3 giorni | "ULTIMI GIORNI per il Mantello dell'Inaugurazione!" su tutti i social |
 | 26 ottobre | L'evento finisce da solo. Ringrazia la community e anticipa il prossimo aggiornamento |

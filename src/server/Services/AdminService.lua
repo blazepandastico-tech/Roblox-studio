@@ -498,8 +498,17 @@ ACTIONS.DoubleXP = function()
 	return if on then "Esperienza doppia per tutti ATTIVA" else "Esperienza doppia disattivata"
 end
 
--- Evento della Grande Inaugurazione (prove e gestione dal pannello)
-ACTIONS.Festival = function(admin, target, value)
+-- 😈 ADMIN ABUSE: l'evento della Grande Inaugurazione e le sue animazioni (Pannello Admin → Admin Abuse)
+local function adminRoot(admin: Player): BasePart?
+	return admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function inFront(admin: Player, distance: number): Vector3?
+	local root = adminRoot(admin)
+	return root and (root.Position + root.CFrame.LookVector * distance) or nil
+end
+
+ACTIONS.Festival = function(_, _, value)
 	local fest = S.FestivalService
 	if not fest then
 		return "Evento non disponibile"
@@ -513,25 +522,69 @@ ACTIONS.Festival = function(admin, target, value)
 	elseif value == "auto" then
 		fest.SetOverride(nil)
 		return "Evento: segue le date di Shared/Data/Festival"
-	elseif value == "boss" then
-		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		local spot = root and (root.Position + root.CFrame.LookVector * 140) or nil
-		task.spawn(fest.SpawnColossus, spot)
-		return "Il Colosso d'Oro sta cadendo davanti a te!"
-	elseif value == "fireworks" then
-		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-		if root then
-			fest.FireworksAt(root.Position + root.CFrame.LookVector * 80, 30)
+	elseif value == "showsOn" then
+		fest.SetAutoShows(true)
+		return "Spettacoli automatici ACCESI: Colosso ogni 30 minuti, fuochi ogni 10"
+	elseif value == "showsOff" then
+		fest.SetAutoShows(false)
+		return "Spettacoli automatici SPENTI: Colosso e fuochi solo con Admin Abuse"
+	end
+	return nil
+end
+
+ACTIONS.Abuse = function(admin, target, value)
+	local fest = S.FestivalService
+	if not fest then
+		return "Evento non disponibile"
+	end
+	if value == "announce" then
+		S.EventService.Announce("😈 ADMIN ABUSE!", "Un amministratore è nel server: fuochi d'artificio, il Colosso d'Oro e tante sorprese!", "Raro")
+		return "Admin Abuse annunciato a tutti"
+	elseif value == "boss" or value == "bossZone" then
+		if not fest.CanSpawnColossus() then
+			return "Il Colosso d'Oro è già in campo (o sta già cadendo)"
 		end
-		return "Fuochi d'artificio!"
+		if value == "boss" then
+			task.spawn(fest.SpawnColossus, inFront(admin, 140))
+			return "Il Colosso d'Oro sta cadendo davanti a te!"
+		end
+		fest.ColossusWithWarning()
+		return "Colosso d'Oro annunciato: cade tra 30 secondi nelle Pianure Meridionali"
+	elseif value == "meteor" then
+		local spot = inFront(admin, 160)
+		if not spot then
+			return "Ti serve un personaggio in campo"
+		end
+		fest.Meteor(spot)
+		return "Meteora d'oro!"
+	elseif value == "fireworks" then
+		local spot = inFront(admin, 80)
+		if not spot then
+			return "Ti serve un personaggio in campo"
+		end
+		fest.FireworksAt(spot, 30)
+		return "Fuochi d'artificio davanti a te!"
+	elseif value == "fireworksCities" then
+		fest.FireworksShow()
+		return "Spettacolo di fuochi sopra tutte le città!"
+	elseif value == "fireworksPlayers" then
+		local count = 0
+		for _, p in Players:GetPlayers() do
+			local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root then
+				fest.FireworksAt(root.Position, 15)
+				count += 1
+			end
+		end
+		return ("Fuochi d'artificio sopra %d giocatori!"):format(count)
+	elseif value == "confetti" then
+		fest.ConfettiAll()
+		return "Coriandoli per tutti!"
 	elseif value == "ceremony" then
 		fest.Ceremony(target, true)
 		return "Cerimonia d'apertura per " .. target.DisplayName
-	elseif value == "confetti" then
-		for _, p in Players:GetPlayers() do
-			S.EventService.EffectTo(p, "Confetti", { Big = true })
-		end
-		return "Coriandoli per tutti!"
+	elseif value == "ceremonyAll" then
+		return ("Cerimonia d'apertura per %d giocatori"):format(fest.CeremonyAll())
 	end
 	return nil
 end
