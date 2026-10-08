@@ -597,6 +597,60 @@ Scenes.Primordiale = function()
 	letterbox(false)
 end
 
+-- Cerimonia d'apertura della Grande Inaugurazione: fuochi sul Campo, l'arco d'oro
+-- e il Colosso d'Oro che cade dal cielo e si alza oltre il Muro Vermiglio
+Scenes.Inaugurazione = function()
+	local camp = Zones.Get("CampoAddestramento")
+	local c = if camp then camp.Center else Vector3.new(0, W.GroundY, 0)
+	local arch = c + Vector3.new(0, 0, -58)
+	local wallPoint = W.WallPoint("Vermiglia", 215)
+	local outward = Util.SafeUnit(Util.Flat(wallPoint - W.IslandCenter("Vermiglia")))
+	local landing = Vector3.new(wallPoint.X, W.GroundY, wallPoint.Z) + outward * 150
+	api.Stream(c)
+	local fw = C.FireworksController
+	letterbox(true)
+	-- 1. dall'alto: il Campo in festa e i primi fuochi
+	if fw then
+		fw.Show(c + Vector3.new(0, 0, -30), 26, math.random(1, 1e6))
+	end
+	api.ShotAsync(api.Look(c + Vector3.new(170, 150, 150), c + Vector3.new(0, 70, -40)), api.Look(c + Vector3.new(100, 70, 100), c + Vector3.new(0, 110, -40)), 7.5)
+	api.Title("GRANDE INAUGURAZIONE", 3)
+	api.Say("Narratore", "Soldati dell'Arcipelago! Oggi le porte delle Isole si aprono a tutti.", 4)
+	-- 2. l'arco d'oro con la scritta
+	api.ShotAsync(api.Look(arch + Vector3.new(34, 10, 62), arch + Vector3.new(0, 32, 0)), api.Look(arch + Vector3.new(-22, 22, 46), arch + Vector3.new(0, 40, 0)), 5)
+	api.Say("Narratore", "Esperienza e oro doppi, sfide speciali e premi che non torneranno mai più.", 4.5)
+	-- 3. il Colosso d'Oro cade dal cielo oltre il Muro
+	api.Stream(landing)
+	local camPos = c + Vector3.new(70, 24, -40)
+	api.ShotAsync(api.Look(camPos, landing + Vector3.new(0, 260, 0)), api.Look(camPos + Vector3.new(0, -6, 0), landing + Vector3.new(0, 170, 0)), 6)
+	if fw then
+		fw.ColossusArrival(landing, 200)
+	end
+	api.Wait(2.1)
+	local colossus = api.Titan("Dorato", 200, landing - Vector3.new(0, 210, 0), 0)
+	local hip = colossus:GetAttribute("HipHeight") :: number
+	local facing = CFrame.lookAt(landing, Vector3.new(c.X, W.GroundY, c.Z)).Rotation
+	colossus:PivotTo(CFrame.new(landing - Vector3.new(0, 200, 0)) * facing)
+	api.Move(colossus, CFrame.new(landing + Vector3.new(0, hip, 0)) * facing, 3.2)
+	if C.CameraController then
+		C.CameraController.Shake(0.9, 3)
+	end
+	api.Say("Narratore", "Ogni 30 minuti il Colosso d'Oro cadrà dal cielo. Chi lo abbatte... vince l'oro.", 3.8)
+	api.Animate(colossus, "Roar")
+	if C.SoundController then
+		C.SoundController.Play("Roar", landing, { Range = 4000, Volume = 1 })
+	end
+	api.Wait(1.5)
+	-- 4. gran finale
+	if fw then
+		fw.Show(c + Vector3.new(0, 0, -60), 8, math.random(1, 1e6))
+	end
+	api.ShotAsync(api.Look(c + Vector3.new(-60, 30, 90), c + Vector3.new(0, 120, -60)), api.Look(c + Vector3.new(-40, 60, 60), c + Vector3.new(0, 160, -80)), 5)
+	api.Title("VOLATE OLTRE LA PAURA!", 3)
+	api.FadeOut(1)
+	letterbox(false)
+end
+
 -- RIPRODUZIONE --------------------------------------------------------------------------------------
 
 function CutsceneController.IsPlaying(): boolean
@@ -661,14 +715,32 @@ end
 
 function CutsceneController.Start()
 	buildUI()
+	-- le scene arrivano in fila (es. cerimonia dell'evento e prologo della storia): una alla volta
+	local queue: { string } = {}
+	local running = false
 	Net.Event("Cutscene").OnClientEvent:Connect(function(id)
-		if type(id) == "string" then
-			-- aspetta che l'intro e l'eventuale dialogo in corso siano stati chiusi
-			while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) do
-				task.wait(0.2)
-			end
-			CutsceneController.Play(id)
+		if type(id) ~= "string" or table.find(queue, id) then
+			return
 		end
+		table.insert(queue, id)
+		if running then
+			return
+		end
+		running = true
+		task.spawn(function()
+			while #queue > 0 do
+				-- aspetta che l'intro, l'eventuale dialogo e la scena precedente siano finiti
+				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing do
+					task.wait(0.2)
+				end
+				local nextId = table.remove(queue, 1)
+				if nextId then
+					CutsceneController.Play(nextId)
+					task.wait(0.6)
+				end
+			end
+			running = false
+		end)
 	end)
 	RunService.RenderStepped:Connect(function(dt)
 		if playing then

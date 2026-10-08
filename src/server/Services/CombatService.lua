@@ -112,6 +112,9 @@ local function bladeHit(player: Player, part: BasePart, baseDamage: number, spee
 			sendDamageNumber(player, part.Position, result.Damage, kind)
 			if result.Killed and zone == "Nape" and profile then
 				profile.Kills.Napes += 1
+				if S.FestivalService then
+					S.FestivalService.Add(player, "Napes", 1)
+				end
 				Net.Event("HitConfirm"):FireClient(player, { Kind = "NapeKill", Perfect = perfect })
 			elseif result.Severed then
 				Net.Event("HitConfirm"):FireClient(player, { Kind = "Sever" })

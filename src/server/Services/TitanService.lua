@@ -1558,7 +1558,7 @@ local function spawnZones()
 	-- tutti i boss del mondo (non solo quelli elencati nelle zone) devono comparire nella loro zona,
 	-- altrimenti i passi "Sconfiggi il boss" della storia resterebbero bloccati
 	for bossId, def in Titans.Bosses do
-		if not def.Raid and not bossStates[bossId] and Zones.Get(def.Zone) then
+		if not def.Raid and not def.Event and not bossStates[bossId] and Zones.Get(def.Zone) then
 			bossStates[bossId] = { Alive = nil, NextSpawn = os.clock() + rng:NextNumber(15, 60) }
 		end
 	end

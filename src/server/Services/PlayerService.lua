@@ -263,7 +263,7 @@ function PlayerService.AddGold(player: Player, amount: number): number
 		return 0
 	end
 	local stats = PlayerService.Stats(player)
-	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0)
+	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0) + (player:GetAttribute("BonusGoldEvento") or 0)
 	if (profile.Buffs.GoldUntil or 0) > os.time() then
 		mult *= 2
 	end

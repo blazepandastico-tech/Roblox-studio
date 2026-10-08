@@ -395,6 +395,20 @@ local function makeProfile(look: string, rng: Random)
 	elseif look == "Cristallo" then
 		p.Crystal = true
 		p.EyeGlow = Color3.fromRGB(140, 230, 255)
+	elseif look == "Dorato" then
+		-- il Colosso d'Oro dell'evento Grande Inaugurazione
+		p.Skin = Color3.fromRGB(226, 176, 64)
+		p.Hair = Color3.fromRGB(250, 236, 190)
+		p.HairStyle = "Lungo"
+		p.LegMul, p.ArmMul, p.TorsoMul, p.HeadMul, p.WidthMul, p.ThickMul = 1.05, 1.05, 1.05, 0.9, 1.1, 1.15
+		p.Belly = 0
+		p.Muscle = true
+		p.Armor = true
+		p.Lips = false
+		p.MouthWidth = 0.7
+		p.Grin = true
+		p.Steam = true
+		p.EyeGlow = Color3.fromRGB(255, 250, 220)
 	end
 	if look == "Puro" or look == "Cristallo" then
 		applyArchetype(p, rng)
@@ -823,6 +837,19 @@ function TitanBuilder.Build(params): Model
 	local steamAtt = Instance.new("Attachment")
 	steamAtt.Name = "SteamAtt"
 	steamAtt.Parent = torso
+
+	-- Colosso d'Oro: pelle d'oro lucida (occhi, denti e capelli restano com'erano)
+	if look == "Dorato" then
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d.Material ~= Enum.Material.Neon and d.Transparency < 0.9 then
+				local c = d.Color
+				if c.R > 0.55 and c.B < 0.45 and c.R - c.B > 0.25 then
+					d.Material = Enum.Material.Foil
+					d.Reflectance = 0.18
+				end
+			end
+		end
+	end
 
 	model.PrimaryPart = root
 	model:SetAttribute("Height", H)

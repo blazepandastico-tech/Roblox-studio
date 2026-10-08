@@ -197,6 +197,9 @@ local function onDied(victim: Player)
 	if S.AchievementService then
 		task.defer(S.AchievementService.Check, killer)
 	end
+	if S.FestivalService then
+		S.FestivalService.Add(killer, "PvPKills", 1)
+	end
 end
 
 function PvPService.Init(services)

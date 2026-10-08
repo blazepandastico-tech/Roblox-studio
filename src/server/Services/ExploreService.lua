@@ -148,6 +148,9 @@ local function open(player: Player, def, base: BasePart)
 		S.EventService.AnnounceTo(player, ("%d forzieri trovati!"):format(count), ("Premio da esploratore: +%d 💎"):format(T.MilestoneGems), "Raro")
 	end
 	S.EventService.EffectTo(player, "TreasureOpen", { Position = base.Position, Tier = def.Tier })
+	if S.FestivalService then
+		S.FestivalService.Add(player, "Treasures", 1)
+	end
 	S.DataService.MarkDirty(player)
 	if S.AchievementService then
 		task.defer(S.AchievementService.Check, player)

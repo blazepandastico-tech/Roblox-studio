@@ -1050,6 +1050,23 @@ handlers.Voyage = function(_p)
 	end
 end
 
+-- Grande Inaugurazione: fuochi d'artificio, coriandoli e l'arrivo del Colosso d'Oro
+handlers.Fireworks = function(p)
+	if C.FireworksController then
+		C.FireworksController.Show(p.Center, p.Duration or 30, p.Seed)
+	end
+end
+handlers.Confetti = function(p)
+	if C.FireworksController then
+		C.FireworksController.Confetti(p.Big == true)
+	end
+end
+handlers.ColossusArrival = function(p)
+	if C.FireworksController then
+		C.FireworksController.ColossusArrival(p.Position, p.Height or 70)
+	end
+end
+
 -- mondo aperto: un gigante che emerge dal mare, un forziere aperto
 handlers.Splash = function(p)
 	local size = p.Size or 20

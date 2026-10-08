@@ -534,7 +534,37 @@ add({
 	Description = "Placche di cristallo di mutaforma fuse sull'uniforme. Quasi impenetrabile.",
 })
 
+-- Ricompensa esclusiva dell'evento Grande Inaugurazione (completa tutte le sfide)
+add({
+	Id = "MantelloInaugurazione",
+	Name = "Mantello dell'Inaugurazione",
+	Category = "Armatura",
+	Rarity = "Leggendario",
+	LevelReq = 1,
+	Style = "Falchi",
+	Emblem = "Falco",
+	Cloak = true,
+	CloakColor = Color3.fromRGB(196, 148, 40),
+	CloakTrim = Color3.fromRGB(250, 240, 210),
+	HealthBonus = 0.12,
+	Defense = 0.04,
+	XPBonus = 0.05,
+	JacketColor = Color3.fromRGB(40, 44, 66),
+	Description = "Esclusivo della Grande Inaugurazione: lo indossano solo i primi soldati dell'Arcipelago. +5% esperienza.",
+})
+
 -- ACCESSORI ------------------------------------------------------------------------
+
+add({
+	Id = "MedagliaInaugurazione",
+	Name = "Medaglia dell'Inaugurazione",
+	Category = "Accessorio",
+	Rarity = "Epico",
+	LevelReq = 1,
+	XPBonus = 0.05,
+	GoldBonus = 0.05,
+	Description = "Il regalo per chi c'era alla Grande Inaugurazione. +5% esperienza e oro.",
+})
 
 add({
 	Id = "DistintivoPrimiDieci",

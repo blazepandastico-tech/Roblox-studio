@@ -2286,6 +2286,20 @@ local function makeProfile(look: string, rng: Random)
 	elseif look == "Cristallo" then
 		p.Crystal = true
 		p.EyeGlow = Color3.fromRGB(140, 230, 255)
+	elseif look == "Dorato" then
+		-- il Colosso d'Oro dell'evento Grande Inaugurazione
+		p.Skin = Color3.fromRGB(226, 176, 64)
+		p.Hair = Color3.fromRGB(250, 236, 190)
+		p.HairStyle = "Lungo"
+		p.LegMul, p.ArmMul, p.TorsoMul, p.HeadMul, p.WidthMul, p.ThickMul = 1.05, 1.05, 1.05, 0.9, 1.1, 1.15
+		p.Belly = 0
+		p.Muscle = true
+		p.Armor = true
+		p.Lips = false
+		p.MouthWidth = 0.7
+		p.Grin = true
+		p.Steam = true
+		p.EyeGlow = Color3.fromRGB(255, 250, 220)
 	end
 	if look == "Puro" or look == "Cristallo" then
 		applyArchetype(p, rng)
@@ -2714,6 +2728,19 @@ function TitanBuilder.Build(params): Model
 	local steamAtt = Instance.new("Attachment")
 	steamAtt.Name = "SteamAtt"
 	steamAtt.Parent = torso
+
+	-- Colosso d'Oro: pelle d'oro lucida (occhi, denti e capelli restano com'erano)
+	if look == "Dorato" then
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d.Material ~= Enum.Material.Neon and d.Transparency < 0.9 then
+				local c = d.Color
+				if c.R > 0.55 and c.B < 0.45 and c.R - c.B > 0.25 then
+					d.Material = Enum.Material.Foil
+					d.Reflectance = 0.18
+				end
+			end
+		end
+	end
 
 	model.PrimaryPart = root
 	model:SetAttribute("Height", H)
@@ -3361,6 +3388,112 @@ return Enemies
         </Item>
         <Item class="ModuleScript" referent="16">
           <Properties>
+            <string name="Name">Festival</string>
+            <string name="Source"><![CDATA[--[[
+	Festival - l'evento "Grande Inaugurazione" del gioco
+
+	DATE (secondi Unix, ora UTC):
+	  Start = 0           → l'evento è attivo da subito (appena pubblichi il gioco)
+	  End   = 1792969200  → finisce il 26 ottobre 2026 alle 00:00 (ora italiana)
+	Per cambiare le date usa https://www.epochconverter.com (incolla il numero che ti dà).
+	Dal Pannello Admin (P → Server → Evento) si può accendere o spegnere l'evento in ogni momento.
+
+	Durante l'evento:
+	  - esperienza e oro DOPPI per tutti
+	  - regalo di benvenuto (gemme + Medaglia dell'Inaugurazione)
+	  - la cerimonia d'apertura (scena animata) la prima volta che entri
+	  - il COLOSSO D'ORO cade dal cielo ogni 30 minuti nelle Pianure Meridionali
+	  - spettacoli di fuochi d'artificio sopra le città ogni 10 minuti
+	  - 8 sfide: completale tutte per il Mantello dell'Inaugurazione (esclusivo)
+	  - addobbi di festa nelle città e il codice regalo INAUGURAZIONE
+]]
+
+local Festival = {}
+
+Festival.Id = "Inaugurazione2026"
+Festival.Name = "Grande Inaugurazione"
+Festival.Start = 0
+Festival.End = 1792969200
+
+Festival.XPBonus = 1 -- +100% esperienza
+Festival.GoldBonus = 1 -- +100% oro
+Festival.WelcomeGems = 100
+Festival.WelcomeItem = "MedagliaInaugurazione"
+Festival.FinalItem = "MantelloInaugurazione"
+Festival.FinalGems = 150
+
+-- Colosso d'Oro: cade dal cielo, il livello si adatta ai giocatori presenti
+Festival.Boss = {
+	Id = "ColossoDorato",
+	Zone = "PianureSud",
+	FirstDelay = 240, -- secondi dopo l'avvio del server
+	Interval = 1800, -- ogni 30 minuti
+	Warning = 60, -- avviso un minuto prima
+	Lifetime = 600, -- se nessuno lo sconfigge sparisce dopo 10 minuti
+	HPPerPlayer = 0.35, -- +35% di vita per ogni giocatore in più nel server
+	Gems = 15,
+	Gold = 50000,
+}
+
+-- Spettacoli di fuochi d'artificio sopra le città (tutte insieme)
+Festival.Fireworks = {
+	Interval = 600,
+	FirstDelay = 90,
+	Duration = 40,
+	Zones = { "CampoAddestramento", "Calaneth", "Aurion", "Brenn", "PortoRevelia", "ApprodoCenere", "PortoOrientale" },
+	Range = 1300, -- chi è entro questa distanza vede lo spettacolo (e completa la sfida)
+}
+
+-- Città addobbate a festa
+Festival.Decorated = { "CampoAddestramento", "Calaneth", "Aurion", "Brenn", "PortoRevelia", "PortoOrientale" }
+
+-- Sfide dell'evento: Stat è il tipo di progresso registrato da FestivalService
+Festival.Challenges = {
+	{ Id = "Giganti", Icon = "⚔️", Name = "Caccia d'inaugurazione", Text = "Uccidi 30 giganti", Stat = "Titans", Goal = 30, Gems = 20, Gold = 20000 },
+	{ Id = "Nuche", Icon = "🎯", Name = "Colpo da maestro", Text = "Uccidi 10 giganti colpendo la nuca", Stat = "Napes", Goal = 10, Gems = 15, Gold = 15000 },
+	{ Id = "Colosso", Icon = "👑", Name = "Contro il Colosso d'Oro", Text = "Aiuta a sconfiggere il Colosso d'Oro", Stat = "Colossus", Goal = 1, Gems = 40, Gold = 40000 },
+	{ Id = "Forzieri", Icon = "📦", Name = "Cacciatore di tesori", Text = "Apri 3 forzieri nascosti", Stat = "Treasures", Goal = 3, Gems = 20, Gold = 20000 },
+	{ Id = "Isolotti", Icon = "⛵", Name = "Lupo di mare", Text = "Visita 3 isolotti del mare aperto", Stat = "Islets", Goal = 3, Gems = 20, Gold = 20000 },
+	{ Id = "Fuochi", Icon = "🎆", Name = "Lo spettacolo", Text = "Guarda uno spettacolo di fuochi d'artificio in città", Stat = "Fireworks", Goal = 1, Gems = 10, Gold = 10000 },
+	{ Id = "Taverna", Icon = "🍺", Name = "Un brindisi", Text = "Mangia un pasto caldo in una taverna", Stat = "Meal", Goal = 1, Gems = 10, Gold = 10000 },
+	{ Id = "Duello", Icon = "🤺", Name = "Gloria nell'arena", Text = "Vinci un duello (Arena dei Duelli o PvP)", Stat = "PvPKills", Goal = 1, Gems = 15, Gold = 15000 },
+}
+
+Festival.ById = {}
+for _, c in Festival.Challenges do
+	Festival.ById[c.Id] = c
+end
+
+-- L'evento è attivo in questo momento? (override = scelta dell'admin: true/false/nil)
+function Festival.IsActive(now: number, override: boolean?): boolean
+	if override ~= nil then
+		return override
+	end
+	return now >= Festival.Start and (Festival.End == 0 or now < Festival.End)
+end
+
+-- "5g 3h", "2h 14m", "45s"
+function Festival.FormatTime(seconds: number): string
+	seconds = math.max(0, math.floor(seconds))
+	local d = seconds // 86400
+	local h = (seconds % 86400) // 3600
+	local m = (seconds % 3600) // 60
+	if d > 0 then
+		return ("%dg %dh"):format(d, h)
+	elseif h > 0 then
+		return ("%dh %dm"):format(h, m)
+	elseif m > 0 then
+		return ("%dm %02ds"):format(m, seconds % 60)
+	end
+	return ("%ds"):format(seconds % 60)
+end
+
+return Festival
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="17">
+          <Properties>
             <string name="Name">Items</string>
             <string name="Source"><![CDATA[--[[
 	Items
@@ -3898,7 +4031,37 @@ add({
 	Description = "Placche di cristallo di mutaforma fuse sull'uniforme. Quasi impenetrabile.",
 })
 
+-- Ricompensa esclusiva dell'evento Grande Inaugurazione (completa tutte le sfide)
+add({
+	Id = "MantelloInaugurazione",
+	Name = "Mantello dell'Inaugurazione",
+	Category = "Armatura",
+	Rarity = "Leggendario",
+	LevelReq = 1,
+	Style = "Falchi",
+	Emblem = "Falco",
+	Cloak = true,
+	CloakColor = Color3.fromRGB(196, 148, 40),
+	CloakTrim = Color3.fromRGB(250, 240, 210),
+	HealthBonus = 0.12,
+	Defense = 0.04,
+	XPBonus = 0.05,
+	JacketColor = Color3.fromRGB(40, 44, 66),
+	Description = "Esclusivo della Grande Inaugurazione: lo indossano solo i primi soldati dell'Arcipelago. +5% esperienza.",
+})
+
 -- ACCESSORI ------------------------------------------------------------------------
+
+add({
+	Id = "MedagliaInaugurazione",
+	Name = "Medaglia dell'Inaugurazione",
+	Category = "Accessorio",
+	Rarity = "Epico",
+	LevelReq = 1,
+	XPBonus = 0.05,
+	GoldBonus = 0.05,
+	Description = "Il regalo per chi c'era alla Grande Inaugurazione. +5% esperienza e oro.",
+})
 
 add({
 	Id = "DistintivoPrimiDieci",
@@ -4215,7 +4378,7 @@ return Items
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="17">
+        <Item class="ModuleScript" referent="18">
           <Properties>
             <string name="Name">Leveling</string>
             <string name="Source"><![CDATA[--[[
@@ -4276,7 +4439,7 @@ return Leveling
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">Monetization</string>
             <string name="Source"><![CDATA[--[[
@@ -4418,7 +4581,7 @@ return Monetization
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">NPCs</string>
             <string name="Source"><![CDATA[--[[
@@ -4815,7 +4978,7 @@ return NPCs
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[
@@ -4928,7 +5091,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Raids</string>
             <string name="Source"><![CDATA[--[[
@@ -5043,7 +5206,7 @@ return Raids
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="22">
+        <Item class="ModuleScript" referent="23">
           <Properties>
             <string name="Name">Rewards</string>
             <string name="Source"><![CDATA[--[[
@@ -5121,7 +5284,7 @@ return Rewards
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="24">
           <Properties>
             <string name="Name">Serums</string>
             <string name="Source"><![CDATA[--[[
@@ -5413,7 +5576,7 @@ return Serums
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="25">
           <Properties>
             <string name="Name">Shops</string>
             <string name="Source"><![CDATA[--[[
@@ -5484,7 +5647,7 @@ return Shops
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Skills</string>
             <string name="Source"><![CDATA[--[[
@@ -5557,7 +5720,7 @@ return Skills
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="27">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[--[[
@@ -5620,7 +5783,7 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">StatsCalc</string>
             <string name="Source"><![CDATA[--[[
@@ -5782,7 +5945,7 @@ return StatsCalc
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="28">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">Story</string>
             <string name="Source"><![CDATA[--[[
@@ -6465,7 +6628,7 @@ return Story
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="30">
           <Properties>
             <string name="Name">Titans</string>
             <string name="Source"><![CDATA[--[[
@@ -6756,6 +6919,30 @@ Titans.Bosses = {
 			{ Id = "MidolloGigante", Chance = 1, Min = 8, Max = 14 },
 		},
 	},
+	-- Boss dell'evento Grande Inaugurazione: cade dal cielo ogni 30 minuti (FestivalService),
+	-- il livello e la vita si adattano ai giocatori presenti nel server
+	ColossoDorato = {
+		Id = "ColossoDorato",
+		Name = "Il Colosso d'Oro",
+		Title = "Boss dell'Inaugurazione",
+		Look = "Dorato",
+		Zone = "PianureSud",
+		Level = 100,
+		Height = 78,
+		Speed = 15,
+		HPMult = 30,
+		DmgMult = 1.4,
+		Event = true,
+		Attacks = { "Swipe", "Stomp", "Grab", "Leap", "NapeSwat" },
+		Respawn = 1800,
+		XPMult = 25,
+		GoldMult = 20,
+		Fragments = { 2, 5 },
+		Drops = {
+			{ Id = "MidolloGigante", Chance = 1, Min = 2, Max = 5 },
+			{ Id = "FrammentoSiero", Chance = 0.5, Min = 1, Max = 2 },
+		},
+	},
 	Primordiale = {
 		Id = "Primordiale",
 		Name = "Il Gigante Primordiale",
@@ -6805,7 +6992,7 @@ return Titans
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="30">
+        <Item class="ModuleScript" referent="31">
           <Properties>
             <string name="Name">Treasures</string>
             <string name="Source"><![CDATA[--[[
@@ -6926,7 +7113,7 @@ return Treasures
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">WorldLayout</string>
             <string name="Source"><![CDATA[--[[
@@ -7141,7 +7328,7 @@ return W
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">Zones</string>
             <string name="Source"><![CDATA[--[[
@@ -7784,11 +7971,11 @@ return Zones
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="33">
+      <Item class="Folder" referent="34">
         <Properties>
           <string name="Name">Lib</string>
         </Properties>
-        <Item class="ModuleScript" referent="34">
+        <Item class="ModuleScript" referent="35">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[--[[
@@ -7932,7 +8119,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="36">
           <Properties>
             <string name="Name">Signal</string>
             <string name="Source"><![CDATA[--[[
@@ -8013,7 +8200,7 @@ return Signal
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">Util</string>
             <string name="Source"><![CDATA[--[[
@@ -8307,11 +8494,11 @@ return Util
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="37">
+      <Item class="Folder" referent="38">
         <Properties>
           <string name="Name">Modules</string>
         </Properties>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">ODMPhysicsModule</string>
             <string name="Source"><![CDATA[--[[
@@ -8547,15 +8734,15 @@ return ODMPhysics
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="39">
+  <Item class="ServerScriptService" referent="40">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="40">
+    <Item class="Folder" referent="41">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="41">
+      <Item class="Script" referent="42">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -8601,6 +8788,7 @@ local ORDER = {
 	"ExploreService",
 	"HorseService",
 	"PvPService",
+	"FestivalService",
 	"CodesService",
 	"RewardsService",
 	"CommunityService",
@@ -8652,11 +8840,11 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="42">
+      <Item class="Folder" referent="43">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">AchievementService</string>
             <string name="Source"><![CDATA[--[[
@@ -8747,7 +8935,7 @@ return AchievementService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--[[
@@ -9250,6 +9438,44 @@ ACTIONS.DoubleXP = function()
 	return if on then "Esperienza doppia per tutti ATTIVA" else "Esperienza doppia disattivata"
 end
 
+-- Evento della Grande Inaugurazione (prove e gestione dal pannello)
+ACTIONS.Festival = function(admin, target, value)
+	local fest = S.FestivalService
+	if not fest then
+		return "Evento non disponibile"
+	end
+	if value == "on" then
+		fest.SetOverride(true)
+		return "Evento ACCESO per questo server"
+	elseif value == "off" then
+		fest.SetOverride(false)
+		return "Evento SPENTO per questo server"
+	elseif value == "auto" then
+		fest.SetOverride(nil)
+		return "Evento: segue le date di Shared/Data/Festival"
+	elseif value == "boss" then
+		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local spot = root and (root.Position + root.CFrame.LookVector * 140) or nil
+		task.spawn(fest.SpawnColossus, spot)
+		return "Il Colosso d'Oro sta cadendo davanti a te!"
+	elseif value == "fireworks" then
+		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			fest.FireworksAt(root.Position + root.CFrame.LookVector * 80, 30)
+		end
+		return "Fuochi d'artificio!"
+	elseif value == "ceremony" then
+		fest.Ceremony(target, true)
+		return "Cerimonia d'apertura per " .. target.DisplayName
+	elseif value == "confetti" then
+		for _, p in Players:GetPlayers() do
+			S.EventService.EffectTo(p, "Confetti", { Big = true })
+		end
+		return "Coriandoli per tutti!"
+	end
+	return nil
+end
+
 local function onAction(admin: Player, action: any, targetId: any, value: any)
 	if type(action) ~= "string" or not AdminService.IsAdmin(admin) then
 		return
@@ -9305,7 +9531,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -9324,6 +9550,8 @@ local S
 -- Nome del codice (maiuscolo) -> ricompense
 local CODES = {
 	SIERIPERDUTI = { Gold = 5000, Gems = 25, Items = { PergamenaEsperienza = 1 } },
+	-- evento della Grande Inaugurazione
+	INAUGURAZIONE = { Gold = 25000, Gems = 50, Items = { PergamenaEsperienza = 2 } },
 	ARCIPELAGO = { Gold = 10000, Gems = 25 },
 	CORPODEIFALCHI = { Items = { Razione = 5, BombolaGas = 3, KitLame = 2 } },
 	BENVENUTORECLUTA = { Gold = 2500, Gems = 10, Items = { Razione = 3 } },
@@ -9367,7 +9595,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -9484,6 +9712,9 @@ local function bladeHit(player: Player, part: BasePart, baseDamage: number, spee
 			sendDamageNumber(player, part.Position, result.Damage, kind)
 			if result.Killed and zone == "Nape" and profile then
 				profile.Kills.Napes += 1
+				if S.FestivalService then
+					S.FestivalService.Add(player, "Napes", 1)
+				end
 				Net.Event("HitConfirm"):FireClient(player, { Kind = "NapeKill", Perfect = perfect })
 			elseif result.Severed then
 				Net.Event("HitConfirm"):FireClient(player, { Kind = "Sever" })
@@ -9927,7 +10158,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">CommunityService</string>
             <string name="Source"><![CDATA[--[[
@@ -10063,7 +10294,7 @@ return CommunityService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -10149,6 +10380,8 @@ local TEMPLATE = {
 	-- mondo aperto
 	Treasures = {},
 	Bounty = 0,
+	-- eventi a tempo (Grande Inaugurazione)
+	Festival = {},
 	HorseColor = 0,
 }
 
@@ -10437,7 +10670,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -10708,7 +10941,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -11181,7 +11414,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -11294,7 +11527,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">ExploreService</string>
             <string name="Source"><![CDATA[--[[
@@ -11447,6 +11680,9 @@ local function open(player: Player, def, base: BasePart)
 		S.EventService.AnnounceTo(player, ("%d forzieri trovati!"):format(count), ("Premio da esploratore: +%d 💎"):format(T.MilestoneGems), "Raro")
 	end
 	S.EventService.EffectTo(player, "TreasureOpen", { Position = base.Position, Tier = def.Tier })
+	if S.FestivalService then
+		S.FestivalService.Add(player, "Treasures", 1)
+	end
 	S.DataService.MarkDirty(player)
 	if S.AchievementService then
 		task.defer(S.AchievementService.Check, player)
@@ -11486,7 +11722,588 @@ return ExploreService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
+          <Properties>
+            <string name="Name">FestivalService</string>
+            <string name="Source"><![CDATA[--[[
+	FestivalService - l'evento "Grande Inaugurazione" (date e premi in Shared/Data/Festival)
+	  - esperienza e oro doppi, regalo di benvenuto, cerimonia d'apertura (scena animata)
+	  - il Colosso d'Oro che cade dal cielo ogni 30 minuti nelle Pianure Meridionali
+	  - spettacoli di fuochi d'artificio sopra le città ogni 10 minuti
+	  - 8 sfide con premi e il Mantello dell'Inaugurazione per chi le completa tutte
+	  - addobbi di festa nelle città (archi, bandiere, festoni di luci, coriandoli)
+	Il client legge lo stato dagli attributi di ReplicatedStorage (FestaAttiva, FestaFine, ...).
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Lib.Util)
+local Net = require(Shared.Lib.Net)
+local Zones = require(Shared.Data.Zones)
+local W = require(Shared.Data.WorldLayout)
+local Titans = require(Shared.Data.Titans)
+local Festival = require(Shared.Data.Festival)
+
+local FestivalService = {}
+local S
+
+local active = false
+local override: boolean? = nil -- scelta dell'admin (nil = segue le date)
+local colossus: any = nil
+local decorations: Folder? = nil
+local rng = Random.new()
+local nextBossClock = 0
+local nextFireworksClock = 0
+
+local function clockToUnix(clockTime: number): number
+	return math.floor(os.time() + (clockTime - os.clock()))
+end
+
+local function publish()
+	ReplicatedStorage:SetAttribute("FestaAttiva", active)
+	ReplicatedStorage:SetAttribute("FestaNome", Festival.Name)
+	ReplicatedStorage:SetAttribute("FestaFine", if override == true then 0 else Festival.End)
+	ReplicatedStorage:SetAttribute("FestaProssimoBoss", clockToUnix(nextBossClock))
+	ReplicatedStorage:SetAttribute("FestaProssimiFuochi", clockToUnix(nextFireworksClock))
+end
+
+function FestivalService.IsActive(): boolean
+	return active
+end
+
+-- DATI DEL GIOCATORE ------------------------------------------------------------------------------------
+
+local function festivalData(profile)
+	local f = profile.Festival
+	if type(f) ~= "table" or f.Id ~= Festival.Id then
+		f = { Id = Festival.Id, Gift = false, Ceremony = false, Final = false, Progress = {}, Done = {}, Islets = {} }
+		profile.Festival = f
+	end
+	f.Progress = f.Progress or {}
+	f.Done = f.Done or {}
+	f.Islets = f.Islets or {}
+	return f
+end
+
+local function applyBonus(player: Player)
+	local adminXP = ReplicatedStorage:GetAttribute("EventoXP") == true
+	player:SetAttribute("BonusXPEvento", if active then Festival.XPBonus elseif adminXP then 1 else nil)
+	player:SetAttribute("BonusGoldEvento", if active then Festival.GoldBonus else nil)
+end
+
+local function checkFinal(player: Player, profile, f)
+	if f.Final then
+		return
+	end
+	for _, c in Festival.Challenges do
+		if not f.Done[c.Id] then
+			return
+		end
+	end
+	f.Final = true
+	profile.Gems += Festival.FinalGems
+	if S.InventoryService then
+		S.InventoryService.Give(player, Festival.FinalItem, 1)
+	end
+	S.EventService.AnnounceTo(player, "🏆 TUTTE LE SFIDE COMPLETATE!", ("Mantello dell'Inaugurazione (esclusivo) + %d 💎"):format(Festival.FinalGems), "Raro")
+	S.EventService.NotifyAll(("🏆 %s ha completato tutte le sfide della Grande Inaugurazione!"):format(player.DisplayName), "Raro", 6)
+	S.EventService.EffectTo(player, "Confetti", { Big = true })
+end
+
+-- Registra un progresso per le sfide dell'evento (es. "Titans", "Treasures", "Meal")
+function FestivalService.Add(player: Player, stat: string, amount: number?)
+	if not active then
+		return
+	end
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	local f = festivalData(profile)
+	local changed = false
+	for _, c in Festival.Challenges do
+		if c.Stat == stat and not f.Done[c.Id] then
+			local value = math.min(c.Goal, (f.Progress[c.Id] or 0) + (amount or 1))
+			f.Progress[c.Id] = value
+			changed = true
+			if value >= c.Goal then
+				f.Done[c.Id] = true
+				profile.Gems += c.Gems
+				S.PlayerService.AddGold(player, c.Gold)
+				S.EventService.Notify(player, ("%s Sfida dell'Inaugurazione completata: %s!  +%d 💎"):format(c.Icon, c.Name, c.Gems), "Ricompensa", 5)
+				S.EventService.EffectTo(player, "Confetti", {})
+				checkFinal(player, profile, f)
+			end
+		end
+	end
+	if changed then
+		S.DataService.MarkDirty(player)
+	end
+end
+
+local function welcome(player: Player, profile)
+	if not active or not player.Parent then
+		return
+	end
+	applyBonus(player)
+	local f = festivalData(profile)
+	if not f.Gift then
+		f.Gift = true
+		profile.Gems += Festival.WelcomeGems
+		if S.InventoryService then
+			S.InventoryService.Give(player, Festival.WelcomeItem, 1)
+		end
+		S.DataService.MarkDirty(player)
+		S.EventService.AnnounceTo(player, "🎉 Benvenuto alla Grande Inaugurazione!", ("Regalo: %d 💎 e la Medaglia dell'Inaugurazione (Menu → Equipaggiamento)"):format(Festival.WelcomeGems), "Raro")
+	end
+end
+
+-- Cerimonia d'apertura: la scena animata, una volta per giocatore
+function FestivalService.Ceremony(player: Player, force: boolean?)
+	local profile = S.DataService.Get(player)
+	if not profile or (not active and not force) then
+		return
+	end
+	local f = festivalData(profile)
+	if f.Ceremony and not force then
+		return
+	end
+	f.Ceremony = true
+	S.DataService.MarkDirty(player)
+	player:SetAttribute("CutsceneUntil", workspace:GetServerTimeNow() + 90)
+	if S.TitanService then
+		S.TitanService.ReleasePlayer(player)
+	end
+	Net.Event("Cutscene"):FireClient(player, "Inaugurazione")
+end
+
+-- IL COLOSSO D'ORO -----------------------------------------------------------------------------------------
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+groundParams.IgnoreWater = true
+
+local function groundAt(pos: Vector3): Vector3
+	groundParams.FilterDescendantsInstances = { workspace.Terrain }
+	local hit = workspace:Raycast(Vector3.new(pos.X, 500, pos.Z), Vector3.new(0, -800, 0), groundParams)
+	return Vector3.new(pos.X, if hit then hit.Position.Y else W.GroundY, pos.Z)
+end
+
+-- Il livello del Colosso è quello "medio" dei giocatori presenti (così è una sfida per tutti)
+local function colossusLevel(): number
+	local levels = {}
+	for _, player in Players:GetPlayers() do
+		local profile = S.DataService.Get(player)
+		if profile then
+			table.insert(levels, profile.Level)
+		end
+	end
+	if #levels == 0 then
+		return 50
+	end
+	table.sort(levels)
+	return math.clamp(levels[math.ceil(#levels / 2)], 10, Config.MaxLevel)
+end
+
+local function goldenAura(model: Model)
+	local torso = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso") or model.PrimaryPart
+	if not torso or not torso:IsA("BasePart") then
+		return
+	end
+	local glow = Instance.new("PointLight")
+	glow.Name = "AuraDorata"
+	glow.Color = Color3.fromRGB(255, 210, 110)
+	glow.Range = 60
+	glow.Brightness = 2.5
+	glow.Parent = torso
+	local sparkles = Instance.new("ParticleEmitter")
+	sparkles.Name = "PolvereDorata"
+	sparkles.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	sparkles.Color = ColorSequence.new(Color3.fromRGB(255, 230, 140), Color3.fromRGB(255, 180, 60))
+	sparkles.LightEmission = 1
+	sparkles.Rate = 40
+	sparkles.Lifetime = NumberRange.new(1.2, 2.2)
+	sparkles.Speed = NumberRange.new(4, 10)
+	sparkles.SpreadAngle = Vector2.new(180, 180)
+	sparkles.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.6), NumberSequenceKeypoint.new(1, 0) })
+	sparkles.Parent = torso
+end
+
+function FestivalService.SpawnColossus(position: Vector3?): boolean
+	if colossus and colossus.State ~= "Dead" and colossus.Model.Parent then
+		return false
+	end
+	local def = Titans.Bosses[Festival.Boss.Id]
+	local zone = Zones.Get(Festival.Boss.Zone)
+	if not def or not zone then
+		return false
+	end
+	local spot = position or (zone.Center + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(0, zone.Radius * 0.45)))
+	local ground = groundAt(spot)
+	local level = colossusLevel()
+	-- arriva dal cielo come una meteora d'oro: prima l'effetto, poi il gigante all'impatto
+	S.EventService.Effect("ColossusArrival", { Position = ground, Height = def.Height }, ground, 4000)
+	task.wait(2.2)
+	local players = math.max(1, #Players:GetPlayers())
+	local t = S.TitanService.Spawn({
+		Boss = def.Id,
+		Level = level,
+		Zone = zone.Id,
+		Position = ground,
+		HPMult = 1 + Festival.Boss.HPPerPlayer * (players - 1),
+		Yaw = rng:NextNumber(0, math.pi * 2),
+	})
+	if not t then
+		return false
+	end
+	colossus = t
+	goldenAura(t.Model)
+	ReplicatedStorage:SetAttribute("FestaBossPos", ground)
+	S.EventService.Announce("👑 IL COLOSSO D'ORO È ATTERRATO!", ("Livello %d • %s (Vermiglia) • ricompense d'oro per tutti quelli che combattono!"):format(level, zone.Name), "Boss")
+	S.EventService.Effect("Roar", { Position = ground + Vector3.new(0, def.Height * 0.8, 0), Height = def.Height }, ground, 2500)
+	task.delay(Festival.Boss.Lifetime, function()
+		if colossus == t and t.State ~= "Dead" then
+			S.TitanService.Despawn(t)
+			colossus = nil
+			ReplicatedStorage:SetAttribute("FestaBossPos", nil)
+			S.EventService.Announce("Il Colosso d'Oro è tornato nel cielo...", "Tornerà tra poco: preparatevi meglio!", "Info")
+		end
+	end)
+	return true
+end
+
+local function onTitanKilled(t, _killer, contributors)
+	if not active then
+		return
+	end
+	for _, player in contributors do
+		FestivalService.Add(player, "Titans", 1)
+	end
+	if t.BossId ~= Festival.Boss.Id then
+		return
+	end
+	if colossus == t then
+		colossus = nil
+	end
+	ReplicatedStorage:SetAttribute("FestaBossPos", nil)
+	for _, player in contributors do
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Gems += Festival.Boss.Gems
+			S.PlayerService.AddGold(player, Festival.Boss.Gold)
+			S.DataService.MarkDirty(player)
+			S.EventService.Notify(player, ("👑 Hai sconfitto il Colosso d'Oro! +%d 💎 e oro"):format(Festival.Boss.Gems), "Ricompensa", 5)
+			S.EventService.EffectTo(player, "Confetti", { Big = true })
+		end
+		FestivalService.Add(player, "Colossus", 1)
+	end
+	S.EventService.Effect("Fireworks", { Center = t.Position, Duration = 12, Seed = rng:NextInteger(1, 1e6) }, t.Position, 2000)
+	S.EventService.NotifyAll("👑 Il Colosso d'Oro è stato sconfitto! Tornerà tra 30 minuti.", "Raro", 6)
+end
+
+-- FUOCHI D'ARTIFICIO ---------------------------------------------------------------------------------------
+
+function FestivalService.FireworksAt(center: Vector3, duration: number?)
+	S.EventService.Effect("Fireworks", { Center = center, Duration = duration or Festival.Fireworks.Duration, Seed = rng:NextInteger(1, 1e6) }, center, Festival.Fireworks.Range)
+end
+
+local function fireworksShow()
+	local range = Festival.Fireworks.Range
+	for _, zoneId in Festival.Fireworks.Zones do
+		local zone = Zones.Get(zoneId)
+		if zone then
+			FestivalService.FireworksAt(zone.Center)
+			for _, player in Players:GetPlayers() do
+				local root = Util.GetRoot(player.Character)
+				if root and Util.FlatDistance(root.Position, zone.Center) < range then
+					FestivalService.Add(player, "Fireworks", 1)
+					S.EventService.Notify(player, "🎆 Spettacolo di fuochi d'artificio! Guarda il cielo sopra la città.", "Raro", 4)
+				end
+			end
+		end
+	end
+end
+
+-- ADDOBBI -------------------------------------------------------------------------------------------------
+
+local GOLD = Color3.fromRGB(226, 176, 64)
+local RED = Color3.fromRGB(176, 36, 40)
+local BULBS = { Color3.fromRGB(255, 210, 110), Color3.fromRGB(255, 120, 100), Color3.fromRGB(140, 220, 255), Color3.fromRGB(160, 255, 160), Color3.fromRGB(255, 160, 230) }
+
+local function decoPart(parent: Instance, props: { [string]: any }): BasePart
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CastShadow = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		(p :: any)[k] = v
+	end
+	p.Parent = parent
+	return p
+end
+
+-- Festone di lampadine colorate tra due punti in alto
+local function lightString(parent: Instance, a: Vector3, b: Vector3)
+	local length = (b - a).Magnitude
+	decoPart(parent, { Name = "Filo", Size = Vector3.new(0.15, 0.15, length), CFrame = CFrame.lookAt((a + b) / 2, b), Material = Enum.Material.Fabric, Color = Color3.fromRGB(40, 36, 32) })
+	local count = math.max(4, math.floor(length / 4))
+	for i = 1, count do
+		local k = i / (count + 1)
+		local sag = math.sin(k * math.pi) * 1.8
+		local pos = a:Lerp(b, k) - Vector3.new(0, sag + 0.6, 0)
+		local bulb = decoPart(parent, { Name = "Lampadina", Shape = Enum.PartType.Ball, Size = Vector3.new(0.8, 0.8, 0.8), CFrame = CFrame.new(pos), Material = Enum.Material.Neon, Color = BULBS[(i % #BULBS) + 1] })
+		if i % 4 == 0 then
+			local light = Instance.new("PointLight")
+			light.Range = 12
+			light.Brightness = 0.9
+			light.Color = bulb.Color
+			light.Parent = bulb
+		end
+	end
+end
+
+local function flagPole(parent: Instance, base: Vector3, color: Color3): Vector3
+	local h = 22
+	decoPart(parent, { Name = "PennoneFesta", Size = Vector3.new(0.7, h, 0.7), CFrame = CFrame.new(base + Vector3.new(0, h / 2, 0)), Material = Enum.Material.Metal, Color = Color3.fromRGB(60, 56, 52), CanCollide = true })
+	decoPart(parent, { Name = "PomoFesta", Shape = Enum.PartType.Ball, Size = Vector3.new(1.4, 1.4, 1.4), CFrame = CFrame.new(base + Vector3.new(0, h + 0.5, 0)), Material = Enum.Material.Foil, Color = GOLD })
+	decoPart(parent, { Name = "Stendardo", Size = Vector3.new(0.15, 7, 3.6), CFrame = CFrame.new(base + Vector3.new(0, h - 4.5, 1.9)), Material = Enum.Material.Fabric, Color = color })
+	decoPart(parent, { Name = "BordoStendardo", Size = Vector3.new(0.2, 0.6, 3.6), CFrame = CFrame.new(base + Vector3.new(0, h - 8.2, 1.9)), Material = Enum.Material.Foil, Color = GOLD })
+	return base + Vector3.new(0, h - 1, 0)
+end
+
+local function signText(part: BasePart, text: string)
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.CanvasSize = Vector2.new(900, 200)
+		gui.LightInfluence = 0
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.GrenzeGotisch
+		label.TextScaled = true
+		label.TextColor3 = Color3.fromRGB(255, 226, 140)
+		label.TextStrokeTransparency = 0.3
+		label.Text = text
+		label.Parent = gui
+		gui.Parent = part
+	end
+end
+
+-- Grande arco d'oro con la scritta e i coriandoli che cadono
+local function buildArch(parent: Instance, center: Vector3, facing: Vector3)
+	local cf = CFrame.lookAt(center, center + facing)
+	for _, sx in { -1, 1 } do
+		decoPart(parent, { Name = "PilastroArco", Size = Vector3.new(4, 30, 4), CFrame = cf * CFrame.new(sx * 18, 15, 0), Material = Enum.Material.Marble, Color = Color3.fromRGB(240, 232, 214), CanCollide = true })
+		decoPart(parent, { Name = "CapitelloArco", Size = Vector3.new(5.4, 2, 5.4), CFrame = cf * CFrame.new(sx * 18, 30.5, 0), Material = Enum.Material.Foil, Color = GOLD })
+		decoPart(parent, { Name = "DrappoArco", Size = Vector3.new(3.4, 20, 0.2), CFrame = cf * CFrame.new(sx * 18, 18, -2.2), Material = Enum.Material.Fabric, Color = RED })
+	end
+	local beam = decoPart(parent, { Name = "TraveArco", Size = Vector3.new(42, 4, 4.4), CFrame = cf * CFrame.new(0, 33, 0), Material = Enum.Material.Marble, Color = Color3.fromRGB(240, 232, 214), CanCollide = true })
+	local sign = decoPart(parent, { Name = "InsegnaInaugurazione", Size = Vector3.new(34, 7, 0.6), CFrame = cf * CFrame.new(0, 39, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(70, 30, 30) })
+	signText(sign, "GRANDE INAUGURAZIONE")
+	decoPart(parent, { Name = "CorniceInsegna", Size = Vector3.new(35.2, 8.2, 0.4), CFrame = cf * CFrame.new(0, 39, 0.3), Material = Enum.Material.Foil, Color = GOLD })
+	decoPart(parent, { Name = "Stella", Shape = Enum.PartType.Ball, Size = Vector3.new(3.4, 3.4, 3.4), CFrame = cf * CFrame.new(0, 44.5, 0), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 220, 120) })
+	lightString(parent, (cf * CFrame.new(-18, 31, -2.6)).Position, (cf * CFrame.new(18, 31, -2.6)).Position)
+	local confetti = Instance.new("ParticleEmitter")
+	confetti.Name = "Coriandoli"
+	confetti.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	confetti.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)),
+		ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 220, 90)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(110, 220, 120)),
+		ColorSequenceKeypoint.new(0.75, Color3.fromRGB(110, 170, 255)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 120, 255)),
+	})
+	confetti.Rate = 14
+	confetti.Lifetime = NumberRange.new(4, 6)
+	confetti.Speed = NumberRange.new(2, 5)
+	confetti.Acceleration = Vector3.new(0, -4, 0)
+	confetti.Drag = 1
+	confetti.SpreadAngle = Vector2.new(60, 60)
+	confetti.Rotation = NumberRange.new(0, 360)
+	confetti.RotSpeed = NumberRange.new(-200, 200)
+	confetti.Size = NumberSequence.new(0.6)
+	confetti.LightEmission = 0.4
+	confetti.Parent = beam
+end
+
+local DECORATION_SPOTS = {
+	CampoAddestramento = { Offset = Vector3.new(0, 0, 6), Arch = Vector3.new(0, 0, -58) },
+	Calaneth = { District = "Calaneth" },
+	Aurion = { Plaza = true },
+	Brenn = { Offset = Vector3.new(0, 0, 0) },
+	PortoRevelia = { Offset = Vector3.new(0, 0, 0) },
+	PortoOrientale = { Offset = Vector3.new(0, 0, 0) },
+}
+
+local function decorationCenter(zoneId: string, zone): Vector3
+	local spot = DECORATION_SPOTS[zoneId] or {}
+	if spot.Plaza then
+		return W.IslandCenter("Aurea") + Vector3.new(0, 0, 120)
+	elseif spot.District then
+		return W.DistrictGatePoint(spot.District) + W.DistrictOutward(spot.District) * 16
+	end
+	return zone.Center + (spot.Offset or Vector3.zero)
+end
+
+local function buildDecorations()
+	if decorations then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "Festa"
+	decorations = folder
+	for _, zoneId in Festival.Decorated do
+		local zone = Zones.Get(zoneId)
+		if zone then
+			local ok, err = pcall(function()
+				local group = Instance.new("Model")
+				group.Name = "Festa - " .. zone.Name
+				group.Parent = folder
+				local center = groundAt(decorationCenter(zoneId, zone))
+				local tops = {}
+				local poles = 8
+				for i = 0, poles - 1 do
+					local base = groundAt(center + Util.Polar(i * 360 / poles + 22.5, 26))
+					table.insert(tops, flagPole(group, base, if i % 2 == 0 then RED else GOLD))
+				end
+				for i = 1, #tops do
+					lightString(group, tops[i], tops[(i % #tops) + 1])
+				end
+				local spot = DECORATION_SPOTS[zoneId]
+				if spot and spot.Arch then
+					local archCenter = groundAt(zone.Center + spot.Arch)
+					buildArch(group, archCenter, Vector3.new(0, 0, -1))
+				end
+			end)
+			if not ok then
+				warn("[Festa] Addobbi di " .. zoneId .. ": " .. tostring(err))
+			end
+		end
+	end
+	folder.Parent = workspace
+end
+
+local function removeDecorations()
+	if decorations then
+		decorations:Destroy()
+		decorations = nil
+	end
+end
+
+-- ACCENSIONE E SPEGNIMENTO -------------------------------------------------------------------------------
+
+local function setActive(on: boolean)
+	if active == on then
+		return
+	end
+	active = on
+	if on then
+		nextBossClock = os.clock() + Festival.Boss.FirstDelay
+		nextFireworksClock = os.clock() + Festival.Fireworks.FirstDelay
+		buildDecorations()
+		S.EventService.Announce("🎉 " .. Festival.Name:upper() .. "!", "Esperienza e oro doppi, il Colosso d'Oro, fuochi d'artificio e premi esclusivi!", "Raro")
+	else
+		removeDecorations()
+		if colossus and colossus.State ~= "Dead" then
+			S.TitanService.Despawn(colossus)
+		end
+		colossus = nil
+		ReplicatedStorage:SetAttribute("FestaBossPos", nil)
+		S.EventService.Announce("La Grande Inaugurazione è finita", "Grazie a tutti i soldati che hanno festeggiato!", "Info")
+	end
+	for _, player in Players:GetPlayers() do
+		applyBonus(player)
+		local profile = S.DataService.Get(player)
+		if on and profile then
+			task.spawn(welcome, player, profile)
+		end
+	end
+	publish()
+end
+
+-- Admin: true = sempre attivo, false = spento, nil = segue le date
+function FestivalService.SetOverride(value: boolean?)
+	override = value
+	setActive(Festival.IsActive(os.time(), override))
+	publish()
+end
+
+function FestivalService.Init(services)
+	S = services
+end
+
+function FestivalService.Start()
+	S.WorldBuilder.WaitReady()
+	setActive(Festival.IsActive(os.time(), override))
+	publish()
+	S.DataService.OnLoaded(function(player, profile)
+		applyBonus(player)
+		-- il regalo arriva dopo la cerimonia d'apertura (se la deve ancora vedere)
+		local f = festivalData(profile)
+		task.delay(if active and not f.Ceremony then 40 else 8, welcome, player, profile)
+	end)
+	Net.Event("ClientReady").OnServerEvent:Connect(function(player, request)
+		if request == nil and active then
+			task.delay(0.5, function()
+				if player.Parent then
+					FestivalService.Ceremony(player)
+				end
+			end)
+		end
+	end)
+	S.TitanService.Killed:Connect(onTitanKilled)
+	S.PlayerService.ZoneEntered:Connect(function(player, zoneId)
+		local zone = Zones.Get(zoneId)
+		local profile = active and zone and zone.Islet and S.DataService.Get(player)
+		if profile then
+			local f = festivalData(profile)
+			if not f.Islets[zoneId] then
+				f.Islets[zoneId] = true
+				FestivalService.Add(player, "Islets", 1)
+			end
+		end
+	end)
+	-- orologio dell'evento
+	local warned = false
+	while true do
+		task.wait(1)
+		local shouldBe = Festival.IsActive(os.time(), override)
+		if shouldBe ~= active then
+			setActive(shouldBe)
+		end
+		if active then
+			local now = os.clock()
+			if not warned and nextBossClock - now <= Festival.Boss.Warning then
+				warned = true
+				local zone = Zones.Get(Festival.Boss.Zone)
+				S.EventService.Announce("👑 Il Colosso d'Oro sta arrivando!", ("Tra 1 minuto cadrà dal cielo: %s, isola di Vermiglia"):format(zone and zone.Name or "Vermiglia"), "Pericolo")
+			end
+			if now >= nextBossClock then
+				nextBossClock = now + Festival.Boss.Interval
+				warned = false
+				publish()
+				task.spawn(FestivalService.SpawnColossus)
+			end
+			if now >= nextFireworksClock then
+				nextFireworksClock = now + Festival.Fireworks.Interval
+				publish()
+				task.spawn(fireworksShow)
+			end
+		end
+	end
+end
+
+return FestivalService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">HorseService</string>
             <string name="Source"><![CDATA[--[[
@@ -11789,7 +12606,7 @@ return HorseService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -11973,7 +12790,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">LeaderboardService</string>
             <string name="Source"><![CDATA[--[[
@@ -12206,7 +13023,7 @@ return LeaderboardService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -12406,7 +13223,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -12817,7 +13634,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -13291,6 +14108,9 @@ local function onChoice(player: Player, npcId: any, choiceId: any)
 		end
 		S.DataService.MarkDirty(player)
 		S.EventService.Notify(player, "🍲 Che pasto! Salute, gas e lame al massimo, +10% danni per 10 minuti.", "Successo", 4)
+		if S.FestivalService then
+			S.FestivalService.Add(player, "Meal", 1)
+		end
 	elseif choiceId == "rumor" and npc.Role == "Tavern" then
 		-- una voce su un forziere che il giocatore non ha ancora trovato
 		local missing = {}
@@ -13352,7 +14172,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -13753,7 +14573,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -14290,7 +15110,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -14558,7 +15378,7 @@ function PlayerService.AddGold(player: Player, amount: number): number
 		return 0
 	end
 	local stats = PlayerService.Stats(player)
-	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0)
+	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0) + (player:GetAttribute("BonusGoldEvento") or 0)
 	if (profile.Buffs.GoldUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -15049,7 +15869,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">PvPService</string>
             <string name="Source"><![CDATA[--[[
@@ -15251,6 +16071,9 @@ local function onDied(victim: Player)
 	if S.AchievementService then
 		task.defer(S.AchievementService.Check, killer)
 	end
+	if S.FestivalService then
+		S.FestivalService.Add(killer, "PvPKills", 1)
+	end
 end
 
 function PvPService.Init(services)
@@ -15296,7 +16119,7 @@ return PvPService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -15418,7 +16241,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -15901,7 +16724,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">RewardsService</string>
             <string name="Source"><![CDATA[--[[
@@ -16165,7 +16988,7 @@ return RewardsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">SeaService</string>
             <string name="Source"><![CDATA[--[[
@@ -16677,7 +17500,7 @@ return SeaService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -17002,7 +17825,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -17808,7 +18631,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -18025,7 +18848,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -18401,7 +19224,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -18476,7 +19299,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -20039,7 +20862,7 @@ local function spawnZones()
 	-- tutti i boss del mondo (non solo quelli elencati nelle zone) devono comparire nella loro zona,
 	-- altrimenti i passi "Sconfiggi il boss" della storia resterebbero bloccati
 	for bossId, def in Titans.Bosses do
-		if not def.Raid and not bossStates[bossId] and Zones.Get(def.Zone) then
+		if not def.Raid and not def.Event and not bossStates[bossId] and Zones.Get(def.Zone) then
 			bossStates[bossId] = { Alive = nil, NextSpawn = os.clock() + rng:NextNumber(15, 60) }
 		end
 	end
@@ -20121,7 +20944,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -22589,11 +23412,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="74">
+  <Item class="ServerStorage" referent="76">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="75">
+    <Item class="ModuleScript" referent="77">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -22820,19 +23643,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="76">
+  <Item class="SoundService" referent="78">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="77">
+  <Item class="StarterGui" referent="79">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="78">
+  <Item class="StarterPlayer" referent="80">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -22843,11 +23666,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="79">
+    <Item class="StarterCharacterScripts" referent="81">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="80">
+      <Item class="LocalScript" referent="82">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -22860,19 +23683,19 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="81">
+    <Item class="StarterPlayerScripts" referent="83">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="82">
+      <Item class="Folder" referent="84">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="83">
+        <Item class="Folder" referent="85">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -23190,7 +24013,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -23726,7 +24549,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="88">
             <Properties>
               <string name="Name">BoatController</string>
               <string name="Source"><![CDATA[--[[
@@ -23915,7 +24738,7 @@ return BoatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -24250,7 +25073,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">CitizenController</string>
               <string name="Source"><![CDATA[--[[
@@ -24579,7 +25402,7 @@ return CitizenController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -24638,7 +25461,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -25380,7 +26203,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -25982,6 +26805,60 @@ Scenes.Primordiale = function()
 	letterbox(false)
 end
 
+-- Cerimonia d'apertura della Grande Inaugurazione: fuochi sul Campo, l'arco d'oro
+-- e il Colosso d'Oro che cade dal cielo e si alza oltre il Muro Vermiglio
+Scenes.Inaugurazione = function()
+	local camp = Zones.Get("CampoAddestramento")
+	local c = if camp then camp.Center else Vector3.new(0, W.GroundY, 0)
+	local arch = c + Vector3.new(0, 0, -58)
+	local wallPoint = W.WallPoint("Vermiglia", 215)
+	local outward = Util.SafeUnit(Util.Flat(wallPoint - W.IslandCenter("Vermiglia")))
+	local landing = Vector3.new(wallPoint.X, W.GroundY, wallPoint.Z) + outward * 150
+	api.Stream(c)
+	local fw = C.FireworksController
+	letterbox(true)
+	-- 1. dall'alto: il Campo in festa e i primi fuochi
+	if fw then
+		fw.Show(c + Vector3.new(0, 0, -30), 26, math.random(1, 1e6))
+	end
+	api.ShotAsync(api.Look(c + Vector3.new(170, 150, 150), c + Vector3.new(0, 70, -40)), api.Look(c + Vector3.new(100, 70, 100), c + Vector3.new(0, 110, -40)), 7.5)
+	api.Title("GRANDE INAUGURAZIONE", 3)
+	api.Say("Narratore", "Soldati dell'Arcipelago! Oggi le porte delle Isole si aprono a tutti.", 4)
+	-- 2. l'arco d'oro con la scritta
+	api.ShotAsync(api.Look(arch + Vector3.new(34, 10, 62), arch + Vector3.new(0, 32, 0)), api.Look(arch + Vector3.new(-22, 22, 46), arch + Vector3.new(0, 40, 0)), 5)
+	api.Say("Narratore", "Esperienza e oro doppi, sfide speciali e premi che non torneranno mai più.", 4.5)
+	-- 3. il Colosso d'Oro cade dal cielo oltre il Muro
+	api.Stream(landing)
+	local camPos = c + Vector3.new(70, 24, -40)
+	api.ShotAsync(api.Look(camPos, landing + Vector3.new(0, 260, 0)), api.Look(camPos + Vector3.new(0, -6, 0), landing + Vector3.new(0, 170, 0)), 6)
+	if fw then
+		fw.ColossusArrival(landing, 200)
+	end
+	api.Wait(2.1)
+	local colossus = api.Titan("Dorato", 200, landing - Vector3.new(0, 210, 0), 0)
+	local hip = colossus:GetAttribute("HipHeight") :: number
+	local facing = CFrame.lookAt(landing, Vector3.new(c.X, W.GroundY, c.Z)).Rotation
+	colossus:PivotTo(CFrame.new(landing - Vector3.new(0, 200, 0)) * facing)
+	api.Move(colossus, CFrame.new(landing + Vector3.new(0, hip, 0)) * facing, 3.2)
+	if C.CameraController then
+		C.CameraController.Shake(0.9, 3)
+	end
+	api.Say("Narratore", "Ogni 30 minuti il Colosso d'Oro cadrà dal cielo. Chi lo abbatte... vince l'oro.", 3.8)
+	api.Animate(colossus, "Roar")
+	if C.SoundController then
+		C.SoundController.Play("Roar", landing, { Range = 4000, Volume = 1 })
+	end
+	api.Wait(1.5)
+	-- 4. gran finale
+	if fw then
+		fw.Show(c + Vector3.new(0, 0, -60), 8, math.random(1, 1e6))
+	end
+	api.ShotAsync(api.Look(c + Vector3.new(-60, 30, 90), c + Vector3.new(0, 120, -60)), api.Look(c + Vector3.new(-40, 60, 60), c + Vector3.new(0, 160, -80)), 5)
+	api.Title("VOLATE OLTRE LA PAURA!", 3)
+	api.FadeOut(1)
+	letterbox(false)
+end
+
 -- RIPRODUZIONE --------------------------------------------------------------------------------------
 
 function CutsceneController.IsPlaying(): boolean
@@ -26046,14 +26923,32 @@ end
 
 function CutsceneController.Start()
 	buildUI()
+	-- le scene arrivano in fila (es. cerimonia dell'evento e prologo della storia): una alla volta
+	local queue: { string } = {}
+	local running = false
 	Net.Event("Cutscene").OnClientEvent:Connect(function(id)
-		if type(id) == "string" then
-			-- aspetta che l'intro e l'eventuale dialogo in corso siano stati chiusi
-			while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) do
-				task.wait(0.2)
-			end
-			CutsceneController.Play(id)
+		if type(id) ~= "string" or table.find(queue, id) then
+			return
 		end
+		table.insert(queue, id)
+		if running then
+			return
+		end
+		running = true
+		task.spawn(function()
+			while #queue > 0 do
+				-- aspetta che l'intro, l'eventuale dialogo e la scena precedente siano finiti
+				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing do
+					task.wait(0.2)
+				end
+				local nextId = table.remove(queue, 1)
+				if nextId then
+					CutsceneController.Play(nextId)
+					task.wait(0.6)
+				end
+			end
+			running = false
+		end)
 	end)
 	RunService.RenderStepped:Connect(function(dt)
 		if playing then
@@ -26073,7 +26968,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -27128,6 +28023,23 @@ handlers.Voyage = function(_p)
 	end
 end
 
+-- Grande Inaugurazione: fuochi d'artificio, coriandoli e l'arrivo del Colosso d'Oro
+handlers.Fireworks = function(p)
+	if C.FireworksController then
+		C.FireworksController.Show(p.Center, p.Duration or 30, p.Seed)
+	end
+end
+handlers.Confetti = function(p)
+	if C.FireworksController then
+		C.FireworksController.Confetti(p.Big == true)
+	end
+end
+handlers.ColossusArrival = function(p)
+	if C.FireworksController then
+		C.FireworksController.ColossusArrival(p.Position, p.Height or 70)
+	end
+end
+
 -- mondo aperto: un gigante che emerge dal mare, un forziere aperto
 handlers.Splash = function(p)
 	local size = p.Size or 20
@@ -27184,7 +28096,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">ExploreController</string>
               <string name="Source"><![CDATA[--[[
@@ -27250,7 +28162,481 @@ return ExploreController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="96">
+            <Properties>
+              <string name="Name">FireworksController</string>
+              <string name="Source"><![CDATA[--[[
+	FireworksController - le animazioni della Grande Inaugurazione
+	  - Show: spettacolo di razzi sopra una città (peonie, anelli, salici d'oro, palme e crepitii)
+	    che finisce con un gran finale
+	  - Confetti: pioggia di coriandoli sul giocatore (sfide completate, vittorie)
+	  - ColossusArrival: il Colosso d'Oro cade dal cielo come una meteora d'oro
+	Tutto è solo grafico e viene calcolato da ogni client (non pesa sul server).
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local FireworksController = {}
+local C
+local player = Players.LocalPlayer
+
+local folder: Folder
+local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
+
+local COLORS = {
+	Color3.fromRGB(255, 70, 70),
+	Color3.fromRGB(255, 200, 70),
+	Color3.fromRGB(90, 220, 255),
+	Color3.fromRGB(120, 255, 120),
+	Color3.fromRGB(255, 110, 220),
+	Color3.fromRGB(170, 120, 255),
+	Color3.fromRGB(255, 255, 255),
+	Color3.fromRGB(255, 150, 60),
+}
+local GOLD = Color3.fromRGB(255, 196, 80)
+
+-- MOTORE DEI MOVIMENTI (un solo aggiornamento per fotogramma per tutti i razzi) --------------------
+
+type Mover = { Part: BasePart, Path: (number) -> Vector3, Start: number, Duration: number, Done: (() -> ())? }
+local movers: { Mover } = {}
+
+local function step()
+	local now = os.clock()
+	for i = #movers, 1, -1 do
+		local m = movers[i]
+		local k = math.clamp((now - m.Start) / m.Duration, 0, 1)
+		if m.Part.Parent then
+			m.Part.CFrame = CFrame.new(m.Path(k))
+		end
+		if k >= 1 then
+			table.remove(movers, i)
+			if m.Done then
+				local ok, err = pcall(m.Done)
+				if not ok then
+					warn("[Fuochi] " .. tostring(err))
+				end
+			end
+		end
+	end
+end
+
+local function move(part: BasePart, path: (number) -> Vector3, duration: number, done: (() -> ())?)
+	table.insert(movers, { Part = part, Path = path, Start = os.clock(), Duration = duration, Done = done })
+end
+
+-- MATTONI ------------------------------------------------------------------------------------------------
+
+local function glowPart(size: number, color: Color3, position: Vector3): Part
+	local p = Instance.new("Part")
+	p.Shape = Enum.PartType.Ball
+	p.Size = Vector3.one * size
+	p.Material = Enum.Material.Neon
+	p.Color = color
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.CFrame = CFrame.new(position)
+	p.Parent = folder
+	return p
+end
+
+local function addTrail(p: BasePart, color: Color3, width: number, lifetime: number)
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(-width / 2, 0, 0)
+	a0.Parent = p
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(width / 2, 0, 0)
+	a1.Parent = p
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = lifetime
+	trail.FaceCamera = true
+	trail.LightEmission = 1
+	trail.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+	trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.2) })
+	trail.Parent = p
+end
+
+-- Un punto invisibile da cui partono le particelle (si cancella da solo)
+local function anchorAt(position: Vector3, lifetime: number): Attachment
+	local holder = Instance.new("Part")
+	holder.Size = Vector3.one
+	holder.Transparency = 1
+	holder.Anchored = true
+	holder.CanCollide = false
+	holder.CanQuery = false
+	holder.CanTouch = false
+	holder.CFrame = CFrame.new(position)
+	holder.Parent = folder
+	local a = Instance.new("Attachment")
+	a.Parent = holder
+	task.delay(lifetime, function()
+		holder:Destroy()
+	end)
+	return a
+end
+
+local function sparkEmitter(parent: Instance, props: { [string]: any }): ParticleEmitter
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = SPARKLE
+	e.LightEmission = 1
+	e.LightInfluence = 0
+	e.Rate = 0
+	e.SpreadAngle = Vector2.new(180, 180)
+	for k, v in props do
+		(e :: any)[k] = v
+	end
+	e.Parent = parent
+	return e
+end
+
+local function flashLight(position: Vector3, color: Color3, brightness: number, time: number)
+	local a = anchorAt(position, time + 0.2)
+	local light = Instance.new("PointLight")
+	light.Range = 60
+	light.Brightness = brightness
+	light.Color = color
+	light.Shadows = false
+	light.Parent = a
+	local start = os.clock()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local k = (os.clock() - start) / time
+		if k >= 1 or not light.Parent then
+			conn:Disconnect()
+			return
+		end
+		light.Brightness = brightness * (1 - k) * (1 - k)
+	end)
+end
+
+local function sound(name: string, position: Vector3, volume: number, pitch: number)
+	if C.SoundController then
+		C.SoundController.Play(name, position, { Range = 1600, Volume = volume, Pitch = pitch })
+	end
+end
+
+local function pick(rng: Random, list)
+	return list[rng:NextInteger(1, #list)]
+end
+
+-- ESPLOSIONI ------------------------------------------------------------------------------------------
+
+local function burstPeony(apex: Vector3, color: Color3, rng: Random)
+	local a = anchorAt(apex, 4)
+	local second = if rng:NextNumber() < 0.5 then Color3.new(1, 1, 1) else pick(rng, COLORS)
+	local e = sparkEmitter(a, {
+		Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)), ColorSequenceKeypoint.new(0.15, color), ColorSequenceKeypoint.new(1, second) }),
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.2), NumberSequenceKeypoint.new(0.5, 1.4), NumberSequenceKeypoint.new(1, 0) }),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.8, 0.2), NumberSequenceKeypoint.new(1, 1) }),
+		Lifetime = NumberRange.new(1.4, 2.1),
+		Speed = NumberRange.new(48, 62),
+		Drag = 2.3,
+		Acceleration = Vector3.new(0, -9, 0),
+	})
+	e:Emit(230)
+end
+
+local function burstWillow(apex: Vector3)
+	local a = anchorAt(apex, 5)
+	local e = sparkEmitter(a, {
+		Color = ColorSequence.new(Color3.fromRGB(255, 240, 190), Color3.fromRGB(255, 150, 40)),
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.8), NumberSequenceKeypoint.new(1, 0.2) }),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }),
+		Lifetime = NumberRange.new(2.6, 3.8),
+		Speed = NumberRange.new(30, 42),
+		Drag = 1.3,
+		Acceleration = Vector3.new(0, -24, 0),
+	})
+	e:Emit(190)
+end
+
+local function burstCrackle(apex: Vector3, delay: number)
+	task.delay(delay, function()
+		local a = anchorAt(apex, 2)
+		local e = sparkEmitter(a, {
+			Color = ColorSequence.new(Color3.new(1, 1, 1)),
+			Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 0) }),
+			Lifetime = NumberRange.new(0.08, 0.3),
+			Speed = NumberRange.new(10, 40),
+			Drag = 3,
+		})
+		e:Emit(140)
+		sound("Shot", apex, 0.25, 3)
+	end)
+end
+
+-- Anello: scintille con la scia che si allargano su un piano inclinato
+local function burstRing(apex: Vector3, color: Color3, rng: Random)
+	local tilt = CFrame.Angles(rng:NextNumber(-0.9, 0.9), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.9, 0.9))
+	local count = 22
+	local radius = rng:NextNumber(45, 60)
+	for i = 1, count do
+		local a = i / count * math.pi * 2
+		local dir = tilt:VectorToWorldSpace(Vector3.new(math.cos(a), 0, math.sin(a)))
+		local spark = glowPart(0.8, color, apex)
+		addTrail(spark, color, 0.7, 0.45)
+		move(spark, function(k)
+			local spread = 1 - (1 - k) * (1 - k)
+			return apex + dir * radius * spread - Vector3.new(0, 10 * k * k, 0)
+		end, 1.5, function()
+			spark:Destroy()
+		end)
+	end
+end
+
+-- Palma: grandi comete che si aprono verso l'alto e poi ricadono
+local function burstPalm(apex: Vector3, color: Color3, rng: Random)
+	local arms = 8
+	for i = 1, arms do
+		local a = i / arms * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
+		local dir = Vector3.new(math.cos(a), rng:NextNumber(0.15, 0.6), math.sin(a)).Unit
+		local comet = glowPart(1.6, color, apex)
+		addTrail(comet, color, 1.4, 0.9)
+		local speed = rng:NextNumber(55, 70)
+		move(comet, function(k)
+			local t = k * 2.2
+			return apex + dir * speed * t * (1 - 0.35 * t) - Vector3.new(0, 14 * t * t, 0)
+		end, 2.2, function()
+			comet:Destroy()
+		end)
+	end
+end
+
+local function explode(apex: Vector3, color: Color3, kind: string, rng: Random)
+	flashLight(apex, color, 7, 0.8)
+	sound("Explosion", apex, 0.6, rng:NextNumber(0.9, 1.4))
+	if kind == "Willow" then
+		burstWillow(apex)
+		burstCrackle(apex, 1.6)
+	elseif kind == "Ring" then
+		burstRing(apex, color, rng)
+		burstPeony(apex, color, rng)
+	elseif kind == "Palm" then
+		burstPalm(apex, color, rng)
+	elseif kind == "Crackle" then
+		burstPeony(apex, Color3.new(1, 1, 1), rng)
+		burstCrackle(apex, 0.6)
+	else
+		burstPeony(apex, color, rng)
+		if rng:NextNumber() < 0.35 then
+			burstCrackle(apex, 1.2)
+		end
+	end
+end
+
+local KINDS = { "Peony", "Peony", "Peony", "Willow", "Willow", "Ring", "Palm", "Crackle" }
+
+-- Un razzo: sale con la scia e scoppia in cima
+function FireworksController.Rocket(base: Vector3, height: number, color: Color3?, kind: string?, rng: Random?)
+	local r = rng or Random.new()
+	local c = color or pick(r, COLORS)
+	local k = kind or pick(r, KINDS)
+	local shell = glowPart(0.9, Color3.fromRGB(255, 230, 190), base)
+	addTrail(shell, Color3.fromRGB(255, 170, 80), 0.5, 0.5)
+	local sparks = sparkEmitter(shell, {
+		Color = ColorSequence.new(Color3.fromRGB(255, 200, 120)),
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0) }),
+		Lifetime = NumberRange.new(0.2, 0.4),
+		Speed = NumberRange.new(2, 6),
+		Rate = 60,
+		EmissionDirection = Enum.NormalId.Bottom,
+		SpreadAngle = Vector2.new(25, 25),
+	})
+	local drift = Vector3.new(r:NextNumber(-8, 8), 0, r:NextNumber(-8, 8))
+	local apex = base + Vector3.new(0, height, 0) + drift
+	sound("Shot", base, 0.25, r:NextNumber(1.6, 2.2))
+	move(shell, function(t)
+		local up = 1 - (1 - t) * (1 - t)
+		return base:Lerp(apex, up) + Vector3.new(math.sin(t * 20) * 0.6, 0, 0)
+	end, r:NextNumber(1.0, 1.4), function()
+		sparks.Enabled = false
+		shell.Transparency = 1
+		task.delay(0.6, function()
+			shell:Destroy()
+		end)
+		explode(apex, c, k, r)
+	end)
+end
+
+-- Spettacolo completo sopra una città
+function FireworksController.Show(center: Vector3, duration: number, seed: number?)
+	local rng = Random.new(seed or os.clock() * 1000)
+	local dense = not C.ClientData or C.ClientData.Setting("Scenery", true) ~= false
+	local function launch()
+		local base = center + Vector3.new(rng:NextNumber(-90, 90), 6, rng:NextNumber(-90, 90))
+		FireworksController.Rocket(base, rng:NextNumber(110, 190), nil, nil, rng)
+	end
+	task.spawn(function()
+		local finale = math.max(4, duration - 5)
+		local t0 = os.clock()
+		while os.clock() - t0 < finale do
+			launch()
+			if dense and rng:NextNumber() < 0.35 then
+				launch()
+			end
+			task.wait(rng:NextNumber(0.45, 1.1))
+		end
+		-- gran finale: un muro di salici d'oro e raffiche di colori
+		for i = 1, (if dense then 18 else 9) do
+			local base = center + Vector3.new(-80 + (i % 9) * 20, 6, rng:NextNumber(-30, 30))
+			FireworksController.Rocket(base, rng:NextNumber(130, 200), if i % 3 == 0 then GOLD else nil, if i % 2 == 0 then "Willow" else nil, rng)
+			task.wait(0.14)
+		end
+	end)
+end
+
+-- Pioggia di coriandoli sopra il giocatore
+function FireworksController.Confetti(big: boolean?)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	local a = anchorAt(root.Position + Vector3.new(0, 14, 0), 6)
+	local e = sparkEmitter(a, {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+			ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 220, 80)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 220, 120)),
+			ColorSequenceKeypoint.new(0.75, Color3.fromRGB(100, 170, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 110, 255)),
+		}),
+		LightEmission = 0.3,
+		Size = NumberSequence.new(0.7),
+		Lifetime = NumberRange.new(2.5, 4),
+		Speed = NumberRange.new(14, 30),
+		Drag = 1.6,
+		Acceleration = Vector3.new(0, -14, 0),
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-300, 300),
+		EmissionDirection = Enum.NormalId.Top,
+		SpreadAngle = Vector2.new(70, 70),
+	})
+	e:Emit(if big then 320 else 140)
+	if C.SoundController then
+		C.SoundController.Play("Reward")
+	end
+end
+
+-- Il Colosso d'Oro cade dal cielo: meteora, fulmini, impatto e colonna di luce
+function FireworksController.ColossusArrival(position: Vector3, height: number)
+	local fx = C.EffectsController
+	local sky = position + Vector3.new(320, 1100, 220)
+	local size = math.max(16, height * 0.28)
+	local meteor = glowPart(size, Color3.fromRGB(255, 214, 110), sky)
+	addTrail(meteor, GOLD, size * 0.8, 1.2)
+	local fire = Instance.new("Fire")
+	fire.Size = math.min(30, size * 1.2)
+	fire.Heat = 0
+	fire.Color = Color3.fromRGB(255, 190, 60)
+	fire.SecondaryColor = Color3.fromRGB(255, 120, 30)
+	fire.Parent = meteor
+	sparkEmitter(meteor, {
+		Color = ColorSequence.new(Color3.fromRGB(255, 240, 180), Color3.fromRGB(255, 150, 40)),
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(1, 0) }),
+		Lifetime = NumberRange.new(0.6, 1.2),
+		Speed = NumberRange.new(10, 30),
+		Rate = 120,
+	})
+	local light = Instance.new("PointLight")
+	light.Range = 60
+	light.Brightness = 5
+	light.Color = GOLD
+	light.Parent = meteor
+	if fx then
+		fx.Flash(Color3.fromRGB(255, 220, 150), 0.25, 1.2)
+		for i = 0, 2 do
+			task.delay(0.3 + i * 0.55, function()
+				local around = position + Vector3.new(math.random(-120, 120), 0, math.random(-120, 120))
+				fx.Lightning(around + Vector3.new(0, 900, 0), around, Color3.fromRGB(255, 226, 140), 5)
+			end)
+		end
+	end
+	if C.SoundController then
+		C.SoundController.Play("Thunder", position, { Range = 4000, Volume = 1, Pitch = 0.6 })
+	end
+	if C.CameraController then
+		C.CameraController.Shake(0.25, 2)
+	end
+	move(meteor, function(k)
+		return sky:Lerp(position + Vector3.new(0, height * 0.4, 0), k * k)
+	end, 2.0, function()
+		meteor:Destroy()
+		local impact = position + Vector3.new(0, 2, 0)
+		if fx then
+			fx.Explosion(impact, height * 0.7, true)
+			fx.Shockwave(impact, height * 3.2, GOLD, 1.4, 3)
+			fx.Shockwave(impact, height * 2.2, Color3.new(1, 1, 1), 1, 2)
+			fx.Shockwave(impact + Vector3.new(0, 6, 0), height * 1.5, Color3.fromRGB(255, 150, 60), 0.8, 1.5)
+			fx.Steam(impact, height * 0.9, 30, 4, Color3.fromRGB(196, 176, 140))
+			fx.DebrisBurst(impact, 26, 5, Color3.fromRGB(120, 104, 84), Enum.Material.Ground, 160)
+			fx.Flash(Color3.fromRGB(255, 240, 200), 0.6, 1)
+			fx.ShakeAt(impact, 1, 3000, 1.6)
+		end
+		flashLight(impact + Vector3.new(0, 20, 0), GOLD, 10, 2.5)
+		if C.SoundController then
+			C.SoundController.Play("Explosion", impact, { Range = 4000, Volume = 1, Pitch = 0.45 })
+		end
+		-- colonna di luce dorata che sale al cielo e si spegne
+		local pillar = Instance.new("Part")
+		pillar.Shape = Enum.PartType.Cylinder
+		pillar.Size = Vector3.new(600, height * 0.6, height * 0.6)
+		pillar.CFrame = CFrame.new(impact + Vector3.new(0, 300, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		pillar.Material = Enum.Material.Neon
+		pillar.Color = Color3.fromRGB(255, 220, 130)
+		pillar.Transparency = 0.35
+		pillar.Anchored = true
+		pillar.CanCollide = false
+		pillar.CanQuery = false
+		pillar.CanTouch = false
+		pillar.CastShadow = false
+		pillar.Parent = folder
+		local start = os.clock()
+		local conn
+		conn = RunService.RenderStepped:Connect(function()
+			local k = (os.clock() - start) / 2.6
+			if k >= 1 or not pillar.Parent then
+				conn:Disconnect()
+				pillar:Destroy()
+				return
+			end
+			local w = height * 0.6 * (1 - k * 0.8)
+			pillar.Size = Vector3.new(600, w, w)
+			pillar.Transparency = 0.35 + 0.65 * k
+		end)
+		local a = anchorAt(impact + Vector3.new(0, 10, 0), 5)
+		sparkEmitter(a, {
+			Color = ColorSequence.new(Color3.fromRGB(255, 240, 180), GOLD),
+			Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.5), NumberSequenceKeypoint.new(1, 0) }),
+			Lifetime = NumberRange.new(1.5, 2.5),
+			Speed = NumberRange.new(60, 110),
+			Drag = 2,
+			Acceleration = Vector3.new(0, -20, 0),
+		}):Emit(260)
+	end)
+end
+
+function FireworksController.Init(c)
+	C = c
+end
+
+function FireworksController.Start()
+	folder = Instance.new("Folder")
+	folder.Name = "FuochiLocali"
+	folder.Parent = workspace
+	RunService.RenderStepped:Connect(step)
+end
+
+return FireworksController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">HorseController</string>
               <string name="Source"><![CDATA[--[[
@@ -27418,7 +28804,7 @@ return HorseController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -27573,7 +28959,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">NatureController</string>
               <string name="Source"><![CDATA[--[[
@@ -28055,7 +29441,7 @@ return NatureController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -28955,7 +30341,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">SkyController</string>
               <string name="Source"><![CDATA[--[[
@@ -29268,7 +30654,7 @@ return SkyController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -29358,7 +30744,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -29832,7 +31218,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -29943,7 +31329,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="102">
+        <Item class="LocalScript" referent="105">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -29979,9 +31365,11 @@ local ORDER = {
 	{ Controllers, "BoatController" },
 	{ Controllers, "HorseController" },
 	{ Controllers, "ExploreController" },
+	{ Controllers, "FireworksController" },
 	{ UI, "DamageNumbers" },
 	{ UI, "HUD" },
 	{ UI, "WorldMap" },
+	{ UI, "Festival" },
 	{ UI, "Menu" },
 	{ UI, "Dialogue" },
 	{ UI, "Shop" },
@@ -30034,11 +31422,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="103">
+        <Item class="Folder" referent="106">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -30324,7 +31712,9 @@ local function showWorld()
 	r = row()
 	local bosses = {}
 	for id, def in Titans.Bosses do
-		table.insert(bosses, { Id = id, Def = def })
+		if not def.Event then
+			table.insert(bosses, { Id = id, Def = def })
+		end
 	end
 	table.sort(bosses, function(a, b)
 		return (a.Def.Level or 0) < (b.Def.Level or 0)
@@ -30383,6 +31773,30 @@ local function showServer()
 	end)
 	button(r, "⭐ Esperienza doppia (tutti)", GREEN, function()
 		send("DoubleXP")
+	end)
+	section("🎉 Grande Inaugurazione", "L'evento segue le date scritte in Shared/Data/Festival; qui puoi accenderlo, spegnerlo o provarne i pezzi.")
+	r = row(220, 44)
+	button(r, "🎉 Accendi evento", GREEN, function()
+		send("Festival", "on")
+	end)
+	button(r, "⛔ Spegni evento", RED, function()
+		send("Festival", "off")
+	end)
+	button(r, "📅 Segui le date", nil, function()
+		send("Festival", "auto")
+	end)
+	r = row(220, 44)
+	button(r, "👑 Colosso d'Oro qui", PURPLE, function()
+		send("Festival", "boss")
+	end)
+	button(r, "🎆 Fuochi d'artificio qui", BLUE, function()
+		send("Festival", "fireworks")
+	end)
+	button(r, "🎬 Cerimonia (bersaglio)", nil, function()
+		send("Festival", "ceremony")
+	end)
+	button(r, "🎊 Coriandoli a tutti", nil, function()
+		send("Festival", "confetti")
 	end)
 	section("Moderazione", "Scegli il giocatore come BERSAGLIO in alto.")
 	r = row(220, 44)
@@ -30540,7 +31954,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -30696,7 +32110,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="106">
+          <Item class="ModuleScript" referent="109">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -31352,7 +32766,191 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="110">
+            <Properties>
+              <string name="Name">Festival</string>
+              <string name="Source"><![CDATA[--[[
+	Festival - interfaccia dell'evento "Grande Inaugurazione"
+	  - striscione sotto la bussola: bonus attivi, quando arriva il Colosso d'Oro, quando finisce l'evento
+	  - pannello (clic sullo striscione): le 8 sfide con i progressi, i premi e il codice regalo
+	Lo stato arriva dagli attributi di ReplicatedStorage (li scrive FestivalService).
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Festival = require(Shared.Data.Festival)
+local Items = require(Shared.Data.Items)
+
+local Theme = require(script.Parent.Theme)
+local New = Theme.New
+local Colors = Theme.Colors
+
+local FestivalUI = {}
+local C
+
+local banner: TextButton
+local bannerText: TextLabel
+local panel: Frame
+local subtitle: TextLabel
+local timers: TextLabel
+local rows: { [string]: any } = {}
+local finalLabel: TextLabel
+
+local GOLD = Color3.fromRGB(255, 206, 96)
+
+local function serverNow(): number
+	return workspace:GetServerTimeNow()
+end
+
+local function festivalData()
+	local profile = C.ClientData.Profile
+	local f = profile and profile.Festival
+	if type(f) == "table" and f.Id == Festival.Id then
+		return f
+	end
+	return nil
+end
+
+local function buildBanner()
+	banner = New("TextButton", {
+		Name = "StriscioneFesta",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 76),
+		Size = UDim2.fromOffset(560, 30),
+		BackgroundColor3 = Color3.fromRGB(70, 22, 26),
+		BackgroundTransparency = 0.1,
+		AutoButtonColor = false,
+		Text = "",
+		Visible = false,
+		Parent = C.UIController.Layers.HUD,
+	})
+	C.UIController.AttachScale(banner)
+	Theme.Corner(banner, 15)
+	Theme.Stroke(banner, GOLD, 1.5, 0.1)
+	New("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 170, 150)), Rotation = 90, Parent = banner })
+	bannerText = Theme.Label("", {
+		Size = UDim2.fromScale(1, 1),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Font = Theme.Fonts.Bold,
+		TextSize = 14,
+		TextColor3 = Color3.fromRGB(255, 236, 190),
+		Parent = banner,
+	})
+	banner.Activated:Connect(function()
+		C.UIController.Toggle("Inaugurazione")
+	end)
+end
+
+local function challengeRow(parent: Instance, order: number, c)
+	local row = Theme.Panel({ Size = UDim2.new(1, -8, 0, 54), LayoutOrder = order, Parent = parent })
+	New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(8, 0), Size = UDim2.fromOffset(40, 54), Text = c.Icon, TextSize = 26, Font = Theme.Fonts.Bold, TextColor3 = Colors.Text, Parent = row })
+	local name = Theme.Label(c.Name, { Position = UDim2.fromOffset(52, 6), Size = UDim2.new(1, -200, 0, 18), Font = Theme.Fonts.Bold, TextSize = 15, Parent = row })
+	Theme.Label(c.Text, { Position = UDim2.fromOffset(52, 24), Size = UDim2.new(1, -200, 0, 16), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = row })
+	local _, setBar = Theme.Bar({ Position = UDim2.new(1, -140, 0, 30), Size = UDim2.fromOffset(128, 10), Parent = row }, GOLD)
+	local count = Theme.Label("", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 8), Size = UDim2.fromOffset(128, 18), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.Bold, TextSize = 13, TextColor3 = GOLD, Parent = row })
+	rows[c.Id] = { Name = name, SetBar = setBar, Count = count, Row = row }
+end
+
+local function buildPanel()
+	panel = Theme.Panel({ Name = "Inaugurazione", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(760, 600), Parent = C.UIController.Layers.Panels })
+	Theme.Padding(panel, 14)
+	Theme.Label("🎉 " .. Festival.Name, { Size = UDim2.new(1, -50, 0, 36), Font = Theme.Fonts.Title, TextSize = 32, TextColor3 = GOLD, Parent = panel })
+	Theme.Button("✕", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(36, 32), Parent = panel }, function()
+		C.UIController.Close("Inaugurazione")
+	end)
+	subtitle = Theme.Label("", { Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 0, 20), Font = Theme.Fonts.UI, TextSize = 14, TextColor3 = Colors.TextDim, Parent = panel })
+	timers = Theme.Label("", { Position = UDim2.fromOffset(0, 60), Size = UDim2.new(1, 0, 0, 44), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.Text, TextYAlignment = Enum.TextYAlignment.Top, Parent = panel })
+	local list = New("ScrollingFrame", { Position = UDim2.fromOffset(0, 108), Size = UDim2.new(1, 0, 1, -170), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), Parent = panel })
+	New("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
+	for i, c in Festival.Challenges do
+		challengeRow(list, i, c)
+	end
+	local cloak = Items.Get(Festival.FinalItem)
+	finalLabel = Theme.Label("", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -22), Size = UDim2.new(1, 0, 0, 36), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = GOLD, TextWrapped = true, Parent = panel })
+	finalLabel.Text = ("Completa tutte le sfide: %s (esclusivo) + %d 💎"):format(cloak and cloak.Name or "premio finale", Festival.FinalGems)
+	Theme.Label("Codice regalo dell'evento: INAUGURAZIONE (Menu → Codici)", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 18), Font = Theme.Fonts.UI, TextSize = 13, TextColor3 = Colors.TextDim, Parent = panel })
+	C.UIController.RegisterPanel("Inaugurazione", panel)
+end
+
+local function timeUntil(attr: string): string
+	local at = ReplicatedStorage:GetAttribute(attr)
+	if type(at) ~= "number" then
+		return "-"
+	end
+	return Festival.FormatTime(at - serverNow())
+end
+
+local accumulator = 0
+local function update(dt: number)
+	accumulator += dt
+	if accumulator < 0.5 then
+		return
+	end
+	accumulator = 0
+	local active = ReplicatedStorage:GetAttribute("FestaAttiva") == true
+	local cinematic = C.CameraController and C.CameraController.IsCinematic()
+	local intro = C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()
+	banner.Visible = active and not cinematic and not intro
+	banner.Position = UDim2.new(0.5, 0, 0, math.floor(14 + 62 * C.UIController.Scale))
+	if not active then
+		if C.UIController.IsOpen("Inaugurazione") then
+			C.UIController.Close("Inaugurazione")
+		end
+		return
+	end
+	local fine = ReplicatedStorage:GetAttribute("FestaFine")
+	local ends = if type(fine) == "number" and fine > 0 then ("  •  fine tra " .. Festival.FormatTime(fine - serverNow())) else ""
+	local bossHere = ReplicatedStorage:GetAttribute("FestaBossPos") ~= nil
+	local boss = if bossHere then "👑 COLOSSO D'ORO IN CAMPO!" else ("👑 Colosso tra " .. timeUntil("FestaProssimoBoss"))
+	bannerText.Text = ("🎉 GRANDE INAUGURAZIONE  •  2x XP e ORO  •  %s%s"):format(boss, ends)
+	if not C.UIController.IsOpen("Inaugurazione") then
+		return
+	end
+	subtitle.Text = "Esperienza e oro doppi per tutti" .. (if ends ~= "" then ends else "")
+	timers.Text = ("👑 Colosso d'Oro: %s (Pianure Meridionali, Vermiglia)\n🎆 Prossimi fuochi d'artificio sopra le città: tra %s"):format(if bossHere then "in campo ORA!" else "tra " .. timeUntil("FestaProssimoBoss"), timeUntil("FestaProssimiFuochi"))
+	local f = festivalData()
+	local done = 0
+	for _, c in Festival.Challenges do
+		local row = rows[c.Id]
+		local progress = f and f.Progress and f.Progress[c.Id] or 0
+		local complete = f and f.Done and f.Done[c.Id] == true
+		if complete then
+			done += 1
+		end
+		row.SetBar(progress / c.Goal)
+		row.Count.Text = if complete then "✅ Completata" else ("%d / %d  •  +%d 💎"):format(progress, c.Goal, c.Gems)
+		row.Name.TextColor3 = if complete then Colors.GreenBright else Colors.Text
+	end
+	if f and f.Final then
+		finalLabel.Text = "🏆 Tutte le sfide completate! Il Mantello dell'Inaugurazione è nel tuo equipaggiamento."
+	else
+		local cloak = Items.Get(Festival.FinalItem)
+		finalLabel.Text = ("Sfide completate: %d / %d  •  Premio finale: %s (esclusivo) + %d 💎"):format(done, #Festival.Challenges, cloak and cloak.Name or "", Festival.FinalGems)
+	end
+end
+
+function FestivalUI.Init(c)
+	C = c
+end
+
+function FestivalUI.Start()
+	buildBanner()
+	buildPanel()
+	RunService.RenderStepped:Connect(function(dt)
+		local ok, err = pcall(update, dt)
+		if not ok then
+			warn("[Evento] " .. tostring(err))
+		end
+	end)
+end
+
+return FestivalUI
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -32081,7 +33679,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -32595,7 +34193,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -33282,7 +34880,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -33562,7 +35160,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="111">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -33886,7 +35484,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -34014,7 +35612,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -34686,7 +36284,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -35369,7 +36967,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -35614,7 +37212,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -35812,7 +37410,7 @@ return UIController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">WorldMap</string>
               <string name="Source"><![CDATA[--[[
@@ -36191,6 +37789,11 @@ local function drawMarkers(canvas: Canvas, detailed: boolean, myRoot: BasePart?)
 			end
 		end
 	end
+	-- il Colosso d'Oro dell'evento (sempre visibile, ovunque sia)
+	local bossPos = ReplicatedStorage:GetAttribute("FestaBossPos")
+	if typeof(bossPos) == "Vector3" then
+		marker(canvas, "Colosso", bossPos, "👑", if detailed then 26 else 18, Color3.fromRGB(255, 206, 96))
+	end
 	-- obiettivo della storia e segnaposto
 	local objective = C.HUD and C.HUD.ObjectivePosition()
 	if objective then
@@ -36527,7 +38130,7 @@ return WorldMap
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="118">
+  <Item class="Workspace" referent="122">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>
@@ -36542,7 +38145,7 @@ return WorldMap
       <token name="StreamingIntegrityMode">2</token>
       <int name="StreamingTargetRadius">1600</int>
     </Properties>
-    <Item class="Terrain" referent="119">
+    <Item class="Terrain" referent="123">
       <Properties>
         <string name="Name">Terrain</string>
         <bool name="Decoration">true</bool>

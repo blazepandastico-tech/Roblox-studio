@@ -374,6 +374,11 @@ local function drawMarkers(canvas: Canvas, detailed: boolean, myRoot: BasePart?)
 			end
 		end
 	end
+	-- il Colosso d'Oro dell'evento (sempre visibile, ovunque sia)
+	local bossPos = ReplicatedStorage:GetAttribute("FestaBossPos")
+	if typeof(bossPos) == "Vector3" then
+		marker(canvas, "Colosso", bossPos, "👑", if detailed then 26 else 18, Color3.fromRGB(255, 206, 96))
+	end
 	-- obiettivo della storia e segnaposto
 	local objective = C.HUD and C.HUD.ObjectivePosition()
 	if objective then

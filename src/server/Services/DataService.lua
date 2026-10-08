@@ -81,6 +81,8 @@ local TEMPLATE = {
 	-- mondo aperto
 	Treasures = {},
 	Bounty = 0,
+	-- eventi a tempo (Grande Inaugurazione)
+	Festival = {},
 	HorseColor = 0,
 }
 

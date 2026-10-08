@@ -14,6 +14,8 @@ local S
 -- Nome del codice (maiuscolo) -> ricompense
 local CODES = {
 	SIERIPERDUTI = { Gold = 5000, Gems = 25, Items = { PergamenaEsperienza = 1 } },
+	-- evento della Grande Inaugurazione
+	INAUGURAZIONE = { Gold = 25000, Gems = 50, Items = { PergamenaEsperienza = 2 } },
 	ARCIPELAGO = { Gold = 10000, Gems = 25 },
 	CORPODEIFALCHI = { Items = { Razione = 5, BombolaGas = 3, KitLame = 2 } },
 	BENVENUTORECLUTA = { Gold = 2500, Gems = 10, Items = { Razione = 3 } },

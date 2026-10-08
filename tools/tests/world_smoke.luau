@@ -69,7 +69,7 @@ character.PrimaryPart = root
 character.Parent = workspace
 player.Character = character
 
-local profile = { Level = 120, Treasures = {}, Gems = 0, Gold = 0, HorseColor = 0, Settings = { PvP = false }, Kills = { Players = 0 }, Bounty = 0 }
+local profile: any = { Level = 120, Treasures = {}, Gems = 0, Gold = 0, HorseColor = 0, Settings = { PvP = false }, Kills = { Players = 0 }, Bounty = 0, Festival = {} }
 local state = {}
 local S: any = {
 	WorldBuilder = WB,
@@ -152,6 +152,48 @@ if docks[1] then
 	end
 end
 
+-- EVENTO GRANDE INAUGURAZIONE ---------------------------------------------------------------------------
+local replicated = game:GetService("ReplicatedStorage")
+S.TitanService = {
+	Killed = MOCK_NEW_SIGNAL(),
+	Despawn = function() end,
+	ReleasePlayer = function() end,
+	Spawn = function(spec)
+		local model = Instance.new("Model")
+		model.Name = "ColossoProva"
+		local torso = Instance.new("Part")
+		torso.Name = "Torso"
+		torso.Parent = model
+		model.PrimaryPart = torso
+		model.Parent = workspace
+		return { Model = model, State = "Idle", Position = spec.Position, BossId = spec.Boss }
+	end,
+}
+S.PlayerService.ZoneEntered = MOCK_NEW_SIGNAL()
+local Fest = require(SERVER.Services.FestivalService)
+Fest.Init(S)
+S.FestivalService = Fest
+local okF, errF = pcall(Fest.SetOverride, true)
+check(okF, "FestivalService.SetOverride(true): " .. tostring(errF))
+check(replicated:GetAttribute("FestaAttiva") == true, "l'evento non risulta attivo")
+local festa = workspace:FindFirstChild("Festa")
+check(festa ~= nil and #festa:GetDescendants() > 200, "addobbi dell'evento non costruiti")
+LOG(("Addobbi della festa: %d pezzi"):format(festa and #festa:GetDescendants() or 0))
+local okC, errC = pcall(Fest.SpawnColossus)
+check(okC, "FestivalService.SpawnColossus: " .. tostring(errC))
+check(typeof(replicated:GetAttribute("FestaBossPos")) == "Vector3", "il Colosso d'Oro non è stato segnato sulla mappa")
+local okW, errW = pcall(Fest.FireworksAt, Vector3.new(0, 8, 0), 20)
+check(okW, "FestivalService.FireworksAt: " .. tostring(errW))
+local okA, errA = pcall(Fest.Add, player, "Titans", 30)
+check(okA, "FestivalService.Add: " .. tostring(errA))
+check(profile.Festival and profile.Festival.Done and profile.Festival.Done.Giganti == true, "la sfida dei giganti non si completa")
+local okR, errR = pcall(Fest.Ceremony, player, true)
+check(okR, "FestivalService.Ceremony: " .. tostring(errR))
+local okO, errO = pcall(Fest.SetOverride, false)
+check(okO, "FestivalService.SetOverride(false): " .. tostring(errO))
+check(workspace:FindFirstChild("Festa") == nil, "gli addobbi non vengono tolti a fine evento")
+pcall(Fest.SetOverride, true)
+
 for _, w in WARNINGS do
 	table.insert(ERRORS, "Avviso: " .. w)
 end
@@ -161,5 +203,5 @@ if #ERRORS > 0 then
 	end
 	error(("prova del mondo fallita: %d errori"):format(#ERRORS))
 end
-LOG("Prova del mondo OK: mappa, forzieri, cavallo e barca costruiti senza errori")
+LOG("Prova del mondo OK: mappa, forzieri, cavallo, barca ed evento costruiti senza errori")
 TEST_PLAYER = player

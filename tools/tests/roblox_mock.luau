@@ -907,6 +907,17 @@ function Methods.Sit(self, humanoid)
 	end
 	rawget(self, "__props").Occupant = humanoid
 end
+-- metodi che nella prova non devono fare nulla
+local function noop() end
+for _, name in { "Emit", "Clear", "AddItem", "FireClient", "FireAllClients", "FireServer", "Play", "Stop", "Pause", "Resume", "ApplyImpulse", "BreakJoints", "MoveTo", "ChangeState", "TakeDamage", "LoadCharacter", "Kick" } do
+	Methods[name] = noop
+end
+function Methods.InvokeServer(_self)
+	return nil
+end
+function Methods.GetState(_self)
+	return Enum.HumanoidStateType.Running
+end
 function Methods.GetPlayers(_self)
 	return {}
 end

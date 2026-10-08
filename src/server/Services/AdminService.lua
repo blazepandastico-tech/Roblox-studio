@@ -498,6 +498,44 @@ ACTIONS.DoubleXP = function()
 	return if on then "Esperienza doppia per tutti ATTIVA" else "Esperienza doppia disattivata"
 end
 
+-- Evento della Grande Inaugurazione (prove e gestione dal pannello)
+ACTIONS.Festival = function(admin, target, value)
+	local fest = S.FestivalService
+	if not fest then
+		return "Evento non disponibile"
+	end
+	if value == "on" then
+		fest.SetOverride(true)
+		return "Evento ACCESO per questo server"
+	elseif value == "off" then
+		fest.SetOverride(false)
+		return "Evento SPENTO per questo server"
+	elseif value == "auto" then
+		fest.SetOverride(nil)
+		return "Evento: segue le date di Shared/Data/Festival"
+	elseif value == "boss" then
+		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local spot = root and (root.Position + root.CFrame.LookVector * 140) or nil
+		task.spawn(fest.SpawnColossus, spot)
+		return "Il Colosso d'Oro sta cadendo davanti a te!"
+	elseif value == "fireworks" then
+		local root = admin.Character and admin.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			fest.FireworksAt(root.Position + root.CFrame.LookVector * 80, 30)
+		end
+		return "Fuochi d'artificio!"
+	elseif value == "ceremony" then
+		fest.Ceremony(target, true)
+		return "Cerimonia d'apertura per " .. target.DisplayName
+	elseif value == "confetti" then
+		for _, p in Players:GetPlayers() do
+			S.EventService.EffectTo(p, "Confetti", { Big = true })
+		end
+		return "Coriandoli per tutti!"
+	end
+	return nil
+end
+
 local function onAction(admin: Player, action: any, targetId: any, value: any)
 	if type(action) ~= "string" or not AdminService.IsAdmin(admin) then
 		return

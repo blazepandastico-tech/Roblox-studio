@@ -469,6 +469,9 @@ local function onChoice(player: Player, npcId: any, choiceId: any)
 		end
 		S.DataService.MarkDirty(player)
 		S.EventService.Notify(player, "🍲 Che pasto! Salute, gas e lame al massimo, +10% danni per 10 minuti.", "Successo", 4)
+		if S.FestivalService then
+			S.FestivalService.Add(player, "Meal", 1)
+		end
 	elseif choiceId == "rumor" and npc.Role == "Tavern" then
 		-- una voce su un forziere che il giocatore non ha ancora trovato
 		local missing = {}
