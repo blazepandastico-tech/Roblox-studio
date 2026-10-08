@@ -74,6 +74,7 @@
       "$className": "Workspace",
       "$properties": {
         "StreamingEnabled": true,
+        "StreamingIntegrityMode": "MinimumRadiusPause",
         "FallenPartsDestroyHeight": -1200,
         "Gravity": 196.2,
         "GlobalWind": [

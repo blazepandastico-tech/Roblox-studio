@@ -246,12 +246,43 @@ for id, quest in Quests.List do
 			check(spawns, "Quests.%s: nella zona %s non nascono giganti %s", id, t.Zone, t.Class)
 		end
 	elseif t.Kind == "Boss" then
-		check(Titans.Bosses[t.Boss] ~= nil, "Quests.%s: boss '%s' inesistente", id, t.Boss)
+		local boss = Titans.Bosses[t.Boss]
+		check(boss ~= nil, "Quests.%s: boss '%s' inesistente", id, t.Boss)
+		if boss and boss.Raid then
+			local inRaid = false
+			for _, raid in Raids.List do
+				if raid.Boss and raid.Boss.Id == t.Boss then
+					inRaid = true
+				end
+			end
+			check(inRaid, "Quests.%s: il boss '%s' è solo da raid ma nessun raid lo contiene", id, t.Boss)
+		elseif boss then
+			check(Zones.Get(boss.Zone) ~= nil, "Quests.%s: il boss '%s' non ha una zona dove comparire", id, t.Boss)
+		end
 	elseif t.Kind == "Enemy" then
 		check(Enemies.Types[t.Type] ~= nil, "Quests.%s: nemico '%s' inesistente", id, t.Type)
-		check(Zones.Get(t.Zone) ~= nil, "Quests.%s: zona '%s' inesistente", id, t.Zone)
+		local zone = Zones.Get(t.Zone)
+		check(zone ~= nil, "Quests.%s: zona '%s' inesistente", id, t.Zone)
+		if zone then
+			local spawns = false
+			for _, spawn in zone.Enemies or {} do
+				if (spawn.Type or spawn.Enemy) == t.Type then
+					spawns = true
+				end
+			end
+			check(spawns, "Quests.%s: nella zona %s non nascono nemici '%s'", id, t.Zone, t.Type)
+		end
 	elseif t.Kind == "HumanBoss" then
 		check(Enemies.Bosses[t.Boss] ~= nil, "Quests.%s: boss umano '%s' inesistente", id, t.Boss)
+		local spawnsSomewhere = false
+		for _, zone in Zones.List do
+			for _, bossId in zone.HumanBosses or {} do
+				if bossId == t.Boss then
+					spawnsSomewhere = true
+				end
+			end
+		end
+		check(spawnsSomewhere, "Quests.%s: il boss umano '%s' non compare in nessuna zona", id, t.Boss)
 	else
 		check(false, "Quests.%s: tipo di obiettivo '%s' sconosciuto", id, t.Kind)
 	end

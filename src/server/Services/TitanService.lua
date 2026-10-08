@@ -427,7 +427,7 @@ end
 
 local function startHold(t, player: Player)
 	local state = S.PlayerService.GetState(player)
-	if state.GrabbedBy or state.Transformed then
+	if state.GrabbedBy or state.Transformed or S.PlayerService.InCutscene(player) then
 		return false
 	end
 	state.GrabbedBy = t.Uid
@@ -483,6 +483,15 @@ end
 function TitanService.IsHolding(uid: any, player: Player): boolean
 	local t = titans[uid]
 	return t ~= nil and t.Holding == player and t.State ~= "Dead"
+end
+
+-- Lascia andare il giocatore senza spinte (es. all'inizio di una scena animata)
+function TitanService.ReleasePlayer(player: Player)
+	for _, t in titans do
+		if t.Holding == player then
+			releaseHold(t, "Released")
+		end
+	end
 end
 
 function TitanService.EscapePress(player: Player)
@@ -766,6 +775,10 @@ end
 
 local function isTargetable(t, entry): boolean
 	if t.Kind == "Ally" then
+		return false
+	end
+	-- chi sta guardando una scena animata non viene attaccato
+	if entry.Player and S.PlayerService.InCutscene(entry.Player) then
 		return false
 	end
 	-- nelle zone sicure (basi, città, porti) i giganti non attaccano: lì si rinasce

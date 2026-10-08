@@ -300,8 +300,17 @@ end
 
 -- DANNI -------------------------------------------------------------------------------
 
+-- Durante una scena animata (e per un attimo dopo) il giocatore è protetto
+function PlayerService.InCutscene(player: Player): boolean
+	local untilTime = player:GetAttribute("CutsceneUntil")
+	return type(untilTime) == "number" and workspace:GetServerTimeNow() < untilTime
+end
+
 function PlayerService.IsInvulnerable(player: Player): boolean
 	if player:GetAttribute("AdminGod") == true then
+		return true
+	end
+	if PlayerService.InCutscene(player) then
 		return true
 	end
 	local state = PlayerService.GetState(player)
@@ -549,10 +558,37 @@ end
 
 -- ZONE ----------------------------------------------------------------------------------
 
+-- Personaggio sparito senza un "Died" (parti distrutte, errori): dopo un po' rinasce comunque
+local MISSING_RESPAWN = Config.Player.RespawnDelay + 6
+local missingSince: { [Player]: number } = {}
+
+local function watchCharacter(player: Player, now: number)
+	if not handled[player] or not S.WorldBuilder.Ready then
+		missingSince[player] = nil
+		return
+	end
+	local root = Util.GetRoot(player.Character)
+	local humanoid = getHumanoid(player)
+	if root and humanoid and humanoid.Health > 0 then
+		missingSince[player] = nil
+		return
+	end
+	local since = missingSince[player]
+	if not since then
+		missingSince[player] = now
+	elseif now - since > MISSING_RESPAWN then
+		missingSince[player] = now
+		warn("[PlayerService] " .. player.Name .. " è rimasto senza personaggio: rinasce")
+		task.spawn(spawnCharacter, player)
+	end
+end
+
 local function trackZones()
 	while true do
 		task.wait(0.5)
+		local now = os.clock()
 		for _, player in Players:GetPlayers() do
+			watchCharacter(player, now)
 			local root = Util.GetRoot(player.Character)
 			local profile = S.DataService.Get(player)
 			if root and profile and root.Position.Y < -520 then
@@ -657,6 +693,7 @@ function PlayerService.Start()
 		states[player] = nil
 		statsCache[player] = nil
 		handled[player] = nil
+		missingSince[player] = nil
 	end)
 
 	Net.Event("AllocateStat").OnServerEvent:Connect(allocate)

@@ -99,6 +99,10 @@ local function disabled(): boolean
 	if player:GetAttribute("Transformed") or player:GetAttribute("Grabbed") then
 		return true
 	end
+	-- Durante le scene animate i rampini si staccano e il volo si ferma
+	if C and C.CameraController and C.CameraController.IsCinematic() then
+		return true
+	end
 	return false
 end
 
@@ -531,13 +535,19 @@ end
 
 -- FISICA (ogni frame) -------------------------------------------------------------------------
 
+local TELEPORT_JUMP = 150
+local lastRootPosition: Vector3? = nil
+
 local function physics(dt: number)
 	local root = rootPart()
 	local hum = humanoid()
 	if not root or not hum then
 		return
 	end
-	if disabled() then
+	-- teletrasporto (traghetti, rinascita, raid): i rampini resterebbero indietro e ti tirerebbero via
+	local jumped = lastRootPosition ~= nil and (root.Position - lastRootPosition).Magnitude > TELEPORT_JUMP
+	lastRootPosition = root.Position
+	if disabled() or jumped then
 		if next(hooks) then
 			ODMController.ReleaseAll(true)
 		end

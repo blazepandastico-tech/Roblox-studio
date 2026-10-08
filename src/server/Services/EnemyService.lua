@@ -325,7 +325,7 @@ local function think(e, now: number)
 	for _, player in Players:GetPlayers() do
 		local root = Util.GetRoot(player.Character)
 		local humanoid = Util.GetHumanoid(player.Character)
-		if root and humanoid and humanoid.Health > 0 then
+		if root and humanoid and humanoid.Health > 0 and not S.PlayerService.InCutscene(player) then
 			local d = (root.Position - e.Root.Position).Magnitude
 			if player == e.Target then
 				d *= 0.6

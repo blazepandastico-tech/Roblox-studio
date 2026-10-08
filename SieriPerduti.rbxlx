@@ -8211,7 +8211,7 @@ function AchievementService.Init(services)
 end
 
 function AchievementService.Start()
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.delay(6, function()
 			if player.Parent then
 				AchievementService.Check(player)
@@ -9488,7 +9488,7 @@ end
 
 function CommunityService.Start()
 	ReplicatedStorage:SetAttribute("GroupId", Config.GroupId)
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.spawn(checkGroup, player, false)
 		task.defer(updateFriends)
 	end)
@@ -9601,13 +9601,14 @@ local TEMPLATE = {
 
 DataService.Template = TEMPLATE
 
+local function isStudio(): boolean
+	return RunService:IsStudio()
+end
+
 local function keyFor(player: Player): string
 	return "Giocatore_" .. player.UserId
 end
 
-local function isStudio(): boolean
-	return RunService:IsStudio()
-end
 
 local function newProfile()
 	local profile = Util.DeepCopy(TEMPLATE)
@@ -9678,6 +9679,10 @@ local function loadFromStore(player: Player)
 		end
 		if not ok then
 			warn(("[DataService] Caricamento fallito per %s (tentativo %d): %s"):format(player.Name, attempt, tostring(err)))
+			-- in Studio senza accesso alle API non ha senso riprovare: si gioca subito senza salvare
+			if isStudio() then
+				return nil, "failed"
+			end
 		end
 		task.wait(if lockedByOther then 4 else 2 * attempt)
 	end
@@ -9696,19 +9701,23 @@ local function saveToStore(player: Player, release: boolean): boolean
 	local data = sanitize(snapshot(profile))
 	local key = keyFor(player)
 	for attempt = 1, 3 do
+		local written = false
 		local ok, err = pcall(function()
 			(store :: DataStore):UpdateAsync(key, function(old)
+				written = false
 				if type(old) == "table" and type(old.Lock) == "table" and old.Lock.Job ~= game.JobId then
 					-- un altro server ha preso il controllo: non sovrascrivere
 					if os.time() - (old.Lock.Time or 0) < SESSION_TIMEOUT then
 						return nil
 					end
 				end
+				written = true
 				return { Data = data, Lock = if release then nil else { Job = game.JobId, Time = os.time() } }
 			end)
 		end)
 		if ok then
-			return true
+			-- "riuscito" solo se i dati sono stati scritti davvero (non bloccati da un altro server)
+			return written
 		end
 		warn(("[DataService] Salvataggio fallito per %s (tentativo %d): %s"):format(player.Name, attempt, tostring(err)))
 		task.wait(1.5 * attempt)
@@ -9759,6 +9768,18 @@ end
 
 function DataService.Get(player: Player)
 	return profiles[player]
+end
+
+-- Come Loaded:Connect, ma chiama subito fn anche per i giocatori già caricati
+-- (così nessun servizio "perde" un giocatore entrato prima che fosse pronto)
+function DataService.OnLoaded(fn: (Player, any) -> ())
+	local connection = DataService.Loaded:Connect(fn)
+	for player, profile in profiles do
+		if player.Parent then
+			task.spawn(fn, player, profile)
+		end
+	end
+	return connection
 end
 
 function DataService.WaitFor(player: Player, timeout: number?)
@@ -10464,7 +10485,7 @@ local function think(e, now: number)
 	for _, player in Players:GetPlayers() do
 		local root = Util.GetRoot(player.Character)
 		local humanoid = Util.GetHumanoid(player.Character)
-		if root and humanoid and humanoid.Health > 0 then
+		if root and humanoid and humanoid.Health > 0 and not S.PlayerService.InCutscene(player) then
 			local d = (root.Position - e.Root.Position).Magnitude
 			if player == e.Target then
 				d *= 0.6
@@ -11105,7 +11126,7 @@ function LeaderboardService.Start()
 			pcall(buildSign, board, CFrame.lookAt(pos, Vector3.new(c.X, c.Y, pos.Z)))
 		end
 	end
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.delay(3, function()
 			if player.Parent then
 				broadcast(player)
@@ -11706,7 +11727,7 @@ function MonetizationService.Start()
 			end
 		end
 	end)
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.spawn(function()
 			refreshPasses(player)
 			dailyGifts(player)
@@ -13444,8 +13465,17 @@ end
 
 -- DANNI -------------------------------------------------------------------------------
 
+-- Durante una scena animata (e per un attimo dopo) il giocatore è protetto
+function PlayerService.InCutscene(player: Player): boolean
+	local untilTime = player:GetAttribute("CutsceneUntil")
+	return type(untilTime) == "number" and workspace:GetServerTimeNow() < untilTime
+end
+
 function PlayerService.IsInvulnerable(player: Player): boolean
 	if player:GetAttribute("AdminGod") == true then
+		return true
+	end
+	if PlayerService.InCutscene(player) then
 		return true
 	end
 	local state = PlayerService.GetState(player)
@@ -13669,7 +13699,13 @@ function PlayerService.UpdateKillStat(player: Player)
 	end
 end
 
+local handled: { [Player]: boolean } = {}
+
 local function onProfileLoaded(player: Player, profile)
+	if handled[player] then
+		return
+	end
+	handled[player] = true
 	setupLeaderstats(player, profile)
 	player.CharacterAdded:Connect(function(character)
 		onCharacterAdded(player, character)
@@ -13687,10 +13723,37 @@ end
 
 -- ZONE ----------------------------------------------------------------------------------
 
+-- Personaggio sparito senza un "Died" (parti distrutte, errori): dopo un po' rinasce comunque
+local MISSING_RESPAWN = Config.Player.RespawnDelay + 6
+local missingSince: { [Player]: number } = {}
+
+local function watchCharacter(player: Player, now: number)
+	if not handled[player] or not S.WorldBuilder.Ready then
+		missingSince[player] = nil
+		return
+	end
+	local root = Util.GetRoot(player.Character)
+	local humanoid = getHumanoid(player)
+	if root and humanoid and humanoid.Health > 0 then
+		missingSince[player] = nil
+		return
+	end
+	local since = missingSince[player]
+	if not since then
+		missingSince[player] = now
+	elseif now - since > MISSING_RESPAWN then
+		missingSince[player] = now
+		warn("[PlayerService] " .. player.Name .. " è rimasto senza personaggio: rinasce")
+		task.spawn(spawnCharacter, player)
+	end
+end
+
 local function trackZones()
 	while true do
 		task.wait(0.5)
+		local now = os.clock()
 		for _, player in Players:GetPlayers() do
+			watchCharacter(player, now)
 			local root = Util.GetRoot(player.Character)
 			local profile = S.DataService.Get(player)
 			if root and profile and root.Position.Y < -520 then
@@ -13701,6 +13764,16 @@ local function trackZones()
 					S.EventService.Notify(player, "Sei caduto nel vuoto: ti abbiamo riportato alla base.", "Info", 3)
 				end
 			elseif root and profile then
+				-- sicurezza: "afferrato" da un gigante che non esiste più (o che non ti tiene) → liberato
+				local grabState = PlayerService.GetState(player)
+				if grabState.GrabbedBy and S.TitanService and not S.TitanService.IsHolding(grabState.GrabbedBy, player) then
+					grabState.GrabbedBy = nil
+					player:SetAttribute("Grabbed", false)
+					Net.Event("Grab"):FireClient(player, false, nil, "Lost")
+				elseif not grabState.GrabbedBy and player:GetAttribute("Grabbed") == true then
+					player:SetAttribute("Grabbed", false)
+					Net.Event("Grab"):FireClient(player, false, nil, "Lost")
+				end
 				local zone = Zones.Find(root.Position)
 				local id = zone and zone.Id or ""
 				local state = PlayerService.GetState(player)
@@ -13779,15 +13852,28 @@ function PlayerService.Init(services)
 end
 
 function PlayerService.Start()
-	S.DataService.Loaded:Connect(onProfileLoaded)
+	S.DataService.OnLoaded(onProfileLoaded)
 	Players.PlayerRemoving:Connect(function(player)
 		descriptions[player] = nil
 		states[player] = nil
 		statsCache[player] = nil
+		handled[player] = nil
+		missingSince[player] = nil
 	end)
 
 	Net.Event("AllocateStat").OnServerEvent:Connect(allocate)
-	Net.Event("ClientReady").OnServerEvent:Connect(function(player)
+	Net.Event("ClientReady").OnServerEvent:Connect(function(player, request)
+		-- la schermata iniziale aspetta da troppo il personaggio: lo creiamo di nuovo
+		if request == "NoCharacter" then
+			local root = Util.GetRoot(player.Character)
+			local humanoid = getHumanoid(player)
+			if S.DataService.Get(player) and handled[player] and (not root or not humanoid or humanoid.Health <= 0) then
+				warn("[PlayerService] Personaggio mancante per " .. player.Name .. ": lo ricreo")
+				task.spawn(spawnCharacter, player)
+			end
+			S.DataService.SyncNow(player)
+			return
+		end
 		S.DataService.SyncNow(player)
 		if S.StoryService then
 			S.StoryService.OnClientReady(player)
@@ -14665,7 +14751,7 @@ function RewardsService.Start()
 		lastRequest[player] = now
 		spin(player)
 	end)
-	S.DataService.Loaded:Connect(function(player, profile)
+	S.DataService.OnLoaded(function(player, profile)
 		playState(profile)
 		player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
 		task.spawn(checkPolicy, player)
@@ -15764,8 +15850,13 @@ function ShifterService.Start()
 			player:SetAttribute("Transformed", false)
 			Net.Event("TitanForm"):FireClient(player, { On = false, Reason = "Morto" })
 		end
+		-- gli accessori messi da parte durante la trasformazione non servono più (il nuovo personaggio ha i suoi)
+		local holder = ServerStorage:FindFirstChild("Custodia_" .. player.UserId)
+		if holder then
+			holder:ClearAllChildren()
+		end
 	end)
-	S.DataService.Loaded:Connect(function(player)
+	S.DataService.OnLoaded(function(player)
 		task.defer(ShifterService.ResetEnergy, player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -16049,6 +16140,17 @@ local Items = require(Shared.Data.Items)
 local StoryService = {}
 local S
 
+-- Avvia una scena animata: il giocatore viene liberato e resta protetto finché non finisce
+local CUTSCENE_PROTECTION = 120
+
+local function sendCutscene(player: Player, cutsceneId: string)
+	player:SetAttribute("CutsceneUntil", workspace:GetServerTimeNow() + CUTSCENE_PROTECTION)
+	if S.TitanService then
+		S.TitanService.ReleasePlayer(player)
+	end
+	Net.Event("Cutscene"):FireClient(player, cutsceneId)
+end
+
 function StoryService.Current(player: Player)
 	local profile = S.DataService.Get(player)
 	if not profile or profile.Story.Done then
@@ -16095,7 +16197,7 @@ local function startStep(player: Player)
 	profile.Story.Progress = 0
 	S.DataService.MarkDirty(player)
 	if step.Type == "Cutscene" then
-		Net.Event("Cutscene"):FireClient(player, step.Cutscene)
+		sendCutscene(player, step.Cutscene)
 	elseif step.Type == "Level" then
 		if profile.Level >= step.Level then
 			task.defer(StoryService.Advance, player)
@@ -16229,7 +16331,7 @@ function StoryService.OnClientReady(player: Player)
 	if step and step.Type == "Cutscene" then
 		task.delay(1.5, function()
 			if player.Parent then
-				Net.Event("Cutscene"):FireClient(player, step.Cutscene)
+				sendCutscene(player, step.Cutscene)
 			end
 		end)
 	end
@@ -16240,6 +16342,15 @@ end
 local function spawnPickups()
 	local interactive = workspace:WaitForChild(Config.Folders.Interactive)
 	local rng = Random.new(Config.WorldSeed + 7)
+	-- gli oggetti vanno appoggiati sul terreno vero (le zone non sono tutte piatte)
+	local groundParams = RaycastParams.new()
+	groundParams.FilterType = Enum.RaycastFilterType.Include
+	local map = workspace:FindFirstChild(Config.Folders.Map)
+	groundParams.FilterDescendantsInstances = if map then { workspace.Terrain, map } else { workspace.Terrain }
+	local function onGround(pos: Vector3): Vector3
+		local hit = workspace:Raycast(pos + Vector3.new(0, 250, 0), Vector3.new(0, -500, 0), groundParams)
+		return if hit then hit.Position + Vector3.new(0, 1.2, 0) else pos
+	end
 	for _, chapter in Story.Chapters do
 		for _, step in chapter.Steps do
 			if step.Type == "Collect" then
@@ -16248,7 +16359,7 @@ local function spawnPickups()
 					for i = 1, (step.Count or 1) + 3 do
 						local a = rng:NextNumber(0, math.pi * 2)
 						local r = rng:NextNumber(10, zone.Radius * 0.8)
-						local pos = zone.Center + Vector3.new(math.cos(a) * r, 1.5, math.sin(a) * r)
+						local pos = onGround(zone.Center + Vector3.new(math.cos(a) * r, 1.5, math.sin(a) * r))
 						local item = Items.Get(step.Item)
 						local can = Instance.new("Part")
 						can.Name = "Raccoglibile_" .. step.Item .. "_" .. i
@@ -16310,15 +16421,23 @@ local function spawnPickups()
 	end
 end
 
--- Controllo periodico dei passi "Reach" con una posizione precisa
+-- Controllo periodico dei passi che si completano "da soli": posizione raggiunta, zona in cui
+-- ti trovi già, livello già raggiunto (anche con il pannello admin o i comandi di prova).
+-- Così nessun passo può restare bloccato.
 local function checkReach()
 	while true do
 		task.wait(0.5)
 		for _, player in Players:GetPlayers() do
-			local _, step = StoryService.Current(player)
-			if step and step.Type == "Reach" and step.Position then
-				local root = Util.GetRoot(player.Character)
-				if root and (root.Position - step.Position).Magnitude <= (step.Radius or 20) then
+			local _, step, profile = StoryService.Current(player)
+			if step and profile then
+				if step.Type == "Reach" and step.Position then
+					local root = Util.GetRoot(player.Character)
+					if root and (root.Position - step.Position).Magnitude <= (step.Radius or 20) then
+						StoryService.Advance(player)
+					end
+				elseif step.Type == "Reach" and step.Zone and player:GetAttribute("Zone") == step.Zone then
+					StoryService.Advance(player)
+				elseif step.Type == "Level" and profile.Level >= (step.Level or 1) then
 					StoryService.Advance(player)
 				end
 			end
@@ -16354,6 +16473,10 @@ function StoryService.Start()
 		end
 	end)
 	Net.Event("CutsceneDone").OnServerEvent:Connect(function(player, cutsceneId)
+		-- ancora un paio di secondi di protezione per riprendere i comandi
+		if S.PlayerService.InCutscene(player) then
+			player:SetAttribute("CutsceneUntil", workspace:GetServerTimeNow() + 2)
+		end
 		local _, step = StoryService.Current(player)
 		if step and step.Type == "Cutscene" and step.Cutscene == cutsceneId then
 			StoryService.Advance(player)
@@ -16875,7 +16998,7 @@ end
 
 local function startHold(t, player: Player)
 	local state = S.PlayerService.GetState(player)
-	if state.GrabbedBy or state.Transformed then
+	if state.GrabbedBy or state.Transformed or S.PlayerService.InCutscene(player) then
 		return false
 	end
 	state.GrabbedBy = t.Uid
@@ -16924,6 +17047,21 @@ local function updateHold(t)
 		t.Action = nil
 		t.Cooldowns.Grab = os.clock() + 6
 		setAttr(t, "Action", "")
+	end
+end
+
+-- Il gigante uid sta davvero tenendo in mano questo giocatore?
+function TitanService.IsHolding(uid: any, player: Player): boolean
+	local t = titans[uid]
+	return t ~= nil and t.Holding == player and t.State ~= "Dead"
+end
+
+-- Lascia andare il giocatore senza spinte (es. all'inizio di una scena animata)
+function TitanService.ReleasePlayer(player: Player)
+	for _, t in titans do
+		if t.Holding == player then
+			releaseHold(t, "Released")
+		end
 	end
 end
 
@@ -17210,6 +17348,10 @@ local function isTargetable(t, entry): boolean
 	if t.Kind == "Ally" then
 		return false
 	end
+	-- chi sta guardando una scena animata non viene attaccato
+	if entry.Player and S.PlayerService.InCutscene(entry.Player) then
+		return false
+	end
 	-- nelle zone sicure (basi, città, porti) i giganti non attaccano: lì si rinasce
 	local zone = entry.Position and Zones.Find(entry.Position)
 	if zone and zone.Safe then
@@ -17408,6 +17550,10 @@ local function think(t, roots, dt: number)
 		return
 	end
 	if t.Temporary and now > t.Temporary then
+		-- un gigante a tempo che sparisce deve lasciare andare chi teneva in mano
+		if t.Holding then
+			releaseHold(t, "Escaped")
+		end
 		t.State = "Dead"
 		setAttr(t, "State", "Dead")
 		S.EventService.Effect("TitanDeath", { Model = t.Model }, t.Position, 900)
@@ -17964,6 +18110,13 @@ local function spawnZones()
 			for _, bossId in zone.Bosses do
 				bossStates[bossId] = { Alive = nil, NextSpawn = os.clock() + rng:NextNumber(15, 60) }
 			end
+		end
+	end
+	-- tutti i boss del mondo (non solo quelli elencati nelle zone) devono comparire nella loro zona,
+	-- altrimenti i passi "Sconfiggi il boss" della storia resterebbero bloccati
+	for bossId, def in Titans.Bosses do
+		if not def.Raid and not bossStates[bossId] and Zones.Get(def.Zone) then
+			bossStates[bossId] = { Alive = nil, NextSpawn = os.clock() + rng:NextNumber(15, 60) }
 		end
 	end
 end
@@ -25000,6 +25153,10 @@ local function disabled(): boolean
 	if player:GetAttribute("Transformed") or player:GetAttribute("Grabbed") then
 		return true
 	end
+	-- Durante le scene animate i rampini si staccano e il volo si ferma
+	if C and C.CameraController and C.CameraController.IsCinematic() then
+		return true
+	end
 	return false
 end
 
@@ -25432,13 +25589,19 @@ end
 
 -- FISICA (ogni frame) -------------------------------------------------------------------------
 
+local TELEPORT_JUMP = 150
+local lastRootPosition: Vector3? = nil
+
 local function physics(dt: number)
 	local root = rootPart()
 	local hum = humanoid()
 	if not root or not hum then
 		return
 	end
-	if disabled() then
+	-- teletrasporto (traghetti, rinascita, raid): i rampini resterebbero indietro e ti tirerebbero via
+	local jumped = lastRootPosition ~= nil and (root.Position - lastRootPosition).Magnitude > TELEPORT_JUMP
+	lastRootPosition = root.Position
+	if disabled() or jumped then
 		if next(hooks) then
 			ODMController.ReleaseAll(true)
 		end
@@ -28930,6 +29093,7 @@ local startClock = os.clock()
 local orbitAngle = math.random() * math.pi * 2
 local renderConnection: RBXScriptConnection? = nil
 local nextFlash = os.clock() + 4
+local nextCharacterRequest = os.clock() + 20
 
 type Ember = { Frame: Frame, X: number, Y: number, Speed: number, Sway: number, Phase: number, Size: number }
 local embers: { Ember } = {}
@@ -29321,6 +29485,12 @@ local function step(dt: number)
 	else
 		local dots = string.rep(".", 1 + math.floor(now * 2) % 3)
 		ui.Status.Text = (if C.ClientData.Ready then "Arrivo al campo di addestramento" else "Caricamento dei progressi") .. dots
+		-- il personaggio non arriva: chiediamo al server di ricrearlo (ogni 15 secondi)
+		if not characterReady() and now >= nextCharacterRequest then
+			nextCharacterRequest = now + 15
+			ui.Status.Text = "Il caricamento sta impiegando più del solito, riprovo" .. dots
+			Net.Event("ClientReady"):FireServer("NoCharacter")
+		end
 	end
 	if C.ClientData.Ready and ui.Welcome.Text == "" then
 		ui.Welcome.Text = welcomeText()
@@ -29347,6 +29517,12 @@ function Intro.Begin()
 		ZIndex = 40,
 		Parent = C.UIController.Layers.Top,
 	})
+	-- sicurezza: il nero non resta mai sullo schermo, qualunque cosa succeda
+	task.delay(4, function()
+		if fade.Parent then
+			fade:Destroy()
+		end
+	end)
 	Theme.Tween(fade, 0.6, { BackgroundTransparency = 0 }).Completed:Wait()
 	showing = false
 	if renderConnection then
@@ -32609,6 +32785,7 @@ return UIController
       <float name="Gravity">196.2</float>
       <bool name="NeedsPivotMigration">false</bool>
       <bool name="StreamingEnabled">true</bool>
+      <token name="StreamingIntegrityMode">2</token>
     </Properties>
     <Item class="Terrain" referent="110">
       <Properties>

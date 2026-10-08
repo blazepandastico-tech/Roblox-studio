@@ -20,6 +20,17 @@ local Items = require(Shared.Data.Items)
 local StoryService = {}
 local S
 
+-- Avvia una scena animata: il giocatore viene liberato e resta protetto finché non finisce
+local CUTSCENE_PROTECTION = 120
+
+local function sendCutscene(player: Player, cutsceneId: string)
+	player:SetAttribute("CutsceneUntil", workspace:GetServerTimeNow() + CUTSCENE_PROTECTION)
+	if S.TitanService then
+		S.TitanService.ReleasePlayer(player)
+	end
+	Net.Event("Cutscene"):FireClient(player, cutsceneId)
+end
+
 function StoryService.Current(player: Player)
 	local profile = S.DataService.Get(player)
 	if not profile or profile.Story.Done then
@@ -66,7 +77,7 @@ local function startStep(player: Player)
 	profile.Story.Progress = 0
 	S.DataService.MarkDirty(player)
 	if step.Type == "Cutscene" then
-		Net.Event("Cutscene"):FireClient(player, step.Cutscene)
+		sendCutscene(player, step.Cutscene)
 	elseif step.Type == "Level" then
 		if profile.Level >= step.Level then
 			task.defer(StoryService.Advance, player)
@@ -200,7 +211,7 @@ function StoryService.OnClientReady(player: Player)
 	if step and step.Type == "Cutscene" then
 		task.delay(1.5, function()
 			if player.Parent then
-				Net.Event("Cutscene"):FireClient(player, step.Cutscene)
+				sendCutscene(player, step.Cutscene)
 			end
 		end)
 	end
@@ -342,6 +353,10 @@ function StoryService.Start()
 		end
 	end)
 	Net.Event("CutsceneDone").OnServerEvent:Connect(function(player, cutsceneId)
+		-- ancora un paio di secondi di protezione per riprendere i comandi
+		if S.PlayerService.InCutscene(player) then
+			player:SetAttribute("CutsceneUntil", workspace:GetServerTimeNow() + 2)
+		end
 		local _, step = StoryService.Current(player)
 		if step and step.Type == "Cutscene" and step.Cutscene == cutsceneId then
 			StoryService.Advance(player)

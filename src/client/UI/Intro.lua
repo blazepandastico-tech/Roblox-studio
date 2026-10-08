@@ -457,6 +457,12 @@ function Intro.Begin()
 		ZIndex = 40,
 		Parent = C.UIController.Layers.Top,
 	})
+	-- sicurezza: il nero non resta mai sullo schermo, qualunque cosa succeda
+	task.delay(4, function()
+		if fade.Parent then
+			fade:Destroy()
+		end
+	end)
 	Theme.Tween(fade, 0.6, { BackgroundTransparency = 0 }).Completed:Wait()
 	showing = false
 	if renderConnection then
