@@ -125,10 +125,10 @@ Se vai in un'isola troppo forte per te, il gioco ti avvisa, ma non ti ferma.
   dettagli (barba, baffi, cicatrice, lentiggini, guance rosse, occhiaie, nei, macchie, rughe), e uno su quattro ha
   la **faccia storta**: centinaia di migliaia di combinazioni. È solo l'aspetto: abilità, nuca, occhi da accecare, arti da
   tagliare e animazioni restano identici. I mutaforma tengono il loro aspetto riconoscibile (a blocchi).
-- **Il Vulcano dei filmati** (prologo, ritorno a Calaneth, Admin Abuse "La Caduta del Muro") è un colosso
-  anatomico senza pelle: oltre 370 pezzi tra muscoli a fasci con le fibre, tendini e fasce chiare, addominali,
-  ginocchia ossute, bende chiare a polsi e caviglie, cranio chiaro e denti scoperti
-  (`src/shared/Anim/ColossoAnatomico.lua`, foto in `assets/colosso_filmati/`). Il boss in gioco non cambia.
+- **Il Vulcano dei filmati** (prologo, ritorno a Calaneth, Admin Abuse "La Caduta del Muro") è il colosso
+  anatomico senza pelle fatto con Meshy (`assets/modelli/GiganteColosso.glb`, vedi la sezione 6c per importarlo);
+  finché non è importato si usa la versione costruita con le parti (`src/shared/Anim/ColossoAnatomico.lua`).
+  Foto e video in `assets/colosso_filmati/`. Il boss in gioco non cambia.
 - Le foto PRIMA/DOPO sono in `assets/realismo/`. Si rifanno con `python3 tools/world_photo.py <cartella>`:
   costruisce il mondo vero dal codice del gioco e lo fotografa da più punti (case, bosco, mura, giganti).
 - **Città vive**: cittadini che passeggiano per le strade (meno di notte), banchi del mercato con i tendoni
@@ -220,8 +220,23 @@ con i punti delle articolazioni e le texture incluse.
    e mandalo, così viene incluso direttamente nel progetto.
 
 Finché il modello non è importato, il Gigante della Furia usa l'aspetto costruito con le parti.
-Per convertire altri modelli: `python3 tools/mesh_titan/convert.py modello.fbx colore.png normali.png rugosita.png metallo.png uscita.glb NomeAspetto`
+Per convertire altri modelli: `python3 tools/mesh_titan/convert.py modello.fbx colore.png normali.png rugosita.png metallo.png uscita.glb NomeAspetto [--profilo colosso]`
 (poi aggiungi l'aspetto in `MeshTitan.Skins`).
+
+### Il colosso anatomico dei filmati (modello Meshy)
+
+Nei filmati (prologo, ritorno a Calaneth e Admin Abuse → 🧱 La Caduta del Muro) il Gigante Vulcano è il
+colosso anatomico senza pelle fatto con Meshy: `assets/modelli/GiganteColosso.glb` (15 parti del corpo, segnaposto
+delle articolazioni e texture PBR). Si importa come la Furia:
+
+1. In Studio: **File → Importa 3D** → `GiganteColosso.glb` → "Unisci mesh" **disattivato** → **Importa**.
+2. Premi **Play**: il gioco sposta il modello in `ReplicatedStorage → ModelliGiganti` (Output:
+   "[Giganti 3D] Modello 'Colosso' pronto"). Poi salvalo nel posto (o tasto destro → Salva su file).
+
+Viene animato dallo stesso scheletro dei giganti (si alza oltre il Muro, ruggisce, cammina, calcia il cancello).
+Finché non è importato, i filmati usano il colosso costruito con le parti (`ColossoAnatomico.lua`). Il boss in
+gioco non cambia. Video di prova dell'animazione: `python3 tools/mesh_titan/video.py assets/modelli/GiganteColosso.glb cartella`
+(il risultato è in `assets/colosso_filmati/colosso_animato.mp4`).
 
 ## 7. Codici regalo
 

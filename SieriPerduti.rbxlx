@@ -501,6 +501,7 @@ local FOLDER = "ModelliGiganti"
 -- nome dell'aspetto → colore medio della pelle (per le giunture)
 MeshTitan.Skins = {
 	Furia = Color3.fromRGB(150, 120, 88), -- il Gigante della Furia (boss, filmati e forma del siero)
+	Colosso = Color3.fromRGB(128, 34, 32), -- il colosso anatomico senza pelle dei filmati (GiganteColosso.glb)
 }
 
 -- altri nomi accettati per il modello importato
@@ -2853,8 +2854,30 @@ function TitanBuilder.Build(params): Model
 	if look == "Sagoma" then
 		return buildDummy(H, params.Name)
 	end
-	-- nei filmati il Vulcano è il colosso anatomico senza pelle (molto più dettagliato)
+	-- nei filmati il Vulcano è il colosso anatomico senza pelle: il modello 3D importato
+	-- (GiganteColosso, da Meshy) se c'è, altrimenti quello costruito con le parti
 	if params.Cinematic and look == "Vulcano" then
+		if MeshTitan.Has("Colosso") then
+			local ok, meshModel = pcall(MeshTitan.Build, { Height = H, Look = "Colosso", Seed = seed, Name = params.Name or "Vulcano", CFrame = params.CFrame })
+			if ok and meshModel then
+				local steam = Instance.new("ParticleEmitter")
+				steam.Name = "Vapore"
+				steam.Texture = "rbxasset://textures/particles/smoke_main.dds"
+				steam.Color = ColorSequence.new(Color3.fromRGB(245, 240, 235))
+				steam.LightEmission = 0.15
+				steam.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) })
+				steam.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.05), NumberSequenceKeypoint.new(1, H * 0.18) })
+				steam.Lifetime = NumberRange.new(2.5, 4)
+				steam.Rate = 6
+				steam.Speed = NumberRange.new(H * 0.03, H * 0.08)
+				steam.SpreadAngle = Vector2.new(40, 40)
+				steam.Acceleration = Vector3.new(0, H * 0.05, 0)
+				steam.Parent = meshModel:FindFirstChild("Torso")
+				meshModel:SetAttribute("JawIdle", 6)
+				return meshModel
+			end
+			warn("[Giganti 3D] Errore nel colosso dei filmati: " .. tostring(meshModel))
+		end
 		local ok, colosso = pcall(ColossoAnatomico.Build, params)
 		if ok and colosso then
 			return colosso

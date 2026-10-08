@@ -22,6 +22,7 @@ local FOLDER = "ModelliGiganti"
 -- nome dell'aspetto → colore medio della pelle (per le giunture)
 MeshTitan.Skins = {
 	Furia = Color3.fromRGB(150, 120, 88), -- il Gigante della Furia (boss, filmati e forma del siero)
+	Colosso = Color3.fromRGB(128, 34, 32), -- il colosso anatomico senza pelle dei filmati (GiganteColosso.glb)
 }
 
 -- altri nomi accettati per il modello importato

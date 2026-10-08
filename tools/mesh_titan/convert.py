@@ -2,7 +2,10 @@
 """Converte un modello di gigante (FBX statico, es. generato da Meshy) in un file .glb
 pronto per il 3D Importer di Roblox Studio, diviso nelle parti del corpo dei giganti del gioco.
 
-  python3 tools/mesh_titan/convert.py modello.fbx texture.png normal.png roughness.png metallic.png uscita.glb NomeGigante
+  python3 tools/mesh_titan/convert.py modello.fbx texture.png normal.png roughness.png metallic.png uscita.glb NomeGigante [--profilo colosso]
+
+Profili delle proporzioni: "normale" (gigante con il collo corto, es. la Furia) e "colosso"
+(gigante altissimo con la testa piccola e le spalle alte, es. il colosso anatomico dei filmati).
 
 Cosa fa:
   1. legge la geometria (vertici, poligoni, UV) dal file FBX binario;
@@ -116,6 +119,30 @@ BUDGET = {
     "UpperLeg": 900, "LowerLeg": 750, "Foot": 600,
 }
 
+# altezze delle articolazioni (altezza del gigante = 1), raggi delle ossa e triangoli per profilo
+PROFILES = {
+    "normale": {
+        "neck": 0.83, "waist": 0.60, "root": 0.52, "shoulder": (0.775, 0.122), "elbow": 0.625, "wrist": 0.485,
+        "hip_x": 0.05, "knee": 0.29, "ankle": 0.07, "eye": 0.895, "mouth": 0.86, "nape": 0.83, "head_x": 0.085,
+        "radius": {"Head": 0.045, "Torso": 0.08, "Hips": 0.05, "UpperArm": 0.03, "LowerArm": 0.025, "Hand": 0.02,
+                   "UpperLeg": 0.05, "LowerLeg": 0.032, "Foot": 0.02},
+        "budget": BUDGET,
+    },
+    # colosso anatomico: collo e spalle alti, braccia lunghe vicine al corpo, cosce grosse.
+    # Si vede da vicino nei filmati: molti più triangoli
+    "colosso": {
+        "neck": 0.9, "waist": 0.60, "root": 0.53, "shoulder": (0.815, 0.135), "elbow": 0.635, "wrist": 0.47,
+        "hip_x": 0.06, "knee": 0.30, "ankle": 0.075, "eye": 0.96, "mouth": 0.93, "nape": 0.9, "head_x": 0.05,
+        # le braccia toccano i fianchi: tra queste altezze, più vicino al centro di x è sempre busto
+        "arm_gap": (0.50, 0.79, 0.118),
+        "radius": {"Head": 0.04, "Torso": 0.11, "Hips": 0.07, "UpperArm": 0.035, "LowerArm": 0.028, "Hand": 0.024,
+                   "UpperLeg": 0.06, "LowerLeg": 0.045, "Foot": 0.028},
+        "budget": {"Head": 4500, "Torso": 9000, "Hips": 3500, "UpperArm": 2600, "LowerArm": 2000, "Hand": 2200,
+                   "UpperLeg": 3800, "LowerLeg": 2800, "Foot": 2000},
+    },
+}
+PROFILE = PROFILES["normale"]
+
 
 def to_roblox(V):
     """Porta il modello nello spazio di Roblox: Y in alto, il gigante guarda verso -Z, destra = +X.
@@ -159,52 +186,58 @@ def skeleton(P):
         s = P[m]
         return np.array([s[:, 0].mean(), t, s[:, 2].mean()])
 
-    # altezze tipiche di un corpo umano (verificate sulle sezioni del modello)
+    # altezze tipiche di un corpo umano (verificate sulle sezioni del modello, vedi PROFILES)
+    pr = PROFILE
     J = {}
-    J["Neck"] = ring(0.83)
-    J["Waist"] = ring(0.60) * np.array([0, 1, 1])
-    J["Root"] = ring(0.52) * np.array([0, 1, 1])
+    J["Neck"] = ring(pr["neck"])
+    J["Waist"] = ring(pr["waist"]) * np.array([0, 1, 1])
+    J["Root"] = ring(pr["root"]) * np.array([0, 1, 1])
+    sh_y, sh_x = pr["shoulder"]
     for sign, side in ((1, "Right"), (-1, "Left")):
         # coordinate normalizzate: altezza del gigante = 1
-        sh = ring(0.775, sign, 0.09, 0.17)
-        J[side + "Shoulder"] = np.array([sign * 0.122, 0.775, sh[2]])
-        J[side + "Elbow"] = ring(0.625, sign, 0.1, 0.25)
-        J[side + "Wrist"] = ring(0.485, sign, 0.11, 0.25)
+        sh = ring(sh_y, sign, sh_x - 0.03, sh_x + 0.05)
+        J[side + "Shoulder"] = np.array([sign * sh_x, sh_y, sh[2]])
+        J[side + "Elbow"] = ring(pr["elbow"], sign, 0.1, 0.25)
+        J[side + "Wrist"] = ring(pr["wrist"], sign, 0.11, 0.25)
         J[side + "HandTip"] = J[side + "Wrist"] + (J[side + "Wrist"] - J[side + "Elbow"]) * 0.5
-        J[side + "Hip"] = np.array([sign * 0.05, 0.52, J["Root"][2]])
-        J[side + "Knee"] = ring(0.29, sign, 0.0, 0.2)
-        J[side + "Ankle"] = ring(0.07, sign, 0.0, 0.2)
+        J[side + "Hip"] = np.array([sign * pr["hip_x"], pr["root"], J["Root"][2]])
+        J[side + "Knee"] = ring(pr["knee"], sign, 0.0, 0.2)
+        J[side + "Ankle"] = ring(pr["ankle"], sign, 0.0, 0.2)
         toe = P[(y < 0.03) & (P[:, 0] * sign > 0)]
         J[side + "Toe"] = np.array([toe[:, 0].mean(), 0.01, toe[:, 2].min()])
-    J["HeadTop"] = np.array([0, 1.0, ring(0.95)[2]])
+    J["HeadTop"] = np.array([0, 1.0, ring(0.95 + (pr["eye"] - 0.895) * 0.3)[2]])
     # volto: la superficie più avanzata della testa all'altezza degli occhi
-    face = P[(y > 0.885) & (y < 0.905) & (np.abs(P[:, 0]) < 0.03)]
+    eye = pr["eye"]
+    face = P[(y > eye - 0.01) & (y < eye + 0.01) & (np.abs(P[:, 0]) < 0.03)]
     front_z = face[:, 2].min() if len(face) else J["Neck"][2] - 0.06
     for sign, side in ((1, "Right"), (-1, "Left")):
-        J[side + "Eye"] = np.array([sign * 0.017, 0.895, front_z + 0.006])
-    mouth = P[(y > 0.855) & (y < 0.865) & (np.abs(P[:, 0]) < 0.02)]
-    J["Mouth"] = np.array([0, 0.86, (mouth[:, 2].min() if len(mouth) else front_z) + 0.005])
-    back = P[(y > 0.815) & (y < 0.845) & (np.abs(P[:, 0]) < 0.03)]
-    J["Nape"] = np.array([0, 0.83, back[:, 2].max() if len(back) else J["Neck"][2] + 0.05])
+        J[side + "Eye"] = np.array([sign * 0.017, eye, front_z + 0.006])
+    mo = pr["mouth"]
+    mouth = P[(y > mo - 0.005) & (y < mo + 0.005) & (np.abs(P[:, 0]) < 0.02)]
+    J["Mouth"] = np.array([0, mo, (mouth[:, 2].min() if len(mouth) else front_z) + 0.005])
+    na = pr["nape"]
+    back = P[(y > na - 0.015) & (y < na + 0.015) & (np.abs(P[:, 0]) < 0.03)]
+    J["Nape"] = np.array([0, na, back[:, 2].max() if len(back) else J["Neck"][2] + 0.05])
     J["Ground"] = np.array([0.0, 0.0, 0.0])
     return J
 
 
 def bones(J):
     """Segmenti (parte, inizio, fine, raggio) usati per assegnare i triangoli."""
+    r = PROFILE["radius"]
     b = [
-        ("Head", J["Neck"] + [0, 0.02, 0], J["HeadTop"], 0.045),
-        ("Torso", J["Waist"], J["Neck"], 0.08),
-        ("Hips", J["Root"] + [0, 0.01, 0], J["Waist"], 0.05),
+        ("Head", J["Neck"] + [0, 0.02, 0], J["HeadTop"], r["Head"]),
+        ("Torso", J["Waist"], J["Neck"], r["Torso"]),
+        ("Hips", J["Root"] + [0, 0.01, 0], J["Waist"], r["Hips"]),
     ]
     for side in ("Right", "Left"):
         b += [
-            (side + "UpperArm", J[side + "Shoulder"], J[side + "Elbow"], 0.03),
-            (side + "LowerArm", J[side + "Elbow"], J[side + "Wrist"], 0.025),
-            (side + "Hand", J[side + "Wrist"], J[side + "HandTip"], 0.02),
-            (side + "UpperLeg", J[side + "Hip"] + [0, 0.02, 0], J[side + "Knee"], 0.05),
-            (side + "LowerLeg", J[side + "Knee"], J[side + "Ankle"], 0.032),
-            (side + "Foot", J[side + "Ankle"], J[side + "Toe"], 0.02),
+            (side + "UpperArm", J[side + "Shoulder"], J[side + "Elbow"], r["UpperArm"]),
+            (side + "LowerArm", J[side + "Elbow"], J[side + "Wrist"], r["LowerArm"]),
+            (side + "Hand", J[side + "Wrist"], J[side + "HandTip"], r["Hand"]),
+            (side + "UpperLeg", J[side + "Hip"] + [0, 0.02, 0], J[side + "Knee"], r["UpperLeg"]),
+            (side + "LowerLeg", J[side + "Knee"], J[side + "Ankle"], r["LowerLeg"]),
+            (side + "Foot", J[side + "Ankle"], J[side + "Toe"], r["Foot"]),
         ]
     return b
 
@@ -224,7 +257,24 @@ def assign(P, T, J):
     y = P[:, 1]
     # capelli e testa: tutto sopra il collo e vicino all'asse centrale
     head = names.index("Head")
-    label_v[(y > J["Neck"][1] + 0.01) & (np.abs(P[:, 0]) < 0.085)] = head
+    label_v[(y > J["Neck"][1] + 0.01) & (np.abs(P[:, 0]) < PROFILE["head_x"])] = head
+    gap = PROFILE.get("arm_gap")
+    if gap:
+        # fianchi e dorsali non devono seguire il braccio quando si alza (resterebbero schegge sospese)
+        y0, y1, xg = gap
+        band = (y > y0) & (y < y1)
+        for side, sign in (("Right", 1), ("Left", -1)):
+            arm = [names.index(side + n) for n in ("UpperArm", "LowerArm", "Hand")]
+            inner = band & (P[:, 0] * sign < xg) & np.isin(label_v, arm)
+            label_v[inner & (y >= J["Waist"][1] - 0.03)] = names.index("Torso")
+            label_v[inner & (y < J["Waist"][1] - 0.03)] = names.index("Hips")
+            # la mano sfiora la coscia: quello che sta sulla coscia (lontano dall'asse del braccio) è gamba
+            low = (y < J["Root"][1]) & np.isin(label_v, arm)
+            if low.any():
+                d_leg = segment_distance(P, J[side + "Hip"], J[side + "Knee"])
+                d_fore = segment_distance(P, J[side + "Elbow"], J[side + "Wrist"])
+                d_hand = segment_distance(P, J[side + "Wrist"], J[side + "HandTip"])
+                label_v[low & (d_leg < 0.072) & (d_fore > 0.024) & (d_hand > 0.03)] = names.index(side + "UpperLeg")
     hips = names.index("Hips")
     # fascia del bacino: dalla vita all'inguine (prima la prendeva il busto)
     torso = names.index("Torso")
@@ -237,7 +287,46 @@ def assign(P, T, J):
     # ogni triangolo prende la parte della maggioranza dei suoi vertici
     lv = label_v[T]
     label_t = np.array([np.bincount(row, minlength=len(names)).argmax() for row in lv])
-    return names, label_t
+    return names, clean_islands(T, label_t, len(names))
+
+
+def clean_islands(T, label_t, nparts):
+    """Pezzetti staccati dal resto della loro parte (es. un lembo di coscia finito nella mano):
+    passano alla parte con cui confinano, così non volano via quando l'arto si muove."""
+    vert_tris = {}
+    for t, tri in enumerate(T):
+        for v in tri:
+            vert_tris.setdefault(int(v), []).append(t)
+    for part in range(nparts):
+        tris = np.where(label_t == part)[0]
+        if len(tris) == 0:
+            continue
+        parent = {int(t): int(t) for t in tris}
+
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+
+        for t in tris:
+            for v in T[t]:
+                for o in vert_tris[int(v)]:
+                    if o != t and label_t[o] == part:
+                        ra, rb = find(int(t)), find(int(o))
+                        if ra != rb:
+                            parent[ra] = rb
+        groups = {}
+        for t in tris:
+            groups.setdefault(find(int(t)), []).append(int(t))
+        biggest = max(len(g) for g in groups.values())
+        for g in groups.values():
+            if len(g) == biggest or len(g) > max(40, 0.04 * len(tris)):
+                continue
+            around = [label_t[o] for t in g for v in T[t] for o in vert_tris[int(v)] if label_t[o] != part]
+            if around:
+                label_t[g] = np.bincount(around, minlength=nparts).argmax()
+    return label_t
 
 
 # ---------------------------------------------------------------------------------------------
@@ -382,7 +471,10 @@ def cube(center, size):
 
 
 def main():
+    global PROFILE
     fbx, color, normal, rough, metal, out, name = sys.argv[1:8]
+    if "--profilo" in sys.argv:
+        PROFILE = PROFILES[sys.argv[sys.argv.index("--profilo") + 1]]
     scale = 20.0  # studs di altezza nel file (il gioco poi lo ridimensiona come vuole)
     V, T, UV, TUV = read_fbx(fbx)
     P = to_roblox(V)
@@ -406,7 +498,7 @@ def main():
     for i, part in enumerate(names):
         sel = label == i
         key = part.replace("Right", "").replace("Left", "")
-        verts, faces, wuv = decimate(P[...], T[sel], UV, TUV[sel], BUDGET[key])
+        verts, faces, wuv = decimate(P[...], T[sel], UV, TUV[sel], PROFILE["budget"][key])
         # vertici separati per ogni coppia (posizione, UV)
         pos = verts[faces].reshape(-1, 3) * scale
         uv = wuv.reshape(-1, 2).copy()
