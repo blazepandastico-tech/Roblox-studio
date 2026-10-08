@@ -9100,7 +9100,8 @@ local S
 
 local rng = Random.new()
 local MAX_EVENT_TITANS = 45 -- giganti dell'evento vivi tutti insieme, al massimo
-local INTRO_TIME = 8 -- secondi di animazione prima che arrivino giganti e boss
+local INTRO_SECONDS = 17 -- durata della regia d'apertura sul client (giocatori bloccati e intoccabili)
+local INTRO_TIME = INTRO_SECONDS + 1 -- giganti e boss arrivano solo quando tutti hanno ripreso i comandi
 
 type Context = {
 	Def: any,
@@ -9421,6 +9422,13 @@ function AbuseService.Launch(id: string, minutes: any): (boolean, string)
 	}
 	for _, player in Players:GetPlayers() do
 		applyBonus(player)
+		-- durante l'animazione d'apertura i giocatori sono bloccati: nessun gigante può toccarli
+		local protectedUntil = serverNow() + INTRO_SECONDS + 1
+		local old = player:GetAttribute("CutsceneUntil")
+		player:SetAttribute("CutsceneUntil", if type(old) == "number" then math.max(old, protectedUntil) else protectedUntil)
+		if S.TitanService.ReleasePlayer then
+			S.TitanService.ReleasePlayer(player)
+		end
 	end
 	publish()
 	return true, ("%s %s: %d minut%s"):format(def.Icon, def.Name, mins, if mins == 1 then "o" else "i")
@@ -24503,13 +24511,16 @@ return {}
               <string name="Source"><![CDATA[--[[
 	AbuseEventController - le animazioni degli eventi a tempo dell'Admin Abuse (prima stagione)
 	Quando un admin avvia un evento (attributo AbuseEvento di ReplicatedStorage):
-	  1. ANIMAZIONE D'APERTURA: schermata con il titolo che si schianta sullo schermo, raggi di luce,
-	     bande nere e, davanti a te nel mondo, la scena dell'evento (giganti enormi, fulmini, razzi...).
-	     Non blocca il giocatore: puoi continuare a muoverti mentre la guardi.
+	  1. ANIMAZIONE D'APERTURA (circa 16 secondi), uguale per tutti i giocatori del server:
+	     la telecamera passa alla REGIA (bande nere, titolo che si schianta sullo schermo) e mostra la scena
+	     dell'evento su un set costruito nel cielo, con inquadrature che seguono l'azione (giganti enormi,
+	     fulmini, razzi, cavalleria...). Durante l'animazione non si può fare altro: niente movimento,
+	     rampini, attacchi, menu o interfaccia (e il server rende tutti intoccabili dai giganti).
 	  2. DURANTE L'EVENTO: il cielo cambia colore, particelle attorno a te (cenere, foglie, polvere...),
 	     piccoli eventi nel cielo ogni tanto e lo striscione con il conto alla rovescia.
 	  3. FINE: il cielo torna normale e compare "EVENTO TERMINATO".
-	Chi entra a evento già iniziato vede subito cielo e striscione (senza l'animazione d'apertura).
+	Chi entra a evento già iniziato vede subito cielo e striscione; chi è dentro una scena della storia
+	vede solo il titolo (senza regia).
 	Tutto è solo grafico e viene calcolato da ogni client.
 ]]
 
@@ -24569,6 +24580,15 @@ type Mover = { Model: Model?, Part: BasePart?, Path: (number) -> CFrame, Start: 
 local movers: { Mover } = {}
 local followers: { () -> () } = {}
 
+-- regia: quando è attiva la telecamera segue l'inquadratura attuale (camShot) e il giocatore è bloccato
+local cinematic = false
+type Shot = { Path: (number) -> CFrame, Start: number, Duration: number }
+local camShot: Shot? = nil
+
+local function shotPath(path: (number) -> CFrame, duration: number)
+	camShot = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration) }
+end
+
 local function moveAlong(target: Instance, path: (number) -> CFrame, duration: number, done: (() -> ())?)
 	local m: Mover = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration), Done = done }
 	if target:IsA("Model") then
@@ -24614,7 +24634,16 @@ local function step(dt: number)
 		pcall(f)
 	end
 	for _, a in animators do
+		a.Context.Phase = (a.Context.Phase or 0) + dt * 3 * (a.Context.Move or 0)
 		a:Update(dt)
+	end
+	local s = camShot
+	if cinematic and s then
+		local k = math.clamp((now - s.Start) / s.Duration, 0, 1)
+		local cam = workspace.CurrentCamera
+		cam.CameraType = Enum.CameraType.Scriptable
+		local wobble = if C.CameraController and C.CameraController.CinematicShake then C.CameraController.CinematicShake() else CFrame.identity
+		cam.CFrame = s.Path(k) * wobble
 	end
 end
 
@@ -24672,30 +24701,116 @@ local function groundAt(position: Vector3, fallbackY: number): Vector3
 	return if hit then hit.Position else Vector3.new(position.X, fallbackY, position.Z)
 end
 
--- Il "palco" dell'animazione: davanti alla telecamera, a "distance" passi
-type Stage = { Origin: Vector3, Fwd: Vector3, Right: Vector3, Center: Vector3, ToCamera: CFrame }
-local function stage(distance: number): Stage
-	local cam = workspace.CurrentCamera.CFrame
-	local fwd = Util.SafeUnit(Util.Flat(cam.LookVector), Vector3.new(0, 0, -1))
-	local origin = cam.Position
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local baseY = if root then root.Position.Y - 3 else origin.Y - 20
-	local center = groundAt(origin + fwd * distance, baseY)
-	local right = fwd:Cross(Vector3.yAxis)
+-- IL SET NEL CIELO E LA REGIA ---------------------------------------------------------------------------
+-- Le animazioni si girano su un set costruito sopra il mondo (come il prologo della storia):
+-- nessuna collina o casa copre la scena e tutti i giocatori vedono la stessa cosa, ovunque siano.
+-- Sul set: x = destra/sinistra, z = lontano (+) o verso la telecamera (-), y = altezza.
+
+local SET = Vector3.new(-2600, 3300, 2600)
+
+type Stage = { Center: Vector3, Fwd: Vector3, Right: Vector3, ToCamera: CFrame, Away: CFrame }
+
+local function setStage(groundColor: Color3, material: Enum.Material): Stage
+	for gx = -1, 1 do
+		for gz = -1, 1 do
+			part({ Name = "Terreno", Size = Vector3.new(2048, 8, 2048), CFrame = CFrame.new(SET + Vector3.new(gx * 2040, -4, gz * 2040)), Material = material, Color = groundColor })
+		end
+	end
+	local fwd = Vector3.new(0, 0, -1)
 	return {
-		Origin = origin,
+		Center = SET,
 		Fwd = fwd,
-		Right = right,
-		Center = center,
-		ToCamera = CFrame.lookAt(Vector3.zero, Vector3.new(-fwd.X, 0, -fwd.Z)),
+		Right = fwd:Cross(Vector3.yAxis),
+		ToCamera = CFrame.lookAt(Vector3.zero, -fwd),
+		Away = CFrame.lookAt(Vector3.zero, fwd),
 	}
 end
 
--- punto del palco: x = destra/sinistra, z = più lontano (+) o più vicino (-) rispetto al centro
-local function at(st: Stage, x: number, z: number): Vector3
-	local p = st.Center + st.Right * x + st.Fwd * z
-	return groundAt(p, st.Center.Y)
+-- punto del set
+local function at(st: Stage, x: number, z: number, y: number?): Vector3
+	return st.Center + st.Right * x + st.Fwd * z + Vector3.new(0, y or 0, 0)
 end
+
+-- spostamento sul set (per le telecamere che seguono un gigante)
+local function rel(st: Stage, x: number, z: number, y: number?): Vector3
+	return st.Right * x + st.Fwd * z + Vector3.new(0, y or 0, 0)
+end
+
+local function look(from: Vector3, target: Vector3): CFrame
+	return CFrame.lookAt(from, target)
+end
+
+-- l'inquadratura va da "from" a "to" in "duration" secondi (senza attendere)
+local function shot(from: CFrame, to: CFrame, duration: number, style: string?)
+	shotPath(function(k)
+		return from:Lerp(to, Util.Ease(k, style or "SineInOut"))
+	end, duration)
+end
+
+local HOUSE_WALLS = { Color3.fromRGB(226, 214, 190), Color3.fromRGB(214, 200, 172), Color3.fromRGB(236, 226, 206), Color3.fromRGB(206, 196, 180) }
+
+-- una casa del distretto: muri, tetto a due falde e qualche trave scura
+local function house(base: Vector3, w: number, h: number, yaw: number)
+	local origin = CFrame.new(base) * CFrame.Angles(0, yaw, 0)
+	local d = w * 0.8
+	part({ Name = "Casa", Size = Vector3.new(w, h, d), CFrame = origin * CFrame.new(0, h / 2, 0), Material = Enum.Material.Plaster, Color = HOUSE_WALLS[rng:NextInteger(1, #HOUSE_WALLS)] })
+	part({ Name = "Trave", Size = Vector3.new(w + 0.4, 1.2, d + 0.4), CFrame = origin * CFrame.new(0, 12, 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(86, 60, 42) })
+	local roofColor = Color3.fromRGB(166, 78, 52):Lerp(Color3.fromRGB(116, 58, 44), rng:NextNumber())
+	local roofH = w * 0.4
+	part({ ClassName = "WedgePart", Name = "Tetto", Size = Vector3.new(w + 2, roofH, d / 2 + 1), CFrame = origin * CFrame.new(0, h + roofH / 2, -d / 4), Material = Enum.Material.ClayRoofTiles, Color = roofColor })
+	part({ ClassName = "WedgePart", Name = "Tetto", Size = Vector3.new(w + 2, roofH, d / 2 + 1), CFrame = origin * CFrame.new(0, h + roofH / 2, d / 4) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.ClayRoofTiles, Color = roofColor })
+end
+
+-- un distretto di case tra x0..x1 e z0..z1, tranne dove "avoid" dice di no (strade, piazze)
+local function district(st: Stage, x0: number, x1: number, z0: number, z1: number, avoid: (number, number) -> boolean)
+	local stepSize = 44
+	local x = x0
+	while x <= x1 do
+		local z = z0
+		while z <= z1 do
+			local px, pz = x + rng:NextNumber(-6, 6), z + rng:NextNumber(-6, 6)
+			if rng:NextNumber() < 0.72 and not avoid(px, pz) then
+				house(at(st, px, pz), rng:NextNumber(18, 26), rng:NextInteger(2, 3) * 12, if rng:NextNumber() < 0.5 then 0 else math.pi / 2)
+			end
+			z += stepSize
+		end
+		x += stepSize
+	end
+end
+
+-- la foresta degli alberi giganti (tranne dove "avoid" dice di no)
+local function forest(st: Stage, avoid: (number, number) -> boolean)
+	local stepSize = 125
+	local x = -1000
+	while x <= 1000 do
+		local z = -600
+		while z <= 900 do
+			local px, pz = x + rng:NextNumber(-35, 35), z + rng:NextNumber(-35, 35)
+			if not avoid(px, pz) then
+				local base = at(st, px, pz)
+				local h = rng:NextNumber(220, 290)
+				local r = rng:NextNumber(22, 30)
+				part({ Name = "Tronco", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, r, r), CFrame = CFrame.new(base + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 50):Lerp(Color3.fromRGB(70, 52, 40), rng:NextNumber()) })
+				for j = 1, 3 do
+					local size = rng:NextNumber(90, 140)
+					part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = CFrame.new(base + Vector3.new(rng:NextNumber(-35, 35), h + (j - 2) * 34, rng:NextNumber(-35, 35))), Material = Enum.Material.Grass, Color = Color3.fromRGB(52, 98, 46):Lerp(Color3.fromRGB(88, 128, 58), rng:NextNumber()) })
+				end
+			end
+			z += stepSize
+		end
+		x += stepSize
+	end
+end
+
+-- colline erbose che chiudono l'orizzonte
+local function hills(st: Stage, count: number, color: Color3, keepClear: number)
+	for _ = 1, count do
+		local x = rng:NextNumber(keepClear, 1100) * (if rng:NextNumber() < 0.5 then -1 else 1)
+		local size = rng:NextNumber(220, 420)
+		part({ Name = "Collina", Shape = Enum.PartType.Ball, Size = Vector3.one * size, CFrame = CFrame.new(at(st, x, rng:NextNumber(300, 1300), -size * 0.32)), Material = Enum.Material.Grass, Color = color:Lerp(Color3.new(0, 0, 0), rng:NextNumber(0, 0.15)) })
+	end
+end
+
 
 -- Un gigante costruito sul client, animato (Walk, Animate) e sempre in piedi sul punto "ground"
 local function titan(look: string, height: number, ground: Vector3, facing: CFrame): Model
@@ -24770,34 +24885,39 @@ local function glowLight(parent: Instance, color: Color3, range: number, brightn
 	return light
 end
 
--- Pezzo di muro (con o senza cancello) perpendicolare alla direzione dello sguardo
-local function wallSegment(st: Stage, z: number, width: number, height: number): { BasePart }
+-- Il Muro sul set (perpendicolare alla telecamera) con al centro:
+--   "Cancello" (cancello di legno chiuso), "Aperto" (arco aperto) o "Breccia" (buco con macerie)
+local function wallSegment(st: Stage, z: number, width: number, height: number, middle: string): { BasePart }
 	local parts = {}
 	local seg = 70
 	local n = math.floor(width / seg / 2)
 	local rot = st.ToCamera.Rotation
+	local gateH = height * 0.42
 	for i = -n, n do
 		local p = at(st, i * seg, z)
 		if i == 0 then
-			local gateH = height * 0.45
-			table.insert(parts, part({ Name = "Cancello", Size = Vector3.new(seg * 0.62, gateH, 8), CFrame = CFrame.new(p + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(86, 60, 40) }))
-			table.insert(parts, part({ Name = "Arco", Size = Vector3.new(seg + 1, height - gateH, 30), CFrame = CFrame.new(p + Vector3.new(0, gateH + (height - gateH) / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
-			table.insert(parts, part({ Name = "Spalla", Size = Vector3.new(seg * 0.2, gateH, 30), CFrame = CFrame.new(p + st.Right * seg * 0.41 + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
-			table.insert(parts, part({ Name = "Spalla", Size = Vector3.new(seg * 0.2, gateH, 30), CFrame = CFrame.new(p - st.Right * seg * 0.41 + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+			if middle == "Breccia" then
+				for _ = 1, 9 do
+					local s = rng:NextNumber(10, 24)
+					table.insert(parts, part({ Name = "Maceria", Size = Vector3.new(s, s * 0.7, s), CFrame = CFrame.new(p + st.Right * rng:NextNumber(-30, 30) + st.Fwd * rng:NextNumber(-25, 25) + Vector3.new(0, s * 0.3, 0)) * CFrame.Angles(rng:NextNumber(0, 1), rng:NextNumber(0, 6), rng:NextNumber(0, 1)), Material = Enum.Material.Slate, Color = STONE }))
+				end
+			else
+				if middle == "Cancello" then
+					table.insert(parts, part({ Name = "Cancello", Size = Vector3.new(seg * 0.62, gateH, 8), CFrame = CFrame.new(p + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(86, 60, 40) }))
+				end
+				table.insert(parts, part({ Name = "Arco", Size = Vector3.new(seg + 1, height - gateH, 30), CFrame = CFrame.new(p + Vector3.new(0, gateH + (height - gateH) / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+				table.insert(parts, part({ Name = "Spalla", Size = Vector3.new(seg * 0.2, gateH, 30), CFrame = CFrame.new(p + st.Right * seg * 0.41 + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+				table.insert(parts, part({ Name = "Spalla", Size = Vector3.new(seg * 0.2, gateH, 30), CFrame = CFrame.new(p - st.Right * seg * 0.41 + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+			end
 		else
 			table.insert(parts, part({ Name = "Muro", Size = Vector3.new(seg + 1, height, 30), CFrame = CFrame.new(p + Vector3.new(0, height / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE:Lerp(Color3.new(0.6, 0.58, 0.54), rng:NextNumber(0, 0.2)) }))
+			-- camminamento in cima
+			table.insert(parts, part({ Name = "Merli", Size = Vector3.new(seg + 1, 5, 34), CFrame = CFrame.new(p + Vector3.new(0, height + 2.5, 0)) * rot, Material = Enum.Material.Slate, Color = Color3.fromRGB(150, 144, 132) }))
 		end
 	end
 	return parts
 end
 
-local function fadeOut(parts: { Instance }, time: number)
-	for _, p in parts do
-		if p:IsA("BasePart") and p.Parent then
-			TweenService:Create(p, TweenInfo.new(time), { Transparency = 1 }):Play()
-		end
-	end
-end
 
 -- Razzo di segnalazione con scia di fumo colorato (verde, rosso, nero, giallo)
 local FLARE_COLORS = {
@@ -24993,12 +25113,18 @@ local function bonusText(def): string
 	return table.concat(parts, "  •  ")
 end
 
--- La schermata del titolo: lampo, bande nere, raggi, titolo che si schianta, testo a macchina da scrivere
-local function playCard(def, minutes: number, token: number)
+-- La schermata del titolo: lampo, bande nere, raggi, titolo che si schianta, testo a macchina da scrivere.
+-- Con la regia (cinematic) il titolo resta solo all'inizio, poi il testo scorre nella banda nera in basso
+-- e la durata in quella in alto, mentre la scena continua; le bande si tolgono alla fine (endCinematic).
+local function playCard(def, minutes: number, token: number, cinematic: boolean)
 	local c = card
 	if not c then
 		return
 	end
+	local exitAt = if cinematic then 3.3 else 6.6
+	c.Text.Position = if cinematic then UDim2.fromScale(0.5, 0.9) else UDim2.fromScale(0.5, 0.58)
+	c.Text.Size = if cinematic then UDim2.new(0.8, 0, 0.09, 0) else UDim2.new(0.62, 0, 0, 60)
+	c.Chip.Position = if cinematic then UDim2.fromScale(0.5, 0.06) else UDim2.fromScale(0.5, 0.72)
 	local color = def.Color
 	c.Root.Visible = true
 	c.Flash.BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.55)
@@ -25074,7 +25200,8 @@ local function playCard(def, minutes: number, token: number)
 	end)
 	-- testo a macchina da scrivere
 	c.Text.Text = ""
-	task.delay(1.9, function()
+	c.Text.TextTransparency = 0
+	task.delay(if cinematic then 3.4 else 1.9, function()
 		local full = def.Text
 		local len = utf8.len(full) or #full
 		for i = 1, len do
@@ -25095,7 +25222,7 @@ local function playCard(def, minutes: number, token: number)
 	c.Chip.BackgroundTransparency = 1
 	c.ChipStroke.Color = color
 	c.ChipStroke.Transparency = 1
-	task.delay(2.4, function()
+	task.delay(if cinematic then 3.4 else 2.4, function()
 		if token ~= showToken then
 			return
 		end
@@ -25114,8 +25241,8 @@ local function playCard(def, minutes: number, token: number)
 		c.Rays.Rotation = t * 12
 		c.IconScale.Scale = math.max(c.IconScale.Scale, 1.1 + math.sin(t * 3) * 0.05)
 	end)
-	-- uscita: tutto sfuma, le bande si ritirano
-	task.delay(6.6, function()
+	-- uscita: il titolo sfuma (senza regia anche il testo e le bande)
+	task.delay(exitAt, function()
 		if token ~= showToken then
 			return
 		end
@@ -25130,6 +25257,9 @@ local function playCard(def, minutes: number, token: number)
 		tween(c.TitleScale, 0.6, { Scale = 0.8 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		tween(c.Episode, 0.5, { TextTransparency = 1 })
 		tween(c.EpisodeStroke, 0.5, { Transparency = 1 })
+		if cinematic then
+			return
+		end
 		tween(c.Text, 0.5, { TextTransparency = 1 })
 		tween(c.Chip, 0.5, { TextTransparency = 1, BackgroundTransparency = 1 })
 		tween(c.ChipStroke, 0.5, { Transparency = 1 })
@@ -25143,6 +25273,8 @@ local function playCard(def, minutes: number, token: number)
 		end)
 	end)
 end
+
+
 
 -- Fine dell'evento: scritta "EVENTO TERMINATO" che appare e sparisce
 local function playOutro(def)
@@ -25336,36 +25468,57 @@ local AMBIENT_EVENTS: { [string]: { Every: { number }, Run: () -> () } } = {
 	},
 }
 
--- LE ANIMAZIONI D'APERTURA ------------------------------------------------------------------------------
+-- LE ANIMAZIONI D'APERTURA (con la regia) ----------------------------------------------------------------
+-- Ogni scena dura circa INTRO_LENGTH secondi: nei primi 3 c'è il titolo sopra un'inquadratura tranquilla,
+-- poi parte l'azione. "after(t, fn)" fa succedere fn dopo t secondi (si ferma se parte un'altra scena).
+
+local INTRO_LENGTH = 15.6
 
 local SHOWS: { [string]: ((number, () -> ()) -> ()) -> () } = {}
 
--- 🧱 La Caduta del Muro: il Vulcano si alza oltre il Muro tra fulmini e vapore e sfonda il cancello
-SHOWS.CadutaMuro = function(after)
-	local st = stage(600)
-	local wall = wallSegment(st, -80, 900, 150)
-	local gate: BasePart? = nil
-	for _, p in wall do
-		if p.Name == "Cancello" then
-			gate = p
-		end
+local function roarAt(model: Model, height: number, color: Color3, pitch: number)
+	animate(model, "Roar")
+	playSound("Roar", nil, 1, pitch)
+	shake(0.8, 1.6)
+	local head = headPosition(model, height)
+	for i = 0, 3 do
+		task.delay(i * 0.2, function()
+			if fx() and model.Parent then
+				fx().Shockwave(head, height * 3 + i * height * 1.6, color, 1.2, 3)
+			end
+		end)
 	end
-	local spot = st.Center
+end
+
+-- 🧱 La Caduta del Muro: il distretto tranquillo, il fulmine, il Vulcano che si alza oltre il Muro e il calcio al cancello
+SHOWS.CadutaMuro = function(after)
+	local st = setStage(Color3.fromRGB(118, 108, 92), Enum.Material.Ground)
+	district(st, -360, 360, -640, -80, function(x, _)
+		return math.abs(x) < 30
+	end)
+	local wall = wallSegment(st, 0, 1400, 160, "Cancello")
+	local spot = at(st, 0, 85)
 	local face = st.ToCamera
 	local vulcano = titan("Vulcano", 190, spot - Vector3.new(0, 215, 0), face)
-	local glow = glowLight(vulcano.PrimaryPart or vulcano, Color3.fromRGB(255, 140, 60), 160, 0)
-	shake(0.25, 1.6)
-	playSound("Thunder", nil, 0.7, 0.2)
-	after(0.7, function()
-		goldenStrike(spot + Vector3.new(0, 30, 0), 14)
-		goldenStrike(spot + st.Right * 60, 7)
+	local glow = glowLight(vulcano.PrimaryPart or vulcano, Color3.fromRGB(255, 140, 60), 180, 0)
+	-- 1. la strada del distretto verso il cancello: tutto tranquillo (sotto il titolo)
+	shot(look(at(st, 10, -400, 7), at(st, 0, 0, 70)), look(at(st, 6, -340, 7), at(st, 0, 0, 80)), 3.8)
+	after(2.6, function()
+		shake(0.25, 1.4)
+		playSound("Thunder", nil, 0.7, 0.2)
+	end)
+	-- 2. il fulmine dorato oltre il Muro e il gigante che si alza: la telecamera guarda in su
+	after(3.7, function()
+		shot(look(at(st, -40, -240, 10), at(st, 0, 80, 140)), look(at(st, -36, -250, 10), at(st, 0, 80, 235)), 3.8)
+		goldenStrike(spot + Vector3.new(0, 30, 0), 16)
+		goldenStrike(spot + st.Right * 80, 8)
 		if fx() then
-			fx().Flash(Color3.fromRGB(255, 240, 200), 0.7, 0.9)
+			fx().Flash(Color3.fromRGB(255, 240, 200), 0.75, 0.9)
 			fx().Explosion(spot + Vector3.new(0, 50, 0), 70, true)
 		end
 		steamBurst(spot + Vector3.new(0, 80, 0), 200, 40, 7, Color3.fromRGB(255, 230, 210))
 	end)
-	after(0.9, function()
+	after(3.9, function()
 		tweenTo(vulcano, standing(vulcano, spot, face), 3.4, "QuadOut")
 		TweenService:Create(glow, TweenInfo.new(2), { Brightness = 4 }):Play()
 		for i = 0, 10 do
@@ -25375,95 +25528,106 @@ SHOWS.CadutaMuro = function(after)
 		end
 		shake(0.45, 3.2)
 	end)
-	after(4.5, function()
-		animate(vulcano, "Roar")
-		playSound("Roar", nil, 1, 0.16)
-		shake(0.7, 1.6)
+	-- 3. primo piano: la testa oltre il Muro urla
+	after(7.5, function()
 		local head = headPosition(vulcano, 190)
-		for i = 0, 3 do
-			task.delay(i * 0.22, function()
-				if fx() then
-					fx().Shockwave(head, 260 + i * 120, Color3.fromRGB(255, 190, 120), 1.2, 4)
-				end
-			end)
-		end
-		steamBurst(head, 160, 30, 6, Color3.fromRGB(255, 240, 230))
+		shot(look(at(st, 100, -160, 168), head), look(at(st, 70, -100, 176), head), 2.4)
 	end)
-	after(6.2, function()
+	after(7.8, function()
+		roarAt(vulcano, 190, Color3.fromRGB(255, 190, 120), 0.16)
+		steamBurst(headPosition(vulcano, 190), 160, 30, 6, Color3.fromRGB(255, 240, 230))
+	end)
+	-- 4. dai tetti del distretto: il calcio e il cancello che esplode
+	after(9.9, function()
+		shot(look(at(st, -150, -480, 72), at(st, 0, 0, 50)), look(at(st, -128, -440, 64), at(st, 0, 0, 45)), 3)
+	end)
+	after(10.1, function()
 		animate(vulcano, "Kick")
 	end)
-	after(6.8, function()
-		local g = if gate then gate.Position else at(st, 0, -80)
-		if gate then
-			gate:Destroy()
-		end
+	after(10.7, function()
+		local g = at(st, 0, 0, 30)
 		for _, p in wall do
-			if p.Parent and (p.Position - g).Magnitude < 60 then
+			if p.Parent and (Util.Flat(p.Position - g)).Magnitude < 60 then
 				p:Destroy()
 			end
 		end
 		local f = fx()
 		if f then
 			f.Explosion(g, 60, true)
-			f.DebrisBurst(g + Vector3.new(0, 20, 0), 45, 9, STONE, Enum.Material.Slate, 240)
-			f.Shockwave(g + Vector3.new(0, 2, 0), 320, Color3.fromRGB(255, 220, 180), 1.2, 4)
+			f.DebrisBurst(g, 50, 9, STONE, Enum.Material.Slate, 260)
+			f.Shockwave(at(st, 0, 0, 2), 340, Color3.fromRGB(255, 220, 180), 1.2, 4)
 			f.Flash(Color3.fromRGB(255, 236, 210), 0.55, 0.7)
 		end
-		steamBurst(g + Vector3.new(0, 30, 0), 140, 30, 6, Color3.fromRGB(200, 186, 170))
+		steamBurst(g, 150, 30, 6, Color3.fromRGB(200, 186, 170))
 		playSound("Explosion", nil, 1, 0.35)
 		shake(1.3, 1.5)
 	end)
-	after(10, function()
+	-- 5. dall'alto: il vapore copre la breccia e il gigante sparisce
+	after(12.9, function()
+		shot(look(at(st, 170, -330, 120), at(st, 0, 0, 60)), look(at(st, 250, -580, 290), at(st, 0, 20, 50)), 2.8, "QuadOut")
 		steamBurst(spot + Vector3.new(0, 100, 0), 240, 50, 6, Color3.fromRGB(255, 240, 230))
-		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 230, 0), face), 3.5, "QuadIn")
-		fadeOut(wall, 3.5)
+		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 230, 0), face), 3.2, "QuadIn")
 	end)
 end
 
--- 🛡️ La Carica del Bastione: passi che fanno tremare la terra, la carica e lo schianto contro il Muro
+-- 🛡️ La Carica del Bastione: la polvere all'orizzonte, la corsa, lo schianto contro il cancello e l'urlo
 SHOWS.CaricaBastione = function(after)
-	local st = stage(340)
-	local wall = wallSegment(st, 0, 700, 110)
-	local face = st.ToCamera
-	local startPos = at(st, 0, 820)
-	local endPos = at(st, 0, -50)
-	local bastione = titan("Bastione", 72, startPos, face)
-	walk(bastione, 1, 1)
-	animate(bastione, "Charge")
-	local hit = false
-	local duration = 5.4
-	local start = os.clock()
-	moveAlong(bastione, function(k)
-		local p = startPos:Lerp(endPos, k)
-		local hip = (bastione:GetAttribute("EventoHip") :: number?) or 30
-		return CFrame.new(p + Vector3.new(0, hip + math.abs(math.sin(k * 40)) * 2, 0)) * face.Rotation
-	end, duration, function()
-		walk(bastione, 0)
-		animate(bastione, "Roar")
-		playSound("Roar", nil, 1, 0.2)
-		shake(0.6, 1.2)
-		if fx() then
-			fx().HighlightModel(bastione, Color3.fromRGB(255, 220, 140), 1.5, 0.4)
-		end
+	local st = setStage(Color3.fromRGB(150, 138, 100), Enum.Material.Ground)
+	hills(st, 10, Color3.fromRGB(120, 130, 80), 260)
+	district(st, -360, 360, -560, -110, function(x, _)
+		return math.abs(x) < 32
 	end)
-	-- passi sempre più forti
-	task.spawn(function()
+	local wall = wallSegment(st, 0, 1400, 120, "Cancello")
+	local face = st.ToCamera
+	local startPos = at(st, 0, 980)
+	local endPos = at(st, 0, -70)
+	local bastione = titan("Bastione", 72, startPos, face)
+	local hip = (bastione:GetAttribute("EventoHip") :: number?) or 30
+	walk(bastione, 1, 1)
+	local runStart, runTime = 1.0, 7.0
+	local hitAt = runStart + runTime * (980 / 1050)
+	-- 1. dall'alto del Muro: una nube di polvere all'orizzonte che si avvicina
+	shot(look(at(st, 50, -16, 136), at(st, 0, 900, 30)), look(at(st, 44, -16, 134), at(st, 0, 760, 36)), 3.4)
+	after(runStart, function()
+		animate(bastione, "Charge")
+		moveAlong(bastione, function(k)
+			local p = startPos:Lerp(endPos, k)
+			return CFrame.new(p + Vector3.new(0, hip + math.abs(math.sin(k * 44)) * 2, 0)) * face.Rotation
+		end, runTime, function()
+			walk(bastione, 0)
+			roarAt(bastione, 72, Color3.fromRGB(255, 230, 170), 0.2)
+			if fx() then
+				fx().HighlightModel(bastione, Color3.fromRGB(255, 220, 140), 1.5, 0.4)
+			end
+		end)
+		-- passi sempre più forti
 		local token = showToken
-		while token == showToken and os.clock() - start < duration do
-			local k = (os.clock() - start) / duration
+		local start = os.clock()
+		local function stepOnce()
+			if token ~= showToken or os.clock() - start > runTime or not bastione.Parent then
+				return
+			end
+			local k = (os.clock() - start) / runTime
 			playSound("Land", nil, 0.6 + k * 0.4, 0.2)
 			shake(0.12 + k * 0.4, 0.3)
-			local feet = bastione:GetPivot().Position - Vector3.new(0, (bastione:GetAttribute("EventoHip") :: number?) or 30, 0)
-			steamBurst(feet, 30, 4, 2.5, Color3.fromRGB(196, 170, 130))
-			task.wait(0.42)
+			steamBurst(bastione:GetPivot().Position - Vector3.new(0, hip, 0), 34, 4, 2.5, Color3.fromRGB(196, 170, 130))
+			task.delay(0.42, stepOnce)
 		end
+		stepOnce()
 	end)
-	after(duration * (820 / 870), function()
-		if hit then
-			return
-		end
-		hit = true
-		local g = at(st, 0, 0) + Vector3.new(0, 40, 0)
+	-- 2. la telecamera corre accanto al Bastione
+	after(3.4, function()
+		shotPath(function(_)
+			local p = bastione:GetPivot().Position
+			return look(p + rel(st, 120, 40, -14), p + Vector3.new(0, 6, 0))
+		end, 2.5)
+	end)
+	-- 3. dietro il cancello: lo schianto
+	after(5.9, function()
+		shot(look(at(st, 0, -200, 16), at(st, 0, 0, 45)), look(at(st, 0, -186, 14), at(st, 0, 0, 50)), 2.5)
+	end)
+	after(hitAt, function()
+		local g = at(st, 0, 0, 40)
 		for _, p in wall do
 			if p.Parent and (Util.Flat(p.Position - g)).Magnitude < 110 then
 				p:Destroy()
@@ -25472,72 +25636,87 @@ SHOWS.CaricaBastione = function(after)
 		local f = fx()
 		if f then
 			f.Explosion(g, 70, true)
-			f.DebrisBurst(g, 60, 10, STONE, Enum.Material.Slate, 260)
-			f.Shockwave(g - Vector3.new(0, 38, 0), 360, Color3.fromRGB(255, 230, 180), 1.3, 4)
+			f.DebrisBurst(g, 60, 10, STONE, Enum.Material.Slate, 280)
+			f.Shockwave(at(st, 0, 0, 2), 380, Color3.fromRGB(255, 230, 180), 1.3, 4)
 			f.Flash(Color3.fromRGB(255, 240, 220), 0.6, 0.6)
 		end
-		steamBurst(g, 150, 30, 5, Color3.fromRGB(200, 180, 150))
+		steamBurst(g, 160, 30, 5, Color3.fromRGB(200, 180, 150))
 		playSound("Explosion", nil, 1, 0.3)
 		shake(1.4, 1.4)
 	end)
+	-- 4. dal basso: il Bastione nella breccia urla e si indurisce
 	after(8.4, function()
+		shot(look(at(st, -46, -165, 5), at(st, 0, -70, 60)), look(at(st, -34, -150, 5), at(st, 0, -70, 68)), 4)
+	end)
+	after(10.7, function()
 		animate(bastione, "Harden")
 		if fx() then
 			fx().Sparks(headPosition(bastione, 72), Color3.fromRGB(255, 240, 200), 60, 60)
+			fx().HighlightModel(bastione, Color3.fromRGB(255, 240, 200), 1.2, 0.5)
 		end
 	end)
-	after(10.5, function()
-		steamBurst(bastione:GetPivot().Position, 120, 30, 5)
-		fadeOut(wall, 2.5)
-		tweenTo(bastione, bastione:GetPivot() - Vector3.new(0, 110, 0), 2.6, "QuadIn")
+	-- 5. dall'alto: polvere e macerie
+	after(12.5, function()
+		shot(look(at(st, 230, -380, 150), at(st, 0, -30, 30)), look(at(st, 280, -470, 220), at(st, 0, -30, 20)), 3, "QuadOut")
+		steamBurst(bastione:GetPivot().Position, 130, 30, 5)
+		tweenTo(bastione, bastione:GetPivot() - Vector3.new(0, 110, 0), 3, "QuadIn")
 	end)
 end
 
 -- 🔥 L'Assedio di Calaneth: razzi rossi e campane, il fulmine, il Gigante della Furia e il masso sulla breccia
 SHOWS.AssedioCalaneth = function(after)
-	local st = stage(300)
+	local st = setStage(Color3.fromRGB(128, 120, 110), Enum.Material.Cobblestone)
+	district(st, -440, 440, -480, 230, function(x, z)
+		return (x * x + z * z) < 130 * 130 or (math.abs(x) < 46 and z > 0)
+	end)
+	wallSegment(st, 275, 1400, 140, "Breccia")
+	local spot = at(st, 0, 0)
 	local face = st.ToCamera
-	for i = 0, 5 do
-		after(i * 0.38, function()
-			flare(at(st, rng:NextNumber(-420, 420), rng:NextNumber(-120, 250)), "Rosso")
+	-- 1. dai tetti: i razzi rossi si alzano dal distretto e suonano le campane
+	shot(look(at(st, -120, -270, 62), at(st, 0, 120, 70)), look(at(st, -104, -246, 66), at(st, 0, 140, 100)), 3.4)
+	for i = 0, 6 do
+		after(0.4 + i * 0.36, function()
+			flare(at(st, rng:NextNumber(-380, 380), rng:NextNumber(-320, 200), 30), "Rosso", 250)
 		end)
 	end
-	for i = 0, 5 do
-		after(0.2 + i * 0.36, function()
+	for i = 0, 7 do
+		after(0.2 + i * 0.34, function()
 			playSound("UI", nil, 0.9, if i % 2 == 0 then 0.32 else 0.27)
 		end)
 	end
-	local spot = st.Center
+	-- 2. il cielo pieno di razzi, poi giù verso la piazza
+	after(3.4, function()
+		shot(look(at(st, 20, -90, 12), at(st, 0, 120, 230)), look(at(st, 20, -90, 12), at(st, 0, 20, 40)), 1.7)
+	end)
 	local furia: Model? = nil
-	after(2.6, function()
-		goldenStrike(spot, 14)
+	-- 3. il fulmine e il Gigante della Furia che esce dal vapore
+	after(5.1, function()
+		shot(look(at(st, 0, -160, 14), at(st, 0, 0, 38)), look(at(st, 0, -146, 12), at(st, 0, 0, 52)), 1.5)
+		goldenStrike(spot, 16)
 		if fx() then
-			fx().Flash(Color3.fromRGB(255, 244, 220), 0.7, 0.8)
+			fx().Flash(Color3.fromRGB(255, 244, 220), 0.75, 0.8)
 			fx().TransformBurst(spot, 60)
 		end
-		steamBurst(spot + Vector3.new(0, 40, 0), 160, 40, 6)
+		steamBurst(spot + Vector3.new(0, 40, 0), 170, 40, 6)
+		playSound("Explosion", nil, 1, 0.3)
 		local m = titan("Furia", 60, spot - Vector3.new(0, 70, 0), face)
 		furia = m
 		tweenTo(m, standing(m, spot, face), 1, "QuadOut")
 		glowLight(m.PrimaryPart or m, Color3.fromRGB(120, 255, 160), 60, 1.5)
 	end)
-	after(3.9, function()
-		if not furia then
-			return
-		end
-		animate(furia, "Roar")
-		playSound("Roar", nil, 1, 0.24)
-		shake(0.8, 1.2)
-		if fx() then
-			fx().Shockwave(headPosition(furia, 60), 260, Color3.fromRGB(150, 255, 180), 1, 3)
+	after(6.6, function()
+		if furia then
+			shot(look(at(st, -26, -74, 7), headPosition(furia, 60)), look(at(st, -20, -66, 7), headPosition(furia, 60)), 1.6)
+			roarAt(furia, 60, Color3.fromRGB(150, 255, 180), 0.24)
 		end
 	end)
+	-- 4. solleva il masso e lo porta verso la breccia (la telecamera lo segue di lato)
 	local boulder: BasePart? = nil
-	after(5.4, function()
-		if not furia then
+	after(8.2, function()
+		local m = furia
+		if not m then
 			return
 		end
-		local m = furia
 		local b = part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 44, Material = Enum.Material.Slate, Color = Color3.fromRGB(128, 122, 114), CFrame = CFrame.new(headPosition(m, 60) + Vector3.new(0, 20, 0)) })
 		boulder = b
 		steamBurst(b.Position, 60, 14, 3, Color3.fromRGB(200, 186, 160))
@@ -25551,28 +25730,39 @@ SHOWS.AssedioCalaneth = function(after)
 				b.CFrame = CFrame.new(headPosition(m, 60) + Vector3.new(0, 19, 0))
 			end
 		end)
-		walk(m, 0.7, 0)
-		tweenTo(m, standing(m, at(st, 0, -70), face), 3.2, "Linear")
+		tweenTo(m, standing(m, spot, st.Away), 0.4)
+		task.delay(0.4, function()
+			if m.Parent then
+				walk(m, 0.7, 0)
+				tweenTo(m, standing(m, at(st, 0, 190), st.Away), 3.1, "Linear")
+			end
+		end)
+		shotPath(function(_)
+			local p = m:GetPivot().Position
+			return look(p + rel(st, 150, -30, 10), p + rel(st, 0, 40, 30))
+		end, 3.6)
 	end)
-	after(8.8, function()
+	-- 5. il masso chiude la breccia
+	after(11.8, function()
+		shot(look(at(st, -180, 110, 70), at(st, 0, 250, 40)), look(at(st, -156, 134, 60), at(st, 0, 258, 34)), 2.4)
 		if furia then
 			walk(furia, 0)
 			animate(furia, "Slam")
 		end
 	end)
-	after(9.25, function()
+	after(12.2, function()
 		local b = boulder
 		if not b then
 			return
 		end
 		b:SetAttribute("Caduto", true)
-		local land = at(st, 0, -150) + Vector3.new(0, 20, 0)
+		local land = at(st, 0, 262, 22)
 		tweenTo(b, CFrame.new(land), 0.5, "QuadIn", function()
 			local f = fx()
 			if f then
 				f.Explosion(land, 55, true)
 				f.DebrisBurst(land, 40, 7, Color3.fromRGB(128, 122, 114), Enum.Material.Slate, 200)
-				f.Shockwave(land - Vector3.new(0, 18, 0), 300, Color3.fromRGB(230, 210, 180), 1.2, 3)
+				f.Shockwave(at(st, 0, 262, 2), 320, Color3.fromRGB(230, 210, 180), 1.2, 3)
 				f.Flash(Color3.fromRGB(255, 240, 220), 0.4, 0.5)
 			end
 			steamBurst(land, 140, 30, 6, Color3.fromRGB(196, 176, 150))
@@ -25580,79 +25770,56 @@ SHOWS.AssedioCalaneth = function(after)
 			shake(1.3, 1.4)
 		end)
 	end)
-	after(11.2, function()
+	-- 6. dall'alto: la breccia è chiusa, il gigante si dissolve nel vapore
+	after(14.2, function()
+		shot(look(at(st, 170, -40, 150), at(st, 0, 210, 30)), look(at(st, 210, -120, 210), at(st, 0, 210, 20)), 1.6)
 		if furia then
 			local pos = furia:GetPivot().Position
 			if fx() then
 				fx().TransformEnd(pos, 60)
 			end
 			steamBurst(pos, 120, 40, 6)
-			tweenTo(furia, furia:GetPivot() - Vector3.new(0, 90, 0), 2.4, "QuadIn")
-		end
-		if boulder then
-			fadeOut({ boulder }, 3)
 		end
 	end)
 end
 
--- 😱 L'Urlo della Cacciatrice: crescono gli alberi giganti, lei corre, si ferma e urla: arrivano i giganti
+-- 😱 L'Urlo della Cacciatrice: la foresta, la corsa tra gli alberi, l'urlo e i giganti che arrivano da ogni parte
 SHOWS.UrloCacciatrice = function(after)
-	local st = stage(330)
-	local face = st.ToCamera
-	local trees = {}
-	for i = 0, 8 do
-		local x = -460 + i * 115 + rng:NextNumber(-25, 25)
-		local z = rng:NextNumber(-40, 180)
-		local base = at(st, x, z)
-		local h = rng:NextNumber(200, 260)
-		local trunk = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 24, 24), CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 50) })
-		local crowns = {}
-		for j = 1, 3 do
-			local crown = part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 0.5, CFrame = CFrame.new(base), Material = Enum.Material.Grass, Color = Color3.fromRGB(56, 104, 50):Lerp(Color3.fromRGB(90, 130, 60), rng:NextNumber()) })
-			table.insert(crowns, crown)
-		end
-		table.insert(trees, trunk)
-		after(0.3 + i * 0.12, function()
-			TweenService:Create(trunk, TweenInfo.new(1.6, Enum.EasingStyle.Quart), { Size = Vector3.new(h, 24, 24), CFrame = CFrame.new(base + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)) }):Play()
-			for j, crown in crowns do
-				local offset = Vector3.new(rng:NextNumber(-30, 30), h + (j - 2) * 30, rng:NextNumber(-30, 30))
-				TweenService:Create(crown, TweenInfo.new(1.9, Enum.EasingStyle.Back), { Size = Vector3.one * rng:NextNumber(90, 130), CFrame = CFrame.new(base + offset) }):Play()
-				table.insert(trees, crown)
-			end
-			shake(0.15, 0.4)
-		end)
-	end
+	local st = setStage(Color3.fromRGB(62, 92, 52), Enum.Material.Grass)
+	forest(st, function(x, z)
+		return (x * x + (z - 60) * (z - 60)) < 160 * 160 or math.abs(z - 60) < 55 or (math.abs(x) < 140 and z < -120)
+	end)
+	local spot = at(st, 0, 60)
 	local runFace = CFrame.lookAt(Vector3.zero, st.Right)
-	local from = at(st, -560, 40)
-	local spot = at(st, 0, 40)
-	local hunter = titan("Cacciatrice", 62, from, runFace)
-	walk(hunter, 1, 1)
-	after(2, function()
-		tweenTo(hunter, standing(hunter, spot, runFace), 3.4, "Linear")
-		for i = 0, 7 do
-			task.delay(i * 0.42, function()
+	local hunter = titan("Cacciatrice", 62, at(st, -820, 60), runFace)
+	-- 1. tra gli alberi giganti, nella penombra
+	shot(look(at(st, -70, -260, 14), at(st, 0, 60, 70)), look(at(st, -50, -214, 16), at(st, 0, 60, 80)), 3.4)
+	-- 2. lei corre tra gli alberi e la telecamera le corre accanto
+	after(2.9, function()
+		walk(hunter, 1, 1)
+		tweenTo(hunter, standing(hunter, spot, runFace), 4, "Linear")
+		for i = 0, 9 do
+			task.delay(i * 0.4, function()
 				playSound("Land", nil, 0.8, 0.28)
 				shake(0.15, 0.25)
 			end)
 		end
 	end)
-	after(5.4, function()
-		walk(hunter, 0)
-		tweenTo(hunter, standing(hunter, spot, face), 0.5, "SineOut")
+	after(3.4, function()
+		shotPath(function(_)
+			local p = hunter:GetPivot().Position
+			return look(p + rel(st, -50, -120, 0), p + rel(st, 20, 0, 12))
+		end, 3.5)
 	end)
-	after(6.1, function()
-		animate(hunter, "Roar")
-		playSound("Roar", nil, 1, 0.55)
+	-- 3. si ferma, si gira verso di noi e urla
+	after(6.9, function()
+		walk(hunter, 0)
+		tweenTo(hunter, standing(hunter, spot, st.ToCamera), 0.5, "QuadOut")
+		shot(look(at(st, -14, -16, 6), at(st, 0, 60, 58)), look(at(st, -9, -4, 6), at(st, 0, 60, 66)), 2.4)
+	end)
+	after(7.6, function()
+		roarAt(hunter, 62, Color3.fromRGB(210, 255, 225), 0.55)
 		playSound("Roar", nil, 0.8, 0.42)
-		shake(0.9, 2.2)
-		local mouth = headPosition(hunter, 62)
-		for i = 0, 5 do
-			task.delay(i * 0.18, function()
-				if fx() then
-					fx().Shockwave(mouth, 300 + i * 110, if i % 2 == 0 then Color3.fromRGB(210, 255, 225) else Color3.new(1, 1, 1), 1.3, 3)
-				end
-			end)
-		end
 		local blur = Instance.new("BlurEffect")
 		blur.Size = 0
 		blur.Parent = Lighting
@@ -25662,29 +25829,35 @@ SHOWS.UrloCacciatrice = function(after)
 			TweenService:Create(blur, TweenInfo.new(1.2), { Size = 0 }):Play()
 		end)
 	end)
-	-- i giganti richiamati dall'urlo corrono verso di lei
-	after(7.3, function()
-		for i = 1, 7 do
-			task.delay(i * 0.12, function()
-				local x = rng:NextNumber(-500, 500)
-				local start = at(st, x, rng:NextNumber(260, 360))
-				local goal = at(st, x * 0.3, 90)
+	-- 4. dall'alto: i giganti richiamati corrono verso di lei da tutte le parti
+	after(9.4, function()
+		shot(look(at(st, 0, -360, 300), spot), look(at(st, 60, -280, 340), spot), 3.4)
+		local token = showToken
+		for i = 1, 9 do
+			task.delay(i * 0.1, function()
+				if token ~= showToken then
+					return
+				end
+				local a = (i / 9) * math.pi * 2 + rng:NextNumber(-0.2, 0.2)
+				local start = spot + rel(st, math.cos(a) * 520, math.sin(a) * 520)
+				local goal = spot + rel(st, math.cos(a) * 140, math.sin(a) * 140)
 				local dir = CFrame.lookAt(Vector3.zero, Util.SafeUnit(Util.Flat(goal - start)))
-				local h = rng:NextNumber(20, 34)
-				local m = titan("Puro", h, start, dir)
+				local m = titan("Puro", rng:NextNumber(22, 34), start, dir)
 				walk(m, 1, 1)
-				tweenTo(m, standing(m, goal, dir), rng:NextNumber(3.2, 4), "Linear")
+				tweenTo(m, standing(m, goal, dir), rng:NextNumber(4, 5), "Linear")
 			end)
 		end
 	end)
-	after(11.5, function()
+	-- 5. arrivano attorno a lei
+	after(12.9, function()
+		shot(look(at(st, 180, -70, 24), at(st, 0, 60, 40)), look(at(st, 156, -50, 26), at(st, 0, 60, 46)), 2.7)
+	end)
+	after(14.3, function()
 		steamBurst(spot + Vector3.new(0, 30, 0), 200, 40, 6, Color3.fromRGB(220, 240, 225))
-		fadeOut(trees, 2.5)
-		tweenTo(hunter, hunter:GetPivot() - Vector3.new(0, 80, 0), 2.5, "QuadIn")
 	end)
 end
 
--- 🐎 La Spedizione: fanfara, razzi verdi in formazione, la cavalleria al galoppo e un anomalo che salta
+
 local function rider(base: CFrame): { Model: Model, Parts: { [string]: BasePart } }
 	local model = Instance.new("Model")
 	model.Name = "Cavaliere"
@@ -25743,110 +25916,135 @@ local function poseRider(r, cf: CFrame, t: number)
 	P.Cape.CFrame = body * CFrame.new(0, 3.2, 0.9) * CFrame.Angles(math.rad(35 + gallop * 10), 0, 0)
 end
 
+-- 🐎 La Spedizione: dal Muro esce la cavalleria, razzi verdi, un razzo nero e l'anomalo che salta fuori
 SHOWS.Spedizione = function(after)
-	local st = stage(320)
-	-- fanfara
+	local st = setStage(Color3.fromRGB(120, 150, 80), Enum.Material.Grass)
+	hills(st, 14, Color3.fromRGB(100, 140, 70), 220)
+	wallSegment(st, -200, 1500, 130, "Aperto")
+	local dir = st.Away
+	local runStart, speed = 1.8, 95
+	local function leadZ(t: number): number
+		return -200 + math.max(0, t - runStart) * speed
+	end
+	local showStart = os.clock()
+	local riders = {}
+	local function lead(): Vector3
+		return at(st, 0, leadZ(os.clock() - showStart), 6)
+	end
+	-- 1. dall'alto del Muro: l'alba sulla pianura e la fanfara
+	shot(look(at(st, 34, -216, 142), at(st, 0, 260, 20)), look(at(st, 28, -216, 140), at(st, 0, 330, 10)), 3.4)
 	for i, pitch in { 0.5, 0.63, 0.75, 1 } do
 		after((i - 1) * 0.22, function()
 			playSound("Reward", nil, 0.8, pitch)
 		end)
 	end
-	for i = 0, 6 do
-		after(0.3 + i * 0.4, function()
-			flare(at(st, -480 + i * 160, rng:NextNumber(40, 180)), "Verde", 260, st.Right * 20)
-		end)
-	end
-	-- la cavalleria al galoppo da sinistra a destra
-	local riders = {}
-	local dir = CFrame.lookAt(Vector3.zero, st.Right)
-	after(1.2, function()
-		local start = os.clock()
-		for i = 1, 10 do
-			local row = (i - 1) % 2
-			local col = math.floor((i - 1) / 2)
-			local lane = -60 - row * 22 + rng:NextNumber(-4, 4)
-			local offset = -col * 30 - row * 14
-			local r = rider(CFrame.new(st.Center))
-			table.insert(riders, { R = r, Lane = lane, Offset = offset, Phase = rng:NextNumber(0, 6) })
+	-- la cavalleria esce dal cancello in formazione (2 colonne)
+	after(runStart, function()
+		for i = 1, 12 do
+			local col = (i - 1) % 2
+			local row = math.floor((i - 1) / 2)
+			table.insert(riders, { R = rider(CFrame.new(st.Center)), X = (col - 0.5) * 16 + rng:NextNumber(-2, 2), Back = row * 20, Phase = rng:NextNumber(0, 6) })
 		end
-		local runTime = 7
 		table.insert(followers, function()
-			local t = os.clock() - start
-			if t > runTime + 1 then
-				return
-			end
-			local k = t / runTime
+			local t = os.clock() - showStart
 			for _, entry in riders do
 				if entry.R.Model.Parent then
-					local x = -620 + k * 1240 + entry.Offset
-					local ground = at(st, x, entry.Lane)
-					poseRider(entry.R, CFrame.new(ground) * dir.Rotation, t + entry.Phase)
+					poseRider(entry.R, CFrame.new(at(st, entry.X, leadZ(t) - entry.Back)) * dir.Rotation, t + entry.Phase)
 				end
 			end
 		end)
-		for i = 0, 12 do
-			task.delay(i * 0.45, function()
-				local lead = riders[1]
-				if lead and lead.R.Model.Parent then
-					steamBurst(lead.R.Parts.Body.Position - st.Right * 12 - Vector3.new(0, 5, 0), 26, 5, 2.5, Color3.fromRGB(210, 190, 150))
+		for i = 0, 16 do
+			task.delay(i * 0.5, function()
+				if #riders > 0 then
+					steamBurst(lead() - Vector3.new(0, 5, 0) - st.Fwd * 60, 30, 6, 2.5, Color3.fromRGB(210, 190, 150))
 				end
 			end)
 		end
 	end)
+	-- 2. i razzi verdi: la telecamera è dietro la formazione e guarda in alto
 	after(3.4, function()
-		flare(at(st, 380, 120), "Rosso", 240)
+		shotPath(function(_)
+			local p = lead()
+			return look(p + rel(st, 24, -150, 12), p + rel(st, 0, 140, 150))
+		end, 2.3)
+		for i = 0, 5 do
+			task.delay(i * 0.25, function()
+				flare(lead() + rel(st, (i - 2.5) * 30, -i * 12, 4), "Verde", 260, st.Fwd * 30)
+			end)
+		end
 	end)
-	after(4.1, function()
-		flare(at(st, 300, 60), "Nero", 220)
+	-- 3. accanto ai cavalli al galoppo
+	after(5.7, function()
+		shotPath(function(_)
+			local p = lead()
+			return look(p + rel(st, 46, 20, 2), p + rel(st, 0, -40, 4))
+		end, 2.3)
+	end)
+	after(6.9, function()
+		flare(lead() + rel(st, 260, 120), "Rosso", 240)
+	end)
+	after(7.5, function()
+		flare(lead() + rel(st, 180, 220), "Nero", 230)
 		playSound("UI", nil, 0.8, 0.3)
 	end)
-	-- l'anomalo salta fuori e insegue la cavalleria
-	after(5, function()
-		local from = at(st, 420, 200)
-		local land = at(st, 140, -20)
+	-- 4. l'anomalo salta fuori da dietro una collina e insegue la cavalleria
+	after(8.0, function()
+		local lz = leadZ(os.clock() - showStart)
+		local from = at(st, 340, lz + 260)
+		local land = at(st, 70, lz + 150)
 		local face = CFrame.lookAt(Vector3.zero, Util.SafeUnit(Util.Flat(land - from)))
-		local abnormal = titan("Puro", 40, from - Vector3.new(0, 40, 0), face)
-		animate(abnormal, "Leap")
+		local abnormal = titan("Puro", 42, from - Vector3.new(0, 40, 0), face)
 		local hip = (abnormal:GetAttribute("EventoHip") :: number?) or 18
+		shot(look(at(st, -70, lz + 30, 14), at(st, 200, lz + 210, 60)), look(at(st, -60, lz + 60, 12), at(st, 90, lz + 160, 40)), 2.4)
+		animate(abnormal, "Leap")
 		moveAlong(abnormal, function(k)
-			local p = from:Lerp(land, k) + Vector3.new(0, hip + math.sin(k * math.pi) * 110 - (1 - k) * 40 * (1 - k), 0)
+			local p = from:Lerp(land, k) + Vector3.new(0, hip + math.sin(k * math.pi) * 120 - (1 - k) * (1 - k) * 40, 0)
 			return CFrame.new(p) * face.Rotation
 		end, 1.4, function()
 			local f = fx()
 			if f then
 				f.Explosion(land, 30, false)
-				f.Shockwave(land + Vector3.new(0, 1, 0), 180, Color3.fromRGB(230, 210, 170), 0.9, 2)
+				f.Shockwave(land + Vector3.new(0, 1, 0), 200, Color3.fromRGB(230, 210, 170), 0.9, 2)
 				f.DebrisBurst(land, 20, 4, Color3.fromRGB(120, 100, 80), Enum.Material.Ground, 120)
 			end
 			playSound("Land", nil, 1, 0.25)
-			shake(0.8, 0.8)
-			local chase = CFrame.lookAt(Vector3.zero, st.Right)
-			abnormal:PivotTo(standing(abnormal, land, chase))
+			shake(0.9, 0.8)
+			abnormal:PivotTo(standing(abnormal, land, dir))
 			walk(abnormal, 1, 1)
-			tweenTo(abnormal, standing(abnormal, at(st, 700, -40), chase), 4.5, "Linear")
+			tweenTo(abnormal, standing(abnormal, land + st.Fwd * 560, dir), 5.5, "Linear")
 		end)
 	end)
-	after(11.5, function()
-		for _, entry in riders do
-			fadeOut(entry.R.Model:GetChildren(), 1.5)
-		end
+	-- 5. dall'alto: la formazione e l'anomalo all'inseguimento
+	after(10.6, function()
+		shotPath(function(k)
+			local p = lead()
+			return look(p + rel(st, -170 - k * 40, -280, 170 + k * 40), p + rel(st, 0, 40, 0))
+		end, 5)
 	end)
 end
 
--- ⚡ Il Fulmine della Trasformazione: pioggia di fulmini dorati, il fulmine gigante e la Furia che emerge
+-- ⚡ Il Fulmine della Trasformazione: fulmini dorati sul distretto, il fulmine gigante e la Furia che emerge
 SHOWS.FulmineTrasformazione = function(after)
-	local st = stage(240)
+	local st = setStage(Color3.fromRGB(100, 98, 96), Enum.Material.Cobblestone)
+	district(st, -440, 440, -440, 440, function(x, z)
+		return (x * x + z * z) < 140 * 140 or (math.abs(x) < 36 and z < 0)
+	end)
+	local spot = at(st, 0, 0)
 	local face = st.ToCamera
-	local spot = st.Center
-	for i = 0, 8 do
-		after(i * 0.36, function()
-			local p = at(st, rng:NextNumber(-500, 500), rng:NextNumber(-150, 400))
-			goldenStrike(p, rng:NextNumber(4, 8))
+	-- 1. il distretto nel temporale: fulmini dorati sulle case
+	shot(look(at(st, -180, -300, 74), at(st, 0, 0, 20)), look(at(st, -156, -260, 68), at(st, 0, 0, 24)), 3.7)
+	for i = 0, 10 do
+		after(0.3 + i * 0.34, function()
+			goldenStrike(at(st, rng:NextNumber(-400, 400), rng:NextNumber(-320, 400), 30), rng:NextNumber(4, 8))
 		end)
 	end
+	-- 2. in strada: il fulmine gigante
+	after(3.7, function()
+		shot(look(at(st, 0, -160, 8), at(st, 0, 0, 28)), look(at(st, 0, -150, 8), at(st, 0, 0, 32)), 0.6)
+	end)
 	local furia: Model? = nil
-	after(3.4, function()
-		goldenStrike(spot, 20)
+	after(4.3, function()
+		goldenStrike(spot, 22)
 		goldenStrike(spot + st.Right * 30, 9)
 		goldenStrike(spot - st.Right * 30, 9)
 		local f = fx()
@@ -25854,7 +26052,7 @@ SHOWS.FulmineTrasformazione = function(after)
 			f.Flash(Color3.new(1, 1, 1), 0.95, 1.1)
 			f.Explosion(spot + Vector3.new(0, 10, 0), 80, true)
 			f.Shockwave(spot + Vector3.new(0, 2, 0), 520, Color3.fromRGB(255, 220, 100), 1.6, 6)
-			f.TransformBurst(spot, 70)
+			f.TransformBurst(spot, 72)
 		end
 		steamBurst(spot + Vector3.new(0, 50, 0), 240, 50, 7)
 		playSound("Thunder", nil, 1, 0.2)
@@ -25869,42 +26067,45 @@ SHOWS.FulmineTrasformazione = function(after)
 				steamBurst(spot + st.Right * rng:NextNumber(-25, 25) + Vector3.new(0, rng:NextNumber(10, 70), 0), 60, 10, 4)
 			end)
 		end
+		-- la telecamera sale lungo il gigante che emerge
+		shot(look(at(st, 0, -140, 8), at(st, 0, 0, 24)), look(at(st, 0, -128, 8), at(st, 0, 0, 82)), 2.2)
 	end)
-	after(5.7, function()
+	-- 3. primo piano: l'urlo, con un fulmine accanto
+	after(6.7, function()
 		if not furia then
 			return
 		end
-		animate(furia, "Roar")
-		playSound("Roar", nil, 1, 0.22)
-		shake(1, 1.5)
 		local head = headPosition(furia, 72)
-		for i = 0, 2 do
-			task.delay(i * 0.2, function()
-				if fx() then
-					fx().Shockwave(head, 220 + i * 120, Color3.fromRGB(130, 255, 170), 1.1, 3)
-				end
-			end)
-		end
-		goldenStrike(spot + st.Right * 90, 6)
+		shot(look(at(st, 34, -64, 24), head), look(at(st, 26, -54, 26), head), 2)
+		roarAt(furia, 72, Color3.fromRGB(130, 255, 170), 0.22)
+		goldenStrike(spot + st.Right * 90, 7)
 	end)
-	after(7.6, function()
+	-- 4. il pugno verso la telecamera
+	after(8.7, function()
+		shot(look(at(st, 0, -82, 48), at(st, 0, 0, 52)), look(at(st, 0, -78, 48), at(st, 0, 0, 52)), 2.2)
 		if furia then
 			animate(furia, "Punch")
 		end
 	end)
-	after(8.05, function()
-		if not furia then
-			return
-		end
-		local fist = furia:GetPivot().Position - st.Fwd * 40 + Vector3.new(0, 30, 0)
+	after(9.15, function()
+		local fist = at(st, 0, -40, 44)
 		if fx() then
-			fx().Shockwave(fist, 200, Color3.new(1, 1, 1), 0.8, 2)
-			fx().Flash(Color3.fromRGB(255, 255, 230), 0.3, 0.4)
+			fx().Shockwave(fist, 220, Color3.new(1, 1, 1), 0.8, 2)
+			fx().Flash(Color3.fromRGB(255, 255, 230), 0.45, 0.4)
 		end
 		playSound("Explosion", nil, 0.9, 0.45)
-		shake(0.9, 0.7)
+		shake(1.2, 0.8)
 	end)
-	after(10.6, function()
+	-- 5. dall'alto: il temporale sul distretto, il gigante si dissolve nel vapore
+	after(11.1, function()
+		shot(look(at(st, -210, -310, 96), at(st, 0, 0, 40)), look(at(st, -250, -380, 140), at(st, 0, 0, 40)), 4.4, "QuadOut")
+		for i = 0, 4 do
+			task.delay(i * 0.6, function()
+				goldenStrike(at(st, rng:NextNumber(-360, 360), rng:NextNumber(-260, 360), 30), rng:NextNumber(5, 9))
+			end)
+		end
+	end)
+	after(12.4, function()
 		if furia then
 			local pos = furia:GetPivot().Position
 			if fx() then
@@ -25916,9 +26117,11 @@ SHOWS.FulmineTrasformazione = function(after)
 	end)
 end
 
+
 local function cleanupShow()
 	table.clear(movers)
 	table.clear(followers)
+	camShot = nil
 	for _, a in animators do
 		pcall(function()
 			a:Destroy()
@@ -25933,8 +26136,93 @@ local function cleanupShow()
 	table.clear(showProps)
 end
 
--- Fa partire l'animazione d'apertura (titolo + scena nel mondo) per l'evento "id"
-function AbuseEventController.PlayIntro(id: string, minutes: number?)
+-- BLOCCO DEL GIOCATORE DURANTE LA REGIA ---------------------------------------------------------------------
+-- La telecamera passa alla regia; niente movimento, rampini, attacchi, menu né interfaccia di gioco.
+-- (Il server intanto rende tutti intoccabili: attributo CutsceneUntil.)
+
+local controls: any = nil
+
+local function lockPlayer(on: boolean)
+	if on == cinematic then
+		return
+	end
+	cinematic = on
+	if C.CameraController then
+		pcall(C.CameraController.SetCinematic, on)
+	end
+	if controls then
+		pcall(function()
+			if on then
+				controls:Disable()
+			else
+				controls:Enable()
+			end
+		end)
+	end
+	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if on and humanoid then
+		pcall(function()
+			humanoid:Move(Vector3.zero)
+		end)
+	end
+	if on and C.UIController and C.UIController.CloseAll then
+		C.UIController.CloseAll()
+	end
+	if C.HUD and C.HUD.SetVisible then
+		C.HUD.SetVisible(not on)
+	end
+	-- via anche pulsanti laterali, striscioni e pannelli: sullo schermo resta solo l'animazione
+	local layers = C.UIController and C.UIController.Layers
+	if layers then
+		for _, name in { "HUD", "Panels" } do
+			local layer = layers[name]
+			if layer then
+				layer.Visible = not on
+			end
+		end
+	end
+	if not on then
+		camShot = nil
+	end
+end
+
+function AbuseEventController.IsCinematic(): boolean
+	return cinematic
+end
+
+-- Fine della regia: dissolvenza al nero, si torna al proprio personaggio, dissolvenza dal nero
+local function endCinematic(token: number)
+	local c = card
+	if not c then
+		cleanupShow()
+		lockPlayer(false)
+		return
+	end
+	c.Flash.BackgroundColor3 = Color3.new(0, 0, 0)
+	tween(c.Flash, 0.45, { BackgroundTransparency = 0 })
+	task.delay(0.5, function()
+		if token ~= showToken then
+			return
+		end
+		cleanupShow()
+		pcall(lockPlayer, false)
+		tween(c.Text, 0.3, { TextTransparency = 1 })
+		tween(c.Chip, 0.3, { TextTransparency = 1, BackgroundTransparency = 1 })
+		tween(c.ChipStroke, 0.3, { Transparency = 1 })
+		tween(c.Top, 0.6, { Size = UDim2.fromScale(1, 0) }, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+		tween(c.Bottom, 0.6, { Size = UDim2.fromScale(1, 0) }, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+		tween(c.Flash, 0.7, { BackgroundTransparency = 1 })
+		task.delay(0.75, function()
+			if token == showToken then
+				c.Root.Visible = false
+			end
+		end)
+	end)
+end
+
+-- Fa partire l'animazione d'apertura dell'evento "id".
+-- withCamera = true: regia completa (telecamera sul set, giocatore bloccato); false: solo il titolo.
+function AbuseEventController.PlayIntro(id: string, minutes: number?, withCamera: boolean?)
 	local def = AbuseEvents.Get(id)
 	if not def then
 		return
@@ -25942,31 +26230,39 @@ function AbuseEventController.PlayIntro(id: string, minutes: number?)
 	cleanupShow()
 	showToken += 1
 	local token = showToken
-	playCard(def, minutes or AbuseEvents.DefaultMinutes, token)
 	local show = SHOWS[id]
-	if show then
-		local function after(t: number, fn: () -> ())
-			task.delay(t, function()
-				if token ~= showToken then
-					return
-				end
-				local ok, err = pcall(fn)
-				if not ok then
-					warn("[Admin Abuse] " .. tostring(err))
-				end
-			end)
-		end
-		local ok, err = pcall(show, after)
-		if not ok then
-			warn("[Admin Abuse] " .. tostring(err))
-		end
+	local cine = withCamera ~= false and show ~= nil
+	playCard(def, minutes or AbuseEvents.DefaultMinutes, token, cine)
+	if not cine or not show then
+		return
 	end
-	task.delay(14.5, function()
+	-- la regia finisce sempre, anche se qualcosa nella scena va storto
+	task.delay(INTRO_LENGTH, function()
 		if token == showToken then
-			cleanupShow()
+			endCinematic(token)
 		end
 	end)
+	local okLock, errLock = pcall(lockPlayer, true)
+	if not okLock then
+		warn("[Admin Abuse] " .. tostring(errLock))
+	end
+	local function after(t: number, fn: () -> ())
+		task.delay(t, function()
+			if token ~= showToken then
+				return
+			end
+			local ok, err = pcall(fn)
+			if not ok then
+				warn("[Admin Abuse] " .. tostring(err))
+			end
+		end)
+	end
+	local ok, err = pcall(show, after)
+	if not ok then
+		warn("[Admin Abuse] " .. tostring(err))
+	end
 end
+
 
 -- EFFETTI MANDATI DAL SERVER DURANTE L'EVENTO ------------------------------------------------------------
 
@@ -26022,6 +26318,13 @@ end
 local nextAmbient = 0
 local activeStart: number? = nil
 
+-- il giocatore sta guardando una scena della storia, l'introduzione del gioco o un dialogo?
+local function busy(): boolean
+	return (C.CutsceneController ~= nil and C.CutsceneController.IsPlaying())
+		or (C.Intro ~= nil and C.Intro.IsShowing ~= nil and C.Intro.IsShowing())
+		or (C.Dialogue ~= nil and C.Dialogue.IsOpen ~= nil and C.Dialogue.IsOpen())
+end
+
 local function refresh()
 	local id = ReplicatedStorage:GetAttribute("AbuseEvento")
 	local def = AbuseEvents.Get(id)
@@ -26036,10 +26339,19 @@ local function refresh()
 			C.SkyController.SetEventSky(def.Sky)
 		end
 		setAmbient(def.Ambient)
-		nextAmbient = os.clock() + 12
-		-- l'animazione d'apertura solo se l'evento è appena partito (non per chi entra dopo)
+		nextAmbient = os.clock() + INTRO_LENGTH + 4
+		-- l'animazione d'apertura solo se l'evento è appena partito (non per chi entra dopo).
+		-- Se il giocatore è dentro una scena della storia aspetta un attimo; se non finisce, solo il titolo.
 		if type(started) ~= "number" or serverNow() - started < 15 then
-			AbuseEventController.PlayIntro(def.Id, minutes)
+			task.spawn(function()
+				local waited = os.clock()
+				while busy() and os.clock() - waited < 5 do
+					task.wait(0.2)
+				end
+				if activeId == def.Id and activeStart == started then
+					AbuseEventController.PlayIntro(def.Id, minutes, not busy())
+				end
+			end)
 		end
 	elseif not def and activeId then
 		local old = AbuseEvents.Get(activeId)
@@ -26050,6 +26362,7 @@ local function refresh()
 		end
 		setAmbient(nil)
 		cleanupShow()
+		lockPlayer(false)
 		playOutro(old)
 	end
 end
@@ -26095,6 +26408,15 @@ function AbuseEventController.Start()
 	folder.Name = "EventoAdminLocale"
 	folder.Parent = workspace
 	buildUI()
+	-- i controlli di movimento (per bloccarli durante la regia)
+	task.spawn(function()
+		local ok, module = pcall(function()
+			return require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule") :: ModuleScript)
+		end)
+		if ok and module then
+			controls = (module :: any):GetControls()
+		end
+	end)
 	RunService.RenderStepped:Connect(function(dt)
 		followCamera()
 		local ok, err = pcall(step, dt)
@@ -29390,7 +29712,7 @@ function CutsceneController.Start()
 		task.spawn(function()
 			while #queue > 0 do
 				-- aspetta che l'intro, l'eventuale dialogo e la scena precedente siano finiti
-				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing do
+				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) do
 					task.wait(0.2)
 				end
 				local nextId = table.remove(queue, 1)
@@ -31357,6 +31679,14 @@ end
 
 function InputController.Trigger(action: string, began: boolean)
 	if began and not ALWAYS[action] and C.UIController and C.UIController.CursorActive() and not action:find("Mash") then
+		return
+	end
+	-- durante l'animazione di un evento dell'Admin Abuse non funziona proprio niente (nemmeno menu e mappa);
+	-- i tasti rilasciati però si registrano, così niente resta "premuto" alla fine
+	if C.AbuseEventController and C.AbuseEventController.IsCinematic() then
+		if not began then
+			held[action] = false
+		end
 		return
 	end
 	if C.CameraController and C.CameraController.IsCinematic() and not ALWAYS[action] then

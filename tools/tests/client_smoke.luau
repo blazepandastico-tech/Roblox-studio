@@ -163,6 +163,10 @@ if C.AbuseEventController then
 	for _, def in AbuseEvents.List do
 		local okI, errI = pcall(C.AbuseEventController.PlayIntro, def.Id, 5)
 		check(okI, def.Id .. ": animazione d'apertura: " .. tostring(errI))
+		-- regia: telecamera sul set nel cielo e giocatore bloccato
+		RunService.RenderStepped:Fire(0.1)
+		check(C.AbuseEventController.IsCinematic(), def.Id .. ": il giocatore non è bloccato durante l'animazione")
+		check(workspace.CurrentCamera.CFrame.Position.Y > 3000, def.Id .. ": la telecamera non inquadra il set dell'animazione")
 		local runs = 0
 		while #queue > 0 and runs < 3000 do
 			local item = table.remove(queue, 1)
@@ -176,6 +180,7 @@ if C.AbuseEventController then
 		for _ = 1, 5 do
 			RunService.RenderStepped:Fire(0.1)
 		end
+		check(not C.AbuseEventController.IsCinematic(), def.Id .. ": a fine animazione il giocatore resta bloccato")
 		local props = workspace:FindFirstChild("EventoAdminLocale")
 		LOG(("Animazione %s %s: %d azioni, %d oggetti in scena"):format(def.Icon, def.Name, runs, props and #props:GetDescendants() or 0))
 		-- effetti mandati dal server durante l'evento

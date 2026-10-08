@@ -918,6 +918,7 @@ end
 function Methods.GetState(_self)
 	return Enum.HumanoidStateType.Running
 end
+function Methods.Move(_self, _direction, _relative) end
 -- le prove possono aggiungere giocatori finti a MOCK_PLAYERS (Players:GetPlayers li restituisce)
 MOCK_PLAYERS = {}
 function Methods.GetPlayers(_self)

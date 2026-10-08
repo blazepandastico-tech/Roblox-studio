@@ -263,8 +263,15 @@ for _, def in AbuseEvents.List do
 	if def.Bonus.XP then
 		check(player:GetAttribute("BonusXPAbuse") == def.Bonus.XP, def.Id .. ": bonus di esperienza non applicato")
 	end
-	-- passano 10 secondi (fine dell'animazione), poi un minuto
-	for _, seconds in { 10, 20, 30 } do
+	local protected = player:GetAttribute("CutsceneUntil")
+	check(type(protected) == "number" and protected > workspace:GetServerTimeNow() + 10, def.Id .. ": i giocatori non sono protetti durante l'animazione")
+	-- durante l'animazione (primi secondi) non arrivano giganti
+	local beforeIntro = #spawned
+	Abuse.FastForward(5)
+	pcall(Abuse.Step)
+	check(#spawned == beforeIntro, def.Id .. ": arrivano giganti mentre i giocatori guardano l'animazione")
+	-- finisce l'animazione (20 secondi in tutto), poi passa un minuto
+	for _, seconds in { 15, 20, 30 } do
 		Abuse.FastForward(seconds)
 		local okS, errS = pcall(Abuse.Step)
 		check(okS, def.Id .. ": Step: " .. tostring(errS))

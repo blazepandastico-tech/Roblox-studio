@@ -89,6 +89,14 @@ function InputController.Trigger(action: string, began: boolean)
 	if began and not ALWAYS[action] and C.UIController and C.UIController.CursorActive() and not action:find("Mash") then
 		return
 	end
+	-- durante l'animazione di un evento dell'Admin Abuse non funziona proprio niente (nemmeno menu e mappa);
+	-- i tasti rilasciati però si registrano, così niente resta "premuto" alla fine
+	if C.AbuseEventController and C.AbuseEventController.IsCinematic() then
+		if not began then
+			held[action] = false
+		end
+		return
+	end
 	if C.CameraController and C.CameraController.IsCinematic() and not ALWAYS[action] then
 		return
 	end

@@ -24,7 +24,8 @@ local S
 
 local rng = Random.new()
 local MAX_EVENT_TITANS = 45 -- giganti dell'evento vivi tutti insieme, al massimo
-local INTRO_TIME = 8 -- secondi di animazione prima che arrivino giganti e boss
+local INTRO_SECONDS = 17 -- durata della regia d'apertura sul client (giocatori bloccati e intoccabili)
+local INTRO_TIME = INTRO_SECONDS + 1 -- giganti e boss arrivano solo quando tutti hanno ripreso i comandi
 
 type Context = {
 	Def: any,
@@ -345,6 +346,13 @@ function AbuseService.Launch(id: string, minutes: any): (boolean, string)
 	}
 	for _, player in Players:GetPlayers() do
 		applyBonus(player)
+		-- durante l'animazione d'apertura i giocatori sono bloccati: nessun gigante può toccarli
+		local protectedUntil = serverNow() + INTRO_SECONDS + 1
+		local old = player:GetAttribute("CutsceneUntil")
+		player:SetAttribute("CutsceneUntil", if type(old) == "number" then math.max(old, protectedUntil) else protectedUntil)
+		if S.TitanService.ReleasePlayer then
+			S.TitanService.ReleasePlayer(player)
+		end
 	end
 	publish()
 	return true, ("%s %s: %d minut%s"):format(def.Icon, def.Name, mins, if mins == 1 then "o" else "i")

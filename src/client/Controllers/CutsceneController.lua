@@ -730,7 +730,7 @@ function CutsceneController.Start()
 		task.spawn(function()
 			while #queue > 0 do
 				-- aspetta che l'intro, l'eventuale dialogo e la scena precedente siano finiti
-				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing do
+				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) do
 					task.wait(0.2)
 				end
 				local nextId = table.remove(queue, 1)

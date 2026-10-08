@@ -106,12 +106,14 @@ Per avere gli spettacoli automatici in tutti i server, metti `Festival.AutoShows
 
 Sempre in **😈 Admin Abuse**, la sezione **🎬 Animazioni** fa partire un evento a tempo per tutto il server:
 1. scegli **quanto dura**: 1, 3, 5, 10, 15, 30 o 60 minuti. Puoi anche scrivere i minuti nel VALORE in alto (da 1 a 120) e premere **✏️ VALORE**;
-2. clicca **l'evento**. Parte subito per tutti un'**animazione d'apertura**:
-   - lampo, bande nere e raggi di luce;
-   - il titolo che si schianta sullo schermo;
-   - la scena dell'evento nel mondo, davanti a ogni giocatore.
+2. clicca **l'evento**. Parte subito per tutti un'**animazione d'apertura con la regia** (circa 16 secondi):
+   - la telecamera di ogni giocatore passa alla regia: bande nere, lampo, raggi di luce e il titolo che si schianta sullo schermo;
+   - poi la scena dell'evento, girata su un set costruito nel cielo (così nessuna casa o collina la copre) con inquadrature che seguono l'azione: primi piani dei giganti, la corsa, lo schianto, i razzi, la cavalleria;
+   - il testo dell'evento scorre nella banda nera in basso, la durata e i bonus in quella in alto.
 
-   I giocatori possono continuare a muoversi mentre la guardano.
+   **Durante l'animazione nessuno può fare altro**: niente movimento, rampini, attacchi, menu o interfaccia, e i giganti non possono toccare nessuno. Alla fine lo schermo sfuma al nero e ognuno torna al suo personaggio. Giganti e boss dell'evento arrivano solo dopo.
+
+   Chi in quel momento sta guardando una scena della storia vede solo il titolo, senza regia. Chi entra a evento già iniziato vede solo cielo e striscione.
 3. Per tutta la durata cambiano anche altre cose:
    - il **cielo** prende i colori dell'evento;
    - **particelle** come cenere, foglie o polvere cadono attorno ai giocatori;
@@ -119,14 +121,14 @@ Sempre in **😈 Admin Abuse**, la sezione **🎬 Animazioni** fa partire un eve
    - in alto compare uno **striscione con il conto alla rovescia**.
 4. Allo scadere del tempo compare **"EVENTO TERMINATO"**: il cielo torna normale, i giganti dell'evento spariscono e i bonus si tolgono. Puoi fermarlo prima con **⏹️ Termina l'evento in corso**. Se lanci un altro evento, sostituisce quello in corso.
 
-| Evento | Animazione d'apertura | Durante l'evento |
+| Evento | Animazione d'apertura (regia) | Durante l'evento |
 |---|---|---|
-| 🧱 **La Caduta del Muro** | Cielo rosso, fulmine dorato. Il Gigante Vulcano si alza oltre il Muro avvolto dal vapore, urla e sfonda il cancello con un calcio | XP x2, oro x1,5. Ondate di giganti vicino a chi è nelle zone con i giganti. Arriva il Gigante Ghignante |
-| 🛡️ **La Carica del Bastione** | Passi che fanno tremare la terra. Il Bastione carica e si schianta contro il Muro, poi si indurisce | Oro x3, XP x1,5. Il boss Bastione (torna se viene abbattuto). Scosse di terremoto |
-| 🔥 **L'Assedio di Calaneth** | Razzi rossi e campane d'allarme, il fulmine e il Gigante della Furia che solleva un masso enorme e chiude la breccia | XP x2, oro x2. Invasione del distretto e ondate fitte. Ogni giocatore riceve un gigante alleato che combatte con lui |
-| 😱 **L'Urlo della Cacciatrice** | Crescono gli alberi giganti. La Cacciatrice corre tra gli alberi, urla (onde d'urto, schermo sfocato) e i giganti corrono verso di lei | XP x2,5, oro x1,5. Il boss Cacciatrice. A ogni urlo arrivano giganti anomali |
-| 🐎 **La Spedizione oltre le Mura** | Fanfara e razzi verdi in formazione. Passa la cavalleria al galoppo, poi un razzo nero: un gigante anomalo salta fuori e la insegue | XP x3, oro x1,5. Giganti anomali segnalati da un razzo nero: ognuno vale 5 💎 |
-| ⚡ **Il Fulmine della Trasformazione** | Pioggia di fulmini dorati, poi il fulmine gigante: il Gigante della Furia emerge dal vapore, urla e tira un pugno | Danni x2, gas infinito, XP e oro x1,5. Temporale. I fulmini immobilizzano i giganti vicino a voi per 5 secondi |
+| 🧱 **La Caduta del Muro** | La strada tranquilla del distretto. Poi il fulmine dorato oltre il Muro, il Gigante Vulcano che si alza nel vapore (la telecamera guarda in su), il primo piano dell'urlo, il calcio che fa esplodere il cancello e il vapore visto dall'alto | XP x2, oro x1,5. Ondate di giganti vicino a chi è nelle zone con i giganti. Arriva il Gigante Ghignante |
+| 🛡️ **La Carica del Bastione** | Dall'alto del Muro, la polvere all'orizzonte. La telecamera corre accanto al Bastione, poi lo schianto contro il cancello visto da dietro. Infine il Bastione nella breccia urla e si indurisce | Oro x3, XP x1,5. Il boss Bastione (torna se viene abbattuto). Scosse di terremoto |
+| 🔥 **L'Assedio di Calaneth** | Razzi rossi dai tetti e campane d'allarme. Poi il fulmine e il Gigante della Furia che esce dal vapore e urla. La telecamera lo segue mentre solleva un masso enorme e lo porta fino alla breccia per chiuderla | XP x2, oro x2. Invasione del distretto e ondate fitte. Ogni giocatore riceve un gigante alleato che combatte con lui |
+| 😱 **L'Urlo della Cacciatrice** | La foresta degli alberi giganti. La telecamera corre accanto alla Cacciatrice, che poi si ferma, si gira e urla (onde d'urto, schermo sfocato). Dall'alto si vedono i giganti che corrono verso di lei da ogni parte | XP x2,5, oro x1,5. Il boss Cacciatrice. A ogni urlo arrivano giganti anomali |
+| 🐎 **La Spedizione oltre le Mura** | Dall'alto del Muro, all'alba, con la fanfara, la cavalleria esce dal cancello in formazione e spara i razzi verdi. Poi la telecamera galoppa accanto ai cavalli: un razzo rosso, un razzo nero, e un gigante anomalo salta fuori e li insegue | XP x3, oro x1,5. Giganti anomali segnalati da un razzo nero: ognuno vale 5 💎 |
+| ⚡ **Il Fulmine della Trasformazione** | Fulmini dorati sulle case nel temporale. Poi il fulmine gigante in mezzo alla strada: il Gigante della Furia emerge dal vapore (la telecamera sale lungo il suo corpo), urla e tira un pugno verso lo schermo | Danni x2, gas infinito, XP e oro x1,5. Temporale. I fulmini immobilizzano i giganti vicino a voi per 5 secondi |
 
 Giganti e boss dell'evento nascono vicino ai giocatori che si trovano in una zona con i giganti, non nelle città sicure né in mare. Danno le ricompense piene.
 
