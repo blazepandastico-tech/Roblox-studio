@@ -306,7 +306,7 @@ end
 
 -- Un gigante costruito sul client, animato (Walk, Animate) e sempre in piedi sul punto "ground"
 local function titan(look: string, height: number, ground: Vector3, facing: CFrame): Model
-	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = rng:NextInteger(1, 1e6) })
+	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = rng:NextInteger(1, 1e6), Cinematic = true })
 	local hip = (model:GetAttribute("HipHeight") :: number?) or height * 0.45
 	model:PivotTo(CFrame.new(ground + Vector3.new(0, hip, 0)) * facing.Rotation)
 	for _, d in model:GetDescendants() do

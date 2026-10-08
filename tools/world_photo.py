@@ -8,7 +8,8 @@ Le foto mostrano il mondo vero del gioco: utili per vedere le modifiche prima di
   python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file]
 
 Inquadrature: calaneth_tetti, calaneth_strada, calaneth_case, muro_esterno, vermiglia_alto, campo, aurion,
-bosco, giganti, giganti_vicino, volto, varieta, varieta_volti
+bosco, giganti, giganti_vicino, volto, varieta, varieta_volti,
+colosso, colosso_busto, colosso_testa, colosso_scena
 (senza nomi le fa tutte). Serve il programma 'luau' (variabile LUAU o nel PATH).
 """
 import math
@@ -167,7 +168,7 @@ def add_wedge(sc, center, size, R, mat, color):
     sc.add(V, F, mat, color, smooth=False)
 
 
-def add_part(sc, part, origin, titan=False, offset=None, R0=None):
+def add_part(sc, part, origin, titan=False, offset=None, R0=None, plain=False):
     size = part["size"] * SCALE
     R = part["R"]
     pos = part["pos"]
@@ -177,7 +178,7 @@ def add_part(sc, part, origin, titan=False, offset=None, R0=None):
     if offset is not None:
         pos = pos + offset
     c = to_engine(pos, origin)
-    mat = material_of(part["mat"], titan)
+    mat = M_COLOR if plain else material_of(part["mat"], titan)
     col = np.clip(part["color"], 0, 1)
     if part["mat"] == "Neon":
         col = col * 2.2
@@ -312,17 +313,17 @@ def build_scene(data, cam_pos, target, reach, clear_view=False):
     return sc, origin
 
 
-def add_titans(sc, data, origin):
+def add_titans(sc, data, origin, only=None):
     for idx, pos, yaw in data["places"]:
         titan = data["titans"].get(idx)
-        if not titan:
+        if not titan or (only is not None and idx not in only) or (only is None and idx >= 30):
             continue
         # i giganti guardano verso la telecamera (verso l'esterno del distretto)
         a = yaw + math.pi
         c, s = math.cos(a), math.sin(a)
         R0 = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
         for p in titan["parts"]:
-            add_part(sc, p, origin, titan=True, offset=pos, R0=R0)
+            add_part(sc, p, origin, titan=True, offset=pos, R0=R0, plain=only is not None)
 
 
 DAY = dict(
@@ -333,13 +334,44 @@ DAY = dict(
 )
 
 
+STUDIO = dict(
+    sun_dir=(0.35, 0.72, 0.6), sun_col=(1.5, 1.46, 1.42), sky_top=(0.92, 0.92, 0.93), sky_hor=(0.99, 0.99, 0.99),
+    sky_amb=(0.42, 0.42, 0.45), ground_amb=(0.30, 0.29, 0.29), fog_density=0.0, fog_height=45, cloud_cover=0.0,
+    cloud_col=(1.0, 1.0, 1.0), cloud_dark=(0.9, 0.9, 0.9), rays=0.0, bloom=0.12, saturation=1.0, exposure=0.9,
+    sun_disk=False, vignette=0.12, ground_mat="ground",
+)
+
+
+def studio_photo(data, name, out_path, width):
+    """Il colosso dei filmati da solo, su un pavimento chiaro (come la foto di una statuetta)."""
+    cam_pos, target = data["views"][name]
+    origin = np.array([0.0, data["ground"], 0.0])
+    sc = Scene()
+    half = 160.0
+    V, F = grid_quad(np.array([-half, 0.0, -half]), np.array([2 * half, 0.0, 0.0]), np.array([0.0, 0.0, 2 * half]), 64, 64)
+    sc.add(V, F, M_COLOR, (0.88, 0.88, 0.89), N=np.tile([0.0, 1.0, 0.0], (len(V), 1)))
+    add_titans(sc, data, origin, only={30})
+    H = int(width * 9 / 16)
+    cp = to_engine(cam_pos, origin)
+    tp = to_engine(target, origin)
+    cam = Camera(cp, tp, 55, width, H)
+    look = Look(**dict(STUDIO, shadow_extent=90.0, shadow_center=(0.0, 0.0, 0.0)))
+    img = render(sc, cam, look, ss=1, shadow_cache={})
+    img.save(out_path)
+    print("foto:", out_path)
+
+
 def photo(data, name, out_path, width):
+    if name.startswith("colosso") and name != "colosso_scena":
+        return studio_photo(data, name, out_path, width)
     cam_pos, target = data["views"][name]
     reach = 4200 if name == "vermiglia_alto" else 2600
     with_titans = name in ("giganti", "giganti_vicino", "volto", "varieta", "varieta_volti")
     sc, origin = build_scene(data, cam_pos, target, reach, clear_view=with_titans)
     if with_titans:
         add_titans(sc, data, origin)
+    if name == "colosso_scena":
+        add_titans(sc, data, origin, only={31})
     H = int(width * 9 / 16)
     cp = to_engine(cam_pos, origin)
     tp = to_engine(target, origin)

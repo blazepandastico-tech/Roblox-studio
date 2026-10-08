@@ -222,7 +222,7 @@ function api.Look(from: Vector3, at: Vector3): CFrame
 end
 
 function api.Titan(look: string, height: number, position: Vector3, yaw: number?): Model
-	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = math.random(1, 1e6) })
+	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = math.random(1, 1e6), Cinematic = true })
 	local hip = model:GetAttribute("HipHeight") :: number
 	model:PivotTo(CFrame.new(position + Vector3.new(0, hip, 0)) * CFrame.Angles(0, math.rad(yaw or 0), 0))
 	for _, d in model:GetDescendants() do

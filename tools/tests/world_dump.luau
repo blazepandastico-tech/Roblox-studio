@@ -148,6 +148,16 @@ do
 end
 local _ = calaneth
 
+-- il colosso anatomico dei filmati, in posa come una statuetta (foto "in studio", sfondo chiaro)
+emit("TP", "30", f(0), f(G), f(0), f(0))
+view("colosso", Vector3.new(0, G + 95, 265), Vector3.new(0, G + 95, 0))
+view("colosso_busto", Vector3.new(0, G + 150, 118), Vector3.new(0, G + 150, 0))
+view("colosso_testa", Vector3.new(8, G + 178, 42), Vector3.new(0, G + 177, 0))
+-- e in scena, come nel filmato: si affaccia oltre il muro esterno di Calaneth
+local colossoScena = outerGate + outward * 60
+emit("TP", "31", f(colossoScena.X), f(G), f(colossoScena.Z), f(math.atan2(outward.X, outward.Z) + math.pi))
+view("colosso_scena", innerGate + outward * 6 + right * 26 + Vector3.new(0, G + 166, 0), colossoScena + Vector3.new(0, G + 150, 0))
+
 -- terreno
 for name, color in MOCK_TERRAIN_COLORS do
 	emit("C", name, f(color.R), f(color.G), f(color.B))
@@ -184,6 +194,31 @@ for i, look in LOOKS do
 		emit("GE", look)
 	else
 		emit("GX", look, tostring(model))
+	end
+end
+do
+	local okC, colosso = pcall(TitanBuilder.Build, { Height = 190, Look = "Vulcano", Seed = 7, Cinematic = true, Name = "Colosso" })
+	if okC and colosso then
+		emit("G", "Colosso", f(190), "30")
+		local n = 0
+		for _, d in colosso:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 0.98 then
+				emitPart(d)
+				n += 1
+			end
+		end
+		emit("GE", "Colosso")
+		-- seconda copia per la foto in scena
+		emit("G", "Colosso", f(190), "31")
+		for _, d in colosso:GetDescendants() do
+			if d:IsA("BasePart") and d.Transparency < 0.98 then
+				emitPart(d)
+			end
+		end
+		emit("GE", "Colosso")
+		LOG(("COLOSSO\t%d pezzi"):format(n))
+	else
+		emit("GX", "Colosso", tostring(colosso))
 	end
 end
 -- semi scelti in modo che ognuno abbia una pettinatura diversa (così si vede anche il calvo)

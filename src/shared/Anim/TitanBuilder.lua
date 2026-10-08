@@ -13,6 +13,7 @@
 ]]
 
 local MeshTitan = require(script.Parent.MeshTitan)
+local ColossoAnatomico = require(script.Parent.ColossoAnatomico)
 
 local TitanBuilder = {}
 
@@ -533,6 +534,14 @@ function TitanBuilder.Build(params): Model
 	local seed: number = params.Seed or 1
 	if look == "Sagoma" then
 		return buildDummy(H, params.Name)
+	end
+	-- nei filmati il Vulcano è il colosso anatomico senza pelle (molto più dettagliato)
+	if params.Cinematic and look == "Vulcano" then
+		local ok, colosso = pcall(ColossoAnatomico.Build, params)
+		if ok and colosso then
+			return colosso
+		end
+		warn("[Giganti] Errore nel colosso dei filmati: " .. tostring(colosso))
 	end
 	-- aspetto fatto con un modello 3D importato (vedi MeshTitan): se c'è, ha la precedenza
 	if MeshTitan.Has(look) then
