@@ -445,6 +445,48 @@ function Poses.Human.Cloak(t, ctx)
 	}
 end
 
+-- Seduto (barche e panche): gambe piegate, mani sulle ginocchia
+function Poses.Human.Sit(t, _ctx)
+	local sway = sin(t * 1.2) * 1.5
+	return {
+		Root = A(0, 0, sway * 0.3),
+		Waist = A(-4, 0, 0),
+		RightHip = A(88, 0, 6),
+		LeftHip = A(88, 0, -6),
+		RightKnee = A(-86, 0, 0),
+		LeftKnee = A(-86, 0, 0),
+		RightShoulder = A(28, 0, 10),
+		LeftShoulder = A(28, 0, -10),
+		RightElbow = A(30, 0, 0),
+		LeftElbow = A(30, 0, 0),
+		Neck = A(sway * 0.5, 0, 0),
+	}
+end
+
+-- A cavallo: gambe aperte ai lati della sella, redini in mano, busto che segue il galoppo
+-- ctx.RideGallop (0..1) e ctx.RidePhase (ciclo del galoppo)
+function Poses.Human.Ride(_t, ctx)
+	local gallop = ctx.RideGallop or 0
+	local cycle = (ctx.RidePhase or 0) * math.pi * 2
+	local bounce = abs(sin(cycle)) * gallop
+	local lean = 6 + 14 * gallop
+	return {
+		Root = TA(0, bounce * 0.35, 0, -lean + sin(cycle) * 4 * gallop, 0, 0),
+		Waist = A(-4 - 4 * gallop, 0, 0),
+		Neck = A(lean * 0.6, 0, 0),
+		RightHip = A(62, 0, 30),
+		LeftHip = A(62, 0, -30),
+		RightKnee = A(-78, 0, 0),
+		LeftKnee = A(-78, 0, 0),
+		RightShoulder = A(42 + 10 * gallop + sin(cycle) * 6 * gallop, 0, 8),
+		LeftShoulder = A(42 + 10 * gallop + sin(cycle) * 6 * gallop, 0, -8),
+		RightElbow = A(48, 0, 0),
+		LeftElbow = A(48, 0, 0),
+		RightWrist = A(-10, 0, 0),
+		LeftWrist = A(-10, 0, 0),
+	}
+end
+
 local H = Poses.Human
 H.Clips = {}
 

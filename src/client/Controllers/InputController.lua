@@ -15,6 +15,8 @@
 	  G              Risveglio Valkar
 	  M              menu
 	  N              negozio premium (gemme, monete, pass)
+	  B              mappa dell'arcipelago
+	  H              chiama il cavallo / scendi
 	  Bloc Maiusc    cammina / corri
 	  Alt sinistro   sblocca il cursore
 ]]
@@ -44,6 +46,9 @@ local KEYS: { [Enum.KeyCode]: string } = {
 	[Enum.KeyCode.M] = "Menu",
 	[Enum.KeyCode.N] = "Premium",
 	[Enum.KeyCode.P] = "Admin",
+	[Enum.KeyCode.B] = "Map",
+	[Enum.KeyCode.H] = "Horse",
+	[Enum.KeyCode.ButtonSelect] = "Map",
 	[Enum.KeyCode.CapsLock] = "WalkToggle",
 	[Enum.KeyCode.LeftAlt] = "ToggleCursor",
 	[Enum.KeyCode.ButtonR2] = "Attack",
@@ -64,6 +69,8 @@ local MOUSE: { [Enum.UserInputType]: string } = {
 -- Azioni che funzionano anche con un menu aperto
 local ALWAYS = {
 	Menu = true,
+	Map = true,
+	Horse = true,
 	Premium = true,
 	Admin = true,
 	ToggleCursor = true,

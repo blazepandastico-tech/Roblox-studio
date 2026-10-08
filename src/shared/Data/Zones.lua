@@ -420,6 +420,138 @@ Zones.List = {
 		Ambience = "Arena",
 		Description = "Un'antica arena circondata dal mare: qui si combattono i raid a ondate.",
 	},
+
+	-- ARENA DEI DUELLI (PvP sempre attivo) ------------------------------------------------
+	{
+		Id = "ArenaDuelli",
+		Name = "Arena dei Duelli",
+		Season = 1,
+		PvP = true,
+		Center = W.Landmarks.ArenaDuelli,
+		Radius = 80,
+		Level = { 1, 2000 },
+		Ambience = "Arena",
+		Description = "Qui i soldati regolano i conti tra loro. Dentro l'arena il PvP è sempre attivo.",
+	},
+
+	-- ISOLOTTI DEL MARE APERTO -------------------------------------------------------------
+	{
+		Id = "IsolaGabbiani",
+		Name = "Isola dei Gabbiani",
+		Season = 1,
+		Islet = true,
+		Center = W.IsletById.IsolaGabbiani.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.IsolaGabbiani.Radius,
+		Level = { 150, 220 },
+		Ambience = "Mare",
+		Titans = {
+			{ Class = "T7", Level = 170, Count = 3 },
+			{ Class = "T10", Level = 200, Count = 2 },
+		},
+		Description = "Uno scoglio pieno di gabbiani a metà strada tra Vermiglia ed Edenia.",
+	},
+	{
+		Id = "IsolaFaro",
+		Name = "Isola del Faro",
+		Season = 2,
+		Islet = true,
+		Center = W.IsletById.IsolaFaro.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.IsolaFaro.Radius,
+		Level = { 250, 350 },
+		Ambience = "Mare",
+		Titans = {
+			{ Class = "T10", Level = 260, Count = 3 },
+			{ Class = "T12", Level = 300, Count = 2, Abnormal = 0.2 },
+		},
+		Description = "Il vecchio faro guida ancora le navi. Dalla cima si vede tutto l'arcipelago.",
+	},
+	{
+		Id = "BancoSabbia",
+		Name = "Banco di Sabbia",
+		Season = 2,
+		Islet = true,
+		Center = W.IsletById.BancoSabbia.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.BancoSabbia.Radius,
+		Level = { 300, 400 },
+		Ambience = "Mare",
+		Titans = {
+			{ Class = "T10", Level = 320, Count = 3 },
+			{ Class = "T12", Level = 360, Count = 2 },
+		},
+		Description = "Una lingua di sabbia tra Vermiglia e Aurea. Con la bassa marea i giganti ci passeggiano.",
+	},
+	{
+		Id = "ScogliNaufraghi",
+		Name = "Scogli dei Naufraghi",
+		Season = 3,
+		Islet = true,
+		Center = W.IsletById.ScogliNaufraghi.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.ScogliNaufraghi.Radius,
+		Level = { 400, 500 },
+		Ambience = "Nebbia",
+		Titans = {
+			{ Class = "T12", Level = 420, Count = 3 },
+			{ Class = "T15", Level = 470, Count = 2 },
+		},
+		Description = "Scogli taglienti e il relitto di una nave mercantile. Il carico non è mai stato trovato.",
+	},
+	{
+		Id = "TorreSommersa",
+		Name = "Torre Sommersa",
+		Season = 3,
+		Islet = true,
+		Center = W.IsletById.TorreSommersa.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.TorreSommersa.Radius,
+		Level = { 600, 700 },
+		Ambience = "Rovine",
+		Titans = {
+			{ Class = "T12", Level = 620, Count = 3 },
+			{ Class = "T15", Level = 680, Count = 1 },
+		},
+		Description = "Una torre di guardia dei tempi antichi, mezza inghiottita dal mare.",
+	},
+	{
+		Id = "RifugioContrabbandieri",
+		Name = "Rifugio dei Contrabbandieri",
+		Season = 3,
+		Islet = true,
+		Center = W.IsletById.RifugioContrabbandieri.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.RifugioContrabbandieri.Radius,
+		Level = { 850, 950 },
+		Ambience = "Nebbia",
+		Enemies = {
+			{ Type = "Contrabbandiere", Level = 860, Count = 5 },
+			{ Type = "Contrabbandiere", Level = 920, Count = 4 },
+		},
+		Description = "Contrabbandieri di gas e di sieri. Non amano le visite.",
+	},
+	{
+		Id = "ScoglioBrace",
+		Name = "Scoglio di Brace",
+		Season = 4,
+		Islet = true,
+		Center = W.IsletById.ScoglioBrace.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.ScoglioBrace.Radius,
+		Level = { 1250, 1400 },
+		Ambience = "Marcia",
+		Titans = {
+			{ Class = "T15", Level = 1260, Count = 3, Abnormal = 0.3 },
+			{ Class = "T12", Level = 1300, Count = 2 },
+		},
+		Description = "Un vulcano spento che fuma ancora. I giganti qui sono feroci.",
+	},
+	{
+		Id = "IsolaPalme",
+		Name = "Isola delle Palme",
+		Season = 2,
+		Safe = true,
+		Islet = true,
+		Center = W.IsletById.IsolaPalme.Center + Vector3.new(0, G, 0),
+		Radius = W.IsletById.IsolaPalme.Radius,
+		Level = { 1, 2000 },
+		Ambience = "Mare",
+		Description = "Un'isola tranquilla in mezzo al mare: niente giganti, solo palme e un vecchio mercante.",
+	},
 }
 
 Zones.ById = {}
@@ -462,7 +594,11 @@ function Zones.RegionName(position: Vector3): string
 	end
 	local island = W.IslandAt(position)
 	if not island then
-		return "Il Mare"
+		local islet = W.IsletAt(position)
+		if islet then
+			return islet.Name
+		end
+		return "Mare Aperto"
 	end
 	for _, wall in W.Walls do
 		if wall.Island == island.Id and Util.FlatDistance(position, island.Center) < wall.Radius then

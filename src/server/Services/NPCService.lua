@@ -1,7 +1,8 @@
 --[[
 	NPCService
 	Crea i personaggi non giocanti e gestisce i dialoghi:
-	storia, missioni, negozi, laboratorio, viaggi rapidi, navi, ascensori e stirpi.
+	storia, missioni, negozi, laboratorio, viaggi rapidi, navi, ascensori, stirpi, taverne e duelli.
+	Mondo aperto: nessuna isola è bloccata dal livello, i PNG avvisano solo se è pericolosa.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -18,6 +19,7 @@ local Quests = require(Shared.Data.Quests)
 local Leveling = require(Shared.Data.Leveling)
 local Bloodlines = require(Shared.Data.Bloodlines)
 local W = require(Shared.Data.WorldLayout)
+local Treasures = require(Shared.Data.Treasures)
 
 local OutfitService = require(script.Parent.OutfitService)
 
@@ -37,9 +39,9 @@ end
 local groundParams = RaycastParams.new()
 groundParams.FilterType = Enum.RaycastFilterType.Include
 
-local function groundAt(pos: Vector3, underground: boolean): number
+local function groundAt(pos: Vector3, underground: boolean, indoor: boolean?): number
 	groundParams.FilterDescendantsInstances = { workspace.Terrain, workspace:FindFirstChild(Config.Folders.Map) or workspace.Terrain }
-	local origin = if underground then pos + Vector3.new(0, 40, 0) else Vector3.new(pos.X, pos.Y + 120, pos.Z)
+	local origin = if indoor then pos + Vector3.new(0, 6, 0) elseif underground then pos + Vector3.new(0, 40, 0) else Vector3.new(pos.X, pos.Y + 120, pos.Z)
 	local result = workspace:Raycast(origin, Vector3.new(0, -220, 0), groundParams)
 	return if result then result.Position.Y else pos.Y
 end
@@ -160,7 +162,7 @@ local function spawnNpc(npc)
 	if not zone or not pos then
 		return
 	end
-	local y = groundAt(pos, zone.Underground == true)
+	local y = groundAt(pos, zone.Underground == true, npc.Indoor == true)
 	pos = Vector3.new(pos.X, y, pos.Z)
 	local name, title = NPCs.DisplayName(npc)
 	local character = npc.Character and NPCs.Characters[npc.Character]
@@ -245,6 +247,18 @@ local function isNear(player: Player, npc): boolean
 	return root ~= nil and pos ~= nil and Util.FlatDistance(root.Position, pos) < 30 and math.abs(root.Position.Y - pos.Y) < 50
 end
 
+-- Mondo aperto: si può andare ovunque, ma chi è troppo debole viene avvisato
+local function warnDanger(player: Player, levelReq: number?, place: string)
+	local profile = S.DataService.Get(player)
+	if profile and levelReq and profile.Level < levelReq then
+		S.EventService.Notify(player, ("⚠️ %s è una zona da livello %d: i nemici lì sono molto più forti di te!"):format(place, levelReq), "Errore", 5)
+	end
+end
+
+local function tavernMealCost(profile): number
+	return 60 + profile.Level * 6
+end
+
 local function teleportToZone(player: Player, zoneId: string)
 	local zone = Zones.Get(zoneId)
 	if not zone then
@@ -314,15 +328,13 @@ function NPCService.Interact(player: Player, npcId: string)
 		local lines = { greeting(npc) }
 		local choices = {}
 		if dest then
-			table.insert(choices, { Id = "ship", Text = ("⛵ Salpa per %s%s"):format(dest.Name, if npc.LevelReq then (" (Lv. %d)"):format(npc.LevelReq) else "") })
+			table.insert(choices, { Id = "ship", Text = ("⛵ Salpa per %s%s"):format(dest.Name, if npc.LevelReq then (" (consigliato Lv. %d)"):format(npc.LevelReq) else "") })
 		end
 		table.insert(choices, { Id = "close", Text = "Non ancora" })
 		send(player, npc, lines, choices)
 	elseif role == "Lift" then
-		if npc.LevelReq and profile.Level < npc.LevelReq then
-			S.EventService.Notify(player, ("Le guardie non ti fanno passare: serve il livello %d."):format(npc.LevelReq), "Errore", 3)
-			return
-		end
+		local dest = Zones.Get(npc.Destination)
+		warnDanger(player, npc.LevelReq, if dest then dest.Name else "Laggiù")
 		teleportToZone(player, npc.Destination)
 	elseif role == "Genealogist" then
 		local bloodline = Bloodlines.Get(profile.Bloodline)
@@ -340,16 +352,33 @@ function NPCService.Interact(player: Player, npcId: string)
 		for _, islandId in W.IslandOrder do
 			local island = W.Islands[islandId]
 			if not island.Raid and (not here or here.Id ~= islandId) then
-				local locked = profile.Level < island.LevelReq
+				local risky = profile.Level < island.LevelReq
 				table.insert(choices, {
 					Id = "ferry:" .. islandId,
-					Text = ("%s %s  (Lv. %d)"):format(if locked then "🔒" else "⛵", island.Name, island.LevelReq),
-					Disabled = locked,
+					Text = ("%s %s  (consigliato Lv. %d)"):format(if risky then "⚠️" else "⛵", island.Name, island.LevelReq),
 				})
 			end
 		end
+		table.insert(choices, { Id = "boat", Text = "🚣 Dammi una barca: navigo da solo" })
 		table.insert(choices, { Id = "close", Text = "Resto qui" })
-		send(player, npc, { greeting(npc), "Ogni isola ha i suoi giganti: più ti allontani, più sono forti." }, choices)
+		send(player, npc, { greeting(npc), "Il mare è aperto: puoi andare dove vuoi, anche con la tua barca. Ma più ti allontani, più i giganti sono forti." }, choices)
+	elseif role == "Tavern" then
+		local cost = tavernMealCost(profile)
+		send(player, npc, { greeting(npc) }, {
+			{ Id = "meal", Text = ("🍲 Pasto caldo (%s oro): salute piena, gas e lame, +10%% danni per 10 minuti"):format(Util.Abbreviate(cost)) },
+			{ Id = "rumor", Text = "🍺 Hai sentito qualche voce?" },
+			{ Id = "close", Text = "Arrivederci" },
+		})
+	elseif role == "Duel" then
+		local pvpOn = profile.Settings.PvP == true
+		send(player, npc, {
+			greeting(npc),
+			("La tua taglia: %s. Il PvP fuori dall'arena è %s (si cambia dal menu, Opzioni)."):format(Util.Abbreviate(profile.Bounty or 0), if pvpOn then "ATTIVO" else "spento"),
+		}, {
+			{ Id = "pvp_on", Text = "⚔️ Attiva il PvP anche fuori dall'arena", Disabled = pvpOn },
+			{ Id = "pvp_off", Text = "🕊️ Spegni il PvP fuori dall'arena", Disabled = not pvpOn },
+			{ Id = "close", Text = "Arrivederci" },
+		})
 	elseif role == "Raid" or role == "RaidArena" then
 		if S.RaidService then
 			local lines, choices = S.RaidService.DialogueFor(player, npc)
@@ -402,10 +431,8 @@ local function onChoice(player: Player, npcId: any, choiceId: any)
 			teleportToZone(player, zoneId)
 		end
 	elseif choiceId == "ship" and npc.Role == "Ship" then
-		if npc.LevelReq and profile.Level < npc.LevelReq then
-			S.EventService.Notify(player, ("Il capitano scuote la testa: serve il livello %d."):format(npc.LevelReq), "Errore", 3)
-			return
-		end
+		local dest = Zones.Get(npc.Destination)
+		warnDanger(player, npc.LevelReq, if dest then dest.Name else "Quel porto")
 		S.EventService.EffectTo(player, "Voyage", { Destination = npc.Destination })
 		task.wait(2)
 		teleportToZone(player, npc.Destination)
@@ -414,13 +441,56 @@ local function onChoice(player: Player, npcId: any, choiceId: any)
 		if not island or island.Raid then
 			return
 		end
-		if profile.Level < island.LevelReq then
-			S.EventService.Notify(player, ("Il nocchiero scuote la testa: per %s serve il livello %d."):format(island.Name, island.LevelReq), "Errore", 3)
-			return
-		end
+		warnDanger(player, island.LevelReq, island.Name)
 		S.EventService.EffectTo(player, "Voyage", { Destination = island.Hub })
 		task.wait(1.5)
 		teleportToZone(player, island.Hub)
+	elseif choiceId == "boat" and npc.Role == "Ferry" then
+		if S.SeaService then
+			S.SeaService.SpawnBoatNear(player, npcPosition(npc) or Vector3.zero)
+		end
+	elseif choiceId == "meal" and npc.Role == "Tavern" then
+		local cost = tavernMealCost(profile)
+		if not S.PlayerService.SpendGold(player, cost) then
+			S.EventService.Notify(player, ("Ti servono %s oro per il pasto."):format(Util.Abbreviate(cost)), "Errore", 3)
+			return
+		end
+		S.PlayerService.Heal(player, 1)
+		if S.ODMService then
+			S.ODMService.Refill(player)
+		end
+		S.PlayerService.RefillWeapons(player)
+		Net.Event("Refilled"):FireClient(player, "Gas")
+		-- non sostituisce un potenziamento più forte già attivo
+		local now = os.time()
+		if (profile.Buffs.DamageUntil or 0) < now or (profile.Buffs.DamageAmount or 0) <= 0.1 then
+			profile.Buffs.DamageUntil = now + 600
+			profile.Buffs.DamageAmount = 0.1
+		end
+		S.DataService.MarkDirty(player)
+		S.EventService.Notify(player, "🍲 Che pasto! Salute, gas e lame al massimo, +10% danni per 10 minuti.", "Successo", 4)
+	elseif choiceId == "rumor" and npc.Role == "Tavern" then
+		-- una voce su un forziere che il giocatore non ha ancora trovato
+		local missing = {}
+		for _, t in Treasures.List do
+			if not (profile.Treasures and profile.Treasures[t.Id]) then
+				table.insert(missing, t)
+			end
+		end
+		local line
+		if #missing == 0 then
+			line = "Voci? Ormai le conosci tutte meglio di me. Hai trovato ogni tesoro dell'arcipelago!"
+		else
+			line = "Si dice che... " .. missing[rng:NextInteger(1, #missing)].Hint
+		end
+		send(player, npc, { line }, {
+			{ Id = "rumor", Text = "🍺 Raccontami un'altra voce" },
+			{ Id = "close", Text = "Grazie, oste" },
+		})
+	elseif (choiceId == "pvp_on" or choiceId == "pvp_off") and npc.Role == "Duel" then
+		if S.PvPService then
+			S.PvPService.SetEnabled(player, choiceId == "pvp_on")
+		end
 	elseif choiceId:sub(1, 5) == "raid:" and (npc.Role == "Raid" or npc.Role == "RaidArena") then
 		if S.RaidService then
 			S.RaidService.HandleChoice(player, choiceId)

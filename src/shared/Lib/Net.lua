@@ -41,7 +41,10 @@ Net.EventNames = {
 	"SpinWheel",
 	"CommunityAction",
 	"AdminAction",
+	"Horse",
+	"PvPToggle",
 	-- server -> client
+	"PvPState",
 	"RaidState",
 	"WheelResult",
 	"Leaderboards",

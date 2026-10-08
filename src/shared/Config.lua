@@ -170,6 +170,51 @@ local Config = {
 		InvasionDuration = 300,
 	},
 
+	-- MONDO APERTO -------------------------------------------------------------------------
+	-- Barche: si prendono ai pontili (tasto F) e si guidano con W A S D, si scende saltando
+	Boat = {
+		MaxSpeed = 70, -- studs al secondo a tutta velocità
+		Reverse = 22,
+		Accel = 26,
+		TurnRate = 70, -- gradi al secondo
+		IdleDespawn = 300, -- una barca senza nessuno sopra sparisce dopo 5 minuti
+		SpawnCooldown = 8,
+	},
+	-- Eventi in mare aperto (giganti che emergono, relitti alla deriva)
+	Sea = {
+		EventInterval = { 150, 260 },
+		TitanDuration = 180,
+		WreckDuration = 240,
+	},
+	-- Cavallo: si chiama con H e si cavalca ovunque all'aperto
+	Horse = {
+		Speed = 54,
+		JumpHeight = 9,
+		Cooldown = 3,
+		SaddleHeight = 5.4,
+	},
+	-- PvP: si attiva dal menu (Opzioni). Nell'Arena dei Duelli è sempre attivo.
+	PvP = {
+		DamageScale = 0.55, -- i colpi sui giocatori fanno meno danni che sui giganti
+		MaxHitFraction = 0.22, -- un colpo non toglie più del 22% della salute
+		MinHitFraction = 0.02,
+		ToggleCombatLock = 20, -- dopo un combattimento devi aspettare per spegnerlo
+		BountyBase = 100,
+		BountySteal = 0.1, -- chi vince prende anche il 10% della taglia dello sconfitto
+		ArenaBountyMult = 0.5,
+	},
+	-- Tesori nascosti: ricompense per chi esplora
+	Treasures = {
+		GoldBase = 300,
+		GoldPerLevel = 45,
+		XPFraction = 0.25, -- frazione dell'esperienza per salire di livello
+		GemsCommon = 2,
+		GemsRare = 8,
+		GemsLegendary = 25,
+		MilestoneEvery = 10,
+		MilestoneGems = 30,
+	},
+
 	-- Nomi condivisi tra server e client (non cambiarli se non sai cosa fai)
 	Folders = {
 		Map = "Mappa",
@@ -188,6 +233,11 @@ local Config = {
 		Pickup = "Raccoglibile",
 		Spinner = "Rotante",
 		Lamp = "Lampione",
+		Boat = "Barca",
+		BoatDock = "PuntoBarca",
+		Horse = "Cavallo",
+		Treasure = "Tesoro",
+		SeaEvent = "EventoMare",
 	},
 	CollisionGroups = {
 		Players = "Giocatori",

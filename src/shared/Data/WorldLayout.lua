@@ -121,4 +121,89 @@ W.Landmarks = {
 	LagoOstrava = ostrava + Vector3.new(-150, 0, -120),
 }
 
+-- MARE APERTO ------------------------------------------------------------------------------
+-- Il mondo è aperto: tra le isole si naviga con la propria barca (o a nuoto).
+-- Gli isolotti in mezzo al mare hanno giganti, relitti e tesori nascosti.
+W.Islets = {
+	{ Id = "IsolaGabbiani", Name = "Isola dei Gabbiani", Center = Vector3.new(150, 0, -1650), Radius = 85, Kind = "Gabbiani" },
+	{ Id = "BancoSabbia", Name = "Banco di Sabbia", Center = Vector3.new(-1600, 0, 150), Radius = 80, Kind = "Sabbia" },
+	{ Id = "TorreSommersa", Name = "Torre Sommersa", Center = Vector3.new(-150, 0, 1650), Radius = 80, Kind = "Torre" },
+	{ Id = "IsolaFaro", Name = "Isola del Faro", Center = Vector3.new(1700, 0, -1700), Radius = 110, Kind = "Faro" },
+	{ Id = "ScogliNaufraghi", Name = "Scogli dei Naufraghi", Center = Vector3.new(-1800, 0, -1900), Radius = 95, Kind = "Relitto" },
+	{ Id = "IsolaPalme", Name = "Isola delle Palme", Center = Vector3.new(-1900, 0, 1900), Radius = 120, Kind = "Palme" },
+	{ Id = "RifugioContrabbandieri", Name = "Rifugio dei Contrabbandieri", Center = Vector3.new(2000, 0, 1900), Radius = 130, Kind = "Rifugio" },
+	{ Id = "ScoglioBrace", Name = "Scoglio di Brace", Center = Vector3.new(2600, 0, -1000), Radius = 100, Kind = "Vulcano" },
+}
+
+W.IsletById = {}
+for _, islet in W.Islets do
+	W.IsletById[islet.Id] = islet
+end
+
+-- Isolotto che contiene una posizione (nil se non sei su un isolotto)
+function W.IsletAt(position: Vector3)
+	for _, islet in W.Islets do
+		if Util.FlatDistance(position, islet.Center) <= islet.Radius + 20 then
+			return islet
+		end
+	end
+	return nil
+end
+
+-- Confini del mare (rettangolo che contiene tutte le isole, con un margine di mare aperto)
+do
+	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+	for _, isl in W.Islands do
+		minX = math.min(minX, isl.Center.X - isl.Water - 600)
+		maxX = math.max(maxX, isl.Center.X + isl.Water + 600)
+		minZ = math.min(minZ, isl.Center.Z - isl.Water - 600)
+		maxZ = math.max(maxZ, isl.Center.Z + isl.Water + 600)
+	end
+	W.SeaBounds = { MinX = minX, MaxX = maxX, MinZ = minZ, MaxZ = maxZ }
+end
+
+-- In mare aperto (lontano dalla terra di isole e isolotti)?
+function W.IsOpenSea(position: Vector3): boolean
+	if position.Y < -60 then
+		return false
+	end
+	for _, isl in W.Islands do
+		if Util.FlatDistance(position, isl.Center) <= isl.Land + 30 then
+			return false
+		end
+	end
+	for _, islet in W.Islets do
+		if Util.FlatDistance(position, islet.Center) <= islet.Radius then
+			return false
+		end
+	end
+	return true
+end
+
+-- Arena dei Duelli (PvP sempre attivo) sull'isola di Vermiglia, fuori dalla porta nord
+W.Landmarks.ArenaDuelli = W.At("Vermiglia", 30, 720, W.GroundY)
+
+-- Locande e taverne in cui si può entrare (Offset rispetto al centro della zona, la porta guarda verso Facing)
+W.Taverns = {
+	{ Id = "TavernaMuro", Name = "Taverna del Muro", Zone = "Calaneth", Offset = Vector3.new(-48, 0, 34), Facing = 90, Style = "Mura" },
+	{ Id = "LocandaCervo", Name = "Locanda del Cervo", Zone = "Brenn", Offset = Vector3.new(-30, 0, 40), Facing = 0, Style = "Mura" },
+	{ Id = "OsteriaAurea", Name = "Osteria Aurea", Zone = "Aurion", Offset = Vector3.new(110, 0, 150), Facing = 270, Style = "Mura" },
+	{ Id = "TavernaGabbiano", Name = "Taverna del Gabbiano", Zone = "PortoOrientale", Offset = Vector3.new(-65, 0, 80), Facing = 0, Style = "Mura" },
+	{ Id = "OsteriaPorto", Name = "Osteria del Porto", Zone = "PortoRevelia", Offset = Vector3.new(70, 0, 60), Facing = 180, Style = "Valdoria" },
+}
+W.TavernSize = Vector3.new(30, 12, 24)
+W.TavernById = {}
+for _, t in W.Taverns do
+	W.TavernById[t.Id] = t
+end
+
+-- Punto dentro la taverna (coordinate locali: X a destra, Z verso il fondo) → offset dal centro della zona
+-- (il davanti, con la porta, guarda verso Facing: è la stessa rotazione di CFrame.lookAt usata dal WorldBuilder)
+function W.TavernOffset(id: string, localPos: Vector3): Vector3
+	local t = W.TavernById[id]
+	local a = math.rad(t.Facing)
+	local c, s = math.cos(a), math.sin(a)
+	return t.Offset + Vector3.new(localPos.X * c - localPos.Z * s, localPos.Y, localPos.X * s + localPos.Z * c)
+end
+
 return W

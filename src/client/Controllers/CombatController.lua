@@ -60,7 +60,31 @@ local function targetFolders(): { Instance }
 			table.insert(list, f)
 		end
 	end
+	-- PvP: anche gli altri giocatori con il PvP attivo (se lo è anche il tuo)
+	if player:GetAttribute("PvPActive") == true then
+		for _, other in Players:GetPlayers() do
+			if other ~= player and other:GetAttribute("PvPActive") == true and other.Character then
+				table.insert(list, other.Character)
+			end
+		end
+	end
 	return list
+end
+
+-- Il personaggio di un altro giocatore a cui appartiene questa parte (per il PvP)
+local function pvpOwner(part: BasePart): Model?
+	local model = part:FindFirstAncestorOfClass("Model")
+	while model do
+		local owner = Players:GetPlayerFromCharacter(model)
+		if owner then
+			if owner ~= player and owner:GetAttribute("PvPActive") == true then
+				return model
+			end
+			return nil
+		end
+		model = model:FindFirstAncestorOfClass("Model")
+	end
+	return nil
 end
 
 -- Trova le parti colpite (una per bersaglio, preferendo la nuca)
@@ -68,7 +92,13 @@ local function collectHits(parts: { BasePart }, max: number?): ({ BasePart }, { 
 	local best: { [Instance]: BasePart } = {}
 	for _, part in parts do
 		local owner = Util.FindAncestorWithAttribute(part, "TitanUid") or Util.FindAncestorWithAttribute(part, "EnemyUid")
-		if owner and owner:GetAttribute("State") ~= "Dead" and owner:GetAttribute("Dead") ~= true and owner:GetAttribute("Ally") ~= true then
+		local rival = if owner then nil else pvpOwner(part)
+		if rival then
+			-- un altro giocatore: si colpisce il busto (una parte sola per bersaglio)
+			if not best[rival] or part.Name == "UpperTorso" then
+				best[rival] = part
+			end
+		elseif owner and owner:GetAttribute("State") ~= "Dead" and owner:GetAttribute("Dead") ~= true and owner:GetAttribute("Ally") ~= true then
 			local zone = part:GetAttribute("HitZone")
 			if zone or owner:GetAttribute("EnemyUid") then
 				local current = best[owner]
@@ -567,8 +597,14 @@ function CombatController.Start()
 	end)
 
 	local input = C.InputController
+	local function leaveHorse()
+		if player:GetAttribute("Riding") and C.HorseController then
+			C.HorseController.Dismount()
+		end
+	end
 	input.On("Attack", function(began)
 		if began then
+			leaveHorse()
 			swing()
 		end
 	end)
@@ -593,6 +629,7 @@ function CombatController.Start()
 			if titanForm then
 				titanSkill(key)
 			else
+				leaveHorse()
 				bladeSkill(key)
 			end
 		end)

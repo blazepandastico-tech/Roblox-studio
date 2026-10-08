@@ -248,21 +248,29 @@ end
 -- PULSANTI DEL MENU E TOUCH ---------------------------------------------------------------------------
 
 local function buildMenuButtons()
-	local holder = New("Frame", { Name = "Menu", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(60, 4 * 60 + 3 * 8), BackgroundTransparency = 1, Parent = root })
-	C.UIController.AttachScale(holder)
-	New("UIListLayout", { Padding = UDim.new(0, 8), Parent = holder })
 	local entries = {
 		{ Icon = "🎒", Tab = "Equipaggiamento", Hint = "M" },
+		{ Icon = "🗺️", Tab = "Mappa", Hint = "B" },
+		{ Icon = "🐎", Tab = "Cavallo", Hint = "H" },
 		{ Icon = "📊", Tab = "Statistiche" },
-		{ Icon = "💉", Tab = "Sieri" },
 		{ Icon = "💎", Tab = "Premium", Hint = "N" },
 	}
+	local holder = New("Frame", { Name = "Menu", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(60, #entries * 60 + (#entries - 1) * 8), BackgroundTransparency = 1, Parent = root })
+	C.UIController.AttachScale(holder)
+	New("UIListLayout", { Padding = UDim.new(0, 8), Parent = holder })
 	for i, entry in entries do
 		local button = Theme.Button(entry.Icon, { Size = UDim2.fromOffset(60, 60), TextSize = 28, LayoutOrder = i, Parent = holder }, function()
 			if entry.Tab == "Premium" then
 				if C.Premium then
 					C.Premium.Open()
 				end
+			elseif entry.Tab == "Mappa" then
+				if C.WorldMap then
+					C.WorldMap.Toggle()
+				end
+			elseif entry.Tab == "Cavallo" then
+				C.InputController.Trigger("Horse", true)
+				C.InputController.Trigger("Horse", false)
 			elseif C.Menu then
 				C.Menu.OpenTab(entry.Tab)
 			end

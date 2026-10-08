@@ -13,6 +13,9 @@
 	  PlayHours  → ore di gioco
 	  Streak     → giorni di fila nel calendario
 	  Friends    → amici nello stesso server
+	  Treasures  → forzieri nascosti trovati
+	  PvPKills   → giocatori sconfitti in PvP
+	  Bounty     → taglia attuale
 ]]
 
 local Achievements = {}
@@ -42,6 +45,13 @@ Achievements.List = {
 	{ Id = "Ore10", Icon = "⏳", Name = "Instancabile", Description = "Gioca per 10 ore in totale.", Stat = "PlayHours", Goal = 10, Gems = 30, BadgeId = 0 },
 	{ Id = "Compagni", Icon = "🤝", Name = "Compagni d'Armi", Description = "Gioca nello stesso server con un amico.", Stat = "Friends", Goal = 1, Gems = 10, BadgeId = 0 },
 	{ Id = "Squadra", Icon = "👥", Name = "La Squadra al Completo", Description = "Gioca con 3 amici nello stesso server.", Stat = "Friends", Goal = 3, Gems = 25, BadgeId = 0 },
+	-- mondo aperto
+	{ Id = "Tesoro1", Icon = "📦", Name = "Cacciatore di Tesori", Description = "Trova il tuo primo forziere nascosto.", Stat = "Treasures", Goal = 1, Gems = 5, BadgeId = 0 },
+	{ Id = "Tesoro20", Icon = "🗺️", Name = "Esploratore", Description = "Trova 20 forzieri nascosti.", Stat = "Treasures", Goal = 20, Gems = 40, BadgeId = 0 },
+	{ Id = "TesoroTutti", Icon = "🧭", Name = "Cartografo dell'Arcipelago", Description = "Trova tutti i forzieri nascosti.", Stat = "Treasures", Goal = 42, Gems = 120, BadgeId = 0 },
+	{ Id = "Duellante", Icon = "🤺", Name = "Duellante", Description = "Sconfiggi un giocatore in PvP.", Stat = "PvPKills", Goal = 1, Gems = 10, BadgeId = 0 },
+	{ Id = "Gladiatore", Icon = "⚔️", Name = "Gladiatore", Description = "Sconfiggi 50 giocatori in PvP.", Stat = "PvPKills", Goal = 50, Gems = 50, BadgeId = 0 },
+	{ Id = "Taglia5000", Icon = "💰", Name = "Ricercato", Description = "Raggiungi una taglia di 5.000.", Stat = "Bounty", Goal = 5000, Gems = 40, BadgeId = 0 },
 }
 
 function Achievements.Get(id: string)
@@ -73,6 +83,16 @@ function Achievements.Value(profile, stat: string, extra: { [string]: number }?)
 		return profile.Streak and profile.Streak.Best or 0
 	elseif stat == "Friends" then
 		return extra and extra.Friends or (profile.FriendsSeen or 0)
+	elseif stat == "Treasures" then
+		local n = 0
+		for _ in profile.Treasures or {} do
+			n += 1
+		end
+		return n
+	elseif stat == "PvPKills" then
+		return profile.Kills and profile.Kills.Players or 0
+	elseif stat == "Bounty" then
+		return profile.Bounty or 0
 	end
 	return 0
 end

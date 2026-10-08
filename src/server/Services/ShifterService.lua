@@ -273,6 +273,18 @@ function ShifterService.Transform(player: Player): (boolean, string?)
 	if d.Energy < d.MaxEnergy * Config.Serums.MinEnergyToTransform then
 		return false, "Energia del gigante insufficiente."
 	end
+	-- giù dal cavallo e dalla barca prima di diventare un gigante
+	if S.HorseService then
+		S.HorseService.Dismount(player, true)
+	end
+	local seated = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if seated and seated.SeatPart then
+		local weld = seated.SeatPart:FindFirstChild("SeatWeld")
+		if weld then
+			weld:Destroy()
+		end
+		seated.Sit = false
+	end
 	local character = player.Character
 	local humanoid = Util.GetHumanoid(character)
 	local root = Util.GetRoot(character)

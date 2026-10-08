@@ -1050,6 +1050,32 @@ handlers.Voyage = function(_p)
 	end
 end
 
+-- mondo aperto: un gigante che emerge dal mare, un forziere aperto
+handlers.Splash = function(p)
+	local size = p.Size or 20
+	for i = 0, 3 do
+		task.delay(i * 0.15, function()
+			EffectsController.Steam(p.Position + Vector3.new(0, 2, 0), size * (0.4 + i * 0.15), 10, 1.8, Color3.fromRGB(226, 240, 250))
+		end)
+	end
+	EffectsController.Shockwave(p.Position, size * 2, Color3.fromRGB(200, 230, 250), 1.2, 1)
+	if C.SoundController then
+		C.SoundController.Play("Splash", p.Position, { Range = 1200, Volume = 1, Pitch = 0.6 })
+	end
+end
+handlers.TreasureOpen = function(p)
+	local color = if p.Tier == "Leggendario" then Color3.fromRGB(255, 200, 80) elseif p.Tier == "Raro" then Color3.fromRGB(140, 200, 255) else Color3.fromRGB(255, 230, 160)
+	EffectsController.Sparks(p.Position + Vector3.new(0, 2, 0), color, if p.Tier == "Leggendario" then 60 else 30, 30)
+	EffectsController.Shockwave(p.Position, 10, color, 0.6, 1)
+	if C.SoundController then
+		C.SoundController.Play("Coins")
+		C.SoundController.Play("Reward")
+	end
+	if C.CameraController then
+		C.CameraController.Shake(0.15, 0.2)
+	end
+end
+
 function EffectsController.Init(c)
 	C = c
 end

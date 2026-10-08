@@ -185,6 +185,18 @@ local function onAttack(player: Player, payload: any)
 					local hit, blocked = bladeHit(player, part, base, speed)
 					anyHit = anyHit or hit
 					anyBlocked = anyBlocked or blocked
+				elseif not owner and S.PvPService then
+					-- PvP: un altro giocatore (solo se entrambi hanno il PvP attivo)
+					local victim = S.PvPService.PlayerFromPart(part)
+					if victim and not seen[victim] and S.PvPService.CanHit(player, victim) then
+						seen[victim] = true
+						count += 1
+						local dealt = S.PvPService.Damage(player, victim, base, "Blade")
+						if dealt > 0 then
+							sendDamageNumber(player, part.Position, dealt, "Normal")
+							anyHit = true
+						end
+					end
 				end
 			end
 		end
@@ -267,7 +279,19 @@ local function onSkillHit(player: Player, key: any, hits: any)
 		end
 		if validPart(part, root, reach, speed) then
 			local owner = Util.FindAncestorWithAttribute(part, "TitanUid") or Util.FindAncestorWithAttribute(part, "EnemyUid")
-			if owner then
+			local victim = if not owner and S.PvPService then S.PvPService.PlayerFromPart(part) else nil
+			if victim and S.PvPService.CanHit(player, victim) then
+				local done = active.PerTarget[victim] or 0
+				if done < perTargetLimit then
+					active.PerTarget[victim] = done + 1
+					active.Hits += 1
+					local dealt = S.PvPService.Damage(player, victim, base, "Skill")
+					if dealt > 0 then
+						sendDamageNumber(player, part.Position, dealt, "Crit")
+						anyHit = true
+					end
+				end
+			elseif owner then
 				local done = active.PerTarget[owner] or 0
 				if done < perTargetLimit then
 					active.PerTarget[owner] = done + 1
@@ -363,6 +387,11 @@ local function onRanged(player: Player, payload: any)
 			for _, r in humans do
 				sendDamageNumber(player, r.Position, r.Result.Damage, "Explosion")
 			end
+			if S.PvPService then
+				for _, hit in S.PvPService.DamageInRadius(player, pos, radius, damage * 0.6) do
+					sendDamageNumber(player, hit.Position, hit.Damage, "Explosion")
+				end
+			end
 			S.EventService.Effect("Explosion", { Position = pos, Radius = radius, Big = kind == "Cannone" }, pos, 1000)
 			if def.Chain then
 				task.delay(0.35, function()
@@ -378,6 +407,14 @@ local function onRanged(player: Player, payload: any)
 	end
 
 	if not hitPart then
+		return
+	end
+	local victim = S.PvPService and S.PvPService.PlayerFromPart(hitPart)
+	if victim then
+		local dealt = S.PvPService.Damage(player, victim, damage, "Ranged")
+		if dealt > 0 then
+			sendDamageNumber(player, hitPart.Position, dealt, "Crit")
+		end
 		return
 	end
 	local t = S.TitanService.GetFromPart(hitPart)

@@ -50,6 +50,7 @@ local BOARDS = {
 	{ Id = "Livello", Title = "⭐ Livello" },
 	{ Id = "Giganti", Title = "⚔️ Giganti uccisi" },
 	{ Id = "Raid", Title = "🔱 Raid vinti" },
+	{ Id = "Taglia", Title = "💰 Taglie" },
 }
 
 local function clear()
@@ -539,17 +540,27 @@ end
 
 local function showSettings()
 	clear()
-	local list = New("Frame", { BackgroundTransparency = 1, Size = UDim2.new(0.6, 0, 1, 0), Parent = content })
-	New("UIListLayout", { Padding = UDim.new(0, 8), Parent = list })
+	local list = New("ScrollingFrame", { BackgroundTransparency = 1, Size = UDim2.new(0.6, 0, 1, 0), ScrollBarThickness = 4, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new(), BorderSizePixel = 0, Parent = content })
+	New("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
+	-- PvP: lo decide il server (non si può spegnere in mezzo a un combattimento)
+	local pvpOn = C.ClientData.Setting("PvP", false) == true
+	local pvpRow = Theme.Panel({ Size = UDim2.new(1, -8, 0, 64), LayoutOrder = 0, Parent = list })
+	Theme.Padding(pvpRow, 8)
+	Theme.Label("⚔️ PvP: combatti con gli altri giocatori", { Size = UDim2.new(0.7, 0, 0, 22), Font = Theme.Fonts.Bold, TextSize = 15, Parent = pvpRow })
+	Theme.Label("Solo fuori dalle zone sicure e con chi l'ha attivo. Vinci per alzare la tua taglia 💰", { Position = UDim2.fromOffset(0, 24), Size = UDim2.new(0.7, 0, 0, 24), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = pvpRow })
+	Theme.Button(if pvpOn then "ATTIVO" else "SPENTO", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(110, 34), BackgroundColor3 = if pvpOn then Colors.Red else Colors.PanelLight, Parent = pvpRow }, function()
+		Net.Event("PvPToggle"):FireServer(not pvpOn)
+	end)
 	local toggles = {
 		{ Key = "Shake", Name = "Scossa della telecamera" },
 		{ Key = "SpeedLines", Name = "Linee di velocità" },
 		{ Key = "DamageNumbers", Name = "Numeri dei danni" },
 		{ Key = "Scenery", Name = "Dettagli ambientali (natura e cittadini)" },
+		{ Key = "Minimap", Name = "Minimappa" },
 	}
 	for i, t in toggles do
 		local on = C.ClientData.Setting(t.Key, true)
-		local row = Theme.Panel({ Size = UDim2.new(1, 0, 0, 50), LayoutOrder = i, Parent = list })
+		local row = Theme.Panel({ Size = UDim2.new(1, -8, 0, 50), LayoutOrder = i, Parent = list })
 		Theme.Padding(row, 8)
 		Theme.Label(t.Name, { Size = UDim2.new(0.7, 0, 1, 0), Font = Theme.Fonts.Bold, TextSize = 15, Parent = row })
 		Theme.Button(if on then "ATTIVO" else "SPENTO", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(110, 34), BackgroundColor3 = if on then Colors.Green else Colors.Red, Parent = row }, function()
@@ -560,7 +571,7 @@ local function showSettings()
 	local sliders = { { Key = "Sfx", Name = "Volume effetti", Default = 0.8 }, { Key = "Music", Name = "Volume musica", Default = 0.5 } }
 	for i, sl in sliders do
 		local value = C.ClientData.Setting(sl.Key, sl.Default)
-		local row = Theme.Panel({ Size = UDim2.new(1, 0, 0, 50), LayoutOrder = 10 + i, Parent = list })
+		local row = Theme.Panel({ Size = UDim2.new(1, -8, 0, 50), LayoutOrder = 10 + i, Parent = list })
 		Theme.Padding(row, 8)
 		Theme.Label(("%s: %d%%"):format(sl.Name, math.floor(value * 100 + 0.5)), { Size = UDim2.new(0.6, 0, 1, 0), Font = Theme.Fonts.Bold, TextSize = 15, Parent = row })
 		Theme.Button("−", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -60, 0.5, 0), Size = UDim2.fromOffset(50, 34), TextSize = 20, Parent = row }, function()
@@ -575,7 +586,7 @@ local function showSettings()
 	local help = Theme.Panel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0.38, 0, 1, 0), Parent = content })
 	Theme.Padding(help, 12)
 	Theme.Label("Comandi", { Size = UDim2.new(1, 0, 0, 24), Font = Theme.Fonts.Header, TextSize = 18, TextColor3 = Colors.Gold, Parent = help })
-	Theme.Label("Q / E — rampino sinistro / destro (tieni premuto)\nSpazio — salto / getto di gas\nWASD — muoviti e correggi il volo\nShift — attiva/disattiva lo shift lock\nCtrl — schivata\nBloc Maiusc — cammina / corri\nClic sinistro — fendente\nClic destro — arma a distanza\nZ X C V — abilità\nR — sostituisci le lame\nT — trasformazione in gigante\nG — Risveglio Valkar\nF — interagisci\nM — menu\nAlt — sblocca il cursore", {
+	Theme.Label("Q / E — rampino sinistro / destro (tieni premuto)\nSpazio — salto / getto di gas\nWASD — muoviti e correggi il volo\nShift — attiva/disattiva lo shift lock\nCtrl — schivata\nBloc Maiusc — cammina / corri\nClic sinistro — fendente\nClic destro — arma a distanza\nZ X C V — abilità\nR — sostituisci le lame\nT — trasformazione in gigante\nG — Risveglio Valkar\nF — interagisci (forzieri, barche, rifornimenti)\nM — menu\nB — mappa dell'arcipelago\nH — cavallo (chiama / scendi)\nIn barca: W/S velocità, A/D timone, Spazio scendi\nAlt — sblocca il cursore", {
 		Position = UDim2.fromOffset(0, 30),
 		Size = UDim2.new(1, 0, 1, -30),
 		Font = Theme.Fonts.UI,
@@ -648,6 +659,12 @@ function Menu.Start()
 	end)
 	C.ClientData.Changed:Connect(function()
 		if C.UIController.IsOpen("Menu") then
+			render()
+		end
+	end)
+	-- il server conferma (o rifiuta, se sei in combattimento) il cambio del PvP
+	Net.Event("PvPState").OnClientEvent:Connect(function()
+		if C.UIController.IsOpen("Menu") and currentTab == "Impostazioni" then
 			render()
 		end
 	end)

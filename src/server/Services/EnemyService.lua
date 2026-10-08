@@ -119,6 +119,17 @@ function EnemyService.Spawn(spec)
 		pos = zone.Center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 	end
 	pos = pos or Vector3.zero
+	if not spec.Position and zone and not zone.Underground then
+		-- appoggiato su quello che c'è sotto (terreno, tetti, casse): mai dentro un edificio
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { workspace.Terrain, workspace:FindFirstChild(Config.Folders.Map) or workspace.Terrain }
+		params.IgnoreWater = true
+		local hit = workspace:Raycast(pos + Vector3.new(0, 80, 0), Vector3.new(0, -160, 0), params)
+		if hit then
+			pos = Vector3.new(pos.X, hit.Position.Y, pos.Z)
+		end
+	end
 	model:PivotTo(CFrame.new(pos + Vector3.new(0, 5, 0)))
 
 	nextUid += 1

@@ -75,6 +75,7 @@
       "$properties": {
         "StreamingEnabled": true,
         "StreamingIntegrityMode": "MinimumRadiusPause",
+        "StreamingTargetRadius": 1600,
         "FallenPartsDestroyHeight": -1200,
         "Gravity": 196.2,
         "GlobalWind": [

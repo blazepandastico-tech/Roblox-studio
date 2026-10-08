@@ -68,6 +68,24 @@ Enemies.Types = {
 			{ Id = "FrammentoSiero", Chance = 0.006, Min = 1, Max = 1 },
 		},
 	},
+	-- contrabbandieri del Rifugio in mezzo al mare (mondo aperto)
+	Contrabbandiere = {
+		Id = "Contrabbandiere",
+		Name = "Contrabbandiere",
+		Uniform = "Mercante",
+		Weapon = "Pistole",
+		HPMult = 1.15,
+		DmgMult = 1.1,
+		Range = 70,
+		FireRate = 1.3,
+		Speed = 19,
+		XP = 1.35,
+		Gold = 1.6,
+		Drops = {
+			{ Id = "BombolaGas", Chance = 0.08, Min = 1, Max = 1 },
+			{ Id = "FrammentoSiero", Chance = 0.004, Min = 1, Max = 1 },
+		},
+	},
 }
 
 -- Boss umani

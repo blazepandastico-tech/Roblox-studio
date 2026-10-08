@@ -737,7 +737,11 @@ local function facadeWindow(cf: CFrame, x: number, y: number, side: number, dept
 	end
 end
 
-local function buildHouse(cf: CFrame, width: number, depth: number, floors: number, style: string, ruined: boolean?)
+local furnishRoom: (CFrame, number, number, number, number, string, number) -> ()
+
+-- opts.Enterable: il piano terra è una stanza vera (porta aperta, pareti, mobili) in cui si entra
+-- opts.Kind: "Casa" | "Caserma" | "Taverna" (cambia l'arredamento)
+local function buildHouse(cf: CFrame, width: number, depth: number, floors: number, style: string, ruined: boolean?, opts: { [string]: any }?)
 	local floorH = 12
 	local height = floors * floorH
 	local isValdoria = style == "Valdoria"
@@ -747,12 +751,58 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 		wallColor = Color3.new(wallColor.R * 0.7, wallColor.G * 0.68, wallColor.B * 0.66)
 		height = height * rng:NextNumber(0.55, 1)
 	end
-	local body = part({ Name = "Casa", Size = Vector3.new(width, height, depth), CFrame = cf * CFrame.new(0, height / 2, 0), Material = material, Color = wallColor })
-	CollectionService:AddTag(body, "Edificio")
-	body.CollisionGroup = Config.CollisionGroups.Buildings
+	local enterable = opts ~= nil and opts.Enterable == true and not ruined and width >= 14 and depth >= 12
+	local cols = math.max(1, math.floor(width / 9))
+	local doorX = if cols % 2 == 1 then 0 else -width / 2 + width * (math.ceil(cols / 2) - 0.5) / cols
+	-- zoccolo di pietra alla base (nelle case aperte è basso: è il pavimento)
+	local plinthH = if enterable then 1.2 elseif isValdoria then 4 else 2.4
+	if enterable then
+		local T = 0.8
+		local wallTop = if floors >= 2 then floorH else height
+		local wallH = wallTop - plinthH
+		local wy = plinthH + wallH / 2
+		local walls = {}
+		local function wall(name: string, size: Vector3, pos: Vector3)
+			local w = part({ Name = name, Size = size, CFrame = cf * CFrame.new(pos), Material = material, Color = wallColor })
+			CollectionService:AddTag(w, "Edificio")
+			w.CollisionGroup = Config.CollisionGroups.Buildings
+			table.insert(walls, w)
+		end
+		wall("Casa", Vector3.new(width, wallH, T), Vector3.new(0, wy, depth / 2 - T / 2))
+		wall("Casa", Vector3.new(T, wallH, depth - 2 * T), Vector3.new(-width / 2 + T / 2, wy, 0))
+		wall("Casa", Vector3.new(T, wallH, depth - 2 * T), Vector3.new(width / 2 - T / 2, wy, 0))
+		-- facciata con il vano della porta
+		local doorW, doorH = 5.2, 8.6
+		local leftW = (doorX - doorW / 2) + width / 2
+		local rightW = width / 2 - (doorX + doorW / 2)
+		if leftW > 0.2 then
+			wall("Casa", Vector3.new(leftW, wallH, T), Vector3.new(-width / 2 + leftW / 2, wy, -depth / 2 + T / 2))
+		end
+		if rightW > 0.2 then
+			wall("Casa", Vector3.new(rightW, wallH, T), Vector3.new(width / 2 - rightW / 2, wy, -depth / 2 + T / 2))
+		end
+		local lintelH = wallTop - (plinthH + doorH)
+		if lintelH > 0.2 then
+			wall("Casa", Vector3.new(doorW, lintelH, T), Vector3.new(doorX, plinthH + doorH + lintelH / 2, -depth / 2 + T / 2))
+		end
+		if floors >= 2 then
+			-- piani superiori pieni (sopra la stanza)
+			wall("Casa", Vector3.new(width, height - floorH, depth), Vector3.new(0, floorH + (height - floorH) / 2, 0))
+		else
+			part({ Name = "Soffitto", Size = Vector3.new(width - 2 * T, 0.6, depth - 2 * T), CFrame = cf * CFrame.new(0, height - 0.3, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(110, 80, 54), CastShadow = false })
+		end
+		-- pavimento di legno
+		part({ Name = "Pavimento", Size = Vector3.new(width - 2 * T, 0.2, depth - 2 * T), CFrame = cf * CFrame.new(0, plinthH + 0.1, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(128, 92, 62), CastShadow = false })
+		local ok, err = pcall(furnishRoom, cf, width - 2 * T, depth - 2 * T, plinthH + 0.2, wallTop, (opts :: any).Kind or "Casa", doorX)
+		if not ok then
+			warn("[WorldBuilder] Arredamento: " .. tostring(err))
+		end
+	else
+		local body = part({ Name = "Casa", Size = Vector3.new(width, height, depth), CFrame = cf * CFrame.new(0, height / 2, 0), Material = material, Color = wallColor })
+		CollectionService:AddTag(body, "Edificio")
+		body.CollisionGroup = Config.CollisionGroups.Buildings
+	end
 
-	-- zoccolo di pietra alla base
-	local plinthH = if isValdoria then 4 else 2.4
 	part({ Name = "Zoccolo", Size = Vector3.new(width + 0.8, plinthH, depth + 0.8), CFrame = cf * CFrame.new(0, plinthH / 2, 0), Material = Enum.Material.Cobblestone, Color = if isValdoria then Color3.fromRGB(150, 144, 134) else Color3.fromRGB(132, 126, 116), CastShadow = false })
 
 	if not isValdoria then
@@ -789,7 +839,6 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 	end
 
 	-- finestre su facciata (con cornice) e retro (solo vetro)
-	local cols = math.max(1, math.floor(width / 9))
 	for f = 0, floors - 1 do
 		local y = f * floorH + 7
 		if y < height - 3 then
@@ -797,6 +846,10 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 				local x = -width / 2 + width * (c - 0.5) / cols
 				if not (f == 0 and c == math.ceil(cols / 2)) then
 					facadeWindow(cf, x, y, -1, depth, isValdoria, not ruined)
+					if enterable and f == 0 then
+						-- la luce del giorno che entra dalla finestra (vista da dentro)
+						part({ Name = "LuceFinestra", Size = Vector3.new(3, 4.2, 0.1), CFrame = cf * CFrame.new(x, y, -depth / 2 + 0.85), Material = Enum.Material.Glass, Color = Color3.fromRGB(196, 218, 236), Transparency = 0.25, CastShadow = false, CanCollide = false })
+					end
 				end
 				if rng:NextNumber() < 0.6 then
 					facadeWindow(cf, x, y, 1, depth, isValdoria, false)
@@ -804,10 +857,21 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			end
 		end
 	end
-	-- porta con stipiti, architrave e gradino
-	local doorX = if cols % 2 == 1 then 0 else -width / 2 + width * (math.ceil(cols / 2) - 0.5) / cols
-	part({ Name = "Porta", Size = Vector3.new(4.4, 8, 0.4), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4, -depth / 2 - 0.15), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(90, 60, 40), CastShadow = false })
-	part({ Name = "Stipite", Size = Vector3.new(5.8, 9.2, 0.3), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4.6, -depth / 2 - 0.05), Material = if isValdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = if isValdoria then Color3.fromRGB(214, 206, 190) else PALETTE.Timber, CastShadow = false, CanCollide = false })
+	-- porta con stipiti, architrave e gradino (nelle case aperte il vano è libero)
+	if not enterable then
+		part({ Name = "Porta", Size = Vector3.new(4.4, 8, 0.4), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4, -depth / 2 - 0.15), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(90, 60, 40), CastShadow = false })
+	end
+	local jambMaterial = if isValdoria then Enum.Material.Limestone else Enum.Material.Wood
+	local jambColor = if isValdoria then Color3.fromRGB(214, 206, 190) else PALETTE.Timber
+	if enterable then
+		-- stipiti e architrave attorno al vano aperto
+		for _, sx in { -1, 1 } do
+			part({ Name = "Stipite", Size = Vector3.new(0.7, 9.2, 1.1), CFrame = cf * CFrame.new(doorX + sx * 2.95, plinthH + 4.6, -depth / 2 + 0.3), Material = jambMaterial, Color = jambColor, CastShadow = false })
+		end
+		part({ Name = "Architrave", Size = Vector3.new(6.6, 0.8, 1.1), CFrame = cf * CFrame.new(doorX, plinthH + 9, -depth / 2 + 0.3), Material = jambMaterial, Color = jambColor, CastShadow = false })
+	else
+		part({ Name = "Stipite", Size = Vector3.new(5.8, 9.2, 0.3), CFrame = cf * CFrame.new(doorX, plinthH / 2 + 4.6, -depth / 2 - 0.05), Material = jambMaterial, Color = jambColor, CastShadow = false, CanCollide = false })
+	end
 	part({ Name = "Gradino", Size = Vector3.new(6, 0.8, 2), CFrame = cf * CFrame.new(doorX, 0.4, -depth / 2 - 1), Material = Enum.Material.Cobblestone, Color = Color3.fromRGB(140, 134, 124) })
 	if not ruined and rng:NextNumber() < 0.5 then
 		local lantern = part({ Name = "Lanterna", Size = Vector3.new(0.8, 1.2, 0.8), CFrame = cf * CFrame.new(doorX + 3.8, plinthH / 2 + 8, -depth / 2 - 0.7), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 196, 120), CastShadow = false, CanCollide = false })
@@ -848,6 +912,129 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 		for _ = 1, 3 do
 			part({ Name = "TraveBruciata", Size = Vector3.new(1.2, 1.2, depth * rng:NextNumber(0.6, 1.1)), CFrame = cf * CFrame.new(rng:NextNumber(-width / 2, width / 2), height + 0.6, 0) * CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(-0.4, 0.4), 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(30, 24, 20), CastShadow = false })
 		end
+	end
+end
+
+-- INTERNI: arredamento delle stanze in cui si entra -----------------------------------------------
+
+local RUGS = { Color3.fromRGB(140, 46, 40), Color3.fromRGB(60, 86, 120), Color3.fromRGB(150, 120, 60), Color3.fromRGB(90, 60, 100) }
+local BLANKETS = { Color3.fromRGB(150, 50, 46), Color3.fromRGB(70, 100, 70), Color3.fromRGB(70, 80, 130), Color3.fromRGB(170, 140, 90) }
+local FURNITURE = Color3.fromRGB(122, 86, 56)
+
+local function warmLight(p: BasePart, range: number, brightness: number)
+	local light = Instance.new("PointLight")
+	light.Range = range
+	light.Brightness = brightness
+	light.Color = Color3.fromRGB(255, 184, 110)
+	light.Shadows = false
+	light.Parent = p
+end
+
+furnishRoom = function(cf: CFrame, w: number, d: number, floorY: number, ceilY: number, kind: string, doorX: number)
+	local function at(x: number, y: number, z: number): CFrame
+		return cf * CFrame.new(x, floorY + y, z)
+	end
+	local function piece(name: string, size: Vector3, x: number, y: number, z: number, material: Enum.Material, color: Color3, collide: boolean?)
+		return part({ Name = name, Size = size, CFrame = at(x, y, z), Material = material, Color = color, CastShadow = false, CanCollide = collide ~= false })
+	end
+	local function tableWithStools(x: number, z: number, round: boolean)
+		if round then
+			part({ Name = "Tavolo", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 3.4, 3.4), CFrame = at(x, 2.9, z) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = FURNITURE, CastShadow = false })
+			piece("GambaTavolo", Vector3.new(0.5, 2.75, 0.5), x, 1.375, z, Enum.Material.Wood, PALETTE.Timber)
+			for i = 0, 2 do
+				local a = i / 3 * math.pi * 2 + 0.4
+				piece("Sgabello", Vector3.new(1.1, 1.7, 1.1), x + math.cos(a) * 2.5, 0.85, z + math.sin(a) * 2.5, Enum.Material.Wood, PALETTE.Wood)
+			end
+		else
+			piece("Tavolo", Vector3.new(4.4, 0.3, 2.8), x, 2.9, z, Enum.Material.Wood, FURNITURE)
+			for _, sx in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					piece("GambaTavolo", Vector3.new(0.3, 2.75, 0.3), x + sx * 1.9, 1.375, z + sz * 1.1, Enum.Material.Wood, PALETTE.Timber)
+				end
+				piece("Sgabello", Vector3.new(1.2, 1.7, 1.2), x + sx * 2.9, 0.85, z, Enum.Material.Wood, PALETTE.Wood)
+			end
+		end
+	end
+	local function ceilingLamp(x: number, z: number, range: number)
+		local h = ceilY - floorY
+		piece("Catena", Vector3.new(0.15, 1.2, 0.15), x, h - 0.6, z, Enum.Material.Metal, Color3.fromRGB(50, 46, 44), false)
+		local bulb = piece("Lume", Vector3.new(0.9, 0.9, 0.9), x, h - 1.6, z, Enum.Material.Neon, Color3.fromRGB(255, 206, 140), false)
+		warmLight(bulb, range, 1.1)
+	end
+	local function fireplace(x: number, z: number, width: number)
+		piece("Camino", Vector3.new(width, 6.5, 1.8), x, 3.25, z, Enum.Material.Brick, Color3.fromRGB(130, 80, 62))
+		piece("BoccaCamino", Vector3.new(width * 0.55, 2.6, 0.3), x, 1.4, z - 0.85, Enum.Material.Slate, Color3.fromRGB(26, 22, 20), false)
+		local ember = piece("Brace", Vector3.new(width * 0.4, 0.5, 0.6), x, 0.4, z - 0.75, Enum.Material.Neon, Color3.fromRGB(255, 120, 40), false)
+		warmLight(ember, 18, 1.4)
+		piece("Mensola", Vector3.new(width + 0.6, 0.4, 2.2), x, 6.7, z - 0.2, Enum.Material.Wood, PALETTE.Timber)
+	end
+	local function barrel(x: number, z: number)
+		part({ Name = "Botte", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.6, 2.2, 2.2), CFrame = at(x, 1.3, z) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(108, 74, 46), CastShadow = false })
+	end
+	local function bed(x: number, z: number, bunk: boolean)
+		piece("Letto", Vector3.new(3.4, 1.4, 6.6), x, 0.7, z, Enum.Material.Wood, PALETTE.Wood)
+		piece("Materasso", Vector3.new(3, 0.6, 6.2), x, 1.7, z, Enum.Material.Fabric, Color3.fromRGB(226, 218, 200), false)
+		piece("Coperta", Vector3.new(3.1, 0.3, 3.8), x, 2.1, z - 1.1, Enum.Material.Fabric, pick(BLANKETS), false)
+		piece("Cuscino", Vector3.new(2.2, 0.5, 1.1), x, 2.2, z + 2.4, Enum.Material.Fabric, Color3.fromRGB(240, 236, 226), false)
+		if bunk then
+			for _, sx in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					piece("PaloBranda", Vector3.new(0.35, 6.4, 0.35), x + sx * 1.55, 3.2, z + sz * 3.1, Enum.Material.Wood, PALETTE.Timber)
+				end
+			end
+			piece("BrandaAlta", Vector3.new(3.4, 0.5, 6.6), x, 4.6, z, Enum.Material.Wood, PALETTE.Wood)
+			piece("MaterassoAlto", Vector3.new(3, 0.5, 6.2), x, 5.1, z, Enum.Material.Fabric, Color3.fromRGB(226, 218, 200), false)
+			piece("CopertaAlta", Vector3.new(3.1, 0.3, 3.8), x, 5.45, z - 1.1, Enum.Material.Fabric, Color3.fromRGB(70, 92, 66), false)
+		end
+	end
+
+	if kind == "Taverna" then
+		-- bancone lungo la parete sinistra, con l'oste dietro
+		piece("Bancone", Vector3.new(1.8, 3.4, 10), -w / 2 + 4.4, 1.7, 1, Enum.Material.WoodPlanks, Color3.fromRGB(96, 64, 42))
+		piece("PianoBancone", Vector3.new(2.3, 0.3, 10.4), -w / 2 + 4.4, 3.55, 1, Enum.Material.Wood, Color3.fromRGB(150, 106, 66))
+		for i = 0, 1 do
+			piece("Scaffale", Vector3.new(1.2, 0.25, 9), -w / 2 + 0.6, 4.6 + i * 2.2, 1, Enum.Material.Wood, PALETTE.Timber)
+			for b = 0, 6 do
+				local bottle = part({ Name = "Bottiglia", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.1, 0.5, 0.5), CFrame = at(-w / 2 + 0.6, 5.3 + i * 2.2, -3 + b * 1.3) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Glass, Color = pick({ Color3.fromRGB(60, 120, 60), Color3.fromRGB(120, 50, 40), Color3.fromRGB(170, 130, 50), Color3.fromRGB(70, 90, 140) }), Transparency = 0.15, CastShadow = false, CanCollide = false })
+				bottle.Reflectance = 0.1
+			end
+		end
+		barrel(-w / 2 + 1.7, d / 2 - 1.6)
+		barrel(-w / 2 + 4.2, d / 2 - 1.4)
+		fireplace(0, d / 2 - 1, 7)
+		part({ Name = "Tappeto", Size = Vector3.new(10, 0.1, 14), CFrame = at(4, 0.05, -1), Material = Enum.Material.Fabric, Color = pick(RUGS), CastShadow = false, CanCollide = false })
+		for _, t in { { 2.5, -5 }, { 8.5, -5 }, { 2.5, 3.5 }, { 8.5, 3.5 } } do
+			tableWithStools(t[1], t[2], true)
+		end
+		ceilingLamp(-2, -3, 22)
+		ceilingLamp(6, 4, 22)
+	elseif kind == "Caserma" then
+		-- brande a castello lungo la parete di fondo e un lungo tavolo
+		local x = -w / 2 + 2.4
+		while x < w / 2 - 2 do
+			bed(x, d / 2 - 3.6, true)
+			x += 4.6
+		end
+		local tableX = if doorX < 0 then w / 4 else -w / 4
+		piece("TavoloLungo", Vector3.new(12, 0.3, 2.6), tableX, 2.9, -d / 2 + 3.6, Enum.Material.Wood, FURNITURE)
+		for _, sx in { -1, 1 } do
+			piece("GambaTavolo", Vector3.new(0.4, 2.75, 2), tableX + sx * 5.5, 1.375, -d / 2 + 3.6, Enum.Material.Wood, PALETTE.Timber)
+			piece("Panca", Vector3.new(11, 1.6, 0.9), tableX, 0.8, -d / 2 + 3.6 + sx * 1.9, Enum.Material.Wood, PALETTE.Wood)
+		end
+		ceilingLamp(-w / 4, 0, 20)
+		ceilingLamp(w / 4, 0, 20)
+	else
+		local side = if doorX > 0 then -1 else 1
+		part({ Name = "Tappeto", Size = Vector3.new(math.min(8, w * 0.45), 0.1, math.min(6, d * 0.4)), CFrame = at(0, 0.05, 0), Material = Enum.Material.Fabric, Color = pick(RUGS), CastShadow = false, CanCollide = false })
+		tableWithStools(-side * w / 4, d * 0.05, false)
+		bed(side * (w / 2 - 2.2), d / 2 - 3.6, false)
+		fireplace(-side * w / 4, d / 2 - 1, 4.4)
+		piece("Mensola", Vector3.new(0.8, 0.25, 4), -side * (w / 2 - 0.45), 5.2, -d * 0.15, Enum.Material.Wood, PALETTE.Timber)
+		for i = -1, 1 do
+			piece("Vaso", Vector3.new(0.7, 0.9, 0.7), -side * (w / 2 - 0.45), 5.8, -d * 0.15 + i * 1.2, Enum.Material.SmoothPlastic, pick(FLOWERS), false)
+		end
+		barrel(side * (w / 2 - 1.5), -d / 2 + 1.5)
+		ceilingLamp(0, 0, 18)
 	end
 end
 
@@ -1054,7 +1241,7 @@ local function buildTown(name: string, center: Vector3, radius: number, opts)
 					local depth = rng:NextNumber(cell * 0.55, cell * 0.75)
 					local floors = rng:NextInteger(opts.MinFloors or 2, opts.MaxFloors or 3)
 					local cf = CFrame.lookAt(Vector3.new(pos.X, opts.Y or G, pos.Z), Vector3.new(pos.X, opts.Y or G, pos.Z) + forward * (if rng:NextNumber() < 0.5 then 1 else -1))
-					buildHouse(cf, width, depth, floors, opts.Style or "Mura", opts.Ruined)
+					buildHouse(cf, width, depth, floors, opts.Style or "Mura", opts.Ruined, { Enterable = rng:NextNumber() < 0.28, Kind = "Casa" })
 					count += 1
 				end
 			end
@@ -1099,6 +1286,44 @@ local function supplyStation(pos: Vector3, label: string?)
 	prompt.Parent = crate
 	CollectionService:AddTag(crate, Config.Tags.Supply)
 	currentGroup = prev
+end
+
+-- Punto in cui si prende la barca: un palo con il cartello e il tasto F. spawnCF = dove compare la barca
+local function boatDock(pos: Vector3, spawnCF: CFrame, label: string?)
+	local post = part({ Name = "PuntoBarca", Size = Vector3.new(1.2, 6, 1.2), CFrame = CFrame.new(pos + Vector3.new(0, 3, 0)), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+	part({ Name = "CartelloBarca", Size = Vector3.new(4.4, 2.2, 0.3), CFrame = CFrame.new(pos + Vector3.new(0, 5.4, 0)) * CFrame.Angles(0, math.rad(rng:NextNumber(-10, 10)), 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(176, 136, 92), CastShadow = false, CanCollide = false })
+	local ring = part({ Name = "Salvagente", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 2.6, 2.6), CFrame = CFrame.new(pos + Vector3.new(0.75, 2.8, 0)), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(220, 60, 50), CastShadow = false, CanCollide = false })
+	ring.Name = "Salvagente"
+	post:SetAttribute("SpawnX", spawnCF.Position.X)
+	post:SetAttribute("SpawnY", spawnCF.Position.Y)
+	post:SetAttribute("SpawnZ", spawnCF.Position.Z)
+	local _, yaw = spawnCF:ToOrientation()
+	post:SetAttribute("SpawnYaw", yaw)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Prendi la tua barca"
+	prompt.ObjectText = label or "Pontile"
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0.5
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = post
+	CollectionService:AddTag(post, Config.Tags.BoatDock)
+	return post
+end
+
+-- Pontile di legno da "from" verso il mare, lungo "length" studs
+local function pier(from: Vector3, dir: Vector3, length: number, width: number?)
+	local right = Vector3.new(-dir.Z, 0, dir.X)
+	local w = width or 10
+	local n = math.max(1, math.ceil(length / 12))
+	for i = 0, n - 1 do
+		local pos = from + dir * (i * 12)
+		part({ Name = "Pontile", Size = Vector3.new(w, 1.4, 12.4), CFrame = CFrame.lookAt(Vector3.new(pos.X, G - 1, pos.Z), Vector3.new(pos.X, G - 1, pos.Z) + dir), Material = Enum.Material.WoodPlanks, Color = PALETTE.Wood })
+		for _, side in { -1, 1 } do
+			part({ Name = "PaloPontile", Size = Vector3.new(1.2, 16, 1.2), CFrame = CFrame.new(pos + right * (side * (w / 2 - 0.5)) + Vector3.new(0, -7, 0)), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false })
+		end
+	end
+	return from + dir * ((n - 1) * 12)
 end
 
 -- ALBERI -------------------------------------------------------------------------------
@@ -1179,7 +1404,7 @@ local function buildTrainingCamp()
 	for i = 0, 2 do
 		local pos = c + Vector3.new(60, 0, 20 + i * 26)
 		local cf = CFrame.lookAt(Vector3.new(pos.X, G, pos.Z), Vector3.new(pos.X - 10, G, pos.Z))
-		buildHouse(cf, 36, 16, 1, "Mura")
+		buildHouse(cf, 36, 16, 1, "Mura", false, { Enterable = true, Kind = "Caserma" })
 	end
 	-- recinto e bandiere del campo
 	for i = 0, 7 do
@@ -1249,7 +1474,7 @@ local function buildVillage(id: string, houses: number)
 		local pos = zone.Center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 		if not isReserved(pos, 16) then
 			local cf = CFrame.lookAt(Vector3.new(pos.X, G, pos.Z), Vector3.new(zone.Center.X, G, zone.Center.Z))
-			buildHouse(cf, rng:NextNumber(16, 24), rng:NextNumber(14, 20), rng:NextInteger(1, 2), "Mura")
+			buildHouse(cf, rng:NextNumber(16, 24), rng:NextNumber(14, 20), rng:NextInteger(1, 2), "Mura", false, { Enterable = rng:NextNumber() < 0.4, Kind = "Casa" })
 		end
 	end
 	-- mulino a vento (le pale girano grazie al client)
@@ -1387,6 +1612,12 @@ local function buildPort(id: string, toward: Vector3, withShip: boolean)
 	supplyStation(c - dir * 10 + right * 18)
 	lamp(c + dir * 30 + right * 8)
 	lamp(c + dir * 30 - right * 8)
+	local isl = W.IslandAt(c)
+	if isl and Util.FlatDistance(c + dir * 148, isl.Center) > isl.Land then
+		local pierEnd = c + dir * 148
+		local spawnPos = Vector3.new(pierEnd.X, W.WaterY + 1, pierEnd.Z) + dir * 26 - right * 14
+		boatDock(pierEnd - right * 4, CFrame.lookAt(spawnPos, spawnPos + dir), zone.Name)
+	end
 end
 
 -- Pontile con barca sulla costa di ogni isola, nella direzione del suo centro abitato
@@ -1399,7 +1630,8 @@ local function buildFerryDocks()
 			local dir = Util.SafeUnit(Util.Flat(hub.Center - isl.Center), Vector3.new(0, 0, 1))
 			local right = Vector3.new(-dir.Z, 0, dir.X)
 			local shore = isl.Center + dir * (isl.Land - 10)
-			for i = 0, 7 do
+			local segments = math.ceil((isl.Beach - isl.Land + 40) / 12)
+			for i = 0, segments do
 				local pos = shore + dir * (i * 12)
 				part({ Name = "Pontile", Size = Vector3.new(12, 1.4, 12.4), CFrame = CFrame.lookAt(Vector3.new(pos.X, G - 1, pos.Z), Vector3.new(pos.X, G - 1, pos.Z) + dir), Material = Enum.Material.WoodPlanks, Color = PALETTE.Wood })
 				for _, side in { -1, 1 } do
@@ -1414,6 +1646,10 @@ local function buildFerryDocks()
 			part({ Name = "AlberoTraghetto", Size = Vector3.new(1.2, 26, 1.2), CFrame = boatCF * CFrame.new(0, 15, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber })
 			part({ Name = "VelaTraghetto", Size = Vector3.new(11, 14, 0.3), CFrame = boatCF * CFrame.new(0, 18, 1), Material = Enum.Material.Fabric, Color = Color3.fromRGB(196, 60, 52), CastShadow = false })
 			lamp(shore - dir * 6 + right * 8)
+			-- in fondo al pontile si prende la propria barca
+			local pierEnd = shore + dir * (segments * 12)
+			local spawnPos = Vector3.new(pierEnd.X, W.WaterY + 1, pierEnd.Z) + dir * 16 - right * 12
+			boatDock(pierEnd - right * 4, CFrame.lookAt(spawnPos, spawnPos + dir), "Pontile di " .. isl.Name)
 		end
 	end
 end
@@ -1636,20 +1872,21 @@ local function scatterTrees()
 	end
 end
 
+-- Mondo aperto: niente muri invisibili attorno alle isole, solo il bordo del mare
 local function buildBoundaries()
 	currentGroup = group("Confini")
-	local function ring(center: Vector3, radius: number)
-		local n = 48
-		for i = 0, n - 1 do
-			local a = (i + 0.5) / n * math.pi * 2
-			local pos = center + Vector3.new(math.cos(a) * radius, 0, math.sin(a) * radius)
-			local length = 2 * radius * math.tan(math.pi / n) + 2
-			part({ Name = "Confine", Size = Vector3.new(length, 400, 4), CFrame = CFrame.lookAt(pos + Vector3.new(0, 150, 0), center + Vector3.new(0, 150, 0)), Transparency = 1, CanQuery = false, CastShadow = false })
-		end
-	end
-	for _, id in W.IslandOrder do
-		local isl = W.Islands[id]
-		ring(isl.Center, isl.Water - 20)
+	local b = W.SeaBounds
+	local inset = 40
+	local minX, maxX, minZ, maxZ = b.MinX + inset, b.MaxX - inset, b.MinZ + inset, b.MaxZ - inset
+	local cx, cz = (minX + maxX) / 2, (minZ + maxZ) / 2
+	local sx, sz = maxX - minX, maxZ - minZ
+	for _, wall in {
+		{ Vector3.new(cx, 150, minZ), Vector3.new(sx + 8, 400, 4) },
+		{ Vector3.new(cx, 150, maxZ), Vector3.new(sx + 8, 400, 4) },
+		{ Vector3.new(minX, 150, cz), Vector3.new(4, 400, sz + 8) },
+		{ Vector3.new(maxX, 150, cz), Vector3.new(4, 400, sz + 8) },
+	} do
+		part({ Name = "Confine", Size = wall[2], CFrame = CFrame.new(wall[1]), Transparency = 1, CanQuery = false, CastShadow = false })
 	end
 end
 
@@ -1669,6 +1906,14 @@ local function reserveAreas()
 	for _, pos in W.Landmarks do
 		table.insert(reserved, { Pos = pos, Radius = 18 })
 	end
+	-- taverne (le case della città non ci finiscono sopra) e arena dei duelli
+	for _, t in W.Taverns do
+		local zone = Zones.Get(t.Zone)
+		if zone then
+			table.insert(reserved, { Pos = zone.Center + t.Offset, Radius = 22 })
+		end
+	end
+	table.insert(reserved, { Pos = W.Landmarks.ArenaDuelli, Radius = 96 })
 	-- strade principali tra i cancelli
 	local aurea = W.IslandCenter("Aurea")
 	table.insert(reserved, { Pos = aurea + Vector3.new(0, 0, 120), Radius = 44 }) -- piazza di Aurion
@@ -1694,6 +1939,336 @@ local function setupCollisionGroups()
 		PhysicsService:CollisionGroupSetCollidable(groups.Debris, groups.Players, false)
 		PhysicsService:CollisionGroupSetCollidable(groups.Debris, groups.NPC, false)
 	end)
+end
+
+-- MONDO APERTO: pontili delle barche, taverne, arena dei duelli e isolotti ----------------------
+
+local function zoneOffsetCF(zoneId: string, offset: Vector3, facing: number): CFrame
+	local zone = Zones.Get(zoneId)
+	local base = (if zone then zone.Center else Vector3.zero) + offset
+	local ground = Vector3.new(base.X, G, base.Z)
+	return CFrame.lookAt(ground, ground + Util.Polar(facing, 1))
+end
+
+local function buildTaverns()
+	currentGroup = group("Taverne")
+	for _, t in W.Taverns do
+		local cf = zoneOffsetCF(t.Zone, t.Offset, t.Facing)
+		local size = W.TavernSize
+		buildHouse(cf, size.X, size.Z, 1, t.Style or "Mura", false, { Enterable = true, Kind = "Taverna" })
+		-- insegna appesa sopra la porta
+		local sign = part({ Name = "Insegna", Size = Vector3.new(9, 2.6, 0.4), CFrame = cf * CFrame.new(0, 11.2, -size.Z / 2 - 1.6), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(96, 64, 40), CastShadow = false, CanCollide = false })
+		part({ Name = "BraccioInsegna", Size = Vector3.new(0.3, 0.3, 2), CFrame = cf * CFrame.new(0, 12.7, -size.Z / 2 - 0.9), Material = Enum.Material.Metal, Color = Color3.fromRGB(40, 38, 36), CastShadow = false, CanCollide = false })
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face
+			gui.CanvasSize = Vector2.new(360, 104)
+			gui.LightInfluence = 0.6
+			local label = Instance.new("TextLabel")
+			label.BackgroundTransparency = 1
+			label.Size = UDim2.fromScale(1, 1)
+			label.Font = Enum.Font.GrenzeGotisch
+			label.TextScaled = true
+			label.TextColor3 = Color3.fromRGB(240, 210, 140)
+			label.Text = t.Name
+			label.Parent = gui
+			gui.Parent = sign
+		end
+		local lantern = part({ Name = "Lanterna", Size = Vector3.new(0.9, 1.3, 0.9), CFrame = cf * CFrame.new(4.2, 9, -size.Z / 2 - 0.8), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 196, 120), CastShadow = false, CanCollide = false })
+		warmLight(lantern, 16, 1.2)
+		CollectionService:AddTag(lantern, Config.Tags.Lamp)
+	end
+end
+
+-- Arena dei Duelli: un piccolo anfiteatro con colonne per i rampini
+local function buildDuelArena()
+	local c = W.Landmarks.ArenaDuelli
+	currentGroup = group("Arena dei Duelli")
+	workspace.Terrain:FillCylinder(CFrame.new(c.X, G - 2, c.Z), 4, 74, Enum.Material.Sand)
+	local radius = 76
+	local n = 28
+	for i = 0, n - 1 do
+		local a = (i + 0.5) / n * math.pi * 2
+		local angleDeg = (math.deg(a) + 90) % 360 -- Polar: 0 = nord
+		local gate = math.abs(((angleDeg - 0) + 540) % 360 - 180) < 9 or math.abs(((angleDeg - 180) + 540) % 360 - 180) < 9
+		local pos = c + Vector3.new(math.cos(a) * radius, 0, math.sin(a) * radius)
+		local length = 2 * radius * math.tan(math.pi / n) + 1
+		if not gate then
+			part({ Name = "Gradinata", Size = Vector3.new(length, 20, 10), CFrame = CFrame.lookAt(pos + Vector3.new(0, 10, 0), c + Vector3.new(0, 10, 0)), Material = Enum.Material.Sandstone, Color = Color3.fromRGB(198, 172, 132) })
+			local inner = c + Vector3.new(math.cos(a) * (radius - 8), 0, math.sin(a) * (radius - 8))
+			part({ Name = "Gradone", Size = Vector3.new(length * 0.96, 9, 6), CFrame = CFrame.lookAt(inner + Vector3.new(0, 4.5, 0), c + Vector3.new(0, 4.5, 0)), Material = Enum.Material.Sandstone, Color = Color3.fromRGB(184, 158, 120), CastShadow = false })
+			if i % 4 == 1 then
+				local torchPart = part({ Name = "Braciere", Size = Vector3.new(2.6, 2.6, 2.6), CFrame = CFrame.new(pos + Vector3.new(0, 21.3, 0)), Material = Enum.Material.CorrodedMetal, Color = Color3.fromRGB(60, 50, 44) })
+				local fire = Instance.new("Fire")
+				fire.Size = 6
+				fire.Heat = 8
+				fire.Parent = torchPart
+			end
+		end
+	end
+	-- archi d'ingresso a nord e a sud
+	for _, z in { -1, 1 } do
+		local gatePos = c + Vector3.new(0, 0, z * radius)
+		for _, sx in { -1, 1 } do
+			part({ Name = "PilastroArco", Size = Vector3.new(4, 24, 8), CFrame = CFrame.new(gatePos + Vector3.new(sx * 9, 12, 0)), Material = Enum.Material.Sandstone, Color = Color3.fromRGB(210, 186, 146) })
+		end
+		part({ Name = "Arco", Size = Vector3.new(22, 4, 8), CFrame = CFrame.new(gatePos + Vector3.new(0, 26, 0)), Material = Enum.Material.Sandstone, Color = Color3.fromRGB(210, 186, 146) })
+		part({ Name = "StendardoArena", Size = Vector3.new(8, 10, 0.2), CFrame = CFrame.new(gatePos + Vector3.new(0, 19, z * 4.2)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(150, 36, 40), CastShadow = false, CanCollide = false })
+	end
+	-- colonne al centro per combattere anche coi rampini
+	for i = 0, 5 do
+		local a = i / 6 * math.pi * 2
+		local pos = c + Vector3.new(math.cos(a) * 38, 0, math.sin(a) * 38)
+		part({ Name = "Colonna", Size = Vector3.new(4, 46, 4), CFrame = CFrame.new(pos + Vector3.new(0, 23, 0)), Material = Enum.Material.Sandstone, Color = Color3.fromRGB(214, 190, 150) })
+	end
+	part({ Name = "PedanaCentrale", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 22, 22), CFrame = CFrame.new(c + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Slate, Color = Color3.fromRGB(120, 112, 100) })
+	supplyStation(c + Vector3.new(14, 0, 60))
+	lamp(c + Vector3.new(-12, 0, -92))
+	lamp(c + Vector3.new(12, 0, -92))
+end
+
+-- Palma: tronco ricurvo a segmenti e foglie a ventaglio
+local function palm(pos: Vector3, scale: number?)
+	local s = scale or rng:NextNumber(0.8, 1.2)
+	local lean = Vector3.new(rng:NextNumber(-1, 1), 0, rng:NextNumber(-1, 1))
+	lean = Util.SafeUnit(lean) * 0.35
+	local top = pos
+	local segments = 6
+	for i = 1, segments do
+		local k = i / segments
+		local nextPos = pos + Vector3.new(0, 26 * s * k, 0) + lean * (26 * s * k * k)
+		local mid = (top + nextPos) / 2
+		-- l'asse Y del segmento segue il tronco (fromMatrix funziona anche se il tronco è verticale)
+		local up = Util.SafeUnit(nextPos - top, Vector3.yAxis)
+		local side = up:Cross(Vector3.zAxis)
+		if side.Magnitude < 0.1 then
+			side = up:Cross(Vector3.xAxis)
+		end
+		part({ Name = "TroncoPalma", Size = Vector3.new(1.8 * s * (1.15 - k * 0.3), (nextPos - top).Magnitude + 0.4, 1.8 * s * (1.15 - k * 0.3)), CFrame = CFrame.fromMatrix(mid, side.Unit, up), Material = Enum.Material.Wood, Color = Color3.fromRGB(132, 100, 66), CastShadow = i == segments })
+		top = nextPos
+	end
+	for i = 0, 6 do
+		local a = i / 7 * math.pi * 2
+		local dir = Vector3.new(math.cos(a), -0.35, math.sin(a)).Unit
+		local leafPos = top + dir * 6 * s
+		local leaf = part({ Name = "Chioma", Size = Vector3.new(2.6 * s, 0.3, 12 * s), CFrame = CFrame.lookAt(leafPos, leafPos + dir), Material = Enum.Material.LeafyGrass, Color = pick({ Color3.fromRGB(70, 130, 60), Color3.fromRGB(86, 146, 64), Color3.fromRGB(60, 118, 56) }), CastShadow = i % 2 == 0 })
+		leaf.CanCollide = false
+	end
+	for i = 1, 3 do
+		part({ Name = "Cocco", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.3 * s, CFrame = CFrame.new(top + Vector3.new(math.cos(i * 2.1), -1.1, math.sin(i * 2.1)) * s), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(96, 66, 40), CastShadow = false, CanCollide = false })
+	end
+end
+
+local function rock(pos: Vector3, size: number, material: Enum.Material?)
+	workspace.Terrain:FillBall(pos, size, material or Enum.Material.Rock)
+end
+
+-- Faro bianco e rosso con la lanterna che si accende di notte
+local function lighthouse(base: Vector3)
+	local h = 92
+	local bands = 6
+	for i = 0, bands - 1 do
+		local y0 = h * i / bands
+		local d = 18 - i * 1.2
+		part({ Name = "Faro", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h / bands + 0.1, d, d), CFrame = CFrame.new(base + Vector3.new(0, y0 + h / bands / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Concrete, Color = if i % 2 == 0 then Color3.fromRGB(236, 232, 224) else Color3.fromRGB(180, 44, 40) })
+	end
+	local top = base + Vector3.new(0, h, 0)
+	part({ Name = "Ballatoio", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 18, 18), CFrame = CFrame.new(top + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Metal, Color = Color3.fromRGB(50, 50, 54) })
+	local lantern = part({ Name = "LanternaFaro", Shape = Enum.PartType.Cylinder, Size = Vector3.new(8, 8, 8), CFrame = CFrame.new(top + Vector3.new(0, 5.2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 230, 160), CastShadow = false })
+	local light = Instance.new("PointLight")
+	light.Range = 60
+	light.Brightness = 2
+	light.Color = Color3.fromRGB(255, 220, 150)
+	light.Parent = lantern
+	CollectionService:AddTag(lantern, Config.Tags.Lamp)
+	part({ Name = "TettoFaro", Shape = Enum.PartType.Ball, Size = Vector3.new(10, 6, 10), CFrame = CFrame.new(top + Vector3.new(0, 10, 0)), Material = Enum.Material.Metal, Color = Color3.fromRGB(150, 40, 36) })
+end
+
+-- Relitto di una nave mercantile arenata sugli scogli
+local function shipwreck(c: Vector3, yaw: number)
+	local cf = CFrame.new(c + Vector3.new(0, G + 2, 0)) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(math.rad(6), 0, math.rad(14))
+	local hull = Color3.fromRGB(84, 60, 42)
+	part({ Name = "ScafoRelitto", Size = Vector3.new(16, 8, 50), CFrame = cf, Material = Enum.Material.WoodPlanks, Color = hull })
+	wedge({ Name = "PruaRelitto", Size = Vector3.new(16, 8, 12), CFrame = cf * CFrame.new(0, 0, -31) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.WoodPlanks, Color = hull })
+	part({ Name = "PonteRelitto", Size = Vector3.new(15, 0.6, 58), CFrame = cf * CFrame.new(0, 4.2, -4), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(128, 98, 66) })
+	-- buco nello scafo e albero spezzato
+	part({ Name = "Squarcio", Size = Vector3.new(0.4, 5, 8), CFrame = cf * CFrame.new(8.1, -0.5, 6), Material = Enum.Material.Slate, Color = Color3.fromRGB(20, 18, 16), CastShadow = false })
+	part({ Name = "AlberoSpezzato", Size = Vector3.new(1.8, 22, 1.8), CFrame = cf * CFrame.new(0, 15, -8), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+	part({ Name = "AlberoCaduto", Size = Vector3.new(1.6, 30, 1.6), CFrame = cf * CFrame.new(10, 6, 14) * CFrame.Angles(math.rad(80), 0, math.rad(20)), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+	part({ Name = "VelaStrappata", Size = Vector3.new(12, 10, 0.2), CFrame = cf * CFrame.new(0, 18, -6.8) * CFrame.Angles(0, 0, math.rad(8)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(200, 190, 170), Transparency = 0.15, CastShadow = false, CanCollide = false })
+	for i = 1, 5 do
+		part({ Name = "CassaCarico", Size = Vector3.new(3, 3, 3), CFrame = cf * CFrame.new(rng:NextNumber(-5, 5), 6, rng:NextNumber(-20, 18)) * CFrame.Angles(0, rng:NextNumber(0, 1.5), 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(150, 110, 72) })
+	end
+end
+
+-- Torre di guardia antica, mezza sommersa e inclinata
+local function ruinedTower(c: Vector3)
+	local base = Vector3.new(c.X, G - 6, c.Z)
+	local tilt = CFrame.Angles(math.rad(5), 0, math.rad(-4))
+	local h = 74
+	local cf = CFrame.new(base) * tilt
+	part({ Name = "TorreSommersa", Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, 24, 24), CFrame = cf * CFrame.new(0, h / 2, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Cobblestone, Color = Color3.fromRGB(120, 126, 118) })
+	part({ Name = "CimaTorre", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 28, 28), CFrame = cf * CFrame.new(0, h + 1, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Cobblestone, Color = Color3.fromRGB(110, 116, 108) })
+	for i = 0, 7 do
+		if i ~= 3 and i ~= 6 then
+			local a = i / 8 * math.pi * 2
+			part({ Name = "Merlo", Size = Vector3.new(4, 4, 3), CFrame = cf * CFrame.new(math.cos(a) * 12.5, h + 4, math.sin(a) * 12.5) * CFrame.Angles(0, -a, 0), Material = Enum.Material.Cobblestone, Color = Color3.fromRGB(110, 116, 108) })
+		end
+	end
+	-- alghe e muschio alla base
+	part({ Name = "Muschio", Shape = Enum.PartType.Cylinder, Size = Vector3.new(10, 24.6, 24.6), CFrame = cf * CFrame.new(0, 9, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Grass, Color = Color3.fromRGB(60, 96, 60), CastShadow = false })
+end
+
+-- Cono di un vulcano spento con il cratere che fuma
+local function volcano(c: Vector3, radius: number)
+	local terrain = workspace.Terrain
+	for i = 0, 5 do
+		local r = radius * (1 - i * 0.15)
+		terrain:FillCylinder(CFrame.new(c.X, G + i * 9, c.Z), 10, r, if i < 2 then Enum.Material.Rock else Enum.Material.Basalt)
+		pause()
+	end
+	local craterY = G + 5 * 9 + 5
+	terrain:FillCylinder(CFrame.new(c.X, craterY - 2, c.Z), 8, radius * 0.24, Enum.Material.Air)
+	terrain:FillCylinder(CFrame.new(c.X, craterY - 7, c.Z), 2, radius * 0.24, Enum.Material.CrackedLava)
+	local smoke = part({ Name = "Fumarola", Size = Vector3.new(4, 1, 4), CFrame = CFrame.new(c.X, craterY - 4, c.Z), Transparency = 1, CanCollide = false, CanQuery = false, CastShadow = false })
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	emitter.Rate = 6
+	emitter.Lifetime = NumberRange.new(6, 9)
+	emitter.Speed = NumberRange.new(8, 14)
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 8), NumberSequenceKeypoint.new(1, 30) })
+	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
+	emitter.Color = ColorSequence.new(Color3.fromRGB(90, 84, 80), Color3.fromRGB(150, 146, 140))
+	emitter.SpreadAngle = Vector2.new(15, 15)
+	emitter.Parent = smoke
+	local glow = Instance.new("PointLight")
+	glow.Range = 40
+	glow.Brightness = 1.5
+	glow.Color = Color3.fromRGB(255, 110, 50)
+	glow.Parent = smoke
+end
+
+-- Covo dei contrabbandieri: palizzata, capanne, casse e un molo nascosto
+local function smugglersCove(c: Vector3, radius: number)
+	local ground = Vector3.new(c.X, G, c.Z)
+	for i = 0, 17 do
+		local a = i / 18 * math.pi * 2
+		if i ~= 4 then
+			local pos = ground + Vector3.new(math.cos(a) * radius * 0.62, 0, math.sin(a) * radius * 0.62)
+			for k = -1, 1 do
+				local p = pos + Vector3.new(-math.sin(a), 0, math.cos(a)) * (k * 4.2)
+				part({ Name = "Palizzata", Size = Vector3.new(1.6, rng:NextNumber(11, 14), 1.6), CFrame = CFrame.new(p + Vector3.new(0, 6, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 46), CastShadow = k == 0 })
+			end
+		end
+	end
+	for i = 0, 2 do
+		local a = i / 3 * math.pi * 2 + 0.5
+		local pos = ground + Vector3.new(math.cos(a) * radius * 0.32, 0, math.sin(a) * radius * 0.32)
+		local cf = CFrame.lookAt(pos, ground)
+		part({ Name = "Capanna", Size = Vector3.new(14, 9, 12), CFrame = cf * CFrame.new(0, 4.5, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(110, 82, 56) })
+		wedge({ Name = "TettoCapanna", Size = Vector3.new(15, 4, 7), CFrame = cf * CFrame.new(0, 11, -3.25), Material = Enum.Material.Fabric, Color = Color3.fromRGB(96, 84, 60) })
+		wedge({ Name = "TettoCapanna", Size = Vector3.new(15, 4, 7), CFrame = cf * CFrame.new(0, 11, 3.25) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(96, 84, 60) })
+	end
+	for _ = 1, 10 do
+		local pos = ground + Vector3.new(rng:NextNumber(-radius * 0.45, radius * 0.45), 0, rng:NextNumber(-radius * 0.45, radius * 0.45))
+		if Util.FlatDistance(pos, ground) > 14 then
+			part({ Name = "CassaContrabbando", Size = Vector3.new(3, 3, 3), CFrame = CFrame.new(pos + Vector3.new(0, 1.5, 0)) * CFrame.Angles(0, rng:NextNumber(0, 1.5), 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(140, 104, 66) })
+		end
+	end
+	local fire = part({ Name = "Falo", Size = Vector3.new(3, 1, 3), CFrame = CFrame.new(ground + Vector3.new(8, 0.5, 8)), Material = Enum.Material.Slate, Color = Color3.fromRGB(50, 44, 40) })
+	local flame = Instance.new("Fire")
+	flame.Size = 5
+	flame.Parent = fire
+	warmLight(fire, 24, 1.5)
+end
+
+local function buildIslets()
+	local terrain = workspace.Terrain
+	for _, islet in W.Islets do
+		currentGroup = group(islet.Name)
+		local c = islet.Center
+		local r = islet.Radius
+		-- spiaggia e terra (come le isole grandi, ma piccole)
+		terrain:FillCylinder(CFrame.new(c.X, 1, c.Z), 10, r + 16, Enum.Material.Sand)
+		local top = if islet.Kind == "Sabbia" or islet.Kind == "Palme" then Enum.Material.Sand else if islet.Kind == "Vulcano" then Enum.Material.Basalt else Enum.Material.Grass
+		terrain:FillCylinder(CFrame.new(c.X, 2, c.Z), 12, r, top)
+		if islet.Kind == "Palme" then
+			terrain:FillCylinder(CFrame.new(c.X, 2.5, c.Z), 12, r * 0.55, Enum.Material.Grass)
+		end
+		pause()
+		local ground = Vector3.new(c.X, G, c.Z)
+		if islet.Kind == "Gabbiani" then
+			for _ = 1, 9 do
+				local p = ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(20, r - 10))
+				rock(p + Vector3.new(0, 2, 0), rng:NextNumber(6, 12))
+			end
+			for _ = 1, 6 do
+				tree(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(15, r - 20)), rng:NextNumber(0.7, 1))
+			end
+			rock(ground + Vector3.new(-20, 10, -20), 18)
+		elseif islet.Kind == "Sabbia" then
+			for _ = 1, 5 do
+				local p = ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(10, r - 12))
+				part({ Name = "Tronco", Shape = Enum.PartType.Cylinder, Size = Vector3.new(rng:NextNumber(8, 14), 1.6, 1.6), CFrame = CFrame.new(p + Vector3.new(0, 0.8, 0)) * CFrame.Angles(0, rng:NextNumber(0, 3), 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(150, 130, 104) })
+			end
+			for _ = 1, 3 do
+				rock(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(10, r - 15)), rng:NextNumber(4, 7))
+			end
+		elseif islet.Kind == "Torre" then
+			for _ = 1, 8 do
+				rock(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(25, r)) + Vector3.new(0, -2, 0), rng:NextNumber(5, 10))
+			end
+			ruinedTower(ground)
+		elseif islet.Kind == "Faro" then
+			for _ = 1, 8 do
+				rock(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(35, r - 5)), rng:NextNumber(6, 11))
+			end
+			lighthouse(ground)
+			buildHouse(CFrame.lookAt(ground + Vector3.new(30, 0, 18), ground + Vector3.new(30, 0, 30)), 18, 14, 1, "Mura", false, { Enterable = true, Kind = "Casa" })
+			for _ = 1, 4 do
+				tree(ground + Util.Polar(rng:NextNumber(150, 300), rng:NextNumber(40, r - 15)), 0.8)
+			end
+		elseif islet.Kind == "Relitto" then
+			for _ = 1, 14 do
+				rock(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(10, r + 10)) + Vector3.new(0, rng:NextNumber(-2, 6), 0), rng:NextNumber(5, 12), Enum.Material.Slate)
+			end
+			shipwreck(c + Vector3.new(20, 0, 0), math.rad(70))
+		elseif islet.Kind == "Palme" then
+			for _ = 1, 12 do
+				palm(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(18, r - 12)))
+			end
+			-- capanna del mercante e falò
+			local hutCF = CFrame.lookAt(ground + Vector3.new(16, 0, -22), ground)
+			part({ Name = "Capanna", Size = Vector3.new(12, 8, 10), CFrame = hutCF * CFrame.new(0, 4, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(150, 120, 80) })
+			wedge({ Name = "TettoPaglia", Size = Vector3.new(14, 4, 6), CFrame = hutCF * CFrame.new(0, 10, -2.75), Material = Enum.Material.Fabric, Color = Color3.fromRGB(206, 180, 110) })
+			wedge({ Name = "TettoPaglia", Size = Vector3.new(14, 4, 6), CFrame = hutCF * CFrame.new(0, 10, 2.75) * CFrame.Angles(0, math.pi, 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(206, 180, 110) })
+			local fire = part({ Name = "Falo", Size = Vector3.new(3, 1, 3), CFrame = CFrame.new(ground + Vector3.new(-6, 0.5, 4)), Material = Enum.Material.Slate, Color = Color3.fromRGB(50, 44, 40) })
+			local flame = Instance.new("Fire")
+			flame.Size = 4
+			flame.Parent = fire
+			warmLight(fire, 20, 1.3)
+			supplyStation(ground + Vector3.new(-18, 0, -10), "Deposito delle Palme")
+		elseif islet.Kind == "Rifugio" then
+			for _ = 1, 10 do
+				rock(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(r * 0.7, r + 8)), rng:NextNumber(6, 12), Enum.Material.Slate)
+			end
+			smugglersCove(c, r)
+		elseif islet.Kind == "Vulcano" then
+			volcano(c, r * 0.8)
+			for _ = 1, 6 do
+				rock(ground + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(r * 0.8, r + 6)), rng:NextNumber(6, 10), Enum.Material.Basalt)
+			end
+		end
+		-- pontile verso Vermiglia con il punto barca (nessuno resta bloccato su un isolotto)
+		local dir = Util.SafeUnit(Util.Flat(Vector3.zero - c), Vector3.new(0, 0, 1))
+		local right = Vector3.new(-dir.Z, 0, dir.X)
+		local start = ground + dir * (r - 6)
+		local finish = pier(start, dir, 40, 8)
+		local spawnPos = Vector3.new(finish.X, W.WaterY + 1, finish.Z) + dir * 14 + right * 10
+		boatDock(finish + right * 3, CFrame.lookAt(spawnPos, spawnPos + dir), islet.Name)
+		lamp(start - dir * 4 + right * 5)
+		pause()
+	end
 end
 
 -- COSTRUZIONE COMPLETA --------------------------------------------------------------------
@@ -1817,6 +2392,9 @@ function WorldBuilder.Build()
 		buildPort("PortoRevelia", W.IslandCenter("Vermiglia"), true)
 	end)
 	step("Traghetti", buildFerryDocks)
+	step("Taverne", buildTaverns)
+	step("Arena dei Duelli", buildDuelArena)
+	step("Isolotti", buildIslets)
 	step("Arena dei raid", buildArena)
 	step("Revelia", function()
 		local revelia = Zones.Get("Revelia")

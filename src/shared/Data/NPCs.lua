@@ -1,9 +1,12 @@
 --[[
 	NPCs - personaggi non giocanti
 	Offset = posizione relativa al centro della zona (la Y viene calcolata sul terreno).
-	Role: Story | Quest | Shop | Lab | Dealer | Travel | Ship | Lift | Genealogist | Object
+	Role: Story | Quest | Shop | Lab | Dealer | Travel | Ship | Lift | Genealogist | Object | Tavern | Duel
+	Indoor = true: il PNG sta dentro un edificio (il pavimento si cerca sotto il soffitto)
 	Character: lo stesso personaggio può apparire in più luoghi durante la storia.
 ]]
+
+local W = require(script.Parent.WorldLayout)
 
 local NPCs = {}
 
@@ -317,6 +320,36 @@ local NPCList = {
 		Name = "Comandante Ilyas", Title = "Maestro dei Raid",
 		Look = { Skin = Color3.fromRGB(176, 128, 96), Hair = Color3.fromRGB(26, 24, 22), HairStyle = "Rasato", Uniform = "Valdoria" },
 		Greeting = { "Anche oltre il mare serve allenamento. Prepara la squadra." } },
+	-- TAVERNE (mondo aperto): l'oste dietro il bancone ------------------------------------------
+	{ Id = "OsteMuro", Zone = "Calaneth", Offset = W.TavernOffset("TavernaMuro", Vector3.new(-12.5, 0, 2)), Facing = (W.TavernById.TavernaMuro.Facing + 90) % 360, Role = "Tavern", Indoor = true, Tavern = "TavernaMuro",
+		Name = "Oste Gunther", Title = "Taverna del Muro",
+		Look = { Skin = Color3.fromRGB(226, 180, 150), Hair = Color3.fromRGB(110, 80, 50), HairStyle = "Calvo", Uniform = "Civile", Beard = true },
+		Greeting = { "Benvenuto alla Taverna del Muro! Qui si mangia bene e si ascoltano storie." } },
+	{ Id = "OsteCervo", Zone = "Brenn", Offset = W.TavernOffset("LocandaCervo", Vector3.new(-12.5, 0, 2)), Facing = (W.TavernById.LocandaCervo.Facing + 90) % 360, Role = "Tavern", Indoor = true, Tavern = "LocandaCervo",
+		Name = "Ostessa Marta", Title = "Locanda del Cervo",
+		Look = { Skin = Color3.fromRGB(236, 196, 166), Hair = Color3.fromRGB(150, 60, 40), HairStyle = "Chignon", Uniform = "Civile" },
+		Greeting = { "Siediti, forestiero. Lo stufato di cervo è appena pronto." } },
+	{ Id = "OsteAurea", Zone = "Aurion", Offset = W.TavernOffset("OsteriaAurea", Vector3.new(-12.5, 0, 2)), Facing = (W.TavernById.OsteriaAurea.Facing + 90) % 360, Role = "Tavern", Indoor = true, Tavern = "OsteriaAurea",
+		Name = "Oste Benedikt", Title = "Osteria Aurea",
+		Look = { Skin = Color3.fromRGB(214, 170, 140), Hair = Color3.fromRGB(60, 50, 40), HairStyle = "Corto", Uniform = "Nobile", Beard = true },
+		Greeting = { "L'osteria più raffinata della capitale. Le voci, però, sono gratis." } },
+	{ Id = "OsteGabbiano", Zone = "PortoOrientale", Offset = W.TavernOffset("TavernaGabbiano", Vector3.new(-12.5, 0, 2)), Facing = (W.TavernById.TavernaGabbiano.Facing + 90) % 360, Role = "Tavern", Indoor = true, Tavern = "TavernaGabbiano",
+		Name = "Ostessa Nella", Title = "Taverna del Gabbiano",
+		Look = { Skin = Color3.fromRGB(200, 150, 116), Hair = Color3.fromRGB(30, 26, 24), HairStyle = "Ricci", Uniform = "Civile", Scarf = true },
+		Greeting = { "I marinai raccontano di tutto: isolotti, relitti, tesori. Vuoi sentire?" } },
+	{ Id = "OstePorto", Zone = "PortoRevelia", Offset = W.TavernOffset("OsteriaPorto", Vector3.new(-12.5, 0, 2)), Facing = (W.TavernById.OsteriaPorto.Facing + 90) % 360, Role = "Tavern", Indoor = true, Tavern = "OsteriaPorto",
+		Name = "Oste Malik", Title = "Osteria del Porto",
+		Look = { Skin = Color3.fromRGB(150, 104, 76), Hair = Color3.fromRGB(26, 22, 20), HairStyle = "Rasato", Uniform = "Civile", Beard = true },
+		Greeting = { "Nuovo a Valdoria? Mangia qualcosa, poi ti racconto dove andare a cercare guai." } },
+	-- MONDO APERTO -------------------------------------------------------------------------
+	{ Id = "MercantePalme", Zone = "IsolaPalme", Offset = Vector3.new(10, 0, -12), Facing = 200, Role = "Shop", Shop = "Emporio",
+		Name = "Vecchio Ezio", Title = "Mercante delle Palme",
+		Look = { Skin = Color3.fromRGB(196, 146, 110), Hair = Color3.fromRGB(220, 220, 220), HairStyle = "Lungo", Uniform = "Civile", Beard = true, Hat = true },
+		Greeting = { "Pochi arrivano fin qui. Hai bisogno di gas, razioni, lame?" } },
+	{ Id = "MaestroDuelli", Zone = "ArenaDuelli", Offset = Vector3.new(0, 0, 62), Facing = 0, Role = "Duel",
+		Name = "Maestro Ingrid", Title = "Arena dei Duelli",
+		Look = { Skin = Color3.fromRGB(230, 192, 160), Hair = Color3.fromRGB(200, 190, 170), HairStyle = "Coda", Uniform = "Falchi", Scarf = true },
+		Greeting = { "Dentro l'arena il PvP è sempre attivo. Vinci i duelli e la tua taglia salirà!" } },
 	{ Id = "CustodeArena", Zone = "ArenaRaid", Offset = Vector3.new(0, 0, 230), Facing = 180, Role = "RaidArena",
 		Name = "Custode dell'Arena", Title = "Arena dei Raid",
 		Look = { Skin = Color3.fromRGB(220, 182, 150), Hair = Color3.fromRGB(200, 200, 200), HairStyle = "Lungo", Uniform = "Civile", Beard = true },

@@ -99,6 +99,10 @@ local function disabled(): boolean
 	if player:GetAttribute("Transformed") or player:GetAttribute("Grabbed") then
 		return true
 	end
+	-- seduto in barca (o su una panca): niente rampini
+	if hum.Sit then
+		return true
+	end
 	-- Durante le scene animate i rampini si staccano e il volo si ferma
 	if C and C.CameraController and C.CameraController.IsCinematic() then
 		return true
@@ -398,6 +402,10 @@ function ODMController.ReleaseAll(silent: boolean?)
 end
 
 local function fire(side: string)
+	-- dal cavallo si salta direttamente in volo: prima si scende
+	if player:GetAttribute("Riding") and C.HorseController then
+		C.HorseController.Dismount()
+	end
 	if disabled() then
 		return
 	end

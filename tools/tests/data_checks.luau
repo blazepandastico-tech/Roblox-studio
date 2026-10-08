@@ -27,6 +27,7 @@ local Monetization = require(Shared.Data.Monetization)
 local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
 local Rewards = require(Shared.Data.Rewards)
 local Achievements = require(Shared.Data.Achievements)
+local Treasures = require(Shared.Data.Treasures)
 
 local errors: { string } = {}
 local checks = 0
@@ -524,7 +525,14 @@ for _, a in W.IslandOrder do
 	end
 end
 for _, zone in Zones.List do
-	check(zone.Island ~= nil, "Zones.%s: non sta su nessuna isola", zone.Id)
+	if zone.Islet then
+		-- gli isolotti del mare aperto: la zona coincide con l'isolotto
+		local islet = W.IsletAt(zone.Center)
+		check(islet ~= nil and islet.Id == zone.Id, "Zones.%s: non coincide con nessun isolotto", zone.Id)
+		check(zone.Island == nil, "Zones.%s: un isolotto non può stare dentro un'isola grande", zone.Id)
+	else
+		check(zone.Island ~= nil, "Zones.%s: non sta su nessuna isola", zone.Id)
+	end
 	local island = zone.Island and W.Islands[zone.Island]
 	if island and not zone.Underground then
 		check(Util.FlatDistance(zone.Center, island.Center) + zone.Radius <= island.Land + 10, "Zones.%s: esce dalla terraferma di %s", zone.Id, zone.Island)
@@ -615,7 +623,7 @@ for _, prize in Rewards.Wheel do
 end
 
 -- TRAGUARDI ----------------------------------------------------------------------------------------
-local validStats = { Level = true, Titans = true, Napes = true, Bosses = true, Enemies = true, RaidsWon = true, Chapter = true, PlayHours = true, Streak = true, Friends = true }
+local validStats = { Level = true, Titans = true, Napes = true, Bosses = true, Enemies = true, RaidsWon = true, Chapter = true, PlayHours = true, Streak = true, Friends = true, Treasures = true, PvPKills = true, Bounty = true }
 local achievementIds = {}
 for _, a in Achievements.List do
 	check(not achievementIds[a.Id], "Traguardo duplicato %s", a.Id)
@@ -628,6 +636,83 @@ for _, a in Achievements.List do
 	if a.Stat == "Level" then
 		check(a.Goal <= Config.MaxLevel, "Traguardo %s: livello oltre il massimo", a.Id)
 	end
+	if a.Stat == "Treasures" then
+		check(a.Goal <= #Treasures.List, "Traguardo %s: più forzieri di quelli che esistono", a.Id)
+	end
+end
+check(Achievements.Get("TesoroTutti") ~= nil and Achievements.Get("TesoroTutti").Goal == #Treasures.List, "Traguardo TesoroTutti: deve chiedere tutti i %d forzieri", #Treasures.List)
+
+-- MONDO APERTO -------------------------------------------------------------------------------------
+local SB = W.SeaBounds
+local function inSea(pos: Vector3, margin: number): boolean
+	return pos.X > SB.MinX + margin and pos.X < SB.MaxX - margin and pos.Z > SB.MinZ + margin and pos.Z < SB.MaxZ - margin
+end
+for i, islet in W.Islets do
+	check(Zones.Get(islet.Id) ~= nil, "Isolotto %s: manca la sua zona", islet.Id)
+	check(inSea(islet.Center, 300), "Isolotto %s: troppo vicino al bordo del mare", islet.Id)
+	for _, isl in W.Islands do
+		check(Util.FlatDistance(islet.Center, isl.Center) > isl.Beach + islet.Radius + 60, "Isolotto %s: troppo vicino all'isola %s", islet.Id, isl.Id)
+	end
+	for j, other in W.Islets do
+		if i < j then
+			check(Util.FlatDistance(islet.Center, other.Center) > islet.Radius + other.Radius + 200, "Isolotti %s e %s troppo vicini", islet.Id, other.Id)
+		end
+	end
+	check(not W.IsOpenSea(islet.Center), "Isolotto %s: risulta in mare aperto", islet.Id)
+end
+check(W.IsOpenSea(Vector3.new(800, 4, -1700)), "Il mare tra Vermiglia ed Edenia dovrebbe essere mare aperto")
+local duel = Zones.Get("ArenaDuelli")
+check(duel ~= nil and duel.PvP == true and not duel.Safe, "Arena dei Duelli: zona PvP mancante")
+for _, t in W.Taverns do
+	local zone = Zones.Get(t.Zone)
+	check(zone ~= nil, "Taverna %s: zona %s inesistente", t.Id, t.Zone)
+	if zone then
+		local center = zone.Center + t.Offset
+		local island = zone.Island and W.Islands[zone.Island]
+		check(island ~= nil and Util.FlatDistance(center, island.Center) + 20 < island.Land, "Taverna %s: non sta sulla terraferma", t.Id)
+		for _, wall in W.Walls do
+			local r = Util.FlatDistance(center, W.WallCenter(wall.Id))
+			check(math.abs(r - wall.Radius) > 20 + wall.Thickness, "Taverna %s: finisce dentro le mura %s", t.Id, wall.Id)
+		end
+		local hasOste = false
+		for _, npc in NPCs.List do
+			local nz = Zones.Get(npc.Zone)
+			if nz and not nz.Underground then
+				local d = Util.FlatDistance(nz.Center + npc.Offset, center)
+				if npc.Tavern == t.Id then
+					hasOste = true
+					check(d < 14 and npc.Role == "Tavern", "Taverna %s: l'oste %s non è dentro la taverna", t.Id, npc.Id)
+				else
+					check(d > 22, "Taverna %s: il PNG %s finirebbe dentro l'edificio", t.Id, npc.Id)
+				end
+			end
+		end
+		check(hasOste, "Taverna %s: manca l'oste", t.Id)
+	end
+end
+local validModes = { Top = true, Ground = true, Under = true, Inside = true }
+for _, t in Treasures.List do
+	check(Treasures.TierInfo[t.Tier] ~= nil, "Forziere %s: rarità %s sconosciuta", t.Id, tostring(t.Tier))
+	check(validModes[t.Mode] == true, "Forziere %s: modo %s sconosciuto", t.Id, tostring(t.Mode))
+	check(type(t.Hint) == "string" and #t.Hint > 10, "Forziere %s: manca la voce dell'oste", t.Id)
+	check(inSea(t.Pos, 200), "Forziere %s: fuori dal mondo", t.Id)
+	if t.Mode == "Under" then
+		local zone = Zones.Find(t.Pos)
+		check(zone ~= nil and zone.Underground == true, "Forziere %s: non è in una grotta", t.Id)
+	elseif t.Mode == "Ground" then
+		-- deve stare sulla terra (isola o isolotto), non in acqua
+		local onLand = W.IsletAt(t.Pos) ~= nil
+		for _, isl in W.Islands do
+			if Util.FlatDistance(t.Pos, isl.Center) < isl.Beach - 5 then
+				onLand = true
+			end
+		end
+		check(onLand, "Forziere %s: finirebbe in mare", t.Id)
+	end
+end
+check(Enemies.Types.Contrabbandiere ~= nil, "Manca il nemico Contrabbandiere")
+for _, key in { "Boat", "Sea", "Horse", "PvP", "Treasures" } do
+	check(type((Config :: any)[key]) == "table", "Config.%s mancante", key)
 end
 
 -- NEGOZIO PREMIUM ------------------------------------------------------------------------------

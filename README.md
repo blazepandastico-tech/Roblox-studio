@@ -43,6 +43,9 @@ poi salva il luogo: all'avvio il server non rigenera una mappa che esiste già.
 | **R** | sostituisci le lame |
 | **F** | parla con i personaggi, usa, raccogli |
 | **M** | menu (equipaggiamento, statistiche, sieri, storia, codici, impostazioni) |
+| **B** | mappa dell'arcipelago (rotella = zoom, trascina, clic destro = segnaposto) |
+| **H** | chiama il cavallo / scendi |
+| **W A S D** in barca | velocità e timone (Spazio per scendere) |
 | **N** | negozio premium |
 | **T** | trasformazione in gigante (per ora solo per gli admin) |
 | **P** | Pannello Admin (solo amministratori) |
@@ -58,9 +61,11 @@ Su telefono e tablet compaiono pulsanti a schermo.
 - Le **Lance Dirompenti** si conficcano nel bersaglio: la miccia lampeggia per 1,4 secondi e poi esplodono.
 - Le lame si consumano a ogni colpo, e molto di più sulle **corazze**: tieni d'occhio la durabilità (R per sostituirle).
 
-## 3. Il mondo: l'arcipelago
+## 3. Il mondo: l'arcipelago (mondo aperto)
 
-Ci si sposta tra le isole con i **traghettatori** (uno in ogni città principale) o con le navi.
+Il mondo è **aperto**: nessuna isola è bloccata. Ci si sposta con la **propria barca** (si prende ai
+pontili con **F**, o chiedendola al traghettatore), a nuoto, oppure con i **traghettatori** (viaggio veloce).
+Se vai in un'isola troppo forte per te, il gioco ti avvisa, ma non ti ferma.
 
 | Isola | Stagione | Livello | Cosa c'è |
 |---|---|---|---|
@@ -70,6 +75,34 @@ Ci si sposta tra le isole con i **traghettatori** (uno in ogni città principale
 | **Cenere** | 3 | 800+ | la patria perduta: Muro di Cenere in rovina, Rovine di Halvar, il seminterrato |
 | **Valdoria** | 4 | 1000+ | il continente oltre il mare: porto, trincee, Revelia, la fortezza di Vael, il Fronte della Grande Marcia |
 | **Arena** | Raid | 120+ | l'anfiteatro dove si combattono i raid |
+
+### Il mare aperto e gli isolotti
+
+| Isolotto | Livello | Cosa c'è |
+|---|---|---|
+| Isola dei Gabbiani | 150-220 | scogli, giganti da 7 e 10 metri |
+| Isola del Faro | 250-350 | il faro (dalla cima si vede tutto), la casa del guardiano |
+| Banco di Sabbia | 300-400 | una lingua di sabbia con tronchi e giganti |
+| Scogli dei Naufraghi | 400-500 | il relitto di una nave mercantile |
+| Torre Sommersa | 600-700 | una torre antica mezza sommersa |
+| Rifugio dei Contrabbandieri | 850-950 | palizzata, capanne e contrabbandieri armati |
+| Scoglio di Brace | 1250-1400 | un vulcano spento che fuma, giganti feroci |
+| Isola delle Palme | zona sicura | palme, falò e il mercante Ezio |
+
+- **Eventi in mare**: ogni pochi minuti, vicino a chi naviga, **emerge un gigante dalle onde** oppure compare
+  un **relitto alla deriva** con un carico da saccheggiare (oro, gemme, bombole). Si vedono sulla mappa.
+- **Mappa e minimappa**: la minimappa è in alto a sinistra; la mappa grande (**B**) colora le zone in base al
+  tuo livello (verde sicura, giallo giusta per te, arancione/rosso pericolosa) e mostra porti, negozi, taverne.
+- **42 forzieri nascosti** (comuni, rari, leggendari) sopra mura, torri, tetti, alberi giganti, nelle grotte,
+  nelle taverne e sugli isolotti. Ogni 10 trovati: +30 💎; tutti: +100 💎 e traguardi. Gli osti nelle
+  **taverne** raccontano le voci su dove cercarli.
+- **Taverne** (Calaneth, Brenn, Aurion, Porto Orientale, Porto di Revelia): ci si entra, si parla con l'oste,
+  si mangia un pasto caldo (salute, gas e lame al massimo, +10% danni per 10 minuti).
+  Anche molte case delle città e le baracche del campo hanno l'interno visitabile.
+- **Cavallo** (**H**): veloce sulle pianure; si scende da soli usando i rampini, attaccando o entrando in acqua.
+- **PvP**: si attiva da **Menu → Opzioni** (o dal Maestro dei Duelli). Funziona solo fuori dalle zone sicure e con
+  chi l'ha attivo; nell'**Arena dei Duelli** (fuori dalla porta nord di Vermiglia) è sempre attivo.
+  Chi vince guadagna una **taglia** 💰 (e ruba il 10% di quella dello sconfitto), visibile sopra la testa e in classifica.
 
 ## 3b. Un mondo vivo: cielo, meteo, natura, città e musica
 
@@ -220,6 +253,10 @@ Le animazioni sono **procedurali** (calcolate dal codice): funzionano subito sen
 ```bash
 python3 tools/check_refs.py   # riferimenti tra servizi, remote e require
 python3 tools/test_data.py    # coerenza di storia, missioni, isole, raid, negozi (serve 'luau')
+python3 tools/test_world.py   # costruisce tutta la mappa, forzieri, cavallo, barca e mappa UI con un Roblox finto
 ```
+
+`tools/test_world.py` controlla ogni proprietà assegnata con l'elenco ufficiale di Roblox
+(`tools/tests/roblox_api.luau`, si rigenera con `python3 tools/gen_roblox_api.py globalTypes.d.luau`).
 
 Vedi `docs/DESIGN.md` per l'architettura del codice.

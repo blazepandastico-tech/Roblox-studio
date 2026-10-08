@@ -24,6 +24,7 @@ LeaderboardService.Boards = {
 	{ Id = "Livello", Title = "⭐ LIVELLO", Store = "Classifica_Livello_v1", Value = function(p) return p.Level end },
 	{ Id = "Giganti", Title = "⚔️ GIGANTI UCCISI", Store = "Classifica_Giganti_v1", Value = function(p) return p.Kills.Titans end },
 	{ Id = "Raid", Title = "🔱 RAID VINTI", Store = "Classifica_Raid_v1", Value = function(p) return p.RaidsWon or 0 end },
+	{ Id = "Taglia", Title = "💰 TAGLIE (PvP)", Store = "Classifica_Taglia_v1", Value = function(p) return math.floor(p.Bounty or 0) end },
 }
 
 local stores: { [string]: OrderedDataStore } = {}

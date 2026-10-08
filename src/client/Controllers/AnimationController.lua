@@ -112,6 +112,9 @@ local function register(model: Model, kind: string)
 		animator:SetLayer("Hang", Poses.Human.Hang, 0, 3, 6)
 		animator:SetLayer("Struggle", Poses.Human.Struggle, 0, 4, 8)
 		animator:SetLayer("Cloak", Poses.Human.Cloak, 1, 5, 6)
+		-- mondo aperto: seduto in barca e a cavallo
+		animator:SetLayer("Seat", Poses.Human.Sit, 0, 1, 6)
+		animator:SetLayer("Ride", Poses.Human.Ride, 0, 1, 6)
 	elseif kind == "NPC" then
 		animator:SetLayer("Idle", Poses.Human.Idle, 1, 1, 4)
 		animator:SetLayer("Cloak", Poses.Human.Cloak, 1, 5, 6)
@@ -339,7 +342,15 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 		local runK = math.clamp((flat - 13) / 6, 0, 1)
 		local dir = if (ctx.Forward or 1) < -0.3 then -1 else 1
 		ctx.Phase = (ctx.Phase or 0) + dt * flat * (0.95 - 0.12 * runK) * dir
-		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit then 0 else 1)
+		local riding = owner ~= nil and owner:GetAttribute("Riding") == true and not transformed
+		local seated = humanoid.Sit and not riding and not transformed
+		rig.Animator:SetLayerWeight("Loco", if flying or transformed or humanoid.Sit or riding then 0 else 1)
+		rig.Animator:SetLayerWeight("Seat", if seated then 1 else 0)
+		rig.Animator:SetLayerWeight("Ride", if riding then 1 else 0)
+		if riding then
+			ctx.RideGallop = (ctx.RideGallop or 0) + (math.clamp((flat - 18) / 14, 0, 1) - (ctx.RideGallop or 0)) * math.min(1, dt * 5)
+			ctx.RidePhase = ((ctx.RidePhase or 0) + dt * flat / (6 + 6 * (ctx.RideGallop or 0))) % 1
+		end
 		-- forma di gigante: passo lento e pesante, la terra trema a ogni passo
 		rig.Animator:SetLayerWeight("TitanLoco", if transformed then 1 else 0)
 		if transformed then

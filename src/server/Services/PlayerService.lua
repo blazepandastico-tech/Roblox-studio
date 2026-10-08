@@ -125,9 +125,16 @@ local function updateNameplate(player: Player)
 	local bloodline = Bloodlines.Get(profile.Bloodline)
 	local nameLabel = (gui :: BillboardGui):FindFirstChild("Nome") :: TextLabel
 	local infoLabel = (gui :: BillboardGui):FindFirstChild("Info") :: TextLabel
-	nameLabel.Text = player.DisplayName
-	infoLabel.Text = ("Lv. %d  •  %s"):format(profile.Level, bloodline.Name)
+	local pvp = player:GetAttribute("PvPActive") == true
+	nameLabel.Text = (if pvp then "⚔️ " else "") .. player.DisplayName
+	nameLabel.TextColor3 = if pvp then Color3.fromRGB(255, 130, 110) else Color3.fromRGB(245, 238, 222)
+	local bounty = profile.Bounty or 0
+	infoLabel.Text = ("Lv. %d  •  %s%s"):format(profile.Level, bloodline.Name, if bounty > 0 then ("  •  💰 %s"):format(Util.Abbreviate(bounty)) else "")
 	infoLabel.TextColor3 = bloodline.Color
+end
+
+function PlayerService.UpdateNameplate(player: Player)
+	updateNameplate(player)
 end
 
 local function setAttributes(player: Player)
@@ -180,9 +187,10 @@ function PlayerService.Refresh(player: Player, keepResources: boolean?)
 		local fraction = if humanoid.MaxHealth > 0 then humanoid.Health / humanoid.MaxHealth else 1
 		humanoid.MaxHealth = stats.MaxHealth
 		humanoid.Health = math.clamp(fraction, 0.05, 1) * stats.MaxHealth
-		humanoid.WalkSpeed = stats.WalkSpeed * (player:GetAttribute("AdminSpeed") or 1)
+		local riding = player:GetAttribute("Riding") == true
+		humanoid.WalkSpeed = (if riding then Config.Horse.Speed else stats.WalkSpeed) * (player:GetAttribute("AdminSpeed") or 1)
 		humanoid.UseJumpPower = false
-		humanoid.JumpHeight = Config.Player.JumpHeight
+		humanoid.JumpHeight = if riding then Config.Horse.JumpHeight else Config.Player.JumpHeight
 	end
 	if not keepResources then
 		state.BladeDurability = math.min(state.BladeDurability, stats.BladeDurability)
@@ -720,7 +728,8 @@ function PlayerService.Start()
 			return
 		end
 		for key, value in settings do
-			if profile.Settings[key] ~= nil and type(value) == type(profile.Settings[key]) then
+			-- il PvP si cambia solo con PvPService (non si spegne in mezzo a un combattimento)
+			if key ~= "PvP" and profile.Settings[key] ~= nil and type(value) == type(profile.Settings[key]) then
 				profile.Settings[key] = value
 			end
 		end

@@ -40,6 +40,8 @@ local nextUid = 0
 local titanFolder: Folder
 local groundParams = RaycastParams.new()
 groundParams.FilterType = Enum.RaycastFilterType.Include
+-- nel mare i giganti camminano sul fondale, con l'acqua alle ginocchia
+groundParams.IgnoreWater = true
 
 local LIMBS = { "RightArm", "LeftArm", "RightLeg", "LeftLeg" }
 
@@ -431,6 +433,18 @@ local function startHold(t, player: Player)
 		return false
 	end
 	state.GrabbedBy = t.Uid
+	if S.HorseService then
+		S.HorseService.Dismount(player, true)
+	end
+	-- strappato via dalla barca
+	local seated = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if seated and seated.SeatPart then
+		local seatWeld = seated.SeatPart:FindFirstChild("SeatWeld")
+		if seatWeld then
+			seatWeld:Destroy()
+		end
+		seated.Sit = false
+	end
 	t.Holding = player
 	t.HoldStart = os.clock()
 	t.EscapeCount = 0

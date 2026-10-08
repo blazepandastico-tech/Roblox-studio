@@ -53,10 +53,10 @@ local TEMPLATE = {
 	Story = { Chapter = 1, Step = 1, Progress = 0, Done = false },
 	Visited = { CampoAddestramento = true },
 	SpawnZone = "CampoAddestramento",
-	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0 },
+	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0, Players = 0 },
 	BossKills = {},
 	Codes = {},
-	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Scenery = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true },
+	Settings = { Shake = true, SpeedLines = true, DamageNumbers = true, Scenery = true, Music = 0.5, Sfx = 0.8, Sensitivity = 1, ShiftLock = true, PvP = false, Minimap = true },
 	Buffs = {},
 	Gems = 0,
 	Passes = {},
@@ -78,6 +78,10 @@ local TEMPLATE = {
 	FriendsSeen = 0,
 	CreatedAt = 0,
 	LastSeen = 0,
+	-- mondo aperto
+	Treasures = {},
+	Bounty = 0,
+	HorseColor = 0,
 }
 
 DataService.Template = TEMPLATE
