@@ -227,6 +227,10 @@ Visibile solo agli amministratori: **Roblox Studio**, il **proprietario del gioc
 - **😈 Admin Abuse**: le animazioni dell'evento quando vuoi tu: il Colosso d'Oro che cade dal cielo (davanti a te
   o nelle Pianure), la meteora d'oro, fuochi d'artificio (davanti a te, su tutte le città, sopra ogni giocatore),
   coriandoli e cerimonia d'apertura a tutti; in più accendi o spegni l'evento e gli spettacoli automatici.
+  Nella sezione **🎬 Animazioni** scegli la durata (1-120 minuti) e uno dei 6 eventi a tempo della prima stagione
+  (La Caduta del Muro, La Carica del Bastione, L'Assedio di Calaneth, L'Urlo della Cacciatrice,
+  La Spedizione oltre le Mura, Il Fulmine della Trasformazione): parte un'animazione per tutti e poi l'evento
+  con bonus, giganti e boss fino allo scadere del tempo (dettagli in `docs/EVENTO_INAUGURAZIONE.md`).
 
 In alto scegli il **bersaglio** (tu o un altro giocatore) e scrivi un **valore** per i pulsanti che lo usano.
 

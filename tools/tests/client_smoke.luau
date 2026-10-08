@@ -61,11 +61,11 @@ C.AmbienceController = { RegionName = "Mare Aperto", ZoneId = nil }
 C.Intro = { IsShowing = function()
 	return false
 end }
-for _, entry in { { "Controllers", "CutsceneController" }, { "Controllers", "EffectsController" }, { "Controllers", "FireworksController" }, { "Controllers", "BoatController" }, { "Controllers", "HorseController" }, { "Controllers", "ExploreController" }, { "UI", "WorldMap" }, { "UI", "Festival" }, { "UI", "AdminPanel" } } do
+for _, entry in { { "Controllers", "CutsceneController" }, { "Controllers", "EffectsController" }, { "Controllers", "FireworksController" }, { "Controllers", "BoatController" }, { "Controllers", "HorseController" }, { "Controllers", "ExploreController" }, { "UI", "WorldMap" }, { "UI", "Festival" }, { "UI", "AdminPanel" }, { "Controllers", "AbuseEventController" } } do
 	load(entry[1], entry[2])
 end
 
-local order = { "ClientData", "UIController", "InputController", "CutsceneController", "EffectsController", "FireworksController", "BoatController", "HorseController", "ExploreController", "WorldMap", "Festival", "AdminPanel" }
+local order = { "ClientData", "UIController", "InputController", "CutsceneController", "EffectsController", "FireworksController", "BoatController", "HorseController", "ExploreController", "WorldMap", "Festival", "AdminPanel", "AbuseEventController" }
 for _, name in order do
 	local m = C[name]
 	if m and m.Init then
@@ -147,6 +147,47 @@ if C.Festival then
 	replicated:SetAttribute("FestaProssimoBoss", nil)
 	RunService.RenderStepped:Fire(0.6)
 end
+-- 🎬 animazioni degli eventi a tempo: ogni scena viene fatta girare fino alla fine
+if C.AbuseEventController then
+	local AbuseEvents = require(SHARED.Data.AbuseEvents)
+	local skyCalls = 0
+	C.SkyController = { SetEventSky = function()
+		skyCalls += 1
+	end }
+	-- task.delay finto: le azioni in ritardo vanno in coda e si eseguono subito, in ordine
+	local queue = {}
+	MOCK_HOOKS.Delay = function(_t, fn, ...)
+		table.insert(queue, { fn, table.pack(...) })
+	end
+	local before = #WARNINGS
+	for _, def in AbuseEvents.List do
+		local okI, errI = pcall(C.AbuseEventController.PlayIntro, def.Id, 5)
+		check(okI, def.Id .. ": animazione d'apertura: " .. tostring(errI))
+		local runs = 0
+		while #queue > 0 and runs < 3000 do
+			local item = table.remove(queue, 1)
+			runs += 1
+			local okQ, errQ = pcall(item[1], table.unpack(item[2], 1, item[2].n))
+			check(okQ, def.Id .. ": azione dell'animazione: " .. tostring(errQ))
+			if runs % 20 == 0 then
+				RunService.RenderStepped:Fire(0.1)
+			end
+		end
+		for _ = 1, 5 do
+			RunService.RenderStepped:Fire(0.1)
+		end
+		local props = workspace:FindFirstChild("EventoAdminLocale")
+		LOG(("Animazione %s %s: %d azioni, %d oggetti in scena"):format(def.Icon, def.Name, runs, props and #props:GetDescendants() or 0))
+		-- effetti mandati dal server durante l'evento
+		for _, name in { "AbuseTremor", "AbuseScream", "AbuseFlare", "AbuseLightning" } do
+			local okE, errE = pcall(C.AbuseEventController.ServerEffect, name, { Position = Vector3.new(50, 8, 50), Kind = "Nero" })
+			check(okE, name .. ": " .. tostring(errE))
+		end
+		table.clear(queue)
+	end
+	MOCK_HOOKS.Delay = nil
+	check(#WARNINGS == before, "le animazioni degli eventi hanno dato un errore: " .. tostring(WARNINGS[#WARNINGS]))
+end
 -- pannello admin: la sezione 😈 Admin Abuse con tutti i pulsanti dell'evento
 if C.AdminPanel then
 	player:SetAttribute("Admin", true)
@@ -174,8 +215,25 @@ if C.AdminPanel then
 				end
 			end
 		end
-		check(buttons == 15, ("nella sezione Admin Abuse ci sono %d pulsanti dell'evento invece di 15"):format(buttons))
-		LOG(("Pannello admin: sezione 😈 Admin Abuse con %d pulsanti"):format(buttons))
+		check(buttons == 16, ("nella sezione Admin Abuse ci sono %d pulsanti dell'evento invece di 16"):format(buttons))
+		-- 🎬 Animazioni: un pulsante per ogni evento e i pulsanti della durata
+		local AbuseEvents = require(SHARED.Data.AbuseEvents)
+		local events, durations = 0, 0
+		for _, d in (gui :: Instance):GetDescendants() do
+			if d:IsA("TextButton") then
+				for _, def in AbuseEvents.List do
+					if d.Text:sub(1, #(def.Icon .. " " .. def.Name)) == def.Icon .. " " .. def.Name then
+						events += 1
+					end
+				end
+				if d.Text:find("min", 1, true) and d.Text:find("⏱️", 1, true) or d.Text == "✏️ VALORE" then
+					durations += 1
+				end
+			end
+		end
+		check(events == #AbuseEvents.List, ("sezione Animazioni: %d eventi invece di %d"):format(events, #AbuseEvents.List))
+		check(durations == #AbuseEvents.Durations + 1, ("sezione Animazioni: %d pulsanti della durata"):format(durations))
+		LOG(("Pannello admin: sezione 😈 Admin Abuse con %d pulsanti, %d eventi animati e %d durate"):format(buttons + events + durations, events, durations))
 	end
 end
 

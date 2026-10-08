@@ -50,6 +50,11 @@ local function damageMultipliers(player: Player): number
 		local bloodline = Bloodlines.Get(profile and profile.Bloodline)
 		mult *= bloodline.Awakening and bloodline.Awakening.DamageMult or 1.5
 	end
+	-- eventi dell'Admin Abuse (es. Il Fulmine della Trasformazione: danni doppi)
+	local eventBonus = player:GetAttribute("BonusDannoAbuse")
+	if type(eventBonus) == "number" then
+		mult *= 1 + eventBonus
+	end
 	return mult
 end
 

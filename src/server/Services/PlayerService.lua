@@ -226,7 +226,7 @@ function PlayerService.AddXP(player: Player, amount: number, silent: boolean?): 
 	end
 	local stats = PlayerService.Stats(player)
 	-- bonus della community (amici nel server, gruppo): vedi CommunityService
-	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0) + (player:GetAttribute("BonusXPEvento") or 0)
+	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0) + (player:GetAttribute("BonusXPEvento") or 0) + (player:GetAttribute("BonusXPAbuse") or 0)
 	if (profile.Buffs.XPUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -263,7 +263,7 @@ function PlayerService.AddGold(player: Player, amount: number): number
 		return 0
 	end
 	local stats = PlayerService.Stats(player)
-	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0) + (player:GetAttribute("BonusGoldEvento") or 0)
+	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0) + (player:GetAttribute("BonusGoldEvento") or 0) + (player:GetAttribute("BonusGoldAbuse") or 0)
 	if (profile.Buffs.GoldUntil or 0) > os.time() then
 		mult *= 2
 	end

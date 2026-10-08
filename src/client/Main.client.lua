@@ -32,6 +32,7 @@ local ORDER = {
 	{ Controllers, "HorseController" },
 	{ Controllers, "ExploreController" },
 	{ Controllers, "FireworksController" },
+	{ Controllers, "AbuseEventController" },
 	{ UI, "DamageNumbers" },
 	{ UI, "HUD" },
 	{ UI, "WorldMap" },

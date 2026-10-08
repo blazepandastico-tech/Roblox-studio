@@ -1230,7 +1230,8 @@ local function kill(t, killer: Player?)
 	if t.Kind == "Boss" and not t.Raid then
 		S.EventService.Announce(t.Name .. " è caduto!", killer and ("Colpo finale di " .. killer.DisplayName) or "", "Vittoria")
 		local bossState = bossStates[t.BossId]
-		if bossState then
+		-- solo il boss "naturale" della zona (non le copie degli eventi)
+		if bossState and bossState.Alive == t then
 			bossState.Alive = nil
 			bossState.NextSpawn = os.clock() + t.Def.Respawn
 		end

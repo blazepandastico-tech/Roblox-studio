@@ -1067,6 +1067,15 @@ handlers.ColossusArrival = function(p)
 	end
 end
 
+-- eventi a tempo dell'Admin Abuse (le animazioni sono in AbuseEventController)
+for _, name in { "AbuseTremor", "AbuseScream", "AbuseFlare", "AbuseLightning" } do
+	handlers[name] = function(p)
+		if C.AbuseEventController then
+			C.AbuseEventController.ServerEffect(name, p)
+		end
+	end
+end
+
 -- mondo aperto: un gigante che emerge dal mare, un forziere aperto
 handlers.Splash = function(p)
 	local size = p.Size or 20

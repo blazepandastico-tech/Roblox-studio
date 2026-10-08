@@ -589,6 +589,25 @@ ACTIONS.Abuse = function(admin, target, value)
 	return nil
 end
 
+-- 🎬 Animazioni: eventi a tempo della prima stagione (tipo e minuti scelti dall'admin)
+ACTIONS.AbuseEvent = function(_, _, value)
+	if not S.AbuseService then
+		return "Eventi non disponibili"
+	end
+	if type(value) ~= "table" then
+		return "Scegli un evento"
+	end
+	local ok, message = S.AbuseService.Launch(value.Id, value.Minutes)
+	return if ok then "🎬 Evento avviato: " .. message else message
+end
+
+ACTIONS.AbuseStop = function()
+	if not S.AbuseService then
+		return "Eventi non disponibili"
+	end
+	return if S.AbuseService.Stop("Admin") then "Evento terminato" else "Nessun evento in corso"
+end
+
 local function onAction(admin: Player, action: any, targetId: any, value: any)
 	if type(action) ~= "string" or not AdminService.IsAdmin(admin) then
 		return

@@ -635,7 +635,7 @@ Scenes.Inaugurazione = function()
 	if C.CameraController then
 		C.CameraController.Shake(0.9, 3)
 	end
-	api.Say("Narratore", "Ogni 30 minuti il Colosso d'Oro cadrà dal cielo. Chi lo abbatte... vince l'oro.", 3.8)
+	api.Say("Narratore", "Durante gli Admin Abuse il Colosso d'Oro cadrà dal cielo. Chi lo abbatte... vince l'oro.", 3.8)
 	api.Animate(colossus, "Roar")
 	if C.SoundController then
 		C.SoundController.Play("Roar", landing, { Range = 4000, Volume = 1 })

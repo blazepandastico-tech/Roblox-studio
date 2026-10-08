@@ -213,6 +213,106 @@ check(okO, "FestivalService.SetOverride(false): " .. tostring(errO))
 check(workspace:FindFirstChild("Festa") == nil, "gli addobbi non vengono tolti a fine evento")
 pcall(Fest.SetOverride, true)
 
+-- 🎬 ADMIN ABUSE: i 6 eventi a tempo della prima stagione ------------------------------------------------
+local Zones = require(SHARED.Data.Zones)
+local AbuseEvents = require(SHARED.Data.AbuseEvents)
+local plains = Zones.Get("PianureSud")
+root.CFrame = CFrame.new(plains.Center + Vector3.new(0, 4, 0))
+table.insert(MOCK_PLAYERS, player)
+local spawned: { any } = {}
+S.TitanService.Spawn = function(spec)
+	local model = Instance.new("Model")
+	model.Name = "GiganteProva"
+	local torso = Instance.new("Part")
+	torso.Name = "Torso"
+	torso.Parent = model
+	model.PrimaryPart = torso
+	model.Parent = workspace
+	local t = { Model = model, State = "Idle", Position = spec.Position or Vector3.zero, BossId = spec.Boss, Spec = spec }
+	table.insert(spawned, t)
+	return t
+end
+S.TitanService.Despawn = function(t)
+	t.State = "Dead"
+end
+local invasions, allies, freezes = 0, 0, 0
+S.TitanService.StartInvasion = function()
+	invasions += 1
+end
+S.TitanService.SpawnAllies = function()
+	allies += 1
+	return {}
+end
+S.TitanService.FreezeInRadius = function()
+	freezes += 1
+	return 2
+end
+local Abuse = require(SERVER.Services.AbuseService)
+Abuse.Init(S)
+S.AbuseService = Abuse
+local okStart, errStart = pcall(Abuse.Start)
+check(okStart, "AbuseService.Start: " .. tostring(errStart))
+check(not Abuse.Launch("EventoCheNonEsiste", 5), "un evento inesistente non deve partire")
+check(AbuseEvents.ClampMinutes(500) == AbuseEvents.MaxMinutes and AbuseEvents.ClampMinutes(0) == AbuseEvents.MinMinutes, "minuti dell'evento non limitati")
+for _, def in AbuseEvents.List do
+	local before = #spawned
+	local okL, resL = pcall(Abuse.Launch, def.Id, 2)
+	check(okL and resL == true, def.Id .. ": l'evento non parte (" .. tostring(resL) .. ")")
+	check(replicated:GetAttribute("AbuseEvento") == def.Id, def.Id .. ": attributo AbuseEvento non pubblicato")
+	check(type(replicated:GetAttribute("AbuseFine")) == "number", def.Id .. ": manca la fine dell'evento")
+	if def.Bonus.XP then
+		check(player:GetAttribute("BonusXPAbuse") == def.Bonus.XP, def.Id .. ": bonus di esperienza non applicato")
+	end
+	-- passano 10 secondi (fine dell'animazione), poi un minuto
+	for _, seconds in { 10, 20, 30 } do
+		Abuse.FastForward(seconds)
+		local okS, errS = pcall(Abuse.Step)
+		check(okS, def.Id .. ": Step: " .. tostring(errS))
+	end
+	local made = #spawned - before
+	check(made > 0 or invasions > 0 or freezes > 0, def.Id .. ": l'evento non ha fatto succedere niente")
+	if def.Id == "Spedizione" then
+		local anomaly = nil
+		for i = before + 1, #spawned do
+			if spawned[i].AbuseGems then
+				anomaly = spawned[i]
+			end
+		end
+		check(anomaly ~= nil, "Spedizione: nessun gigante anomalo con le gemme")
+		if anomaly then
+			local gems = profile.Gems
+			S.TitanService.Killed:Fire(anomaly, player, { player })
+			check(profile.Gems == gems + (def.AnomalyGems or 5), "Spedizione: le gemme dell'anomalo non arrivano")
+		end
+	end
+	if def.Boss then
+		local boss = false
+		for i = before + 1, #spawned do
+			if spawned[i].BossId == def.Boss then
+				boss = true
+			end
+		end
+		check(boss, def.Id .. ": il boss " .. def.Boss .. " non è comparso")
+	end
+	-- finisce il tempo: i giganti dell'evento spariscono e i bonus si tolgono
+	Abuse.FastForward(200)
+	pcall(Abuse.Step)
+	check(replicated:GetAttribute("AbuseEvento") == nil, def.Id .. ": l'evento non finisce allo scadere del tempo")
+	check(player:GetAttribute("BonusXPAbuse") == nil and player:GetAttribute("GasAbuse") == nil, def.Id .. ": i bonus restano dopo la fine")
+	local leftover = 0
+	for i = before + 1, #spawned do
+		if spawned[i].State ~= "Dead" then
+			leftover += 1
+		end
+	end
+	check(leftover == 0, def.Id .. (": %d giganti dell'evento non sono spariti"):format(leftover))
+	LOG(("Evento %s %s: %d giganti/boss creati"):format(def.Icon, def.Name, made))
+end
+check(invasions > 0 and allies > 0 and freezes > 0, "invasione, alleati o fulmini degli eventi non attivati")
+Abuse.Launch("CadutaMuro", 5)
+check(Abuse.Stop("Admin") and replicated:GetAttribute("AbuseEvento") == nil, "Termina evento non funziona")
+table.clear(MOCK_PLAYERS)
+
 for _, w in WARNINGS do
 	table.insert(ERRORS, "Avviso: " .. w)
 end

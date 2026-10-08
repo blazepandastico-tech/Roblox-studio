@@ -3023,6 +3023,227 @@ return Config
         </Properties>
         <Item class="ModuleScript" referent="12">
           <Properties>
+            <string name="Name">AbuseEvents</string>
+            <string name="Source"><![CDATA[--[[
+	AbuseEvents - gli eventi a tempo dell'Admin Abuse, ispirati alla prima stagione
+	Dal Pannello Admin (P → 😈 Admin Abuse → Animazioni) l'admin sceglie la durata e il tipo di evento:
+	parte subito un'animazione per tutti i giocatori, poi l'evento dura il tempo scelto.
+
+	Ogni evento ha:
+	  - Bonus: esperienza, oro e danni in più per tutti (0.5 = +50%)
+	  - Sky: colori del cielo durante l'evento (li usa SkyController)
+	  - Ambient: le particelle che cadono attorno al giocatore
+	Cosa succede nel mondo (giganti, boss, razzi) lo decide AbuseService sul server;
+	le animazioni le fa AbuseEventController sul client.
+]]
+
+local AbuseEvents = {}
+
+AbuseEvents.MinMinutes = 1
+AbuseEvents.MaxMinutes = 120
+AbuseEvents.DefaultMinutes = 5
+AbuseEvents.Durations = { 1, 3, 5, 10, 15, 30, 60 } -- pulsanti rapidi nel pannello
+
+AbuseEvents.List = {
+	{
+		Id = "CadutaMuro",
+		Icon = "🧱",
+		Name = "La Caduta del Muro",
+		Episode = "Stagione 1 • Il giorno in cui il Muro cadde",
+		Short = "Il Vulcano sfonda il cancello: invasioni ovunque",
+		Text = "Il Gigante Vulcano si affaccia oltre il Muro e sfonda il cancello: i giganti invadono le zone dove siete voi!",
+		Color = Color3.fromRGB(255, 96, 52),
+		Bonus = { XP = 1, Gold = 0.5 },
+		Sky = {
+			Color = Color3.fromRGB(255, 120, 70),
+			Decay = Color3.fromRGB(120, 30, 20),
+			Tint = Color3.fromRGB(255, 196, 170),
+			Density = 0.32,
+			Haze = 2.4,
+			Glare = 0.4,
+			Exposure = -0.05,
+			Saturation = 0.05,
+			Contrast = 0.12,
+			Bright = 0.7,
+			CloudColor = Color3.fromRGB(150, 70, 50),
+			Cover = 0.85,
+			Rain = 0,
+		},
+		Ambient = "Cenere",
+	},
+	{
+		Id = "CaricaBastione",
+		Icon = "🛡️",
+		Name = "La Carica del Bastione",
+		Episode = "Stagione 1 • Il gigante corazzato",
+		Short = "Il Bastione carica: boss corazzato e oro x3",
+		Text = "Il Gigante Bastione carica le mura a tutta velocità! Abbattilo: oro triplo per tutti finché dura l'evento.",
+		Color = Color3.fromRGB(230, 190, 110),
+		Bonus = { Gold = 2, XP = 0.5 },
+		Boss = "Bastione",
+		Sky = {
+			Color = Color3.fromRGB(220, 186, 130),
+			Decay = Color3.fromRGB(140, 104, 60),
+			Tint = Color3.fromRGB(255, 236, 200),
+			Density = 0.36,
+			Haze = 2.8,
+			Glare = 0.2,
+			Exposure = 0,
+			Saturation = -0.12,
+			Contrast = 0.1,
+			Bright = 0.85,
+			CloudColor = Color3.fromRGB(210, 180, 140),
+			Cover = 0.7,
+			Rain = 0,
+		},
+		Ambient = "Polvere",
+	},
+	{
+		Id = "AssedioCalaneth",
+		Icon = "🔥",
+		Name = "L'Assedio di Calaneth",
+		Episode = "Stagione 1 • La battaglia del distretto",
+		Short = "Razzi rossi, invasione e giganti alleati",
+		Text = "Il distretto è assediato! Razzi rossi nel cielo, i giganti entrano dalla breccia... e un gigante alleato combatte al vostro fianco.",
+		Color = Color3.fromRGB(255, 60, 60),
+		Bonus = { XP = 1, Gold = 1 },
+		Sky = {
+			Color = Color3.fromRGB(230, 110, 100),
+			Decay = Color3.fromRGB(110, 40, 40),
+			Tint = Color3.fromRGB(255, 210, 205),
+			Density = 0.26,
+			Haze = 1.8,
+			Glare = 0.2,
+			Exposure = -0.04,
+			Saturation = 0,
+			Contrast = 0.1,
+			Bright = 0.8,
+			CloudColor = Color3.fromRGB(170, 110, 110),
+			Cover = 0.8,
+			Rain = 0,
+		},
+		Ambient = "Fumo",
+	},
+	{
+		Id = "UrloCacciatrice",
+		Icon = "😱",
+		Name = "L'Urlo della Cacciatrice",
+		Episode = "Stagione 1 • La foresta degli alberi giganti",
+		Short = "Boss Cacciatrice: il suo urlo richiama i giganti",
+		Text = "La Cacciatrice urla tra gli alberi giganti e richiama orde di giganti contro di voi. Resistete e abbattetela!",
+		Color = Color3.fromRGB(120, 230, 150),
+		Bonus = { XP = 1.5, Gold = 0.5 },
+		Boss = "Cacciatrice",
+		Sky = {
+			Color = Color3.fromRGB(150, 210, 160),
+			Decay = Color3.fromRGB(40, 80, 50),
+			Tint = Color3.fromRGB(220, 255, 225),
+			Density = 0.34,
+			Haze = 2.2,
+			Glare = 0,
+			Exposure = -0.06,
+			Saturation = -0.05,
+			Contrast = 0.08,
+			Bright = 0.75,
+			CloudColor = Color3.fromRGB(150, 180, 160),
+			Cover = 0.75,
+			Rain = 0,
+		},
+		Ambient = "Foglie",
+	},
+	{
+		Id = "Spedizione",
+		Icon = "🐎",
+		Name = "La Spedizione oltre le Mura",
+		Episode = "Stagione 1 • La grande spedizione",
+		Short = "Razzi di segnalazione e giganti anomali: XP x3",
+		Text = "Razzi di segnalazione nel cielo! Esperienza tripla e giganti anomali da cacciare: ognuno vale 5 gemme.",
+		Color = Color3.fromRGB(90, 220, 110),
+		Bonus = { XP = 2, Gold = 0.5 },
+		AnomalyGems = 5,
+		Sky = {
+			Color = Color3.fromRGB(255, 214, 160),
+			Decay = Color3.fromRGB(200, 120, 70),
+			Tint = Color3.fromRGB(255, 240, 210),
+			Density = 0.12,
+			Haze = 1.2,
+			Glare = 0.8,
+			Exposure = 0.06,
+			Saturation = 0.12,
+			Contrast = 0.06,
+			Bright = 1.1,
+			CloudColor = Color3.fromRGB(255, 220, 190),
+			Cover = 0.5,
+			Rain = 0,
+		},
+		Ambient = "Vento",
+	},
+	{
+		Id = "FulmineTrasformazione",
+		Icon = "⚡",
+		Name = "Il Fulmine della Trasformazione",
+		Episode = "Stagione 1 • Il ragazzo diventato gigante",
+		Short = "Temporale dorato: danni x2 e gas infinito",
+		Text = "Fulmini dorati squarciano il cielo e risvegliano il Gigante della Furia: danni doppi e gas infinito per tutti!",
+		Color = Color3.fromRGB(255, 220, 90),
+		Bonus = { XP = 0.5, Gold = 0.5, Damage = 1 },
+		InfiniteGas = true,
+		Sky = {
+			Color = Color3.fromRGB(110, 110, 150),
+			Decay = Color3.fromRGB(30, 30, 50),
+			Tint = Color3.fromRGB(215, 220, 255),
+			Density = 0.3,
+			Haze = 2,
+			Glare = 0,
+			Exposure = -0.12,
+			Saturation = -0.2,
+			Contrast = 0.18,
+			Bright = 0.45,
+			CloudColor = Color3.fromRGB(80, 82, 100),
+			Cover = 0.98,
+			Rain = 2,
+		},
+		Ambient = "Pioggia",
+	},
+}
+
+AbuseEvents.ById = {}
+for i, def in AbuseEvents.List do
+	def.Order = i
+	AbuseEvents.ById[def.Id] = def
+end
+
+function AbuseEvents.Get(id: any)
+	return if type(id) == "string" then AbuseEvents.ById[id] else nil
+end
+
+-- minuti validi (numero intero tra MinMinutes e MaxMinutes)
+function AbuseEvents.ClampMinutes(value: any): number
+	local n = tonumber(value) or AbuseEvents.DefaultMinutes
+	if n ~= n then
+		n = AbuseEvents.DefaultMinutes
+	end
+	return math.clamp(math.floor(n + 0.5), AbuseEvents.MinMinutes, AbuseEvents.MaxMinutes)
+end
+
+-- "4:05" oppure "1:02:30"
+function AbuseEvents.FormatTime(seconds: number): string
+	seconds = math.max(0, math.floor(seconds))
+	local h = seconds // 3600
+	local m = (seconds % 3600) // 60
+	local s = seconds % 60
+	if h > 0 then
+		return ("%d:%02d:%02d"):format(h, m, s)
+	end
+	return ("%d:%02d"):format(m, s)
+end
+
+return AbuseEvents
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="13">
+          <Properties>
             <string name="Name">Achievements</string>
             <string name="Source"><![CDATA[--[[
 	Achievements - Traguardi (con medaglie Roblox opzionali)
@@ -3127,7 +3348,7 @@ return Achievements
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="13">
+        <Item class="ModuleScript" referent="14">
           <Properties>
             <string name="Name">AnimationIds</string>
             <string name="Source"><![CDATA[--[[
@@ -3162,7 +3383,7 @@ return AnimationIds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="14">
+        <Item class="ModuleScript" referent="15">
           <Properties>
             <string name="Name">Bloodlines</string>
             <string name="Source"><![CDATA[--[[
@@ -3255,7 +3476,7 @@ return Bloodlines
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="15">
+        <Item class="ModuleScript" referent="16">
           <Properties>
             <string name="Name">Enemies</string>
             <string name="Source"><![CDATA[--[[
@@ -3386,7 +3607,7 @@ return Enemies
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="16">
+        <Item class="ModuleScript" referent="17">
           <Properties>
             <string name="Name">Festival</string>
             <string name="Source"><![CDATA[--[[
@@ -3497,7 +3718,7 @@ return Festival
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="17">
+        <Item class="ModuleScript" referent="18">
           <Properties>
             <string name="Name">Items</string>
             <string name="Source"><![CDATA[--[[
@@ -4383,7 +4604,7 @@ return Items
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">Leveling</string>
             <string name="Source"><![CDATA[--[[
@@ -4444,7 +4665,7 @@ return Leveling
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">Monetization</string>
             <string name="Source"><![CDATA[--[[
@@ -4586,7 +4807,7 @@ return Monetization
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">NPCs</string>
             <string name="Source"><![CDATA[--[[
@@ -4983,7 +5204,7 @@ return NPCs
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[
@@ -5096,7 +5317,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="22">
+        <Item class="ModuleScript" referent="23">
           <Properties>
             <string name="Name">Raids</string>
             <string name="Source"><![CDATA[--[[
@@ -5211,7 +5432,7 @@ return Raids
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="24">
           <Properties>
             <string name="Name">Rewards</string>
             <string name="Source"><![CDATA[--[[
@@ -5289,7 +5510,7 @@ return Rewards
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="25">
           <Properties>
             <string name="Name">Serums</string>
             <string name="Source"><![CDATA[--[[
@@ -5581,7 +5802,7 @@ return Serums
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Shops</string>
             <string name="Source"><![CDATA[--[[
@@ -5652,7 +5873,7 @@ return Shops
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="27">
           <Properties>
             <string name="Name">Skills</string>
             <string name="Source"><![CDATA[--[[
@@ -5725,7 +5946,7 @@ return Skills
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[--[[
@@ -5788,7 +6009,7 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="28">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">StatsCalc</string>
             <string name="Source"><![CDATA[--[[
@@ -5950,7 +6171,7 @@ return StatsCalc
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="30">
           <Properties>
             <string name="Name">Story</string>
             <string name="Source"><![CDATA[--[[
@@ -6633,7 +6854,7 @@ return Story
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="30">
+        <Item class="ModuleScript" referent="31">
           <Properties>
             <string name="Name">Titans</string>
             <string name="Source"><![CDATA[--[[
@@ -6997,7 +7218,7 @@ return Titans
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">Treasures</string>
             <string name="Source"><![CDATA[--[[
@@ -7118,7 +7339,7 @@ return Treasures
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">WorldLayout</string>
             <string name="Source"><![CDATA[--[[
@@ -7333,7 +7554,7 @@ return W
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="34">
           <Properties>
             <string name="Name">Zones</string>
             <string name="Source"><![CDATA[--[[
@@ -7976,11 +8197,11 @@ return Zones
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="34">
+      <Item class="Folder" referent="35">
         <Properties>
           <string name="Name">Lib</string>
         </Properties>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="36">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[--[[
@@ -8124,7 +8345,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">Signal</string>
             <string name="Source"><![CDATA[--[[
@@ -8205,7 +8426,7 @@ return Signal
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">Util</string>
             <string name="Source"><![CDATA[--[[
@@ -8499,11 +8720,11 @@ return Util
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="38">
+      <Item class="Folder" referent="39">
         <Properties>
           <string name="Name">Modules</string>
         </Properties>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">ODMPhysicsModule</string>
             <string name="Source"><![CDATA[--[[
@@ -8739,15 +8960,15 @@ return ODMPhysics
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="40">
+  <Item class="ServerScriptService" referent="41">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="41">
+    <Item class="Folder" referent="42">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="42">
+      <Item class="Script" referent="43">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -8794,6 +9015,7 @@ local ORDER = {
 	"HorseService",
 	"PvPService",
 	"FestivalService",
+	"AbuseService",
 	"CodesService",
 	"RewardsService",
 	"CommunityService",
@@ -8845,11 +9067,438 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="43">
+      <Item class="Folder" referent="44">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
+          <Properties>
+            <string name="Name">AbuseService</string>
+            <string name="Source"><![CDATA[--[[
+	AbuseService - gli eventi a tempo dell'Admin Abuse (dati in Shared/Data/AbuseEvents)
+	L'admin sceglie dal pannello il tipo di evento e quanti minuti dura: per tutti parte
+	un'animazione (AbuseEventController sul client), poi per il tempo scelto:
+	  - bonus di esperienza, oro e danni (attributi BonusXPAbuse, BonusGoldAbuse, BonusDannoAbuse)
+	  - giganti, boss e razzi di segnalazione vicino ai giocatori, diversi per ogni evento
+	A fine evento i giganti dell'evento spariscono e i bonus si tolgono.
+	I client leggono lo stato dagli attributi di ReplicatedStorage:
+	  AbuseEvento (id), AbuseInizio e AbuseFine (secondi del server), AbuseDurata.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Lib.Util)
+local Zones = require(Shared.Data.Zones)
+local Titans = require(Shared.Data.Titans)
+local AbuseEvents = require(Shared.Data.AbuseEvents)
+
+local AbuseService = {}
+local S
+
+local rng = Random.new()
+local MAX_EVENT_TITANS = 45 -- giganti dell'evento vivi tutti insieme, al massimo
+local INTRO_TIME = 8 -- secondi di animazione prima che arrivino giganti e boss
+
+type Context = {
+	Def: any,
+	Started: number, -- os.clock()
+	Ends: number, -- os.clock()
+	Titans: { any },
+	Timers: { [string]: number },
+	Boss: any?,
+}
+
+local current: Context? = nil
+
+local function serverNow(): number
+	return workspace:GetServerTimeNow()
+end
+
+local function remaining(ctx: Context): number
+	return math.max(0, ctx.Ends - os.clock())
+end
+
+-- BONUS DEI GIOCATORI -------------------------------------------------------------------------------
+
+local function applyBonus(player: Player)
+	local def = current and current.Def
+	local bonus = def and def.Bonus or {}
+	player:SetAttribute("BonusXPAbuse", if bonus.XP and bonus.XP > 0 then bonus.XP else nil)
+	player:SetAttribute("BonusGoldAbuse", if bonus.Gold and bonus.Gold > 0 then bonus.Gold else nil)
+	player:SetAttribute("BonusDannoAbuse", if bonus.Damage and bonus.Damage > 0 then bonus.Damage else nil)
+	player:SetAttribute("GasAbuse", if def and def.InfiniteGas then true else nil)
+end
+
+-- GIGANTI DELL'EVENTO --------------------------------------------------------------------------------
+
+local function aliveTitans(ctx: Context): number
+	local n = 0
+	for i = #ctx.Titans, 1, -1 do
+		local t = ctx.Titans[i]
+		if t.State == "Dead" or not (t.Model and t.Model.Parent) then
+			table.remove(ctx.Titans, i)
+		else
+			n += 1
+		end
+	end
+	return n
+end
+
+-- I giocatori che si trovano in una zona con i giganti (le città sicure e il mare non contano)
+local function huntingPlayers(): { { Player: Player, Root: BasePart, Zone: any } }
+	local list = {}
+	for _, player in Players:GetPlayers() do
+		local root = Util.GetRoot(player.Character)
+		local zone = root and Zones.Find(root.Position)
+		if root and zone and not zone.Safe and zone.Titans and #zone.Titans > 0 then
+			table.insert(list, { Player = player, Root = root, Zone = zone })
+		end
+	end
+	return list
+end
+
+local function pickEntry(zone, strongest: boolean?)
+	local entries = zone.Titans
+	if strongest then
+		local best = entries[1]
+		for _, e in entries do
+			if (e.Level or 0) > (best.Level or 0) then
+				best = e
+			end
+		end
+		return best
+	end
+	return entries[rng:NextInteger(1, #entries)]
+end
+
+local function spawnTitan(ctx: Context, spec): any
+	if aliveTitans(ctx) >= MAX_EVENT_TITANS then
+		return nil
+	end
+	spec.Duration = math.max(5, math.min(spec.Duration or remaining(ctx), remaining(ctx)))
+	spec.Invasion = true -- ricompense piene, come nelle invasioni
+	local t = S.TitanService.Spawn(spec)
+	if t then
+		t.AbuseEvent = ctx.Def.Id
+		table.insert(ctx.Titans, t)
+	end
+	return t
+end
+
+-- Un'ondata di giganti attorno a un giocatore (a 110-220 passi da lui)
+local function waveAround(ctx: Context, hunter, count: number, abnormal: boolean?)
+	for _ = 1, count do
+		local entry = pickEntry(hunter.Zone)
+		local pos = hunter.Root.Position + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(110, 220))
+		local zone = Zones.Find(pos)
+		if zone and not zone.Safe then
+			spawnTitan(ctx, {
+				Class = entry.Class,
+				Level = entry.Level,
+				Look = entry.Look,
+				Zone = zone.Id,
+				Position = pos,
+				Abnormal = abnormal or rng:NextNumber() < (entry.Abnormal or 0.2),
+			})
+		end
+	end
+end
+
+local function wavesForAll(ctx: Context, count: number, abnormal: boolean?)
+	for _, hunter in huntingPlayers() do
+		waveAround(ctx, hunter, count, abnormal)
+	end
+end
+
+-- Il boss dell'evento: vicino a un giocatore che caccia, altrimenti nella sua zona di sempre
+local function spawnBoss(ctx: Context, bossId: string)
+	local def = Titans.Bosses[bossId]
+	if not def then
+		return nil
+	end
+	local hunters = huntingPlayers()
+	local pos, zoneId
+	if #hunters > 0 then
+		local hunter = hunters[rng:NextInteger(1, #hunters)]
+		pos = hunter.Root.Position + Util.Polar(rng:NextNumber(0, 360), 230)
+		local zone = Zones.Find(pos)
+		zoneId = zone and zone.Id or hunter.Zone.Id
+	else
+		local zone = Zones.Get(def.Zone)
+		if not zone then
+			return nil
+		end
+		pos = zone.Center + Util.Polar(rng:NextNumber(0, 360), zone.Radius * 0.3)
+		zoneId = zone.Id
+	end
+	local zone = Zones.Get(zoneId)
+	local t = spawnTitan(ctx, { Boss = bossId, Level = def.Level, Zone = zoneId, Position = pos })
+	if t then
+		ctx.Boss = t
+		S.EventService.Announce(def.Name .. " è apparso!", ("%s • Livello %d • %s"):format(def.Title or "Boss dell'evento", def.Level, zone and zone.Name or ""), "Boss")
+	end
+	return t
+end
+
+local function bossAlive(ctx: Context): boolean
+	local b = ctx.Boss
+	return b ~= nil and b.State ~= "Dead" and b.Model ~= nil and b.Model.Parent ~= nil
+end
+
+-- ogni "every" secondi (la prima volta dopo "first" secondi)
+local function due(ctx: Context, key: string, first: number, every: number): boolean
+	local now = os.clock()
+	local at = ctx.Timers[key]
+	if not at then
+		ctx.Timers[key] = ctx.Started + first
+		at = ctx.Timers[key]
+	end
+	if now >= at then
+		ctx.Timers[key] = now + every
+		return true
+	end
+	return false
+end
+
+-- COSA SUCCEDE IN OGNI EVENTO ----------------------------------------------------------------------
+
+local TICK: { [string]: (Context) -> () } = {}
+
+-- La Caduta del Muro: ondate di giganti ovunque e il Ghignante
+TICK.CadutaMuro = function(ctx)
+	if due(ctx, "Ondata", INTRO_TIME, 40) then
+		wavesForAll(ctx, 4)
+	end
+	if due(ctx, "Ghignante", INTRO_TIME + 6, 1e9) then
+		spawnBoss(ctx, "Ghignante")
+	end
+end
+
+-- La Carica del Bastione: il boss corazzato (torna se viene abbattuto) e qualche gigante
+TICK.CaricaBastione = function(ctx)
+	if due(ctx, "Boss", INTRO_TIME, 20) and not bossAlive(ctx) and remaining(ctx) > 30 then
+		spawnBoss(ctx, "Bastione")
+		S.EventService.Effect("AbuseTremor", { Strength = 1 })
+	end
+	if due(ctx, "Ondata", INTRO_TIME + 20, 60) then
+		wavesForAll(ctx, 2)
+	end
+end
+
+-- L'Assedio di Calaneth: ondate fitte, invasione nel distretto e un gigante alleato per ognuno
+TICK.AssedioCalaneth = function(ctx)
+	if due(ctx, "Invasione", INTRO_TIME, 1e9) then
+		S.TitanService.StartInvasion("Calaneth", math.min(remaining(ctx), 600))
+	end
+	if due(ctx, "Ondata", INTRO_TIME, 35) then
+		wavesForAll(ctx, 5)
+	end
+	if due(ctx, "Alleati", INTRO_TIME + 4, 90) then
+		for _, hunter in huntingPlayers() do
+			local profile = S.DataService.Get(hunter.Player)
+			local level = profile and profile.Level or 1
+			S.TitanService.SpawnAllies(hunter.Player, 1, hunter.Root.Position, math.min(90, remaining(ctx)), level)
+			S.EventService.Notify(hunter.Player, "🔥 Un gigante alleato combatte al tuo fianco!", "Raro", 4)
+		end
+	end
+end
+
+-- L'Urlo della Cacciatrice: il boss e, a ogni urlo, giganti anomali che corrono verso di voi
+TICK.UrloCacciatrice = function(ctx)
+	if due(ctx, "Boss", INTRO_TIME, 25) and not bossAlive(ctx) and remaining(ctx) > 30 then
+		spawnBoss(ctx, "Cacciatrice")
+	end
+	if due(ctx, "Urlo", INTRO_TIME + 12, 30) then
+		local where = if bossAlive(ctx) then ctx.Boss.Position else nil
+		S.EventService.Effect("AbuseScream", { Position = where })
+		wavesForAll(ctx, 3, true)
+	end
+end
+
+-- La Spedizione: giganti anomali segnalati da un razzo nero, ognuno vale gemme
+TICK.Spedizione = function(ctx)
+	if due(ctx, "Anomalo", INTRO_TIME, 25) then
+		local hunters = huntingPlayers()
+		if #hunters > 0 then
+			local hunter = hunters[rng:NextInteger(1, #hunters)]
+			local entry = pickEntry(hunter.Zone, true)
+			local pos = hunter.Root.Position + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(140, 200))
+			local zone = Zones.Find(pos)
+			if zone and not zone.Safe then
+				local t = spawnTitan(ctx, { Class = entry.Class, Level = entry.Level, Look = entry.Look, Zone = zone.Id, Position = pos, Abnormal = true })
+				if t then
+					t.AbuseGems = ctx.Def.AnomalyGems or 5
+					S.EventService.Effect("AbuseFlare", { Position = pos, Kind = "Nero" }, pos, 3000)
+					S.EventService.Notify(hunter.Player, ("⚫ Razzo nero: un gigante anomalo vicino a te! Vale %d 💎"):format(t.AbuseGems), "Raro", 5)
+				end
+			end
+		end
+	end
+	if due(ctx, "Ondata", INTRO_TIME + 10, 50) then
+		wavesForAll(ctx, 2)
+	end
+end
+
+-- Il Fulmine della Trasformazione: fulmini dorati che immobilizzano i giganti vicino ai giocatori
+TICK.FulmineTrasformazione = function(ctx)
+	if due(ctx, "Fulmine", INTRO_TIME, 9) then
+		local hunters = huntingPlayers()
+		if #hunters > 0 then
+			local hunter = hunters[rng:NextInteger(1, #hunters)]
+			local pos = hunter.Root.Position + Util.Polar(rng:NextNumber(0, 360), rng:NextNumber(40, 120))
+			local frozen = S.TitanService.FreezeInRadius(pos, 70, 5)
+			S.EventService.Effect("AbuseLightning", { Position = pos }, pos, 3000)
+			if frozen > 0 then
+				S.EventService.Notify(hunter.Player, ("⚡ Il fulmine ha immobilizzato %d giganti: colpisci la nuca!"):format(frozen), "Raro", 4)
+			end
+		end
+	end
+	if due(ctx, "Ondata", INTRO_TIME + 5, 45) then
+		wavesForAll(ctx, 3)
+	end
+end
+
+-- AVVIO E FINE -----------------------------------------------------------------------------------------
+
+local function publish()
+	local ctx = current
+	ReplicatedStorage:SetAttribute("AbuseEvento", if ctx then ctx.Def.Id else nil)
+	ReplicatedStorage:SetAttribute("AbuseInizio", if ctx then serverNow() - (os.clock() - ctx.Started) else nil)
+	ReplicatedStorage:SetAttribute("AbuseFine", if ctx then serverNow() + remaining(ctx) else nil)
+	ReplicatedStorage:SetAttribute("AbuseDurata", if ctx then ctx.Ends - ctx.Started else nil)
+end
+
+function AbuseService.Current(): (string?, number)
+	if not current then
+		return nil, 0
+	end
+	return current.Def.Id, remaining(current)
+end
+
+-- reason: "Tempo" (finito da solo), "Admin" (fermato dal pannello), "Sostituito" (ne parte un altro)
+function AbuseService.Stop(reason: string?)
+	local ctx = current
+	if not ctx then
+		return false
+	end
+	current = nil
+	for _, t in ctx.Titans do
+		if t.State ~= "Dead" then
+			S.TitanService.Despawn(t)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		applyBonus(player)
+	end
+	publish()
+	if reason ~= "Sostituito" then
+		-- la scritta grande "EVENTO TERMINATO" la mostra il client: qui solo un messaggio piccolo
+		S.EventService.NotifyAll(("⌛ %s è finito: grazie a tutti, alla prossima Admin Abuse!"):format(ctx.Def.Name), "Info", 5)
+	end
+	return true
+end
+
+function AbuseService.Launch(id: string, minutes: any): (boolean, string)
+	local def = AbuseEvents.Get(id)
+	if not def then
+		return false, "Evento sconosciuto"
+	end
+	local mins = AbuseEvents.ClampMinutes(minutes)
+	if current then
+		AbuseService.Stop("Sostituito")
+	end
+	local now = os.clock()
+	current = {
+		Def = def,
+		Started = now,
+		Ends = now + mins * 60,
+		Titans = {},
+		Timers = {},
+		Boss = nil,
+	}
+	for _, player in Players:GetPlayers() do
+		applyBonus(player)
+	end
+	publish()
+	return true, ("%s %s: %d minut%s"):format(def.Icon, def.Name, mins, if mins == 1 then "o" else "i")
+end
+
+local function onTitanKilled(t, _killer, contributors)
+	local gems = t.AbuseGems
+	if not gems or not contributors then
+		return
+	end
+	for _, player in contributors do
+		local profile = S.DataService.Get(player)
+		if profile then
+			profile.Gems += gems
+			S.DataService.MarkDirty(player)
+			S.EventService.Notify(player, ("⚫ Gigante anomalo abbattuto: +%d 💎"):format(gems), "Ricompensa", 5)
+		end
+	end
+end
+
+function AbuseService.Init(services)
+	S = services
+end
+
+-- Un passo dell'evento (ogni secondo): finisce allo scadere del tempo, altrimenti fa succedere le cose
+function AbuseService.Step()
+	local ctx = current
+	if not ctx then
+		return
+	end
+	if remaining(ctx) <= 0 then
+		AbuseService.Stop("Tempo")
+		return
+	end
+	local tick = TICK[ctx.Def.Id]
+	if tick then
+		local ok, err = pcall(tick, ctx)
+		if not ok then
+			warn("[Admin Abuse] " .. tostring(err))
+		end
+	end
+end
+
+-- Per le prove automatiche: fa passare "seconds" secondi di evento
+function AbuseService.FastForward(seconds: number)
+	local ctx = current
+	if not ctx then
+		return
+	end
+	ctx.Started -= seconds
+	ctx.Ends -= seconds
+	for key, at in ctx.Timers do
+		ctx.Timers[key] = at - seconds
+	end
+end
+
+function AbuseService.Start()
+	Players.PlayerAdded:Connect(function(player)
+		if current then
+			applyBonus(player)
+		end
+	end)
+	S.TitanService.Killed:Connect(onTitanKilled)
+	local acc = 0
+	RunService.Heartbeat:Connect(function(dt)
+		acc += dt
+		if acc >= 1 then
+			acc = 0
+			AbuseService.Step()
+		end
+	end)
+end
+
+return AbuseService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">AchievementService</string>
             <string name="Source"><![CDATA[--[[
@@ -8940,7 +9589,7 @@ return AchievementService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--[[
@@ -9534,6 +10183,25 @@ ACTIONS.Abuse = function(admin, target, value)
 	return nil
 end
 
+-- 🎬 Animazioni: eventi a tempo della prima stagione (tipo e minuti scelti dall'admin)
+ACTIONS.AbuseEvent = function(_, _, value)
+	if not S.AbuseService then
+		return "Eventi non disponibili"
+	end
+	if type(value) ~= "table" then
+		return "Scegli un evento"
+	end
+	local ok, message = S.AbuseService.Launch(value.Id, value.Minutes)
+	return if ok then "🎬 Evento avviato: " .. message else message
+end
+
+ACTIONS.AbuseStop = function()
+	if not S.AbuseService then
+		return "Eventi non disponibili"
+	end
+	return if S.AbuseService.Stop("Admin") then "Evento terminato" else "Nessun evento in corso"
+end
+
 local function onAction(admin: Player, action: any, targetId: any, value: any)
 	if type(action) ~= "string" or not AdminService.IsAdmin(admin) then
 		return
@@ -9589,7 +10257,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -9653,7 +10321,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -9707,6 +10375,11 @@ local function damageMultipliers(player: Player): number
 	if os.clock() < state.AwakenedUntil then
 		local bloodline = Bloodlines.Get(profile and profile.Bloodline)
 		mult *= bloodline.Awakening and bloodline.Awakening.DamageMult or 1.5
+	end
+	-- eventi dell'Admin Abuse (es. Il Fulmine della Trasformazione: danni doppi)
+	local eventBonus = player:GetAttribute("BonusDannoAbuse")
+	if type(eventBonus) == "number" then
+		mult *= 1 + eventBonus
 	end
 	return mult
 end
@@ -10216,7 +10889,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">CommunityService</string>
             <string name="Source"><![CDATA[--[[
@@ -10352,7 +11025,7 @@ return CommunityService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -10728,7 +11401,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -10999,7 +11672,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -11472,7 +12145,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -11585,7 +12258,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">ExploreService</string>
             <string name="Source"><![CDATA[--[[
@@ -11780,7 +12453,7 @@ return ExploreService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">FestivalService</string>
             <string name="Source"><![CDATA[--[[
@@ -12431,7 +13104,7 @@ return FestivalService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">HorseService</string>
             <string name="Source"><![CDATA[--[[
@@ -12734,7 +13407,7 @@ return HorseService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -12918,7 +13591,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">LeaderboardService</string>
             <string name="Source"><![CDATA[--[[
@@ -13151,7 +13824,7 @@ return LeaderboardService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -13351,7 +14024,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -13762,7 +14435,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -14300,7 +14973,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -14701,7 +15374,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -15238,7 +15911,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -15469,7 +16142,7 @@ function PlayerService.AddXP(player: Player, amount: number, silent: boolean?): 
 	end
 	local stats = PlayerService.Stats(player)
 	-- bonus della community (amici nel server, gruppo): vedi CommunityService
-	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0) + (player:GetAttribute("BonusXPEvento") or 0)
+	local mult = 1 + stats.XPBonus + (player:GetAttribute("BonusXP") or 0) + (player:GetAttribute("BonusXPEvento") or 0) + (player:GetAttribute("BonusXPAbuse") or 0)
 	if (profile.Buffs.XPUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -15506,7 +16179,7 @@ function PlayerService.AddGold(player: Player, amount: number): number
 		return 0
 	end
 	local stats = PlayerService.Stats(player)
-	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0) + (player:GetAttribute("BonusGoldEvento") or 0)
+	local mult = 1 + stats.GoldBonus + (player:GetAttribute("BonusGold") or 0) + (player:GetAttribute("BonusGoldEvento") or 0) + (player:GetAttribute("BonusGoldAbuse") or 0)
 	if (profile.Buffs.GoldUntil or 0) > os.time() then
 		mult *= 2
 	end
@@ -15997,7 +16670,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">PvPService</string>
             <string name="Source"><![CDATA[--[[
@@ -16247,7 +16920,7 @@ return PvPService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -16369,7 +17042,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -16852,7 +17525,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">RewardsService</string>
             <string name="Source"><![CDATA[--[[
@@ -17116,7 +17789,7 @@ return RewardsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">SeaService</string>
             <string name="Source"><![CDATA[--[[
@@ -17628,7 +18301,7 @@ return SeaService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -17953,7 +18626,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -18759,7 +19432,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -18976,7 +19649,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -19352,7 +20025,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -19427,7 +20100,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -20662,7 +21335,8 @@ local function kill(t, killer: Player?)
 	if t.Kind == "Boss" and not t.Raid then
 		S.EventService.Announce(t.Name .. " è caduto!", killer and ("Colpo finale di " .. killer.DisplayName) or "", "Vittoria")
 		local bossState = bossStates[t.BossId]
-		if bossState then
+		-- solo il boss "naturale" della zona (non le copie degli eventi)
+		if bossState and bossState.Alive == t then
 			bossState.Alive = nil
 			bossState.NextSpawn = os.clock() + t.Def.Respawn
 		end
@@ -21072,7 +21746,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -23540,11 +24214,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="76">
+  <Item class="ServerStorage" referent="78">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="77">
+    <Item class="ModuleScript" referent="79">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -23771,19 +24445,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="78">
+  <Item class="SoundService" referent="80">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="79">
+  <Item class="StarterGui" referent="81">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="80">
+  <Item class="StarterPlayer" referent="82">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -23794,11 +24468,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="81">
+    <Item class="StarterCharacterScripts" referent="83">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="82">
+      <Item class="LocalScript" referent="84">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -23811,19 +24485,1669 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="83">
+    <Item class="StarterPlayerScripts" referent="85">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="84">
+      <Item class="Folder" referent="86">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="85">
+        <Item class="Folder" referent="87">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="88">
+            <Properties>
+              <string name="Name">AbuseEventController</string>
+              <string name="Source"><![CDATA[--[[
+	AbuseEventController - le animazioni degli eventi a tempo dell'Admin Abuse (prima stagione)
+	Quando un admin avvia un evento (attributo AbuseEvento di ReplicatedStorage):
+	  1. ANIMAZIONE D'APERTURA: schermata con il titolo che si schianta sullo schermo, raggi di luce,
+	     bande nere e, davanti a te nel mondo, la scena dell'evento (giganti enormi, fulmini, razzi...).
+	     Non blocca il giocatore: puoi continuare a muoverti mentre la guardi.
+	  2. DURANTE L'EVENTO: il cielo cambia colore, particelle attorno a te (cenere, foglie, polvere...),
+	     piccoli eventi nel cielo ogni tanto e lo striscione con il conto alla rovescia.
+	  3. FINE: il cielo torna normale e compare "EVENTO TERMINATO".
+	Chi entra a evento già iniziato vede subito cielo e striscione (senza l'animazione d'apertura).
+	Tutto è solo grafico e viene calcolato da ogni client.
+]]
+
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Lib.Util)
+local AbuseEvents = require(Shared.Data.AbuseEvents)
+local TitanBuilder = require(Shared.Anim.TitanBuilder)
+local ProceduralAnimator = require(Shared.Anim.ProceduralAnimator)
+local Poses = require(Shared.Anim.Poses)
+
+local AbuseEventController = {}
+local C
+
+local player = Players.LocalPlayer
+local rng = Random.new()
+
+local folder: Folder
+local activeId: string? = nil
+local showToken = 0 -- cambia a ogni nuova animazione: le azioni in ritardo di quella vecchia si fermano
+local showProps: { Instance } = {}
+local animators: { any } = {}
+
+local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
+local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
+local SPARKS = "rbxasset://textures/particles/fire_sparks_main.dds"
+local STONE = Color3.fromRGB(190, 182, 166)
+
+local function serverNow(): number
+	return workspace:GetServerTimeNow()
+end
+
+local function fx(): any
+	return C.EffectsController
+end
+
+local function playSound(name: string, where: any, volume: number?, pitch: number?, range: number?)
+	if C.SoundController then
+		C.SoundController.Play(name, where, { Volume = volume, Pitch = pitch, Range = range })
+	end
+end
+
+local function shake(intensity: number, duration: number)
+	if C.CameraController then
+		C.CameraController.Shake(intensity, duration)
+	end
+end
+
+-- MOTORE: modelli che si spostano, giganti animati, oggetti che seguono altri oggetti ------------------
+
+type Mover = { Model: Model?, Part: BasePart?, Path: (number) -> CFrame, Start: number, Duration: number, Done: (() -> ())? }
+local movers: { Mover } = {}
+local followers: { () -> () } = {}
+
+local function moveAlong(target: Instance, path: (number) -> CFrame, duration: number, done: (() -> ())?)
+	local m: Mover = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration), Done = done }
+	if target:IsA("Model") then
+		m.Model = target
+	else
+		m.Part = target :: BasePart
+	end
+	table.insert(movers, m)
+end
+
+local function tweenTo(target: Instance, to: CFrame, duration: number, style: string?, done: (() -> ())?)
+	local from = if target:IsA("Model") then target:GetPivot() else (target :: BasePart).CFrame
+	moveAlong(target, function(k)
+		return from:Lerp(to, Util.Ease(k, style or "SineInOut"))
+	end, duration, done)
+end
+
+local function step(dt: number)
+	local now = os.clock()
+	for i = #movers, 1, -1 do
+		local m = movers[i]
+		local k = math.clamp((now - m.Start) / m.Duration, 0, 1)
+		local alive = (m.Model and m.Model.Parent) or (m.Part and m.Part.Parent)
+		if alive then
+			local cf = m.Path(k)
+			if m.Model then
+				m.Model:PivotTo(cf)
+			elseif m.Part then
+				m.Part.CFrame = cf
+			end
+		end
+		if k >= 1 or not alive then
+			table.remove(movers, i)
+			if m.Done and alive then
+				local ok, err = pcall(m.Done)
+				if not ok then
+					warn("[Admin Abuse] " .. tostring(err))
+				end
+			end
+		end
+	end
+	for _, f in followers do
+		pcall(f)
+	end
+	for _, a in animators do
+		a:Update(dt)
+	end
+end
+
+-- MATTONI ----------------------------------------------------------------------------------------------
+
+local function track<T>(instance: T): T
+	table.insert(showProps, instance :: any)
+	return instance
+end
+
+local function part(props: { [string]: any }): BasePart
+	local className = props.ClassName or "Part"
+	local p = Instance.new(className) :: BasePart
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		if k ~= "ClassName" and k ~= "Parent" then
+			(p :: any)[k] = v
+		end
+	end
+	p.Parent = folder
+	return track(p)
+end
+
+local function emitter(parent: Instance, props: { [string]: any }): ParticleEmitter
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = SPARKLE
+	e.Rate = 0
+	e.LightInfluence = 0
+	for k, v in props do
+		(e :: any)[k] = v
+	end
+	e.Parent = parent
+	return e
+end
+
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function groundAt(position: Vector3, fallbackY: number): Vector3
+	local exclude = { folder }
+	if player.Character then
+		table.insert(exclude, player.Character)
+	end
+	local titanFolder = workspace:FindFirstChild("Giganti")
+	if titanFolder then
+		table.insert(exclude, titanFolder)
+	end
+	groundParams.FilterDescendantsInstances = exclude
+	local hit = workspace:Raycast(position + Vector3.new(0, 900, 0), Vector3.new(0, -1800, 0), groundParams)
+	return if hit then hit.Position else Vector3.new(position.X, fallbackY, position.Z)
+end
+
+-- Il "palco" dell'animazione: davanti alla telecamera, a "distance" passi
+type Stage = { Origin: Vector3, Fwd: Vector3, Right: Vector3, Center: Vector3, ToCamera: CFrame }
+local function stage(distance: number): Stage
+	local cam = workspace.CurrentCamera.CFrame
+	local fwd = Util.SafeUnit(Util.Flat(cam.LookVector), Vector3.new(0, 0, -1))
+	local origin = cam.Position
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local baseY = if root then root.Position.Y - 3 else origin.Y - 20
+	local center = groundAt(origin + fwd * distance, baseY)
+	local right = fwd:Cross(Vector3.yAxis)
+	return {
+		Origin = origin,
+		Fwd = fwd,
+		Right = right,
+		Center = center,
+		ToCamera = CFrame.lookAt(Vector3.zero, Vector3.new(-fwd.X, 0, -fwd.Z)),
+	}
+end
+
+-- punto del palco: x = destra/sinistra, z = più lontano (+) o più vicino (-) rispetto al centro
+local function at(st: Stage, x: number, z: number): Vector3
+	local p = st.Center + st.Right * x + st.Fwd * z
+	return groundAt(p, st.Center.Y)
+end
+
+-- Un gigante costruito sul client, animato (Walk, Animate) e sempre in piedi sul punto "ground"
+local function titan(look: string, height: number, ground: Vector3, facing: CFrame): Model
+	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = rng:NextInteger(1, 1e6) })
+	local hip = (model:GetAttribute("HipHeight") :: number?) or height * 0.45
+	model:PivotTo(CFrame.new(ground + Vector3.new(0, hip, 0)) * facing.Rotation)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanQuery = false
+			d.CanCollide = false
+			d.CanTouch = false
+		end
+	end
+	local root = model.PrimaryPart
+	if root then
+		root.Anchored = true
+	end
+	model.Parent = folder
+	track(model)
+	local animator = ProceduralAnimator.new(model, true)
+	animator.PositionScale = height
+	animator.Context.Seed = rng:NextNumber() * 10
+	animator:SetLayer("Base", Poses.Titan.Locomotion, 1, 0, 10)
+	table.insert(animators, animator)
+	model:SetAttribute("EventoAnimator", #animators)
+	model:SetAttribute("EventoHip", hip)
+	return model
+end
+
+local function animatorOf(model: Model): any
+	local index = model:GetAttribute("EventoAnimator")
+	return index and animators[index]
+end
+
+local function animate(model: Model, clipName: string)
+	local animator = animatorOf(model)
+	local clip = Poses.Titan.Clips[clipName]
+	if animator and clip then
+		animator:Play(clip)
+	end
+end
+
+local function walk(model: Model, amount: number, run: number?)
+	local animator = animatorOf(model)
+	if animator then
+		animator.Context.Move = amount
+		animator.Context.Run = run or 0
+	end
+end
+
+-- CFrame del gigante con i piedi a terra in "ground" e girato come "facing"
+local function standing(model: Model, ground: Vector3, facing: CFrame): CFrame
+	local hip = (model:GetAttribute("EventoHip") :: number?) or 0
+	return CFrame.new(ground + Vector3.new(0, hip, 0)) * facing.Rotation
+end
+
+local function headPosition(model: Model, height: number): Vector3
+	local att = model:FindFirstChild("HeadTopAtt", true) :: Attachment?
+	if att then
+		return att.WorldPosition
+	end
+	return model:GetPivot().Position + Vector3.new(0, height * 0.55, 0)
+end
+
+local function glowLight(parent: Instance, color: Color3, range: number, brightness: number): PointLight
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = range
+	light.Brightness = brightness
+	light.Shadows = false
+	light.Parent = parent
+	return light
+end
+
+-- Pezzo di muro (con o senza cancello) perpendicolare alla direzione dello sguardo
+local function wallSegment(st: Stage, z: number, width: number, height: number): { BasePart }
+	local parts = {}
+	local seg = 70
+	local n = math.floor(width / seg / 2)
+	local rot = st.ToCamera.Rotation
+	for i = -n, n do
+		local p = at(st, i * seg, z)
+		if i == 0 then
+			local gateH = height * 0.45
+			table.insert(parts, part({ Name = "Cancello", Size = Vector3.new(seg * 0.62, gateH, 8), CFrame = CFrame.new(p + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(86, 60, 40) }))
+			table.insert(parts, part({ Name = "Arco", Size = Vector3.new(seg + 1, height - gateH, 30), CFrame = CFrame.new(p + Vector3.new(0, gateH + (height - gateH) / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+			table.insert(parts, part({ Name = "Spalla", Size = Vector3.new(seg * 0.2, gateH, 30), CFrame = CFrame.new(p + st.Right * seg * 0.41 + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+			table.insert(parts, part({ Name = "Spalla", Size = Vector3.new(seg * 0.2, gateH, 30), CFrame = CFrame.new(p - st.Right * seg * 0.41 + Vector3.new(0, gateH / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE }))
+		else
+			table.insert(parts, part({ Name = "Muro", Size = Vector3.new(seg + 1, height, 30), CFrame = CFrame.new(p + Vector3.new(0, height / 2, 0)) * rot, Material = Enum.Material.Slate, Color = STONE:Lerp(Color3.new(0.6, 0.58, 0.54), rng:NextNumber(0, 0.2)) }))
+		end
+	end
+	return parts
+end
+
+local function fadeOut(parts: { Instance }, time: number)
+	for _, p in parts do
+		if p:IsA("BasePart") and p.Parent then
+			TweenService:Create(p, TweenInfo.new(time), { Transparency = 1 }):Play()
+		end
+	end
+end
+
+-- Razzo di segnalazione con scia di fumo colorato (verde, rosso, nero, giallo)
+local FLARE_COLORS = {
+	Verde = Color3.fromRGB(90, 230, 110),
+	Rosso = Color3.fromRGB(255, 70, 60),
+	Nero = Color3.fromRGB(30, 30, 34),
+	Giallo = Color3.fromRGB(255, 220, 80),
+}
+local function flare(from: Vector3, kind: string, height: number?, drift: Vector3?)
+	local color = FLARE_COLORS[kind] or FLARE_COLORS.Verde
+	local black = kind == "Nero"
+	local h = height or rng:NextNumber(200, 280)
+	local side = drift or Vector3.new(rng:NextNumber(-40, 40), 0, rng:NextNumber(-40, 40))
+	local ball = Instance.new("Part")
+	ball.Shape = Enum.PartType.Ball
+	ball.Size = Vector3.one * 3
+	ball.Material = Enum.Material.Neon
+	ball.Color = if black then Color3.fromRGB(255, 160, 90) else color
+	ball.Anchored = true
+	ball.CanCollide = false
+	ball.CanQuery = false
+	ball.CanTouch = false
+	ball.CastShadow = false
+	ball.CFrame = CFrame.new(from)
+	ball.Parent = folder
+	glowLight(ball, ball.Color, 40, 3)
+	local smoke = emitter(ball, {
+		Texture = SMOKE,
+		Color = ColorSequence.new(color, color:Lerp(Color3.new(0.6, 0.6, 0.6), if black then 0.1 else 0.35)),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, if black then 0.1 else 0.25), NumberSequenceKeypoint.new(0.7, 0.55), NumberSequenceKeypoint.new(1, 1) }),
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(1, 22) }),
+		Lifetime = NumberRange.new(6, 9),
+		Speed = NumberRange.new(0.5, 2),
+		Drag = 0.5,
+		Acceleration = Vector3.new(4, 1, 0),
+		Rotation = NumberRange.new(0, 360),
+		RotSpeed = NumberRange.new(-20, 20),
+		LightEmission = if black then 0 else 0.2,
+		LightInfluence = 0.6,
+		Rate = 90,
+	})
+	playSound("Shot", from, 0.9, 0.7, 2500)
+	moveAlong(ball, function(k)
+		local up = 1 - (1 - k) * (1 - k)
+		return CFrame.new(from + Vector3.new(0, h * up, 0) + side * k)
+	end, 2.4, function()
+		smoke.Enabled = false
+		ball.Transparency = 1
+		local spark = emitter(ball, {
+			Color = ColorSequence.new(Color3.new(1, 1, 1), color),
+			LightEmission = 1,
+			Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.5), NumberSequenceKeypoint.new(1, 0) }),
+			Lifetime = NumberRange.new(0.6, 1),
+			Speed = NumberRange.new(20, 40),
+			SpreadAngle = Vector2.new(180, 180),
+		})
+		spark:Emit(40)
+		task.delay(9, function()
+			ball:Destroy()
+		end)
+	end)
+end
+
+-- Fulmine dorato con lampo e tuono (il tuono arriva dopo, più è lontano più tardi)
+local function goldenStrike(ground: Vector3, thickness: number?, color: Color3?)
+	local f = fx()
+	if not f then
+		return
+	end
+	local col = color or Color3.fromRGB(255, 226, 120)
+	f.Lightning(ground + Vector3.new(rng:NextNumber(-80, 80), 1200, rng:NextNumber(-80, 80)), ground, col, thickness or 6)
+	local cam = workspace.CurrentCamera.CFrame.Position
+	local dist = (cam - ground).Magnitude
+	f.Flash(Color3.fromRGB(255, 244, 210), math.clamp(0.6 - dist / 1600, 0.12, 0.5), 0.3)
+	f.Shockwave(ground + Vector3.new(0, 1, 0), 40 + (thickness or 6) * 6, col, 0.6, 1.2)
+	f.Sparks(ground + Vector3.new(0, 2, 0), col, 30, 70)
+	task.delay(math.min(2.5, dist / 600), function()
+		playSound("Thunder", nil, math.clamp(1.2 - dist / 1200, 0.35, 1), rng:NextNumber(0.22, 0.32))
+		if dist < 450 then
+			shake(0.35, 0.6)
+		end
+	end)
+end
+
+local function steamBurst(position: Vector3, size: number, count: number?, life: number?, color: Color3?)
+	local f = fx()
+	if f then
+		f.Steam(position, size, count or 12, life or 4, color)
+	end
+end
+
+-- INTERFACCIA: titolo dell'animazione, striscione con il conto alla rovescia ------------------------------
+
+local Theme
+local card: any = nil
+local banner: any = nil
+
+local function buildUI()
+	Theme = require(script.Parent.Parent.UI.Theme)
+	local New = Theme.New
+	-- schermata del titolo (sopra tutto, non blocca i clic)
+	local root = New("Frame", { Name = "EventoAdminAbuse", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, ZIndex = 50, Parent = C.UIController.Layers.Top })
+	local flash = New("Frame", { Name = "Lampo", BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 50, Parent = root })
+	local top = New("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, Size = UDim2.fromScale(1, 0), ZIndex = 51, Parent = root })
+	local bottom = New("Frame", { BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1), Size = UDim2.fromScale(1, 0), ZIndex = 51, Parent = root })
+	-- raggi di luce che girano dietro al titolo
+	local rays = New("Frame", { Name = "Raggi", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.44), Size = UDim2.fromScale(1.6, 1.6), ZIndex = 52, Parent = root })
+	New("UIAspectRatioConstraint", { AspectRatio = 1, Parent = rays })
+	local rayList = {}
+	for i = 0, 11 do
+		local ray = New("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.05, 1), Rotation = i * 15, BackgroundTransparency = 1, ZIndex = 52, Parent = rays })
+		New("UIGradient", {
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.45, 0.55), NumberSequenceKeypoint.new(0.5, 0.35), NumberSequenceKeypoint.new(0.55, 0.55), NumberSequenceKeypoint.new(1, 1) }),
+			Rotation = 90,
+			Parent = ray,
+		})
+		table.insert(rayList, ray)
+	end
+	local icon = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.fromOffset(300, 300), Text = "", TextSize = 190, Font = Theme.Fonts.Bold, TextTransparency = 1, ZIndex = 53, Parent = root })
+	local iconScale = New("UIScale", { Scale = 1, Parent = icon })
+	local kicker = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.3), Size = UDim2.new(1, 0, 0, 30), Text = "", TextSize = 22, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), TextTransparency = 1, ZIndex = 55, Parent = root })
+	local kickerStroke = New("UIStroke", { Thickness = 2, Color = Color3.new(0, 0, 0), Transparency = 1, Parent = kicker })
+	local title = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.43), Size = UDim2.new(0.95, 0, 0, 110), Text = "", TextScaled = true, Font = Theme.Fonts.Title, TextColor3 = Color3.new(1, 1, 1), TextTransparency = 1, ZIndex = 56, Parent = root })
+	New("UITextSizeConstraint", { MaxTextSize = 96, Parent = title })
+	local titleStroke = New("UIStroke", { Thickness = 4, Color = Color3.new(0, 0, 0), Transparency = 1, Parent = title })
+	local titleGradient = New("UIGradient", { Rotation = 20, Parent = title })
+	local titleScale = New("UIScale", { Scale = 1, Parent = title })
+	local episode = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.53), Size = UDim2.new(1, 0, 0, 30), Text = "", TextSize = 24, Font = Theme.Fonts.Header, TextColor3 = Color3.fromRGB(240, 230, 210), TextTransparency = 1, ZIndex = 55, Parent = root })
+	local episodeStroke = New("UIStroke", { Thickness = 1.5, Color = Color3.new(0, 0, 0), Transparency = 1, Parent = episode })
+	local text = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.58), Size = UDim2.new(0.62, 0, 0, 60), Text = "", TextWrapped = true, TextSize = 19, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), TextTransparency = 0, ZIndex = 55, Parent = root })
+	New("UIStroke", { Thickness = 1.5, Color = Color3.new(0, 0, 0), Transparency = 0.2, Parent = text })
+	local chip = New("TextLabel", { BackgroundColor3 = Color3.fromRGB(20, 16, 14), BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.72), Size = UDim2.fromOffset(360, 36), Text = "", TextSize = 17, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), TextTransparency = 1, ZIndex = 55, Parent = root })
+	Theme.Corner(chip, 18)
+	local chipStroke = New("UIStroke", { Thickness = 2, Color = Color3.new(1, 1, 1), Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = chip })
+	card = {
+		Root = root,
+		Flash = flash,
+		Top = top,
+		Bottom = bottom,
+		Rays = rays,
+		RayList = rayList,
+		Icon = icon,
+		IconScale = iconScale,
+		Kicker = kicker,
+		KickerStroke = kickerStroke,
+		Title = title,
+		TitleStroke = titleStroke,
+		TitleGradient = titleGradient,
+		TitleScale = titleScale,
+		Episode = episode,
+		EpisodeStroke = episodeStroke,
+		Text = text,
+		Chip = chip,
+		ChipStroke = chipStroke,
+	}
+
+	-- striscione in alto con il conto alla rovescia
+	local b = New("Frame", { Name = "StriscioneAdminAbuse", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 112), Size = UDim2.fromOffset(500, 50), BackgroundColor3 = Color3.fromRGB(24, 18, 16), BackgroundTransparency = 0.12, Visible = false, Parent = C.UIController.Layers.HUD })
+	C.UIController.AttachScale(b)
+	Theme.Corner(b, 12)
+	local stroke = New("UIStroke", { Thickness = 2, Color = Color3.new(1, 1, 1), Transparency = 0.1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
+	local name = New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -110, 0, 22), Text = "", TextXAlignment = Enum.TextXAlignment.Left, TextSize = 16, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), Parent = b })
+	local bonus = New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 25), Size = UDim2.new(1, -110, 0, 16), Text = "", TextXAlignment = Enum.TextXAlignment.Left, TextSize = 12, Font = Theme.Fonts.UI, TextColor3 = Color3.fromRGB(230, 220, 200), Parent = b })
+	local timer = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 6), Size = UDim2.fromOffset(96, 30), Text = "", TextXAlignment = Enum.TextXAlignment.Right, TextSize = 24, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), Parent = b })
+	local barBack = New("Frame", { BackgroundColor3 = Color3.fromRGB(60, 50, 46), BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 10, 1, -5), Size = UDim2.new(1, -20, 0, 4), Parent = b })
+	Theme.Corner(barBack, 2)
+	local bar = New("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = barBack })
+	Theme.Corner(bar, 2)
+	banner = { Frame = b, Stroke = stroke, Name = name, Bonus = bonus, Timer = timer, Bar = bar }
+end
+
+local function tween(instance: Instance, time: number, goals: { [string]: any }, style: Enum.EasingStyle?, direction: Enum.EasingDirection?)
+	local t = TweenService:Create(instance, TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), goals)
+	t:Play()
+	return t
+end
+
+local function bonusText(def): string
+	local parts = {}
+	local b = def.Bonus or {}
+	if b.XP and b.XP > 0 then
+		table.insert(parts, ("XP x%s"):format(tostring(1 + b.XP)))
+	end
+	if b.Gold and b.Gold > 0 then
+		table.insert(parts, ("Oro x%s"):format(tostring(1 + b.Gold)))
+	end
+	if b.Damage and b.Damage > 0 then
+		table.insert(parts, ("Danni x%s"):format(tostring(1 + b.Damage)))
+	end
+	if def.InfiniteGas then
+		table.insert(parts, "Gas infinito")
+	end
+	return table.concat(parts, "  •  ")
+end
+
+-- La schermata del titolo: lampo, bande nere, raggi, titolo che si schianta, testo a macchina da scrivere
+local function playCard(def, minutes: number, token: number)
+	local c = card
+	if not c then
+		return
+	end
+	local color = def.Color
+	c.Root.Visible = true
+	c.Flash.BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.55)
+	c.Flash.BackgroundTransparency = 0.05
+	tween(c.Flash, 0.8, { BackgroundTransparency = 1 })
+	c.Top.Size = UDim2.fromScale(1, 0)
+	c.Bottom.Size = UDim2.fromScale(1, 0)
+	tween(c.Top, 0.5, { Size = UDim2.fromScale(1, 0.12) }, Enum.EasingStyle.Quart)
+	tween(c.Bottom, 0.5, { Size = UDim2.fromScale(1, 0.12) }, Enum.EasingStyle.Quart)
+	for _, ray in c.RayList do
+		ray.BackgroundColor3 = color
+		ray.BackgroundTransparency = 1
+		tween(ray, 0.9, { BackgroundTransparency = 0.25 })
+	end
+	c.Rays.Rotation = 0
+	c.Icon.Text = def.Icon
+	c.Icon.TextTransparency = 1
+	c.IconScale.Scale = 0.4
+	tween(c.Icon, 0.6, { TextTransparency = 0.55 })
+	tween(c.IconScale, 0.9, { Scale = 1.15 }, Enum.EasingStyle.Back)
+	c.Kicker.Text = "⚠️  ADMIN ABUSE  •  EVENTO A TEMPO  ⚠️"
+	c.Kicker.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35)
+	c.Kicker.TextTransparency = 1
+	c.KickerStroke.Transparency = 1
+	c.Kicker.Position = UDim2.fromScale(0.5, 0.26)
+	task.delay(0.35, function()
+		if token ~= showToken then
+			return
+		end
+		tween(c.Kicker, 0.45, { TextTransparency = 0, Position = UDim2.fromScale(0.5, 0.3) }, Enum.EasingStyle.Back)
+		tween(c.KickerStroke, 0.45, { Transparency = 0.2 })
+	end)
+	c.Title.Text = def.Name:upper()
+	c.Title.TextTransparency = 1
+	c.TitleStroke.Transparency = 1
+	c.TitleGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(0.45, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(0.5, color:Lerp(Color3.new(1, 1, 1), 0.2)),
+		ColorSequenceKeypoint.new(0.55, Color3.new(1, 1, 1)),
+		ColorSequenceKeypoint.new(1, color),
+	})
+	c.TitleGradient.Offset = Vector2.new(-1, 0)
+	c.TitleScale.Scale = 2.6
+	task.delay(0.75, function()
+		if token ~= showToken then
+			return
+		end
+		tween(c.Title, 0.35, { TextTransparency = 0 })
+		tween(c.TitleStroke, 0.35, { Transparency = 0 })
+		tween(c.TitleScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+		tween(c.TitleGradient, 2.2, { Offset = Vector2.new(1, 0) }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+		task.delay(0.3, function()
+			if token ~= showToken then
+				return
+			end
+			shake(0.5, 0.5)
+			playSound("Explosion", nil, 0.8, 0.5)
+			c.Flash.BackgroundColor3 = Color3.new(1, 1, 1)
+			c.Flash.BackgroundTransparency = 0.6
+			tween(c.Flash, 0.35, { BackgroundTransparency = 1 })
+		end)
+	end)
+	c.Episode.Text = def.Episode
+	c.Episode.TextTransparency = 1
+	c.EpisodeStroke.Transparency = 1
+	task.delay(1.4, function()
+		if token ~= showToken then
+			return
+		end
+		tween(c.Episode, 0.5, { TextTransparency = 0 })
+		tween(c.EpisodeStroke, 0.5, { Transparency = 0.3 })
+	end)
+	-- testo a macchina da scrivere
+	c.Text.Text = ""
+	task.delay(1.9, function()
+		local full = def.Text
+		local len = utf8.len(full) or #full
+		for i = 1, len do
+			if token ~= showToken then
+				return
+			end
+			local cut = utf8.offset(full, i + 1)
+			c.Text.Text = if cut then full:sub(1, cut - 1) else full
+			if i % 3 == 0 then
+				playSound("Type")
+			end
+			task.wait(0.022)
+		end
+	end)
+	c.Chip.Text = ("⏱️  Durata: %d minut%s   •   %s"):format(minutes, if minutes == 1 then "o" else "i", bonusText(def))
+	c.Chip.Size = UDim2.fromOffset(math.max(360, 26 + 8.6 * (utf8.len(c.Chip.Text) or 40)), 36)
+	c.Chip.TextTransparency = 1
+	c.Chip.BackgroundTransparency = 1
+	c.ChipStroke.Color = color
+	c.ChipStroke.Transparency = 1
+	task.delay(2.4, function()
+		if token ~= showToken then
+			return
+		end
+		tween(c.Chip, 0.4, { TextTransparency = 0, BackgroundTransparency = 0.2 })
+		tween(c.ChipStroke, 0.4, { Transparency = 0 })
+	end)
+	-- i raggi girano e il titolo pulsa finché resta sullo schermo
+	local start = os.clock()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		if token ~= showToken or not c.Root.Visible then
+			conn:Disconnect()
+			return
+		end
+		local t = os.clock() - start
+		c.Rays.Rotation = t * 12
+		c.IconScale.Scale = math.max(c.IconScale.Scale, 1.1 + math.sin(t * 3) * 0.05)
+	end)
+	-- uscita: tutto sfuma, le bande si ritirano
+	task.delay(6.6, function()
+		if token ~= showToken then
+			return
+		end
+		for _, ray in c.RayList do
+			tween(ray, 0.6, { BackgroundTransparency = 1 })
+		end
+		tween(c.Icon, 0.6, { TextTransparency = 1 })
+		tween(c.Kicker, 0.5, { TextTransparency = 1 })
+		tween(c.KickerStroke, 0.5, { Transparency = 1 })
+		tween(c.Title, 0.6, { TextTransparency = 1 })
+		tween(c.TitleStroke, 0.6, { Transparency = 1 })
+		tween(c.TitleScale, 0.6, { Scale = 0.8 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		tween(c.Episode, 0.5, { TextTransparency = 1 })
+		tween(c.EpisodeStroke, 0.5, { Transparency = 1 })
+		tween(c.Text, 0.5, { TextTransparency = 1 })
+		tween(c.Chip, 0.5, { TextTransparency = 1, BackgroundTransparency = 1 })
+		tween(c.ChipStroke, 0.5, { Transparency = 1 })
+		tween(c.Top, 0.6, { Size = UDim2.fromScale(1, 0) }, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+		tween(c.Bottom, 0.6, { Size = UDim2.fromScale(1, 0) }, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+		task.delay(0.7, function()
+			if token == showToken then
+				c.Root.Visible = false
+				c.Text.TextTransparency = 0
+			end
+		end)
+	end)
+end
+
+-- Fine dell'evento: scritta "EVENTO TERMINATO" che appare e sparisce
+local function playOutro(def)
+	local c = card
+	if not c then
+		return
+	end
+	showToken += 1
+	local token = showToken
+	c.Root.Visible = true
+	for _, ray in c.RayList do
+		ray.BackgroundTransparency = 1
+	end
+	c.Icon.TextTransparency = 1
+	c.Kicker.TextTransparency = 1
+	c.KickerStroke.Transparency = 1
+	c.Episode.TextTransparency = 1
+	c.EpisodeStroke.Transparency = 1
+	c.Text.Text = ""
+	c.Chip.TextTransparency = 1
+	c.Chip.BackgroundTransparency = 1
+	c.ChipStroke.Transparency = 1
+	c.Top.Size = UDim2.fromScale(1, 0)
+	c.Bottom.Size = UDim2.fromScale(1, 0)
+	c.Flash.BackgroundColor3 = Color3.new(1, 1, 1)
+	c.Flash.BackgroundTransparency = 0.5
+	tween(c.Flash, 0.6, { BackgroundTransparency = 1 })
+	c.Title.Text = "⌛ EVENTO TERMINATO"
+	c.TitleGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), if def then def.Color else Color3.new(1, 1, 1))
+	c.TitleGradient.Offset = Vector2.zero
+	c.Title.TextTransparency = 1
+	c.TitleStroke.Transparency = 1
+	c.TitleScale.Scale = 1.4
+	tween(c.Title, 0.4, { TextTransparency = 0 })
+	tween(c.TitleStroke, 0.4, { Transparency = 0 })
+	tween(c.TitleScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+	c.Episode.Text = if def then def.Name else ""
+	tween(c.Episode, 0.5, { TextTransparency = 0 })
+	tween(c.EpisodeStroke, 0.5, { Transparency = 0.3 })
+	task.delay(3, function()
+		if token ~= showToken then
+			return
+		end
+		tween(c.Title, 0.6, { TextTransparency = 1 })
+		tween(c.TitleStroke, 0.6, { Transparency = 1 })
+		tween(c.Episode, 0.6, { TextTransparency = 1 })
+		tween(c.EpisodeStroke, 0.6, { Transparency = 1 })
+		task.delay(0.7, function()
+			if token == showToken then
+				c.Root.Visible = false
+			end
+		end)
+	end)
+end
+
+-- PARTICELLE ATTORNO AL GIOCATORE DURANTE L'EVENTO -----------------------------------------------------
+
+local ambientPart: BasePart? = nil
+local ambientEmitters: { ParticleEmitter } = {}
+
+local AMBIENT = {
+	Cenere = {
+		{ Texture = SMOKE, Color = ColorSequence.new(Color3.fromRGB(120, 110, 104), Color3.fromRGB(70, 64, 60)), Size = NumberSequence.new(0.5, 0.8), Transparency = NumberSequence.new(0.2), Lifetime = NumberRange.new(5, 8), Speed = NumberRange.new(4, 9), Rate = 70, EmissionDirection = Enum.NormalId.Bottom, Rotation = NumberRange.new(0, 360), RotSpeed = NumberRange.new(-90, 90), LightInfluence = 0.8 },
+		{ Texture = SPARKLE, Color = ColorSequence.new(Color3.fromRGB(255, 170, 70), Color3.fromRGB(255, 80, 30)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) }), Lifetime = NumberRange.new(3, 5), Speed = NumberRange.new(3, 8), Rate = 40, EmissionDirection = Enum.NormalId.Top, LightEmission = 1, Acceleration = Vector3.new(2, 3, 0) },
+	},
+	Polvere = {
+		{ Texture = SMOKE, Color = ColorSequence.new(Color3.fromRGB(214, 190, 150)), Size = NumberSequence.new(1.5, 4), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.4, 0.8), NumberSequenceKeypoint.new(1, 1) }), Lifetime = NumberRange.new(5, 8), Speed = NumberRange.new(6, 12), Rate = 30, EmissionDirection = Enum.NormalId.Right, LightInfluence = 0.9 },
+		{ Texture = SPARKLE, Color = ColorSequence.new(Color3.fromRGB(255, 236, 190)), Size = NumberSequence.new(0.18), Transparency = NumberSequence.new(0.3), Lifetime = NumberRange.new(4, 7), Speed = NumberRange.new(2, 6), Rate = 50, LightEmission = 0.6, SpreadAngle = Vector2.new(180, 180) },
+	},
+	Fumo = {
+		{ Texture = SMOKE, Color = ColorSequence.new(Color3.fromRGB(80, 70, 70), Color3.fromRGB(50, 44, 44)), Size = NumberSequence.new(4, 12), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.75), NumberSequenceKeypoint.new(1, 1) }), Lifetime = NumberRange.new(6, 9), Speed = NumberRange.new(2, 5), Rate = 14, EmissionDirection = Enum.NormalId.Top, LightInfluence = 0.8 },
+		{ Texture = SPARKLE, Color = ColorSequence.new(Color3.fromRGB(255, 120, 70), Color3.fromRGB(255, 60, 40)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) }), Lifetime = NumberRange.new(2, 4), Speed = NumberRange.new(4, 10), Rate = 30, EmissionDirection = Enum.NormalId.Top, LightEmission = 1 },
+	},
+	Foglie = {
+		{ Texture = SPARKLE, Color = ColorSequence.new(Color3.fromRGB(110, 190, 90), Color3.fromRGB(190, 170, 70)), Size = NumberSequence.new(0.55), Squash = NumberSequence.new(-0.4), Transparency = NumberSequence.new(0.1), Lifetime = NumberRange.new(6, 9), Speed = NumberRange.new(3, 6), Rate = 45, EmissionDirection = Enum.NormalId.Bottom, Rotation = NumberRange.new(0, 360), RotSpeed = NumberRange.new(-180, 180), LightInfluence = 1, Acceleration = Vector3.new(3, -2, 1) },
+		{ Texture = SMOKE, Color = ColorSequence.new(Color3.fromRGB(200, 230, 210)), Size = NumberSequence.new(6, 14), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.85), NumberSequenceKeypoint.new(1, 1) }), Lifetime = NumberRange.new(8, 12), Speed = NumberRange.new(1, 3), Rate = 8, LightInfluence = 1 },
+	},
+	Vento = {
+		{ Texture = SPARKS, Color = ColorSequence.new(Color3.fromRGB(255, 250, 235)), Size = NumberSequence.new(0.12), Squash = NumberSequence.new(4), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.6), NumberSequenceKeypoint.new(1, 1) }), Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(60, 90), Rate = 35, EmissionDirection = Enum.NormalId.Right, LightEmission = 0.5, Orientation = Enum.ParticleOrientation.VelocityParallel },
+		{ Texture = SPARKLE, Color = ColorSequence.new(Color3.fromRGB(255, 220, 140)), Size = NumberSequence.new(0.2), Transparency = NumberSequence.new(0.2), Lifetime = NumberRange.new(3, 6), Speed = NumberRange.new(4, 10), Rate = 40, LightEmission = 0.8, SpreadAngle = Vector2.new(180, 180) },
+	},
+	Pioggia = {
+		{ Texture = SPARKLE, Color = ColorSequence.new(Color3.fromRGB(255, 230, 140)), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) }), Lifetime = NumberRange.new(1, 2), Speed = NumberRange.new(1, 3), Rate = 18, LightEmission = 1, SpreadAngle = Vector2.new(180, 180) },
+	},
+}
+
+local function setAmbient(kind: string?)
+	for _, e in ambientEmitters do
+		e.Enabled = false
+		task.delay(10, function()
+			e:Destroy()
+		end)
+	end
+	table.clear(ambientEmitters)
+	if not kind or not AMBIENT[kind] then
+		return
+	end
+	if not ambientPart then
+		local p = Instance.new("Part")
+		p.Name = "ParticelleEvento"
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Transparency = 1
+		p.Size = Vector3.new(160, 4, 160)
+		p.Parent = workspace.CurrentCamera
+		ambientPart = p
+	end
+	for _, props in AMBIENT[kind] do
+		local e = emitter(ambientPart :: BasePart, props)
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+		e.Enabled = true
+		table.insert(ambientEmitters, e)
+	end
+end
+
+local function followCamera()
+	local p = ambientPart
+	local camera = workspace.CurrentCamera
+	if p and camera then
+		local cam = camera.CFrame.Position
+		p.CFrame = CFrame.new(cam + Vector3.new(0, 35, 0) + camera.CFrame.LookVector * 25)
+	end
+end
+
+-- un punto lontano attorno al giocatore (per i piccoli eventi del cielo)
+local function farPoint(minDist: number, maxDist: number, inFront: boolean?): Vector3
+	local cam = workspace.CurrentCamera.CFrame
+	local base = Util.AngleOf(Util.SafeUnit(Util.Flat(cam.LookVector), Vector3.new(0, 0, -1)))
+	local angle = if inFront then base + rng:NextNumber(-60, 60) else rng:NextNumber(0, 360)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local y = if root then root.Position.Y - 3 else cam.Position.Y - 20
+	return groundAt(cam.Position + Util.Polar(angle, rng:NextNumber(minDist, maxDist)), y)
+end
+
+-- piccoli eventi nel cielo durante l'evento
+local AMBIENT_EVENTS: { [string]: { Every: { number }, Run: () -> () } } = {
+	CadutaMuro = {
+		Every = { 6, 11 },
+		Run = function()
+			local p = farPoint(450, 900, true)
+			steamBurst(p + Vector3.new(0, 40, 0), 120, 20, 7, Color3.fromRGB(230, 200, 180))
+			if rng:NextNumber() < 0.4 and fx() then
+				fx().Flash(Color3.fromRGB(255, 160, 100), 0.12, 0.6)
+				playSound("Thunder", nil, 0.5, 0.2)
+			end
+		end,
+	},
+	CaricaBastione = {
+		Every = { 9, 14 },
+		Run = function()
+			for i = 0, 2 do
+				task.delay(i * 0.55, function()
+					playSound("Land", nil, 1, 0.22)
+					shake(0.18 + i * 0.06, 0.35)
+				end)
+			end
+		end,
+	},
+	AssedioCalaneth = {
+		Every = { 5, 9 },
+		Run = function()
+			flare(farPoint(250, 600, true), if rng:NextNumber() < 0.8 then "Rosso" else "Verde")
+		end,
+	},
+	UrloCacciatrice = {
+		Every = { 14, 22 },
+		Run = function()
+			local p = farPoint(500, 900, true)
+			playSound("Roar", nil, 0.45, 0.55)
+			if fx() then
+				fx().Shockwave(p + Vector3.new(0, 30, 0), 400, Color3.fromRGB(200, 255, 220), 2, 2)
+			end
+		end,
+	},
+	Spedizione = {
+		Every = { 4, 8 },
+		Run = function()
+			local roll = rng:NextNumber()
+			flare(farPoint(250, 700, true), if roll < 0.7 then "Verde" elseif roll < 0.9 then "Rosso" else "Giallo")
+		end,
+	},
+	FulmineTrasformazione = {
+		Every = { 3, 7 },
+		Run = function()
+			goldenStrike(farPoint(180, 650), rng:NextNumber(4, 8))
+		end,
+	},
+}
+
+-- LE ANIMAZIONI D'APERTURA ------------------------------------------------------------------------------
+
+local SHOWS: { [string]: ((number, () -> ()) -> ()) -> () } = {}
+
+-- 🧱 La Caduta del Muro: il Vulcano si alza oltre il Muro tra fulmini e vapore e sfonda il cancello
+SHOWS.CadutaMuro = function(after)
+	local st = stage(600)
+	local wall = wallSegment(st, -80, 900, 150)
+	local gate: BasePart? = nil
+	for _, p in wall do
+		if p.Name == "Cancello" then
+			gate = p
+		end
+	end
+	local spot = st.Center
+	local face = st.ToCamera
+	local vulcano = titan("Vulcano", 190, spot - Vector3.new(0, 215, 0), face)
+	local glow = glowLight(vulcano.PrimaryPart or vulcano, Color3.fromRGB(255, 140, 60), 160, 0)
+	shake(0.25, 1.6)
+	playSound("Thunder", nil, 0.7, 0.2)
+	after(0.7, function()
+		goldenStrike(spot + Vector3.new(0, 30, 0), 14)
+		goldenStrike(spot + st.Right * 60, 7)
+		if fx() then
+			fx().Flash(Color3.fromRGB(255, 240, 200), 0.7, 0.9)
+			fx().Explosion(spot + Vector3.new(0, 50, 0), 70, true)
+		end
+		steamBurst(spot + Vector3.new(0, 80, 0), 200, 40, 7, Color3.fromRGB(255, 230, 210))
+	end)
+	after(0.9, function()
+		tweenTo(vulcano, standing(vulcano, spot, face), 3.4, "QuadOut")
+		TweenService:Create(glow, TweenInfo.new(2), { Brightness = 4 }):Play()
+		for i = 0, 10 do
+			task.delay(i * 0.32, function()
+				steamBurst(spot + st.Right * rng:NextNumber(-50, 50) + Vector3.new(0, rng:NextNumber(40, 180), 0), 70, 10, 5, Color3.fromRGB(255, 236, 220))
+			end)
+		end
+		shake(0.45, 3.2)
+	end)
+	after(4.5, function()
+		animate(vulcano, "Roar")
+		playSound("Roar", nil, 1, 0.16)
+		shake(0.7, 1.6)
+		local head = headPosition(vulcano, 190)
+		for i = 0, 3 do
+			task.delay(i * 0.22, function()
+				if fx() then
+					fx().Shockwave(head, 260 + i * 120, Color3.fromRGB(255, 190, 120), 1.2, 4)
+				end
+			end)
+		end
+		steamBurst(head, 160, 30, 6, Color3.fromRGB(255, 240, 230))
+	end)
+	after(6.2, function()
+		animate(vulcano, "Kick")
+	end)
+	after(6.8, function()
+		local g = if gate then gate.Position else at(st, 0, -80)
+		if gate then
+			gate:Destroy()
+		end
+		for _, p in wall do
+			if p.Parent and (p.Position - g).Magnitude < 60 then
+				p:Destroy()
+			end
+		end
+		local f = fx()
+		if f then
+			f.Explosion(g, 60, true)
+			f.DebrisBurst(g + Vector3.new(0, 20, 0), 45, 9, STONE, Enum.Material.Slate, 240)
+			f.Shockwave(g + Vector3.new(0, 2, 0), 320, Color3.fromRGB(255, 220, 180), 1.2, 4)
+			f.Flash(Color3.fromRGB(255, 236, 210), 0.55, 0.7)
+		end
+		steamBurst(g + Vector3.new(0, 30, 0), 140, 30, 6, Color3.fromRGB(200, 186, 170))
+		playSound("Explosion", nil, 1, 0.35)
+		shake(1.3, 1.5)
+	end)
+	after(10, function()
+		steamBurst(spot + Vector3.new(0, 100, 0), 240, 50, 6, Color3.fromRGB(255, 240, 230))
+		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 230, 0), face), 3.5, "QuadIn")
+		fadeOut(wall, 3.5)
+	end)
+end
+
+-- 🛡️ La Carica del Bastione: passi che fanno tremare la terra, la carica e lo schianto contro il Muro
+SHOWS.CaricaBastione = function(after)
+	local st = stage(340)
+	local wall = wallSegment(st, 0, 700, 110)
+	local face = st.ToCamera
+	local startPos = at(st, 0, 820)
+	local endPos = at(st, 0, -50)
+	local bastione = titan("Bastione", 72, startPos, face)
+	walk(bastione, 1, 1)
+	animate(bastione, "Charge")
+	local hit = false
+	local duration = 5.4
+	local start = os.clock()
+	moveAlong(bastione, function(k)
+		local p = startPos:Lerp(endPos, k)
+		local hip = (bastione:GetAttribute("EventoHip") :: number?) or 30
+		return CFrame.new(p + Vector3.new(0, hip + math.abs(math.sin(k * 40)) * 2, 0)) * face.Rotation
+	end, duration, function()
+		walk(bastione, 0)
+		animate(bastione, "Roar")
+		playSound("Roar", nil, 1, 0.2)
+		shake(0.6, 1.2)
+		if fx() then
+			fx().HighlightModel(bastione, Color3.fromRGB(255, 220, 140), 1.5, 0.4)
+		end
+	end)
+	-- passi sempre più forti
+	task.spawn(function()
+		local token = showToken
+		while token == showToken and os.clock() - start < duration do
+			local k = (os.clock() - start) / duration
+			playSound("Land", nil, 0.6 + k * 0.4, 0.2)
+			shake(0.12 + k * 0.4, 0.3)
+			local feet = bastione:GetPivot().Position - Vector3.new(0, (bastione:GetAttribute("EventoHip") :: number?) or 30, 0)
+			steamBurst(feet, 30, 4, 2.5, Color3.fromRGB(196, 170, 130))
+			task.wait(0.42)
+		end
+	end)
+	after(duration * (820 / 870), function()
+		if hit then
+			return
+		end
+		hit = true
+		local g = at(st, 0, 0) + Vector3.new(0, 40, 0)
+		for _, p in wall do
+			if p.Parent and (Util.Flat(p.Position - g)).Magnitude < 110 then
+				p:Destroy()
+			end
+		end
+		local f = fx()
+		if f then
+			f.Explosion(g, 70, true)
+			f.DebrisBurst(g, 60, 10, STONE, Enum.Material.Slate, 260)
+			f.Shockwave(g - Vector3.new(0, 38, 0), 360, Color3.fromRGB(255, 230, 180), 1.3, 4)
+			f.Flash(Color3.fromRGB(255, 240, 220), 0.6, 0.6)
+		end
+		steamBurst(g, 150, 30, 5, Color3.fromRGB(200, 180, 150))
+		playSound("Explosion", nil, 1, 0.3)
+		shake(1.4, 1.4)
+	end)
+	after(8.4, function()
+		animate(bastione, "Harden")
+		if fx() then
+			fx().Sparks(headPosition(bastione, 72), Color3.fromRGB(255, 240, 200), 60, 60)
+		end
+	end)
+	after(10.5, function()
+		steamBurst(bastione:GetPivot().Position, 120, 30, 5)
+		fadeOut(wall, 2.5)
+		tweenTo(bastione, bastione:GetPivot() - Vector3.new(0, 110, 0), 2.6, "QuadIn")
+	end)
+end
+
+-- 🔥 L'Assedio di Calaneth: razzi rossi e campane, il fulmine, il Gigante della Furia e il masso sulla breccia
+SHOWS.AssedioCalaneth = function(after)
+	local st = stage(300)
+	local face = st.ToCamera
+	for i = 0, 5 do
+		after(i * 0.38, function()
+			flare(at(st, rng:NextNumber(-420, 420), rng:NextNumber(-120, 250)), "Rosso")
+		end)
+	end
+	for i = 0, 5 do
+		after(0.2 + i * 0.36, function()
+			playSound("UI", nil, 0.9, if i % 2 == 0 then 0.32 else 0.27)
+		end)
+	end
+	local spot = st.Center
+	local furia: Model? = nil
+	after(2.6, function()
+		goldenStrike(spot, 14)
+		if fx() then
+			fx().Flash(Color3.fromRGB(255, 244, 220), 0.7, 0.8)
+			fx().TransformBurst(spot, 60)
+		end
+		steamBurst(spot + Vector3.new(0, 40, 0), 160, 40, 6)
+		local m = titan("Furia", 60, spot - Vector3.new(0, 70, 0), face)
+		furia = m
+		tweenTo(m, standing(m, spot, face), 1, "QuadOut")
+		glowLight(m.PrimaryPart or m, Color3.fromRGB(120, 255, 160), 60, 1.5)
+	end)
+	after(3.9, function()
+		if not furia then
+			return
+		end
+		animate(furia, "Roar")
+		playSound("Roar", nil, 1, 0.24)
+		shake(0.8, 1.2)
+		if fx() then
+			fx().Shockwave(headPosition(furia, 60), 260, Color3.fromRGB(150, 255, 180), 1, 3)
+		end
+	end)
+	local boulder: BasePart? = nil
+	after(5.4, function()
+		if not furia then
+			return
+		end
+		local m = furia
+		local b = part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 44, Material = Enum.Material.Slate, Color = Color3.fromRGB(128, 122, 114), CFrame = CFrame.new(headPosition(m, 60) + Vector3.new(0, 20, 0)) })
+		boulder = b
+		steamBurst(b.Position, 60, 14, 3, Color3.fromRGB(200, 186, 160))
+		if fx() then
+			fx().DebrisBurst(b.Position, 18, 4, Color3.fromRGB(128, 122, 114), Enum.Material.Slate, 80)
+		end
+		playSound("Land", nil, 1, 0.3)
+		animate(m, "Grab")
+		table.insert(followers, function()
+			if b.Parent and m.Parent and b:GetAttribute("Caduto") ~= true then
+				b.CFrame = CFrame.new(headPosition(m, 60) + Vector3.new(0, 19, 0))
+			end
+		end)
+		walk(m, 0.7, 0)
+		tweenTo(m, standing(m, at(st, 0, -70), face), 3.2, "Linear")
+	end)
+	after(8.8, function()
+		if furia then
+			walk(furia, 0)
+			animate(furia, "Slam")
+		end
+	end)
+	after(9.25, function()
+		local b = boulder
+		if not b then
+			return
+		end
+		b:SetAttribute("Caduto", true)
+		local land = at(st, 0, -150) + Vector3.new(0, 20, 0)
+		tweenTo(b, CFrame.new(land), 0.5, "QuadIn", function()
+			local f = fx()
+			if f then
+				f.Explosion(land, 55, true)
+				f.DebrisBurst(land, 40, 7, Color3.fromRGB(128, 122, 114), Enum.Material.Slate, 200)
+				f.Shockwave(land - Vector3.new(0, 18, 0), 300, Color3.fromRGB(230, 210, 180), 1.2, 3)
+				f.Flash(Color3.fromRGB(255, 240, 220), 0.4, 0.5)
+			end
+			steamBurst(land, 140, 30, 6, Color3.fromRGB(196, 176, 150))
+			playSound("Explosion", nil, 1, 0.3)
+			shake(1.3, 1.4)
+		end)
+	end)
+	after(11.2, function()
+		if furia then
+			local pos = furia:GetPivot().Position
+			if fx() then
+				fx().TransformEnd(pos, 60)
+			end
+			steamBurst(pos, 120, 40, 6)
+			tweenTo(furia, furia:GetPivot() - Vector3.new(0, 90, 0), 2.4, "QuadIn")
+		end
+		if boulder then
+			fadeOut({ boulder }, 3)
+		end
+	end)
+end
+
+-- 😱 L'Urlo della Cacciatrice: crescono gli alberi giganti, lei corre, si ferma e urla: arrivano i giganti
+SHOWS.UrloCacciatrice = function(after)
+	local st = stage(330)
+	local face = st.ToCamera
+	local trees = {}
+	for i = 0, 8 do
+		local x = -460 + i * 115 + rng:NextNumber(-25, 25)
+		local z = rng:NextNumber(-40, 180)
+		local base = at(st, x, z)
+		local h = rng:NextNumber(200, 260)
+		local trunk = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 24, 24), CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 50) })
+		local crowns = {}
+		for j = 1, 3 do
+			local crown = part({ Shape = Enum.PartType.Ball, Size = Vector3.one * 0.5, CFrame = CFrame.new(base), Material = Enum.Material.Grass, Color = Color3.fromRGB(56, 104, 50):Lerp(Color3.fromRGB(90, 130, 60), rng:NextNumber()) })
+			table.insert(crowns, crown)
+		end
+		table.insert(trees, trunk)
+		after(0.3 + i * 0.12, function()
+			TweenService:Create(trunk, TweenInfo.new(1.6, Enum.EasingStyle.Quart), { Size = Vector3.new(h, 24, 24), CFrame = CFrame.new(base + Vector3.new(0, h / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)) }):Play()
+			for j, crown in crowns do
+				local offset = Vector3.new(rng:NextNumber(-30, 30), h + (j - 2) * 30, rng:NextNumber(-30, 30))
+				TweenService:Create(crown, TweenInfo.new(1.9, Enum.EasingStyle.Back), { Size = Vector3.one * rng:NextNumber(90, 130), CFrame = CFrame.new(base + offset) }):Play()
+				table.insert(trees, crown)
+			end
+			shake(0.15, 0.4)
+		end)
+	end
+	local runFace = CFrame.lookAt(Vector3.zero, st.Right)
+	local from = at(st, -560, 40)
+	local spot = at(st, 0, 40)
+	local hunter = titan("Cacciatrice", 62, from, runFace)
+	walk(hunter, 1, 1)
+	after(2, function()
+		tweenTo(hunter, standing(hunter, spot, runFace), 3.4, "Linear")
+		for i = 0, 7 do
+			task.delay(i * 0.42, function()
+				playSound("Land", nil, 0.8, 0.28)
+				shake(0.15, 0.25)
+			end)
+		end
+	end)
+	after(5.4, function()
+		walk(hunter, 0)
+		tweenTo(hunter, standing(hunter, spot, face), 0.5, "SineOut")
+	end)
+	after(6.1, function()
+		animate(hunter, "Roar")
+		playSound("Roar", nil, 1, 0.55)
+		playSound("Roar", nil, 0.8, 0.42)
+		shake(0.9, 2.2)
+		local mouth = headPosition(hunter, 62)
+		for i = 0, 5 do
+			task.delay(i * 0.18, function()
+				if fx() then
+					fx().Shockwave(mouth, 300 + i * 110, if i % 2 == 0 then Color3.fromRGB(210, 255, 225) else Color3.new(1, 1, 1), 1.3, 3)
+				end
+			end)
+		end
+		local blur = Instance.new("BlurEffect")
+		blur.Size = 0
+		blur.Parent = Lighting
+		track(blur)
+		TweenService:Create(blur, TweenInfo.new(0.35), { Size = 16 }):Play()
+		task.delay(0.6, function()
+			TweenService:Create(blur, TweenInfo.new(1.2), { Size = 0 }):Play()
+		end)
+	end)
+	-- i giganti richiamati dall'urlo corrono verso di lei
+	after(7.3, function()
+		for i = 1, 7 do
+			task.delay(i * 0.12, function()
+				local x = rng:NextNumber(-500, 500)
+				local start = at(st, x, rng:NextNumber(260, 360))
+				local goal = at(st, x * 0.3, 90)
+				local dir = CFrame.lookAt(Vector3.zero, Util.SafeUnit(Util.Flat(goal - start)))
+				local h = rng:NextNumber(20, 34)
+				local m = titan("Puro", h, start, dir)
+				walk(m, 1, 1)
+				tweenTo(m, standing(m, goal, dir), rng:NextNumber(3.2, 4), "Linear")
+			end)
+		end
+	end)
+	after(11.5, function()
+		steamBurst(spot + Vector3.new(0, 30, 0), 200, 40, 6, Color3.fromRGB(220, 240, 225))
+		fadeOut(trees, 2.5)
+		tweenTo(hunter, hunter:GetPivot() - Vector3.new(0, 80, 0), 2.5, "QuadIn")
+	end)
+end
+
+-- 🐎 La Spedizione: fanfara, razzi verdi in formazione, la cavalleria al galoppo e un anomalo che salta
+local function rider(base: CFrame): { Model: Model, Parts: { [string]: BasePart } }
+	local model = Instance.new("Model")
+	model.Name = "Cavaliere"
+	local coat = ({ Color3.fromRGB(110, 76, 50), Color3.fromRGB(70, 50, 36), Color3.fromRGB(150, 120, 90), Color3.fromRGB(40, 36, 34) })[rng:NextInteger(1, 4)]
+	local function p(name: string, size: Vector3, color: Color3, material: Enum.Material?, shape: Enum.PartType?): BasePart
+		local x = Instance.new("Part")
+		x.Name = name
+		x.Size = size
+		x.Color = color
+		x.Material = material or Enum.Material.SmoothPlastic
+		if shape then
+			x.Shape = shape
+		end
+		x.Anchored = true
+		x.CanCollide = false
+		x.CanQuery = false
+		x.CanTouch = false
+		x.CFrame = base
+		x.Parent = model
+		return x
+	end
+	local parts = {
+		Body = p("Corpo", Vector3.new(3.2, 3.4, 8), coat),
+		Neck = p("Collo", Vector3.new(1.8, 4.2, 1.8), coat),
+		Head = p("Testa", Vector3.new(1.6, 1.8, 3.4), coat),
+		LegFL = p("Zampa", Vector3.new(0.9, 4.6, 0.9), coat),
+		LegFR = p("Zampa", Vector3.new(0.9, 4.6, 0.9), coat),
+		LegBL = p("Zampa", Vector3.new(0.9, 4.6, 0.9), coat),
+		LegBR = p("Zampa", Vector3.new(0.9, 4.6, 0.9), coat),
+		Tail = p("Coda", Vector3.new(0.6, 3.6, 0.6), Color3.fromRGB(30, 26, 24)),
+		Rider = p("Soldato", Vector3.new(2.2, 2.8, 1.4), Color3.fromRGB(150, 116, 80)),
+		RiderHead = p("TestaSoldato", Vector3.new(1.4, 1.4, 1.4), Color3.fromRGB(234, 196, 160), nil, Enum.PartType.Ball),
+		Cape = p("Mantello", Vector3.new(2.6, 3.2, 0.25), Color3.fromRGB(46, 104, 58), Enum.Material.Fabric),
+	}
+	model.PrimaryPart = parts.Body
+	model.Parent = folder
+	track(model)
+	return { Model = model, Parts = parts }
+end
+
+local function poseRider(r, cf: CFrame, t: number)
+	local P = r.Parts
+	local gallop = math.sin(t * 14)
+	local bob = math.abs(math.sin(t * 14)) * 0.8
+	local body = cf * CFrame.new(0, 6 + bob, 0) * CFrame.Angles(gallop * 0.06, 0, 0)
+	P.Body.CFrame = body
+	P.Neck.CFrame = body * CFrame.new(0, 2.2, -4.2) * CFrame.Angles(math.rad(-35), 0, 0)
+	P.Head.CFrame = body * CFrame.new(0, 4.4, -5.6) * CFrame.Angles(math.rad(25) + gallop * 0.1, 0, 0)
+	P.LegFL.CFrame = body * CFrame.new(-1.1, -3.6, -3) * CFrame.Angles(gallop * 0.8, 0, 0)
+	P.LegFR.CFrame = body * CFrame.new(1.1, -3.6, -3) * CFrame.Angles(-gallop * 0.8, 0, 0)
+	P.LegBL.CFrame = body * CFrame.new(-1.1, -3.6, 3) * CFrame.Angles(-gallop * 0.8, 0, 0)
+	P.LegBR.CFrame = body * CFrame.new(1.1, -3.6, 3) * CFrame.Angles(gallop * 0.8, 0, 0)
+	P.Tail.CFrame = body * CFrame.new(0, 0.6, 4.6) * CFrame.Angles(math.rad(40) + gallop * 0.2, 0, 0)
+	P.Rider.CFrame = body * CFrame.new(0, 3.1, -0.4) * CFrame.Angles(math.rad(-12), 0, 0)
+	P.RiderHead.CFrame = body * CFrame.new(0, 5.2, -0.7)
+	P.Cape.CFrame = body * CFrame.new(0, 3.2, 0.9) * CFrame.Angles(math.rad(35 + gallop * 10), 0, 0)
+end
+
+SHOWS.Spedizione = function(after)
+	local st = stage(320)
+	-- fanfara
+	for i, pitch in { 0.5, 0.63, 0.75, 1 } do
+		after((i - 1) * 0.22, function()
+			playSound("Reward", nil, 0.8, pitch)
+		end)
+	end
+	for i = 0, 6 do
+		after(0.3 + i * 0.4, function()
+			flare(at(st, -480 + i * 160, rng:NextNumber(40, 180)), "Verde", 260, st.Right * 20)
+		end)
+	end
+	-- la cavalleria al galoppo da sinistra a destra
+	local riders = {}
+	local dir = CFrame.lookAt(Vector3.zero, st.Right)
+	after(1.2, function()
+		local start = os.clock()
+		for i = 1, 10 do
+			local row = (i - 1) % 2
+			local col = math.floor((i - 1) / 2)
+			local lane = -60 - row * 22 + rng:NextNumber(-4, 4)
+			local offset = -col * 30 - row * 14
+			local r = rider(CFrame.new(st.Center))
+			table.insert(riders, { R = r, Lane = lane, Offset = offset, Phase = rng:NextNumber(0, 6) })
+		end
+		local runTime = 7
+		table.insert(followers, function()
+			local t = os.clock() - start
+			if t > runTime + 1 then
+				return
+			end
+			local k = t / runTime
+			for _, entry in riders do
+				if entry.R.Model.Parent then
+					local x = -620 + k * 1240 + entry.Offset
+					local ground = at(st, x, entry.Lane)
+					poseRider(entry.R, CFrame.new(ground) * dir.Rotation, t + entry.Phase)
+				end
+			end
+		end)
+		for i = 0, 12 do
+			task.delay(i * 0.45, function()
+				local lead = riders[1]
+				if lead and lead.R.Model.Parent then
+					steamBurst(lead.R.Parts.Body.Position - st.Right * 12 - Vector3.new(0, 5, 0), 26, 5, 2.5, Color3.fromRGB(210, 190, 150))
+				end
+			end)
+		end
+	end)
+	after(3.4, function()
+		flare(at(st, 380, 120), "Rosso", 240)
+	end)
+	after(4.1, function()
+		flare(at(st, 300, 60), "Nero", 220)
+		playSound("UI", nil, 0.8, 0.3)
+	end)
+	-- l'anomalo salta fuori e insegue la cavalleria
+	after(5, function()
+		local from = at(st, 420, 200)
+		local land = at(st, 140, -20)
+		local face = CFrame.lookAt(Vector3.zero, Util.SafeUnit(Util.Flat(land - from)))
+		local abnormal = titan("Puro", 40, from - Vector3.new(0, 40, 0), face)
+		animate(abnormal, "Leap")
+		local hip = (abnormal:GetAttribute("EventoHip") :: number?) or 18
+		moveAlong(abnormal, function(k)
+			local p = from:Lerp(land, k) + Vector3.new(0, hip + math.sin(k * math.pi) * 110 - (1 - k) * 40 * (1 - k), 0)
+			return CFrame.new(p) * face.Rotation
+		end, 1.4, function()
+			local f = fx()
+			if f then
+				f.Explosion(land, 30, false)
+				f.Shockwave(land + Vector3.new(0, 1, 0), 180, Color3.fromRGB(230, 210, 170), 0.9, 2)
+				f.DebrisBurst(land, 20, 4, Color3.fromRGB(120, 100, 80), Enum.Material.Ground, 120)
+			end
+			playSound("Land", nil, 1, 0.25)
+			shake(0.8, 0.8)
+			local chase = CFrame.lookAt(Vector3.zero, st.Right)
+			abnormal:PivotTo(standing(abnormal, land, chase))
+			walk(abnormal, 1, 1)
+			tweenTo(abnormal, standing(abnormal, at(st, 700, -40), chase), 4.5, "Linear")
+		end)
+	end)
+	after(11.5, function()
+		for _, entry in riders do
+			fadeOut(entry.R.Model:GetChildren(), 1.5)
+		end
+	end)
+end
+
+-- ⚡ Il Fulmine della Trasformazione: pioggia di fulmini dorati, il fulmine gigante e la Furia che emerge
+SHOWS.FulmineTrasformazione = function(after)
+	local st = stage(240)
+	local face = st.ToCamera
+	local spot = st.Center
+	for i = 0, 8 do
+		after(i * 0.36, function()
+			local p = at(st, rng:NextNumber(-500, 500), rng:NextNumber(-150, 400))
+			goldenStrike(p, rng:NextNumber(4, 8))
+		end)
+	end
+	local furia: Model? = nil
+	after(3.4, function()
+		goldenStrike(spot, 20)
+		goldenStrike(spot + st.Right * 30, 9)
+		goldenStrike(spot - st.Right * 30, 9)
+		local f = fx()
+		if f then
+			f.Flash(Color3.new(1, 1, 1), 0.95, 1.1)
+			f.Explosion(spot + Vector3.new(0, 10, 0), 80, true)
+			f.Shockwave(spot + Vector3.new(0, 2, 0), 520, Color3.fromRGB(255, 220, 100), 1.6, 6)
+			f.TransformBurst(spot, 70)
+		end
+		steamBurst(spot + Vector3.new(0, 50, 0), 240, 50, 7)
+		playSound("Thunder", nil, 1, 0.2)
+		playSound("Explosion", nil, 1, 0.3)
+		shake(1.4, 1.6)
+		local m = titan("Furia", 72, spot - Vector3.new(0, 80, 0), face)
+		furia = m
+		glowLight(m.PrimaryPart or m, Color3.fromRGB(110, 255, 150), 80, 2)
+		tweenTo(m, standing(m, spot, face), 1.8, "QuadOut")
+		for i = 0, 6 do
+			task.delay(i * 0.25, function()
+				steamBurst(spot + st.Right * rng:NextNumber(-25, 25) + Vector3.new(0, rng:NextNumber(10, 70), 0), 60, 10, 4)
+			end)
+		end
+	end)
+	after(5.7, function()
+		if not furia then
+			return
+		end
+		animate(furia, "Roar")
+		playSound("Roar", nil, 1, 0.22)
+		shake(1, 1.5)
+		local head = headPosition(furia, 72)
+		for i = 0, 2 do
+			task.delay(i * 0.2, function()
+				if fx() then
+					fx().Shockwave(head, 220 + i * 120, Color3.fromRGB(130, 255, 170), 1.1, 3)
+				end
+			end)
+		end
+		goldenStrike(spot + st.Right * 90, 6)
+	end)
+	after(7.6, function()
+		if furia then
+			animate(furia, "Punch")
+		end
+	end)
+	after(8.05, function()
+		if not furia then
+			return
+		end
+		local fist = furia:GetPivot().Position - st.Fwd * 40 + Vector3.new(0, 30, 0)
+		if fx() then
+			fx().Shockwave(fist, 200, Color3.new(1, 1, 1), 0.8, 2)
+			fx().Flash(Color3.fromRGB(255, 255, 230), 0.3, 0.4)
+		end
+		playSound("Explosion", nil, 0.9, 0.45)
+		shake(0.9, 0.7)
+	end)
+	after(10.6, function()
+		if furia then
+			local pos = furia:GetPivot().Position
+			if fx() then
+				fx().TransformEnd(pos, 72)
+			end
+			steamBurst(pos, 160, 40, 6)
+			tweenTo(furia, furia:GetPivot() - Vector3.new(0, 100, 0), 2.6, "QuadIn")
+		end
+	end)
+end
+
+local function cleanupShow()
+	table.clear(movers)
+	table.clear(followers)
+	for _, a in animators do
+		pcall(function()
+			a:Destroy()
+		end)
+	end
+	table.clear(animators)
+	for _, p in showProps do
+		if p.Parent then
+			p:Destroy()
+		end
+	end
+	table.clear(showProps)
+end
+
+-- Fa partire l'animazione d'apertura (titolo + scena nel mondo) per l'evento "id"
+function AbuseEventController.PlayIntro(id: string, minutes: number?)
+	local def = AbuseEvents.Get(id)
+	if not def then
+		return
+	end
+	cleanupShow()
+	showToken += 1
+	local token = showToken
+	playCard(def, minutes or AbuseEvents.DefaultMinutes, token)
+	local show = SHOWS[id]
+	if show then
+		local function after(t: number, fn: () -> ())
+			task.delay(t, function()
+				if token ~= showToken then
+					return
+				end
+				local ok, err = pcall(fn)
+				if not ok then
+					warn("[Admin Abuse] " .. tostring(err))
+				end
+			end)
+		end
+		local ok, err = pcall(show, after)
+		if not ok then
+			warn("[Admin Abuse] " .. tostring(err))
+		end
+	end
+	task.delay(14.5, function()
+		if token == showToken then
+			cleanupShow()
+		end
+	end)
+end
+
+-- EFFETTI MANDATI DAL SERVER DURANTE L'EVENTO ------------------------------------------------------------
+
+function AbuseEventController.ServerEffect(name: string, p: any)
+	p = p or {}
+	if name == "AbuseTremor" then
+		for i = 0, 3 do
+			task.delay(i * 0.5, function()
+				playSound("Land", nil, 1, 0.2)
+				shake(0.3 + i * 0.1, 0.4)
+			end)
+		end
+	elseif name == "AbuseScream" then
+		local where = if typeof(p.Position) == "Vector3" then p.Position else farPoint(400, 700, true)
+		playSound("Roar", nil, 1, 0.55)
+		shake(0.6, 1.5)
+		for i = 0, 3 do
+			task.delay(i * 0.2, function()
+				if fx() then
+					fx().Shockwave(where + Vector3.new(0, 40, 0), 400 + i * 200, Color3.fromRGB(210, 255, 225), 1.4, 3)
+				end
+			end)
+		end
+		local blur = Instance.new("BlurEffect")
+		blur.Size = 0
+		blur.Parent = Lighting
+		TweenService:Create(blur, TweenInfo.new(0.3), { Size = 10 }):Play()
+		task.delay(0.5, function()
+			TweenService:Create(blur, TweenInfo.new(1), { Size = 0 }):Play()
+			task.delay(1.1, function()
+				blur:Destroy()
+			end)
+		end)
+		if C.Notifications then
+			C.Notifications.Toast("😱 L'urlo della Cacciatrice! Arrivano i giganti!", "Errore", 4)
+		end
+	elseif name == "AbuseFlare" then
+		if typeof(p.Position) == "Vector3" then
+			flare(p.Position, if type(p.Kind) == "string" then p.Kind else "Nero", 240)
+		end
+	elseif name == "AbuseLightning" then
+		if typeof(p.Position) == "Vector3" then
+			goldenStrike(p.Position, 12)
+			if fx() then
+				fx().Shockwave(p.Position + Vector3.new(0, 2, 0), 70, Color3.fromRGB(255, 230, 120), 0.8, 2)
+			end
+		end
+	end
+end
+
+-- STATO DELL'EVENTO (attributi di ReplicatedStorage) -------------------------------------------------------
+
+local nextAmbient = 0
+local activeStart: number? = nil
+
+local function refresh()
+	local id = ReplicatedStorage:GetAttribute("AbuseEvento")
+	local def = AbuseEvents.Get(id)
+	local started = ReplicatedStorage:GetAttribute("AbuseInizio")
+	-- un evento nuovo (anche lo stesso evento rilanciato da capo)
+	if def and (id ~= activeId or started ~= activeStart) then
+		activeId = id
+		activeStart = started
+		local duration = ReplicatedStorage:GetAttribute("AbuseDurata")
+		local minutes = if type(duration) == "number" then math.max(1, math.floor(duration / 60 + 0.5)) else AbuseEvents.DefaultMinutes
+		if C.SkyController and C.SkyController.SetEventSky then
+			C.SkyController.SetEventSky(def.Sky)
+		end
+		setAmbient(def.Ambient)
+		nextAmbient = os.clock() + 12
+		-- l'animazione d'apertura solo se l'evento è appena partito (non per chi entra dopo)
+		if type(started) ~= "number" or serverNow() - started < 15 then
+			AbuseEventController.PlayIntro(def.Id, minutes)
+		end
+	elseif not def and activeId then
+		local old = AbuseEvents.Get(activeId)
+		activeId = nil
+		activeStart = nil
+		if C.SkyController and C.SkyController.SetEventSky then
+			C.SkyController.SetEventSky(nil)
+		end
+		setAmbient(nil)
+		cleanupShow()
+		playOutro(old)
+	end
+end
+
+local function updateBanner()
+	local b = banner
+	if not b then
+		return
+	end
+	local def = AbuseEvents.Get(activeId)
+	local cinematic = C.CameraController and C.CameraController.IsCinematic and C.CameraController.IsCinematic()
+	local intro = card and card.Root.Visible
+	b.Frame.Visible = def ~= nil and not cinematic and not intro
+	if not def then
+		return
+	end
+	local ends = ReplicatedStorage:GetAttribute("AbuseFine")
+	local duration = ReplicatedStorage:GetAttribute("AbuseDurata")
+	local left = if type(ends) == "number" then ends - serverNow() else 0
+	b.Name.Text = ("%s  %s"):format(def.Icon, def.Name:upper())
+	b.Bonus.Text = "😈 ADMIN ABUSE  •  " .. bonusText(def)
+	b.Timer.Text = AbuseEvents.FormatTime(left)
+	b.Timer.TextColor3 = if left < 30 then Color3.fromRGB(255, 110, 100) else Color3.new(1, 1, 1)
+	b.Bar.BackgroundColor3 = def.Color
+	b.Bar.Size = UDim2.fromScale(if type(duration) == "number" and duration > 0 then math.clamp(left / duration, 0, 1) else 0, 1)
+	b.Stroke.Color = def.Color
+	b.Stroke.Transparency = 0.05 + 0.35 * (0.5 + 0.5 * math.sin(os.clock() * 4))
+	-- sotto lo striscione della Grande Inaugurazione, se c'è
+	local festival = ReplicatedStorage:GetAttribute("FestaAttiva") == true
+	b.Frame.Position = UDim2.new(0.5, 0, 0, math.floor(14 + (62 + (if festival then 38 else 0)) * C.UIController.Scale))
+end
+
+function AbuseEventController.ActiveId(): string?
+	return activeId
+end
+
+function AbuseEventController.Init(c)
+	C = c
+end
+
+function AbuseEventController.Start()
+	folder = Instance.new("Folder")
+	folder.Name = "EventoAdminLocale"
+	folder.Parent = workspace
+	buildUI()
+	RunService.RenderStepped:Connect(function(dt)
+		followCamera()
+		local ok, err = pcall(step, dt)
+		if not ok then
+			warn("[Admin Abuse] " .. tostring(err))
+		end
+	end)
+	-- gli attributi arrivano insieme: si aspetta un attimo e si guarda lo stato completo
+	local pending = false
+	for _, attribute in { "AbuseEvento", "AbuseInizio", "AbuseFine", "AbuseDurata" } do
+		ReplicatedStorage:GetAttributeChangedSignal(attribute):Connect(function()
+			if pending then
+				return
+			end
+			pending = true
+			task.delay(0.1, function()
+				pending = false
+				local ok, err = pcall(refresh)
+				if not ok then
+					warn("[Admin Abuse] " .. tostring(err))
+				end
+			end)
+		end)
+	end
+	pcall(refresh)
+	local acc = 0
+	RunService.Heartbeat:Connect(function(dt)
+		acc += dt
+		if acc < 0.25 then
+			return
+		end
+		acc = 0
+		pcall(updateBanner)
+		if activeId and os.clock() >= nextAmbient then
+			local ambient = AMBIENT_EVENTS[activeId]
+			if ambient then
+				nextAmbient = os.clock() + rng:NextNumber(ambient.Every[1], ambient.Every[2])
+				local ok, err = pcall(ambient.Run)
+				if not ok then
+					warn("[Admin Abuse] " .. tostring(err))
+				end
+			else
+				nextAmbient = os.clock() + 10
+			end
+		end
+	end)
+end
+
+return AbuseEventController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -24141,7 +26465,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -24677,7 +27001,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">BoatController</string>
               <string name="Source"><![CDATA[--[[
@@ -24866,7 +27190,7 @@ return BoatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -25201,7 +27525,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">CitizenController</string>
               <string name="Source"><![CDATA[--[[
@@ -25530,7 +27854,7 @@ return CitizenController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -25589,7 +27913,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -26331,7 +28655,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -26971,7 +29295,7 @@ Scenes.Inaugurazione = function()
 	if C.CameraController then
 		C.CameraController.Shake(0.9, 3)
 	end
-	api.Say("Narratore", "Ogni 30 minuti il Colosso d'Oro cadrà dal cielo. Chi lo abbatte... vince l'oro.", 3.8)
+	api.Say("Narratore", "Durante gli Admin Abuse il Colosso d'Oro cadrà dal cielo. Chi lo abbatte... vince l'oro.", 3.8)
 	api.Animate(colossus, "Roar")
 	if C.SoundController then
 		C.SoundController.Play("Roar", landing, { Range = 4000, Volume = 1 })
@@ -27096,7 +29420,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -28168,6 +30492,15 @@ handlers.ColossusArrival = function(p)
 	end
 end
 
+-- eventi a tempo dell'Admin Abuse (le animazioni sono in AbuseEventController)
+for _, name in { "AbuseTremor", "AbuseScream", "AbuseFlare", "AbuseLightning" } do
+	handlers[name] = function(p)
+		if C.AbuseEventController then
+			C.AbuseEventController.ServerEffect(name, p)
+		end
+	end
+end
+
 -- mondo aperto: un gigante che emerge dal mare, un forziere aperto
 handlers.Splash = function(p)
 	local size = p.Size or 20
@@ -28224,7 +30557,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">ExploreController</string>
               <string name="Source"><![CDATA[--[[
@@ -28290,7 +30623,7 @@ return ExploreController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">FireworksController</string>
               <string name="Source"><![CDATA[--[[
@@ -28764,7 +31097,7 @@ return FireworksController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">HorseController</string>
               <string name="Source"><![CDATA[--[[
@@ -28932,7 +31265,7 @@ return HorseController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -29087,7 +31420,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">NatureController</string>
               <string name="Source"><![CDATA[--[[
@@ -29569,7 +31902,7 @@ return NatureController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -30257,7 +32590,7 @@ local function physics(dt: number)
 			startFlying()
 		end
 	end
-	gas = if player:GetAttribute("AdminGas") == true then maxGas else math.clamp(gas - used, 0, maxGas)
+	gas = if player:GetAttribute("AdminGas") == true or player:GetAttribute("GasAbuse") == true then maxGas else math.clamp(gas - used, 0, maxGas)
 end
 
 local function renderVisuals()
@@ -30469,7 +32802,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">SkyController</string>
               <string name="Source"><![CDATA[--[[
@@ -30480,6 +32813,7 @@ return ODMController
 	  • il meteo deciso dal server (attributo "Meteo" di ReplicatedStorage):
 	    Sereno, Nuvoloso, Pioggia (gocce, cielo grigio) e Temporale (pioggia forte, fulmini e tuoni).
 	Sottoterra il meteo e il cielo non si vedono.
+	Durante gli eventi dell'Admin Abuse il cielo prende i colori dell'evento (SetEventSky).
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -30517,6 +32851,18 @@ local rainEmitter: ParticleEmitter? = nil
 local splashPart: Part? = nil
 local splashEmitter: ParticleEmitter? = nil
 local nextLightning = 0
+
+-- cielo degli eventi dell'Admin Abuse: si mescola sopra a tutto il resto (0 = niente, 1 = pieno)
+local eventSky: any = nil
+local eventTarget = 0
+local eventBlend = 0
+
+function SkyController.SetEventSky(sky)
+	if sky then
+		eventSky = sky
+	end
+	eventTarget = if sky then 1 else 0
+end
 
 function SkyController.SetZoneAmbience(ambience)
 	zoneAmbience = ambience or Zones.Ambience.Default
@@ -30689,6 +33035,10 @@ local function approach(current: number, target: number, k: number): number
 	return current + (target - current) * k
 end
 
+local function mix(a: number, b: number, t: number): number
+	return a + (b - a) * t
+end
+
 local function step(dt: number)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	indoor = (root ~= nil and root.Position.Y < -120) or zoneAmbience == Zones.Ambience.Sotterraneo or zoneAmbience == Zones.Ambience.Cristallo
@@ -30711,39 +33061,72 @@ local function step(dt: number)
 	local decay = amb.Decay:Lerp(Color3.fromRGB(214, 120, 86), warm * 0.6 * sky):Lerp(Color3.fromRGB(18, 24, 46), night * 0.8 * sky):Lerp(Color3.fromRGB(96, 100, 110), grey)
 	local tint = amb.Tint:Lerp(Color3.fromRGB(255, 214, 180), warm * 0.45 * sky):Lerp(Color3.fromRGB(198, 212, 255), night * 0.55 * sky):Lerp(Color3.fromRGB(226, 232, 240), grey * 0.6)
 
+	local density = amb.Density + w.Density * sky + dawn * 0.08 * sky
+	local haze = amb.Haze + w.Haze * sky + warm * 0.9 * sky
+	local glare = amb.Glare * (1 - grey) + warm * 0.5 * sky
+	local saturation = amb.Saturation + w.Sat * sky + warm * 0.05 * sky
+	local contrast = amb.Contrast + warm * 0.03 * sky
+	local exposure = amb.Exposure + w.Exposure * sky + night * 0.05 * sky
+	local bright = if indoor then 1 else w.Bright
+	local cover, cloudDensity = w.Cover, w.CloudDensity
+	local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
+	local eventRain = 0
+
+	-- il cielo dell'evento dell'Admin Abuse (arriva e se ne va in un paio di secondi)
+	eventBlend = approach(eventBlend, eventTarget, math.min(1, dt * 0.7))
+	local ev = eventSky
+	if ev and eventBlend > 0.001 then
+		local b = eventBlend * sky
+		color = color:Lerp(ev.Color, b)
+		decay = decay:Lerp(ev.Decay, b)
+		tint = tint:Lerp(ev.Tint, b)
+		density = mix(density, ev.Density, b)
+		haze = mix(haze, ev.Haze, b)
+		glare = mix(glare, ev.Glare, b)
+		saturation = mix(saturation, ev.Saturation, b)
+		contrast = mix(contrast, ev.Contrast, b)
+		exposure = mix(exposure, ev.Exposure, b)
+		bright = mix(bright, ev.Bright, b)
+		cover = mix(cover, ev.Cover, b)
+		cloudDensity = mix(cloudDensity, math.max(cloudDensity, 0.75), b)
+		cloudColor = cloudColor:Lerp(ev.CloudColor, b)
+		eventRain = (ev.Rain or 0) * b
+	elseif eventTarget == 0 and eventBlend <= 0.001 then
+		eventSky = nil
+	end
+
 	local k = math.min(1, dt * 0.6)
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atmosphere then
-		atmosphere.Density = approach(atmosphere.Density, amb.Density + w.Density * sky + dawn * 0.08 * sky, k)
-		atmosphere.Haze = approach(atmosphere.Haze, amb.Haze + w.Haze * sky + warm * 0.9 * sky, k)
-		atmosphere.Glare = approach(atmosphere.Glare, amb.Glare * (1 - grey) + warm * 0.5 * sky, k)
+		atmosphere.Density = approach(atmosphere.Density, density, k)
+		atmosphere.Haze = approach(atmosphere.Haze, haze, k)
+		atmosphere.Glare = approach(atmosphere.Glare, glare, k)
 		atmosphere.Color = atmosphere.Color:Lerp(color, k)
 		atmosphere.Decay = atmosphere.Decay:Lerp(decay, k)
 	end
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if cc then
 		cc.TintColor = cc.TintColor:Lerp(tint, k)
-		cc.Saturation = approach(cc.Saturation, amb.Saturation + w.Sat * sky + warm * 0.05 * sky, k)
-		cc.Contrast = approach(cc.Contrast, amb.Contrast + warm * 0.03 * sky, k)
+		cc.Saturation = approach(cc.Saturation, saturation, k)
+		cc.Contrast = approach(cc.Contrast, contrast, k)
 	end
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
 	if rays then
 		rays.Intensity = approach(rays.Intensity, (0.05 + warm * 0.12) * (1 - grey) * sky, k)
 	end
-	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, amb.Exposure + w.Exposure * sky + night * 0.05 * sky, k)
-	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * (if indoor then 1 else w.Bright), k)
+	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, exposure, k)
+	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * bright, k)
 	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(Color3.fromRGB(96, 106, 146), night * 0.5 * sky), k)
 
 	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
 	if clouds then
-		clouds.Cover = approach(clouds.Cover, w.Cover, k)
-		clouds.Density = approach(clouds.Density, w.CloudDensity, k)
-		local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
+		clouds.Cover = approach(clouds.Cover, cover, k)
+		clouds.Density = approach(clouds.Density, cloudDensity, k)
 		clouds.Color = clouds.Color:Lerp(cloudColor, k)
 	end
 
 	-- pioggia e fulmini
-	local rain = if indoor then 0 else weather.Rain
+	local rain = if indoor then 0 else math.max(weather.Rain, eventRain)
 	updateRain(rain)
 	if rain > 1.5 and not indoor then
 		local now = os.clock()
@@ -30782,7 +33165,7 @@ return SkyController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -30872,7 +33255,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -31346,7 +33729,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -31457,7 +33840,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="105">
+        <Item class="LocalScript" referent="108">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -31494,6 +33877,7 @@ local ORDER = {
 	{ Controllers, "HorseController" },
 	{ Controllers, "ExploreController" },
 	{ Controllers, "FireworksController" },
+	{ Controllers, "AbuseEventController" },
 	{ UI, "DamageNumbers" },
 	{ UI, "HUD" },
 	{ UI, "WorldMap" },
@@ -31550,11 +33934,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="106">
+        <Item class="Folder" referent="109">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -31567,6 +33951,7 @@ end
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -31576,6 +33961,7 @@ local Serums = require(Shared.Data.Serums)
 local Titans = require(Shared.Data.Titans)
 local Zones = require(Shared.Data.Zones)
 local Story = require(Shared.Data.Story)
+local AbuseEvents = require(Shared.Data.AbuseEvents)
 
 local Theme = require(script.Parent.Theme)
 local New = Theme.New
@@ -31914,11 +34300,59 @@ local function showServer()
 end
 
 -- 😈 ADMIN ABUSE: le animazioni dell'evento quando vuoi tu, più i comandi dell'evento
+local render: () -> () -- definita più sotto (ridisegna la categoria aperta)
+local abuseMinutes = AbuseEvents.DefaultMinutes
+local abuseStatus: TextLabel? = nil
+
+local function abuseStatusText(): string
+	local def = AbuseEvents.Get(ReplicatedStorage:GetAttribute("AbuseEvento"))
+	local chosen = ("Durata scelta: %d minut%s"):format(abuseMinutes, if abuseMinutes == 1 then "o" else "i")
+	if not def then
+		return chosen .. "   •   Nessun evento in corso"
+	end
+	local ends = ReplicatedStorage:GetAttribute("AbuseFine")
+	local left = if type(ends) == "number" then ends - workspace:GetServerTimeNow() else 0
+	return ("%s   •   IN CORSO: %s %s (mancano %s)"):format(chosen, def.Icon, def.Name, AbuseEvents.FormatTime(left))
+end
+
 local function showAbuse()
 	section("😈 Admin Abuse", "Le animazioni dell'evento partono quando vuoi tu: annuncia l'Admin Abuse e scatenati!")
 	local r = row(220, 44)
 	button(r, "😈 Annuncia ADMIN ABUSE", RED, function()
 		send("Abuse", "announce")
+	end)
+	-- 🎬 ANIMAZIONI: eventi a tempo della prima stagione
+	section("🎬 Animazioni", "1) Scegli quanto dura l'evento (o scrivi i minuti nel VALORE in alto e premi ✏️).  2) Clicca un evento: parte subito un'animazione per tutti i giocatori, poi l'evento dura il tempo scelto.")
+	r = row(90, 36)
+	for _, minutes in AbuseEvents.Durations do
+		button(r, ("⏱️ %d min"):format(minutes), if minutes == abuseMinutes then Colors.Green else nil, function()
+			abuseMinutes = minutes
+			render()
+		end)
+	end
+	button(r, "✏️ VALORE", if table.find(AbuseEvents.Durations, abuseMinutes) then nil else Colors.Green, function()
+		if tonumber(typedValue()) then
+			abuseMinutes = AbuseEvents.ClampMinutes(typedValue())
+			render()
+		elseif C.Notifications then
+			C.Notifications.Toast(("Scrivi i minuti (da %d a %d) nel VALORE in alto"):format(AbuseEvents.MinMinutes, AbuseEvents.MaxMinutes), "Errore", 3)
+		end
+	end)
+	r = row(256, 64)
+	for _, def in AbuseEvents.List do
+		local b = button(r, ("%s %s\n%s"):format(def.Icon, def.Name, def.Short), def.Color:Lerp(Color3.new(0, 0, 0), 0.6), function()
+			send("AbuseEvent", { Id = def.Id, Minutes = abuseMinutes })
+		end)
+		local stroke = b:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = def.Color
+			stroke.Transparency = 0.1
+		end
+	end
+	abuseStatus = Theme.Label(abuseStatusText(), { Size = UDim2.new(1, -10, 0, 22), LayoutOrder = nextOrder(), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.GoldBright, Parent = content })
+	r = row(220, 44)
+	button(r, "⏹️ Termina l'evento in corso", RED, function()
+		send("AbuseStop")
 	end)
 	section("👑 Colosso d'Oro", "Cade dal cielo come una meteora d'oro. Con l'evento acceso, chi aiuta a sconfiggerlo riceve gemme e oro (e completa la sfida).")
 	r = row(220, 44)
@@ -31998,7 +34432,7 @@ local function updateTarget()
 	targetButton.Text = "🎯 Bersaglio: " .. (if t == player then "TU" else t.DisplayName) .. "  ▸"
 end
 
-local function render()
+function render()
 	if not panel then
 		return
 	end
@@ -32115,7 +34549,13 @@ function AdminPanel.Start()
 		end
 	end)
 	-- stato dell'evento aggiornato nella sezione Admin Abuse
-	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto" } do
+	RunService.Heartbeat:Connect(function()
+		local label = abuseStatus
+		if label and label.Parent and C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
+			label.Text = abuseStatusText()
+		end
+	end)
+	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto", "AbuseEvento" } do
 		ReplicatedStorage:GetAttributeChangedSignal(attribute):Connect(function()
 			if C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
 				render()
@@ -32136,7 +34576,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -32292,7 +34732,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -32948,7 +35388,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">Festival</string>
               <string name="Source"><![CDATA[--[[
@@ -33138,7 +35578,7 @@ return FestivalUI
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="111">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -33867,7 +36307,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -34381,7 +36821,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -35068,7 +37508,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -35348,7 +37788,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -35672,7 +38112,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -35800,7 +38240,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -36472,7 +38912,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -37155,7 +39595,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -37400,7 +39840,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -37598,7 +40038,7 @@ return UIController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">WorldMap</string>
               <string name="Source"><![CDATA[--[[
@@ -38318,7 +40758,7 @@ return WorldMap
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="122">
+  <Item class="Workspace" referent="125">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>
@@ -38333,7 +40773,7 @@ return WorldMap
       <token name="StreamingIntegrityMode">2</token>
       <int name="StreamingTargetRadius">1600</int>
     </Properties>
-    <Item class="Terrain" referent="123">
+    <Item class="Terrain" referent="126">
       <Properties>
         <string name="Name">Terrain</string>
         <bool name="Decoration">true</bool>

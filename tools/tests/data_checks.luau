@@ -28,6 +28,7 @@ local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
 local Rewards = require(Shared.Data.Rewards)
 local Achievements = require(Shared.Data.Achievements)
 local Treasures = require(Shared.Data.Treasures)
+local AbuseEvents = require(Shared.Data.AbuseEvents)
 
 local errors: { string } = {}
 local checks = 0
@@ -805,6 +806,38 @@ do
 	check(ODMPhysics.HookCost(2) < ODMPhysics.HookCost(1), "ODM: l'efficienza del gas non riduce i consumi")
 	check(ODMPhysics.GasDrain(1, true, 1, 1) > ODMPhysics.GasDrain(1, false, 1, 1), "ODM: lo scatto non consuma gas")
 	check(Config.Combat.SpearFuse > 0.6 and Config.Combat.SpearFuse < 5, "Miccia delle Lance Dirompenti fuori misura")
+end
+
+-- EVENTI A TEMPO DELL'ADMIN ABUSE ------------------------------------------------------------------
+do
+	check(#AbuseEvents.List >= 5, "servono almeno 5 eventi a tempo")
+	local skyKeys = { "Color", "Decay", "Tint", "CloudColor" }
+	local skyNumbers = { "Density", "Haze", "Glare", "Exposure", "Saturation", "Contrast", "Bright", "Cover", "Rain" }
+	for _, def in AbuseEvents.List do
+		local where = "Evento " .. tostring(def.Id)
+		check(AbuseEvents.Get(def.Id) == def, "%s: non trovato per Id", where)
+		check(type(def.Icon) == "string" and type(def.Name) == "string" and type(def.Text) == "string" and type(def.Short) == "string" and type(def.Episode) == "string", "%s: testi mancanti", where)
+		check(typeof(def.Color) == "Color3", "%s: colore mancante", where)
+		check(type(def.Bonus) == "table", "%s: bonus mancanti", where)
+		for key, value in def.Bonus do
+			check(type(value) == "number" and value >= 0 and value <= 3, "%s: bonus %s fuori misura", where, key)
+		end
+		check(def.Boss == nil or Titans.Bosses[def.Boss] ~= nil, "%s: boss inesistente %s", where, def.Boss)
+		check(type(def.Sky) == "table", "%s: cielo mancante", where)
+		if def.Sky then
+			for _, key in skyKeys do
+				check(typeof(def.Sky[key]) == "Color3", "%s: colore del cielo %s mancante", where, key)
+			end
+			for _, key in skyNumbers do
+				check(type(def.Sky[key]) == "number", "%s: valore del cielo %s mancante", where, key)
+			end
+		end
+		check(type(def.Ambient) == "string", "%s: particelle mancanti", where)
+	end
+	for _, minutes in AbuseEvents.Durations do
+		check(AbuseEvents.ClampMinutes(minutes) == minutes, "durata %d minuti fuori dai limiti", minutes)
+	end
+	check(AbuseEvents.FormatTime(3725) == "1:02:05" and AbuseEvents.FormatTime(65) == "1:05", "FormatTime degli eventi sbagliato")
 end
 
 -- RISULTATO ----------------------------------------------------------------------------------

@@ -918,13 +918,25 @@ end
 function Methods.GetState(_self)
 	return Enum.HumanoidStateType.Running
 end
+-- le prove possono aggiungere giocatori finti a MOCK_PLAYERS (Players:GetPlayers li restituisce)
+MOCK_PLAYERS = {}
 function Methods.GetPlayers(_self)
-	return {}
+	return table.clone(MOCK_PLAYERS)
 end
-function Methods.GetPlayerFromCharacter(_self, _model)
+function Methods.GetPlayerFromCharacter(_self, model)
+	for _, p in MOCK_PLAYERS do
+		if p.Character == model then
+			return p
+		end
+	end
 	return nil
 end
-function Methods.GetPlayerByUserId(_self, _userId)
+function Methods.GetPlayerByUserId(_self, userId)
+	for _, p in MOCK_PLAYERS do
+		if p.UserId == userId then
+			return p
+		end
+	end
 	return nil
 end
 function Methods.RequestStreamAroundAsync(_self) end
@@ -1146,6 +1158,8 @@ game = setmetatable({}, {
 
 -- i cicli infiniti dei servizi (task.spawn) non vengono eseguiti: la prova controlla solo la costruzione
 SPAWNED = 0
+-- le prove possono intercettare task.delay (MOCK_HOOKS.Delay) per far girare le azioni in ritardo
+MOCK_HOOKS = {}
 task = {
 	wait = function()
 		return 0
@@ -1156,7 +1170,12 @@ task = {
 	defer = function()
 		SPAWNED += 1
 	end,
-	delay = function() end,
+	delay = function(t, fn, ...)
+		local hook = MOCK_HOOKS.Delay
+		if hook then
+			hook(t, fn, ...)
+		end
+	end,
 	cancel = function() end,
 }
 wait = task.wait

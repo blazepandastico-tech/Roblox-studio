@@ -6,6 +6,7 @@
 	  • il meteo deciso dal server (attributo "Meteo" di ReplicatedStorage):
 	    Sereno, Nuvoloso, Pioggia (gocce, cielo grigio) e Temporale (pioggia forte, fulmini e tuoni).
 	Sottoterra il meteo e il cielo non si vedono.
+	Durante gli eventi dell'Admin Abuse il cielo prende i colori dell'evento (SetEventSky).
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -43,6 +44,18 @@ local rainEmitter: ParticleEmitter? = nil
 local splashPart: Part? = nil
 local splashEmitter: ParticleEmitter? = nil
 local nextLightning = 0
+
+-- cielo degli eventi dell'Admin Abuse: si mescola sopra a tutto il resto (0 = niente, 1 = pieno)
+local eventSky: any = nil
+local eventTarget = 0
+local eventBlend = 0
+
+function SkyController.SetEventSky(sky)
+	if sky then
+		eventSky = sky
+	end
+	eventTarget = if sky then 1 else 0
+end
 
 function SkyController.SetZoneAmbience(ambience)
 	zoneAmbience = ambience or Zones.Ambience.Default
@@ -215,6 +228,10 @@ local function approach(current: number, target: number, k: number): number
 	return current + (target - current) * k
 end
 
+local function mix(a: number, b: number, t: number): number
+	return a + (b - a) * t
+end
+
 local function step(dt: number)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	indoor = (root ~= nil and root.Position.Y < -120) or zoneAmbience == Zones.Ambience.Sotterraneo or zoneAmbience == Zones.Ambience.Cristallo
@@ -237,39 +254,72 @@ local function step(dt: number)
 	local decay = amb.Decay:Lerp(Color3.fromRGB(214, 120, 86), warm * 0.6 * sky):Lerp(Color3.fromRGB(18, 24, 46), night * 0.8 * sky):Lerp(Color3.fromRGB(96, 100, 110), grey)
 	local tint = amb.Tint:Lerp(Color3.fromRGB(255, 214, 180), warm * 0.45 * sky):Lerp(Color3.fromRGB(198, 212, 255), night * 0.55 * sky):Lerp(Color3.fromRGB(226, 232, 240), grey * 0.6)
 
+	local density = amb.Density + w.Density * sky + dawn * 0.08 * sky
+	local haze = amb.Haze + w.Haze * sky + warm * 0.9 * sky
+	local glare = amb.Glare * (1 - grey) + warm * 0.5 * sky
+	local saturation = amb.Saturation + w.Sat * sky + warm * 0.05 * sky
+	local contrast = amb.Contrast + warm * 0.03 * sky
+	local exposure = amb.Exposure + w.Exposure * sky + night * 0.05 * sky
+	local bright = if indoor then 1 else w.Bright
+	local cover, cloudDensity = w.Cover, w.CloudDensity
+	local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
+	local eventRain = 0
+
+	-- il cielo dell'evento dell'Admin Abuse (arriva e se ne va in un paio di secondi)
+	eventBlend = approach(eventBlend, eventTarget, math.min(1, dt * 0.7))
+	local ev = eventSky
+	if ev and eventBlend > 0.001 then
+		local b = eventBlend * sky
+		color = color:Lerp(ev.Color, b)
+		decay = decay:Lerp(ev.Decay, b)
+		tint = tint:Lerp(ev.Tint, b)
+		density = mix(density, ev.Density, b)
+		haze = mix(haze, ev.Haze, b)
+		glare = mix(glare, ev.Glare, b)
+		saturation = mix(saturation, ev.Saturation, b)
+		contrast = mix(contrast, ev.Contrast, b)
+		exposure = mix(exposure, ev.Exposure, b)
+		bright = mix(bright, ev.Bright, b)
+		cover = mix(cover, ev.Cover, b)
+		cloudDensity = mix(cloudDensity, math.max(cloudDensity, 0.75), b)
+		cloudColor = cloudColor:Lerp(ev.CloudColor, b)
+		eventRain = (ev.Rain or 0) * b
+	elseif eventTarget == 0 and eventBlend <= 0.001 then
+		eventSky = nil
+	end
+
 	local k = math.min(1, dt * 0.6)
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if atmosphere then
-		atmosphere.Density = approach(atmosphere.Density, amb.Density + w.Density * sky + dawn * 0.08 * sky, k)
-		atmosphere.Haze = approach(atmosphere.Haze, amb.Haze + w.Haze * sky + warm * 0.9 * sky, k)
-		atmosphere.Glare = approach(atmosphere.Glare, amb.Glare * (1 - grey) + warm * 0.5 * sky, k)
+		atmosphere.Density = approach(atmosphere.Density, density, k)
+		atmosphere.Haze = approach(atmosphere.Haze, haze, k)
+		atmosphere.Glare = approach(atmosphere.Glare, glare, k)
 		atmosphere.Color = atmosphere.Color:Lerp(color, k)
 		atmosphere.Decay = atmosphere.Decay:Lerp(decay, k)
 	end
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 	if cc then
 		cc.TintColor = cc.TintColor:Lerp(tint, k)
-		cc.Saturation = approach(cc.Saturation, amb.Saturation + w.Sat * sky + warm * 0.05 * sky, k)
-		cc.Contrast = approach(cc.Contrast, amb.Contrast + warm * 0.03 * sky, k)
+		cc.Saturation = approach(cc.Saturation, saturation, k)
+		cc.Contrast = approach(cc.Contrast, contrast, k)
 	end
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
 	if rays then
 		rays.Intensity = approach(rays.Intensity, (0.05 + warm * 0.12) * (1 - grey) * sky, k)
 	end
-	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, amb.Exposure + w.Exposure * sky + night * 0.05 * sky, k)
-	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * (if indoor then 1 else w.Bright), k)
+	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, exposure, k)
+	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * bright, k)
 	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(Color3.fromRGB(96, 106, 146), night * 0.5 * sky), k)
 
 	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
 	if clouds then
-		clouds.Cover = approach(clouds.Cover, w.Cover, k)
-		clouds.Density = approach(clouds.Density, w.CloudDensity, k)
-		local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
+		clouds.Cover = approach(clouds.Cover, cover, k)
+		clouds.Density = approach(clouds.Density, cloudDensity, k)
 		clouds.Color = clouds.Color:Lerp(cloudColor, k)
 	end
 
 	-- pioggia e fulmini
-	local rain = if indoor then 0 else weather.Rain
+	local rain = if indoor then 0 else math.max(weather.Rain, eventRain)
 	updateRain(rain)
 	if rain > 1.5 and not indoor then
 		local now = os.clock()

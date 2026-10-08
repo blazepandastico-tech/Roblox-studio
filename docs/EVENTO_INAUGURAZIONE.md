@@ -102,6 +102,36 @@ Tutti i comandi e le animazioni dell'evento sono in questa sezione del pannello.
 
 Per avere gli spettacoli automatici in tutti i server, metti `Festival.AutoShows = true` in `src/shared/Data/Festival.lua`.
 
+### 🎬 Animazioni: eventi a tempo della prima stagione
+
+Sempre in **😈 Admin Abuse**, la sezione **🎬 Animazioni** fa partire un evento a tempo per tutto il server:
+1. scegli **quanto dura**: 1, 3, 5, 10, 15, 30 o 60 minuti. Puoi anche scrivere i minuti nel VALORE in alto (da 1 a 120) e premere **✏️ VALORE**;
+2. clicca **l'evento**. Parte subito per tutti un'**animazione d'apertura**:
+   - lampo, bande nere e raggi di luce;
+   - il titolo che si schianta sullo schermo;
+   - la scena dell'evento nel mondo, davanti a ogni giocatore.
+
+   I giocatori possono continuare a muoversi mentre la guardano.
+3. Per tutta la durata cambiano anche altre cose:
+   - il **cielo** prende i colori dell'evento;
+   - **particelle** come cenere, foglie o polvere cadono attorno ai giocatori;
+   - ogni tanto succede qualcosa nel cielo (razzi, fulmini, urla);
+   - in alto compare uno **striscione con il conto alla rovescia**.
+4. Allo scadere del tempo compare **"EVENTO TERMINATO"**: il cielo torna normale, i giganti dell'evento spariscono e i bonus si tolgono. Puoi fermarlo prima con **⏹️ Termina l'evento in corso**. Se lanci un altro evento, sostituisce quello in corso.
+
+| Evento | Animazione d'apertura | Durante l'evento |
+|---|---|---|
+| 🧱 **La Caduta del Muro** | Cielo rosso, fulmine dorato. Il Gigante Vulcano si alza oltre il Muro avvolto dal vapore, urla e sfonda il cancello con un calcio | XP x2, oro x1,5. Ondate di giganti vicino a chi è nelle zone con i giganti. Arriva il Gigante Ghignante |
+| 🛡️ **La Carica del Bastione** | Passi che fanno tremare la terra. Il Bastione carica e si schianta contro il Muro, poi si indurisce | Oro x3, XP x1,5. Il boss Bastione (torna se viene abbattuto). Scosse di terremoto |
+| 🔥 **L'Assedio di Calaneth** | Razzi rossi e campane d'allarme, il fulmine e il Gigante della Furia che solleva un masso enorme e chiude la breccia | XP x2, oro x2. Invasione del distretto e ondate fitte. Ogni giocatore riceve un gigante alleato che combatte con lui |
+| 😱 **L'Urlo della Cacciatrice** | Crescono gli alberi giganti. La Cacciatrice corre tra gli alberi, urla (onde d'urto, schermo sfocato) e i giganti corrono verso di lei | XP x2,5, oro x1,5. Il boss Cacciatrice. A ogni urlo arrivano giganti anomali |
+| 🐎 **La Spedizione oltre le Mura** | Fanfara e razzi verdi in formazione. Passa la cavalleria al galoppo, poi un razzo nero: un gigante anomalo salta fuori e la insegue | XP x3, oro x1,5. Giganti anomali segnalati da un razzo nero: ognuno vale 5 💎 |
+| ⚡ **Il Fulmine della Trasformazione** | Pioggia di fulmini dorati, poi il fulmine gigante: il Gigante della Furia emerge dal vapore, urla e tira un pugno | Danni x2, gas infinito, XP e oro x1,5. Temporale. I fulmini immobilizzano i giganti vicino a voi per 5 secondi |
+
+Giganti e boss dell'evento nascono vicino ai giocatori che si trovano in una zona con i giganti, non nelle città sicure né in mare. Danno le ricompense piene.
+
+Per cambiare bonus, colori del cielo e testi degli eventi, modifica `src/shared/Data/AbuseEvents.lua`. Quello che succede durante l'evento è in `src/server/Services/AbuseService.lua`; le animazioni sono in `src/client/Controllers/AbuseEventController.lua`.
+
 **Idea:** annuncia su Discord e TikTok l'orario degli Admin Abuse (per esempio "sabato alle 18:00"), così i giocatori entrano tutti insieme. Nel gioco premi "😈 Annuncia ADMIN ABUSE", poi lancia fuochi, Colosso e cerimonia.
 
 ## Creare l'evento su Roblox (così appare nella pagina del gioco)

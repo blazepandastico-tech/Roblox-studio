@@ -41,6 +41,7 @@ local ORDER = {
 	"HorseService",
 	"PvPService",
 	"FestivalService",
+	"AbuseService",
 	"CodesService",
 	"RewardsService",
 	"CommunityService",

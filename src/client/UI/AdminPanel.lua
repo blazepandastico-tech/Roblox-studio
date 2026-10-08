@@ -8,6 +8,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -17,6 +18,7 @@ local Serums = require(Shared.Data.Serums)
 local Titans = require(Shared.Data.Titans)
 local Zones = require(Shared.Data.Zones)
 local Story = require(Shared.Data.Story)
+local AbuseEvents = require(Shared.Data.AbuseEvents)
 
 local Theme = require(script.Parent.Theme)
 local New = Theme.New
@@ -355,11 +357,59 @@ local function showServer()
 end
 
 -- 😈 ADMIN ABUSE: le animazioni dell'evento quando vuoi tu, più i comandi dell'evento
+local render: () -> () -- definita più sotto (ridisegna la categoria aperta)
+local abuseMinutes = AbuseEvents.DefaultMinutes
+local abuseStatus: TextLabel? = nil
+
+local function abuseStatusText(): string
+	local def = AbuseEvents.Get(ReplicatedStorage:GetAttribute("AbuseEvento"))
+	local chosen = ("Durata scelta: %d minut%s"):format(abuseMinutes, if abuseMinutes == 1 then "o" else "i")
+	if not def then
+		return chosen .. "   •   Nessun evento in corso"
+	end
+	local ends = ReplicatedStorage:GetAttribute("AbuseFine")
+	local left = if type(ends) == "number" then ends - workspace:GetServerTimeNow() else 0
+	return ("%s   •   IN CORSO: %s %s (mancano %s)"):format(chosen, def.Icon, def.Name, AbuseEvents.FormatTime(left))
+end
+
 local function showAbuse()
 	section("😈 Admin Abuse", "Le animazioni dell'evento partono quando vuoi tu: annuncia l'Admin Abuse e scatenati!")
 	local r = row(220, 44)
 	button(r, "😈 Annuncia ADMIN ABUSE", RED, function()
 		send("Abuse", "announce")
+	end)
+	-- 🎬 ANIMAZIONI: eventi a tempo della prima stagione
+	section("🎬 Animazioni", "1) Scegli quanto dura l'evento (o scrivi i minuti nel VALORE in alto e premi ✏️).  2) Clicca un evento: parte subito un'animazione per tutti i giocatori, poi l'evento dura il tempo scelto.")
+	r = row(90, 36)
+	for _, minutes in AbuseEvents.Durations do
+		button(r, ("⏱️ %d min"):format(minutes), if minutes == abuseMinutes then Colors.Green else nil, function()
+			abuseMinutes = minutes
+			render()
+		end)
+	end
+	button(r, "✏️ VALORE", if table.find(AbuseEvents.Durations, abuseMinutes) then nil else Colors.Green, function()
+		if tonumber(typedValue()) then
+			abuseMinutes = AbuseEvents.ClampMinutes(typedValue())
+			render()
+		elseif C.Notifications then
+			C.Notifications.Toast(("Scrivi i minuti (da %d a %d) nel VALORE in alto"):format(AbuseEvents.MinMinutes, AbuseEvents.MaxMinutes), "Errore", 3)
+		end
+	end)
+	r = row(256, 64)
+	for _, def in AbuseEvents.List do
+		local b = button(r, ("%s %s\n%s"):format(def.Icon, def.Name, def.Short), def.Color:Lerp(Color3.new(0, 0, 0), 0.6), function()
+			send("AbuseEvent", { Id = def.Id, Minutes = abuseMinutes })
+		end)
+		local stroke = b:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = def.Color
+			stroke.Transparency = 0.1
+		end
+	end
+	abuseStatus = Theme.Label(abuseStatusText(), { Size = UDim2.new(1, -10, 0, 22), LayoutOrder = nextOrder(), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.GoldBright, Parent = content })
+	r = row(220, 44)
+	button(r, "⏹️ Termina l'evento in corso", RED, function()
+		send("AbuseStop")
 	end)
 	section("👑 Colosso d'Oro", "Cade dal cielo come una meteora d'oro. Con l'evento acceso, chi aiuta a sconfiggerlo riceve gemme e oro (e completa la sfida).")
 	r = row(220, 44)
@@ -439,7 +489,7 @@ local function updateTarget()
 	targetButton.Text = "🎯 Bersaglio: " .. (if t == player then "TU" else t.DisplayName) .. "  ▸"
 end
 
-local function render()
+function render()
 	if not panel then
 		return
 	end
@@ -556,7 +606,13 @@ function AdminPanel.Start()
 		end
 	end)
 	-- stato dell'evento aggiornato nella sezione Admin Abuse
-	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto" } do
+	RunService.Heartbeat:Connect(function()
+		local label = abuseStatus
+		if label and label.Parent and C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
+			label.Text = abuseStatusText()
+		end
+	end)
+	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto", "AbuseEvento" } do
 		ReplicatedStorage:GetAttributeChangedSignal(attribute):Connect(function()
 			if C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
 				render()
