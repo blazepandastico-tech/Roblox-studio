@@ -940,7 +940,7 @@ def cmd_posters(fbx_dir, out, raw_dir=None):
     img = shade(img, "top", 0.6, 0.3)
     img = shade(img, "bottom", 0.85, 0.42)
     img = plaque(img, 540, 250, 0.62)
-    img = _poster_text(img, [("GRANDE", 150, (540, 1290), "oro"), ("INAUGURAZIONE", 112, (540, 1430), "oro")])
+    img = _poster_text(img, [("GRANDE", 136, (540, 1295), "oro"), ("INAUGURAZIONE", 94, (540, 1425), "oro")])
     img = _ribbon(img, "FINO AL 25 OTTOBRE", 1560, 40)
     img = _poster_text(img, [("2x XP E ORO • COLOSSO D'ORO", 40, (540, 1680), "semplice"),
                              ("FUOCHI D'ARTIFICIO • PREMI ESCLUSIVI", 40, (540, 1740), "semplice"),

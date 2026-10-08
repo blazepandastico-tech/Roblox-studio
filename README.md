@@ -183,6 +183,7 @@ pubblicato quella voce risulta "non disponibile". Gli acquisti sono gestiti in m
 
 Tutti i passi per pubblicare e far crescere il gioco sono in [`docs/LANCIO.md`](docs/LANCIO.md).
 Icona, miniature e descrizione per la pagina del gioco: [`docs/PAGINA_ROBLOX.md`](docs/PAGINA_ROBLOX.md) (immagini in `assets/pagina_roblox/`).
+Evento di lancio **🎉 Grande Inaugurazione** (2x XP e oro, Colosso d'Oro, fuochi d'artificio, 8 sfide): [`docs/EVENTO_INAUGURAZIONE.md`](docs/EVENTO_INAUGURAZIONE.md), con trailer e locandine in `assets/evento/`.
 
 ## 6c. Il Gigante della Furia con modello 3D (es. da Meshy)
 
