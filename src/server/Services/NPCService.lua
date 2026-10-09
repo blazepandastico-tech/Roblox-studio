@@ -275,6 +275,12 @@ function NPCService.Interact(player: Player, npcId: string)
 	if not npc or not profile or not isNear(player, npc) then
 		return
 	end
+	-- durante l'Addestramento di base Brehm aspetta e Mira fa da guida
+	if S.TutorialService and S.TutorialService.Pending(player) and (npcId == "Brehm" or npcId == "Mira") then
+		local line = if npcId == "Brehm" then "Prima le basi con Mira, recluta. Poi vieni a presentarti da me." else "Segui le mie istruzioni in alto: ti mostro tutto io, poi ti porto da Brehm."
+		send(player, npc, { line }, { { Id = "close", Text = "Continua" } })
+		return
+	end
 	if S.StoryService.TryTalk(player, npcId) then
 		return
 	end

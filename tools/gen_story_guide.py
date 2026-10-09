@@ -59,6 +59,7 @@ def main():
         "| `/vai Zona` | teletrasporto (es. `/vai Recinto`, `/vai Aurion`, `/vai Halvar`) |",
         "| `/zone` | elenco delle zone |",
         "| `/cura` | vita, gas e lame al massimo |",
+        "| `/tutorial` | rifà l'Addestramento di base da capo (come un giocatore nuovo) |",
         "",
         "Per verificare un capitolo: `/livello` al livello richiesto, `/capitolo N`, poi segui gli obiettivi",
         "(oppure `/passo` per saltarli uno alla volta).",
@@ -87,6 +88,12 @@ def main():
                 continue
             n += 1
             lines.append(f"{n}. {KIND.get(t.group(1), t.group(1))}: {o.group(1)}")
+            # il tutorial (Data/Tutorial.lua) si fa dopo il prologo, prima di Brehm
+            if i == 0 and n == 1:
+                lines.append(
+                    "   - 🎓 **Missione 0 - Addestramento di base** (tutorial, con Mira): comandi passo per passo,"
+                    " le isole sulla mappa, l'interfaccia e i giganti. Si rivede da Menu (M) → Opzioni."
+                )
         lines.append("")
     lines += [
         "Alla fine del capitolo 17 compare **STORIA COMPLETATA**. I Sieri Perduti (gli 8 giganti",

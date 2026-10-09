@@ -74,6 +74,10 @@ local function startStep(player: Player)
 	if not chapter or not step or not profile then
 		return
 	end
+	-- l'Addestramento di base viene prima di questo passo: la storia aspetta che finisca
+	if S.TutorialService and S.TutorialService.Gate(player) then
+		return
+	end
 	profile.Story.Progress = 0
 	S.DataService.MarkDirty(player)
 	if step.Type == "Cutscene" then
@@ -147,6 +151,9 @@ function StoryService.TryTalk(player: Player, npcId: string): boolean
 	if not step or step.Type ~= "Talk" or step.Npc ~= npcId then
 		return false
 	end
+	if S.TutorialService and S.TutorialService.Pending(player) then
+		return false
+	end
 	local lines = {}
 	for _, line in step.Dialogue do
 		table.insert(lines, { Speaker = line.Speaker, Name = npcSpeakerName(line.Speaker), Text = line.Text })
@@ -165,7 +172,7 @@ function StoryService.OnDialogueChoice(player: Player, npcId: string, choiceId: 
 		return
 	end
 	local _, step = StoryService.Current(player)
-	if step and step.Type == "Talk" and step.Npc == npcId then
+	if step and step.Type == "Talk" and step.Npc == npcId and not (S.TutorialService and S.TutorialService.Pending(player)) then
 		StoryService.Advance(player)
 	end
 end
@@ -212,6 +219,13 @@ function StoryService.OnClientReady(player: Player)
 		task.delay(1.5, function()
 			if player.Parent then
 				sendCutscene(player, step.Cutscene)
+			end
+		end)
+	elseif S.TutorialService and S.TutorialService.Pending(player) then
+		-- rientrato a metà dell'Addestramento di base: riprende da dove era rimasto
+		task.delay(1.5, function()
+			if player.Parent then
+				S.TutorialService.Gate(player)
 			end
 		end)
 	end

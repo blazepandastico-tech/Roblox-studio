@@ -840,6 +840,53 @@ do
 	check(AbuseEvents.FormatTime(3725) == "1:02:05" and AbuseEvents.FormatTime(65) == "1:05", "FormatTime degli eventi sbagliato")
 end
 
+-- ADDESTRAMENTO DI BASE ------------------------------------------------------------------------------
+do
+	local Tutorial = require(Shared.Data.Tutorial)
+	local W = require(Shared.Data.WorldLayout)
+	local GOALS = { Look = true, Walk = true, Jump = true, Action = true, Hook = true, Boost = true, Rings = true, NapeKill = true, Refill = true, Panel = true }
+	local ACTIONS = { Dodge = true, Attack = true, SkillZ = true, Reload = true }
+	local PANELS = { Menu = true, Mappa = true }
+	local ids = {}
+	local lastSection = 0
+	for i, step in Tutorial.Steps do
+		local where = ("Tutorial.Steps[%d] %s"):format(i, tostring(step.Id))
+		check(step.Id and not ids[step.Id], "%s: Id mancante o doppio", where)
+		ids[step.Id] = true
+		check(Tutorial.Sections[step.Section] ~= nil, "%s: sezione %s inesistente", where, tostring(step.Section))
+		check(step.Section >= lastSection, "%s: le sezioni devono andare in ordine", where)
+		lastSection = step.Section
+		check(type(step.Title) == "string" and #step.Title > 0 and type(step.Text) == "string" and #step.Text > 20, "%s: titolo o testo mancante", where)
+		check(step.Keys and step.Keys.PC and #step.Keys.PC > 0, "%s: mancano i tasti del PC", where)
+		check(step.Keys and type(step.Keys.Touch) == "string", "%s: manca la spiegazione per il telefono", where)
+		check(GOALS[step.Goal.Kind], "%s: obiettivo %s sconosciuto", where, tostring(step.Goal.Kind))
+		if step.Goal.Kind == "Action" then
+			check(ACTIONS[step.Goal.Action], "%s: azione %s non controllata dal tutorial", where, tostring(step.Goal.Action))
+		elseif step.Goal.Kind == "Panel" then
+			check(PANELS[step.Goal.Panel], "%s: pannello %s sconosciuto", where, tostring(step.Goal.Panel))
+		elseif step.Goal.Kind == "Look" or step.Goal.Kind == "Walk" or step.Goal.Kind == "Boost" then
+			check(type(step.Goal.Amount) == "number" and step.Goal.Amount > 0, "%s: manca Amount", where)
+		end
+	end
+	-- gli anelli d'oro attorno alla torre, raggiungibili con i rampini (non troppo alti né lontani)
+	local tower = W.Landmarks.TorreAddestramento
+	for i, ring in Tutorial.Rings do
+		local flat = Vector3.new(ring.X - tower.X, 0, ring.Z - tower.Z).Magnitude
+		check(flat < 60 and ring.Y > W.GroundY + 10 and ring.Y < tower.Y + 10, "Tutorial.Rings[%d]: troppo lontano dalla torre o ad altezza sbagliata", i)
+	end
+	for id, count in Tutorial.Reward.Items or {} do
+		check(Items.Get(id) ~= nil and count > 0, "Tutorial.Reward: oggetto %s inesistente", id)
+	end
+	for _, entry in Tutorial.Islands do
+		check(W.Islands[entry.Island] ~= nil, "Tutorial.Islands: isola %s inesistente", tostring(entry.Island))
+		check(#Tutorial.IslandZones(entry.Island, 4) > 0 or entry.Island == "Arena", "Tutorial.Islands: l'isola %s non ha zone", tostring(entry.Island))
+	end
+	local story = Story.Chapters[Tutorial.StoryChapter]
+	local gate = story and story.Steps[Tutorial.StoryStep]
+	check(gate ~= nil and gate.Type == "Talk" and gate.Npc == "Brehm", "Tutorial.StoryStep deve essere il passo \"Presentati all'Istruttore Brehm\"")
+	check(story ~= nil and story.Steps[1].Type == "Cutscene", "il tutorial deve venire dopo il prologo")
+end
+
 -- RISULTATO ----------------------------------------------------------------------------------
 local cutsceneList = {}
 for id in cutscenes do

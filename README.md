@@ -54,6 +54,27 @@ poi salva il luogo: all'avvio il server non rigenera una mappa che esiste già.
 
 Su telefono e tablet compaiono pulsanti a schermo.
 
+### Missione 0: l'Addestramento di base (tutorial)
+Dopo il filmato del prologo, prima della prima missione con l'Istruttore Brehm, la cadetta **Mira**
+guida il giocatore nuovo:
+- **Parte 1 - I comandi**, un passo alla volta e si va avanti solo facendolo davvero: guardarsi intorno,
+  muoversi, saltare, schivare, lanciare un rampino, il gas, **volare tra tre anelli d'oro** attorno alla
+  torre, i fendenti, **abbattere una sagoma dalla nuca**, l'abilità Z, cambiare le lame, il Deposito di
+  Rifornimento, il menu e la mappa. La scheda in alto mostra i tasti giusti per PC, telefono o controller
+  e il tasto si illumina quando lo premi; ogni passo fatto ha la sua medaglia verde e tra una sezione e
+  l'altra (Movimento, Rampini, Combattimento, Interfaccia) compare il titolo grande.
+- **Parte 2 - Il mondo**: la mappa animata vola isola per isola (stagione, livello consigliato, zone
+  principali, mare aperto e viaggi), un riflettore spiega l'interfaccia (missioni, bussola, livello,
+  barre, premi, menu, minimappa) e una scena con i giganti mostra taglie, nuca, occhi e arti, la presa,
+  gli anomali, i boss e i sieri.
+- **Finale**: cosa ti aspetta, il premio (300 oro, esperienza e 2 razioni, una volta sola) e la
+  telecamera che vola fino a Brehm, la prossima missione.
+
+Si può saltare (senza premio) e rivedere quando si vuole da **Menu (M) → Opzioni → Rivedi**. Chi esce a
+metà riprende da dove era rimasto; chi aveva già superato quel punto della storia non lo vede.
+Codice: `src/shared/Data/Tutorial.lua` (testi e passi), `src/client/UI/Tutorial.lua` e
+`TutorialTour.lua`, `src/server/Services/TutorialService.lua`. In Studio `/tutorial` lo fa ripartire.
+
 ### Volo con i rampini: consigli
 - Un aggancio **vicino** tira più forte di uno al limite della portata; tirare **nella direzione in cui voli**
   rende di più che tirare all'indietro (per invertire la rotta conviene oscillare attorno al cavo).
@@ -285,7 +306,8 @@ In alto scegli il **bersaglio** (tu o un altro giocatore) e scrivi un **valore**
 ## 7b. Verificare la storia (comandi di prova)
 
 In **Roblox Studio** (o se sei il proprietario del gioco) scrivi in chat: `/aiuto`, `/capitolo N`, `/passo`,
-`/livello N`, `/oro N`, `/gemme N`, `/vai Zona`, `/zone`, `/cura`, `/giri N`, `/resetpremi`, `/tempo N`.
+`/livello N`, `/oro N`, `/gemme N`, `/vai Zona`, `/zone`, `/cura`, `/giri N`, `/resetpremi`, `/tempo N`,
+`/tutorial` (rifà l'Addestramento di base da capo).
 La guida completa, capitolo per capitolo, è in [`docs/GUIDA_STORIA.md`](docs/GUIDA_STORIA.md).
 
 ## 8. Personalizzare

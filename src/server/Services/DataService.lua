@@ -51,6 +51,8 @@ local TEMPLATE = {
 	StoredSerums = {},
 	Quest = { Id = "", Progress = 0 },
 	Story = { Chapter = 1, Step = 1, Progress = 0, Done = false },
+	-- Addestramento di base (vedi TutorialService)
+	Tutorial = { Done = false, Step = 1, Rewarded = false },
 	Visited = { CampoAddestramento = true },
 	SpawnZone = "CampoAddestramento",
 	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0, Players = 0 },

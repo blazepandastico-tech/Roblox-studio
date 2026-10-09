@@ -630,7 +630,7 @@ function RewardsPanel.Start()
 	task.spawn(function()
 		local p = C.ClientData.WaitReady()
 		task.wait(10)
-		while (C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()) or (C.CutsceneController and C.CutsceneController.IsPlaying()) do
+		while (C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()) or (C.CutsceneController and C.CutsceneController.IsPlaying()) or (C.Tutorial and C.Tutorial.IsActive()) or (C.CameraController and C.CameraController.IsCinematic()) do
 			task.wait(2)
 		end
 		p = profile() or p
@@ -641,7 +641,7 @@ function RewardsPanel.Start()
 
 	-- offerta di benvenuto dopo 6 minuti di gioco (una volta per sessione, solo nei primi 3 giorni)
 	task.delay(360, function()
-		while (C.CutsceneController and C.CutsceneController.IsPlaying()) or C.UIController.IsOpen("Menu") or C.UIController.IsOpen("Rewards") do
+		while (C.CutsceneController and C.CutsceneController.IsPlaying()) or C.UIController.IsOpen("Menu") or C.UIController.IsOpen("Rewards") or (C.Tutorial and C.Tutorial.IsActive()) do
 			task.wait(5)
 		end
 		showStarterOffer()

@@ -1122,7 +1122,7 @@ SHOWS.CadutaMuro = function(after)
 	-- 5. da fuori, in basso dietro la sua gamba: tenendosi al Muro, il calcio sfonda il cancello
 	after(11.0, function()
 		shotPath(function(k)
-			local e = Util.Ease(k, "SineOut")
+			local e = Util.Ease(k, "QuadOut")
 			return look(at(st, -160 + 30 * e, 270 - 40 * e, 16 + 10 * e), at(st, 0, 20, 64))
 		end, 2.2)
 	end)
@@ -1916,6 +1916,7 @@ local function busy(): boolean
 	return (C.CutsceneController ~= nil and C.CutsceneController.IsPlaying())
 		or (C.Intro ~= nil and C.Intro.IsShowing ~= nil and C.Intro.IsShowing())
 		or (C.Dialogue ~= nil and C.Dialogue.IsOpen ~= nil and C.Dialogue.IsOpen())
+		or (C.Tutorial ~= nil and C.Tutorial.IsActive ~= nil and C.Tutorial.IsActive())
 end
 
 local function refresh()

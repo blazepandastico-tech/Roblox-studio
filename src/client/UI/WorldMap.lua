@@ -395,17 +395,21 @@ local function drawMarkers(canvas: Canvas, detailed: boolean, myRoot: BasePart?)
 end
 
 -- Ricolora le zone quando cambia il livello del giocatore
+local function colorZones(canvas: Canvas, level: number)
+	for id, frame in canvas.Zones do
+		local zone = Zones.Get(id)
+		if zone then
+			local color, transparency = zoneColor(zone, level)
+			frame.BackgroundColor3 = color
+			frame.BackgroundTransparency = transparency
+		end
+	end
+end
+
 local function recolorZones(level: number)
 	for _, canvas in { mini, big } do
 		if canvas then
-			for id, frame in canvas.Zones do
-				local zone = Zones.Get(id)
-				if zone then
-					local color, transparency = zoneColor(zone, level)
-					frame.BackgroundColor3 = color
-					frame.BackgroundTransparency = transparency
-				end
-			end
+			colorZones(canvas, level)
 		end
 	end
 end
@@ -683,6 +687,34 @@ end
 
 function WorldMap.Toggle()
 	C.UIController.Toggle("Mappa")
+end
+
+-- Tela con l'arcipelago disegnato come nella mappa grande (usata dal tutorial per la sua mappa
+-- animata): scale = pixel per stud. Restituisce la tela e le funzioni per muoverla.
+function WorldMap.NewCanvas(holder: Frame, scale: number)
+	local canvas = newCanvas(holder, scale, true)
+	if C.ClientData.Profile then
+		colorZones(canvas, C.ClientData.Profile.Level)
+	end
+	return {
+		Canvas = canvas,
+		World = canvas.World,
+		SetScale = function(s: number)
+			setScale(canvas, s)
+		end,
+		CenterOn = function(pos: Vector3)
+			centerOn(canvas, pos)
+		end,
+		UV = uv,
+		WorldSize = Vector2.new(WORLD_W, WORLD_H),
+		Details = canvas.Details,
+		Icons = canvas.Icons,
+	}
+end
+
+-- La minimappa (per il riflettore del tutorial)
+function WorldMap.MiniFrame(): GuiObject?
+	return miniRoot
 end
 
 function WorldMap.Init(c)

@@ -15,6 +15,7 @@
 	/giri N             aggiunge N giri della Ruota della Fortuna
 	/resetpremi         azzera calendario, regali a tempo e giro gratis (per riprovarli)
 	/tempo N            aggiunge N minuti ai regali a tempo di oggi
+	/tutorial           rifà l'Addestramento di base da capo (come un giocatore nuovo)
 ]]
 
 local Players = game:GetService("Players")
@@ -31,7 +32,7 @@ local Leveling = require(Shared.Data.Leveling)
 local DevCommandsService = {}
 local S
 
-local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N"
+local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N • /tutorial"
 
 local function allowed(player: Player): boolean
 	if player:GetAttribute("Admin") == true or RunService:IsStudio() then
@@ -187,6 +188,9 @@ local function run(player: Player, text: string)
 			player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
 			say(player, ("+%d minuti di gioco oggi"):format(math.floor(value)))
 		end
+	elseif command == "/tutorial" then
+		S.TutorialService.Reset(player)
+		say(player, "Addestramento di base da capo")
 	elseif command == "/cura" then
 		S.PlayerService.Heal(player, 1)
 		pcall(S.PlayerService.RefillWeapons, player)
@@ -216,7 +220,7 @@ local function handle(player: Player, text: string)
 	end
 end
 
-local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura", "/giri", "/resetpremi", "/tempo" }
+local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura", "/giri", "/resetpremi", "/tempo", "/tutorial" }
 
 function DevCommandsService.Init(services)
 	S = services

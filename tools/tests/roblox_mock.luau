@@ -173,6 +173,14 @@ UDim2 = {
 		return newUDim2(newUDim(0, x or 0), newUDim(0, y or 0))
 	end,
 }
+-- come in Roblox: UDim2 + UDim2 e UDim2 - UDim2
+local UD2MT = TypeMT.UDim2
+UD2MT.__add = function(a, b)
+	return newUDim2(newUDim(a.X.Scale + b.X.Scale, a.X.Offset + b.X.Offset), newUDim(a.Y.Scale + b.Y.Scale, a.Y.Offset + b.Y.Offset))
+end
+UD2MT.__sub = function(a, b)
+	return newUDim2(newUDim(a.X.Scale - b.X.Scale, a.X.Offset - b.X.Offset), newUDim(a.Y.Scale - b.Y.Scale, a.Y.Offset - b.Y.Offset))
+end
 
 local C3 = { __type = "Color3" }
 C3.__index = function(self, key)
@@ -557,6 +565,11 @@ function SignalMT.Connect(self, fn)
 end
 SignalMT.Once = SignalMT.Connect
 function SignalMT.Wait(_self)
+	-- con l'orologio finto delle prove (MOCK_HOOKS.Wait) aspettare un segnale fa passare un fotogramma
+	local hook = MOCK_HOOKS and MOCK_HOOKS.Wait
+	if hook then
+		hook()
+	end
 	return nil
 end
 function SignalMT.Fire(self, ...)
@@ -963,6 +976,9 @@ end
 function Methods.GetState(_self)
 	return Enum.HumanoidStateType.Running
 end
+function Methods.GetLastInputType(_self)
+	return Enum.UserInputType.Keyboard
+end
 function Methods.Move(_self, _direction, _relative) end
 -- le prove possono aggiungere giocatori finti a MOCK_PLAYERS (Players:GetPlayers li restituisce)
 MOCK_PLAYERS = {}
@@ -1213,12 +1229,29 @@ game = setmetatable({}, {
 -- i cicli infiniti dei servizi (task.spawn) non vengono eseguiti: la prova controlla solo la costruzione
 SPAWNED = 0
 -- le prove possono intercettare task.delay (MOCK_HOOKS.Delay) per far girare le azioni in ritardo
+-- (e anche task.wait, task.spawn e os.clock: MOCK_HOOKS.Wait, MOCK_HOOKS.Spawn, MOCK_HOOKS.Clock;
+-- i moduli si caricano dopo il finto, quindi vedono queste funzioni anche se le prove le cambiano)
 MOCK_HOOKS = {}
+local realOs = os
+os = setmetatable({
+	clock = function()
+		local hook = MOCK_HOOKS.Clock
+		return if hook then hook() else realOs.clock()
+	end,
+}, { __index = realOs })
 task = {
-	wait = function()
+	wait = function(...)
+		local hook = MOCK_HOOKS.Wait
+		if hook then
+			return hook(...)
+		end
 		return 0
 	end,
-	spawn = function()
+	spawn = function(fn, ...)
+		local hook = MOCK_HOOKS.Spawn
+		if hook then
+			return hook(fn, ...)
+		end
 		SPAWNED += 1
 	end,
 	defer = function()

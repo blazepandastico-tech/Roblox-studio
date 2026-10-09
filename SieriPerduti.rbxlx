@@ -8337,6 +8337,256 @@ return Treasures
         </Item>
         <Item class="ModuleScript" referent="36">
           <Properties>
+            <string name="Name">Tutorial</string>
+            <string name="Source"><![CDATA[--[[
+	Tutorial - l'Addestramento di base: la prima missione del gioco, dopo il prologo e prima
+	dell'Istruttore Brehm. La guida è Mira, cadetta del Corpo: Brehm le ha chiesto di mostrare
+	le basi alla recluta nuova.
+
+	PARTE 1 - I COMANDI: passi interattivi, ognuno si completa facendo davvero la cosa.
+	PARTE 2 - IL MONDO: le isole sulla mappa, l'interfaccia e le missioni, i giganti, la crescita.
+
+	Ogni passo ha: Id, Section (indice in Tutorial.Sections), Title, Text (parla Mira),
+	Keys = { PC = { tasti }, Touch = "testo", Gamepad = { tasti } } (senza voce per un dispositivo
+	il passo diventa una spiegazione con "Avanti"), Goal (cosa controllare), Hint (consiglio che
+	compare se ci metti un po'), Target (dove punta la colonna di luce).
+	Goal:
+	  Look     ruota la visuale di Amount gradi        Walk     percorri a piedi Amount studs
+	  Jump     salta                                   Action   premi l'azione Action, Count volte
+	  Hook     aggancia un rampino                     Boost    gas in volo per Amount secondi
+	  Rings    attraversa gli anelli d'oro             NapeKill abbatti una sagoma dalla nuca
+	  Refill   rifornisciti a un Deposito              Panel    apri e richiudi il pannello Panel
+]]
+
+local W = require(script.Parent.WorldLayout)
+local Zones = require(script.Parent.Zones)
+
+local Tutorial = {}
+
+Tutorial.Guide = "Mira"
+Tutorial.Title = "Addestramento di base"
+
+-- il tutorial si fa al posto di questo passo della storia (Capitolo 1: "Presentati all'Istruttore Brehm")
+Tutorial.StoryChapter = 1
+Tutorial.StoryStep = 2
+
+Tutorial.Sections = {
+	{ Id = "Movimento", Name = "Movimento", Icon = "🧭" },
+	{ Id = "Rampini", Name = "Rampini", Icon = "🪝" },
+	{ Id = "Combattimento", Name = "Combattimento", Icon = "⚔️" },
+	{ Id = "Interfaccia", Name = "Interfaccia", Icon = "🎒" },
+}
+
+local camp = Zones.Get("CampoAddestramento")
+local campCenter = if camp then camp.Center else W.At("Vermiglia", 215, 260, W.GroundY)
+local towerTop = W.Landmarks.TorreAddestramento
+local towerBase = Vector3.new(towerTop.X, W.GroundY, towerTop.Z)
+
+-- gli anelli d'oro salgono a spirale attorno alla torre di addestramento (vicini a torre e pali)
+Tutorial.Rings = {
+	towerBase + Vector3.new(30, 24, -6),
+	towerBase + Vector3.new(4, 46, -32),
+	towerBase + Vector3.new(-28, 68, -2),
+}
+Tutorial.RingRadius = 12
+
+-- dove sono le sagome e il deposito del campo (TitanService e WorldBuilder)
+Tutorial.DummyArea = campCenter + Vector3.new(62, 0, -48)
+Tutorial.SupplyPoint = campCenter + Vector3.new(12, 0, 32)
+
+Tutorial.Steps = {
+	-- MOVIMENTO -------------------------------------------------------------------------------------
+	{
+		Id = "Guarda",
+		Section = 1,
+		Title = "Guardati intorno",
+		Text = "Ehi, tu sei quello nuovo! Sono Mira. Brehm mi ha chiesto di mostrarti le basi prima di presentarti a lui. Per cominciare: guardati intorno.",
+		Keys = { PC = { "Mouse" }, Touch = "Trascina il dito sullo schermo", Gamepad = { "Levetta destra" } },
+		Note = { PC = "Con lo Shift lock attivo basta muovere il mouse" },
+		Goal = { Kind = "Look", Amount = 150 },
+		Hint = "Muovi il mouse (o tieni premuto il tasto destro e trascina).",
+	},
+	{
+		Id = "Cammina",
+		Section = 1,
+		Title = "Muoviti",
+		Text = "Fai qualche passo per il campo. Con Bloc Maiusc passi dalla corsa alla camminata.",
+		Keys = { PC = { "W", "A", "S", "D" }, Touch = "Usa il joystick in basso a sinistra", Gamepad = { "Levetta sinistra" } },
+		Goal = { Kind = "Walk", Amount = 40 },
+	},
+	{
+		Id = "Salta",
+		Section = 1,
+		Title = "Salta",
+		Text = "Un soldato delle Isole non resta mai con i piedi a terra a lungo. Salta!",
+		Keys = { PC = { "Spazio" }, Touch = "Tocca il pulsante del salto", Gamepad = { "A" } },
+		Goal = { Kind = "Jump" },
+	},
+	{
+		Id = "Schiva",
+		Section = 1,
+		Title = "Schivata",
+		Text = "Uno scatto rapido nella direzione in cui ti muovi: ti salva dalle mani dei giganti. Costa un po' di gas.",
+		Keys = { PC = { "Ctrl" }, Touch = "Tocca ↯", Gamepad = { "B" } },
+		Goal = { Kind = "Action", Action = "Dodge", Count = 1 },
+	},
+	-- RAMPINI --------------------------------------------------------------------------------------
+	{
+		Id = "Rampino",
+		Section = 2,
+		Title = "Lancia un rampino",
+		Text = "Ora la parte bella. Punta il mirino sulla torre di legno o su un palo: quando diventa VERDE è in portata. Tieni premuto per restare agganciato.",
+		Keys = { PC = { "Q", "E" }, Touch = "Tieni premuto ◀🪝 o 🪝▶", Gamepad = { "L1", "R1" } },
+		Note = { PC = "Q = rampino sinistro • E = rampino destro" },
+		Goal = { Kind = "Hook" },
+		Target = towerBase + Vector3.new(0, 40, 0),
+		Hint = "Il mirino deve essere verde: avvicinati alla torre e guardala.",
+	},
+	{
+		Id = "Gas",
+		Section = 2,
+		Title = "Gas!",
+		Text = "Mentre sei agganciato, il gas ti spinge in avanti e ti fa salire. Si consuma: tienilo d'occhio nella barra azzurra in basso a sinistra.",
+		Keys = { PC = { "Spazio" }, Touch = "Tieni premuto 💨", Gamepad = { "A" } },
+		Note = { PC = "Tieni premuto Q o E e intanto Spazio" },
+		Goal = { Kind = "Boost", Amount = 0.6 },
+		Target = towerBase + Vector3.new(0, 40, 0),
+		Hint = "Aggancia la torre (Q o E) e tieni premuto Spazio mentre voli.",
+	},
+	{
+		Id = "Anelli",
+		Section = 2,
+		Title = "Vola tra gli anelli",
+		Text = "Attraversa i tre anelli d'oro attorno alla torre. Alterna i rampini, sterza con W A S D e usa il gas per salire.",
+		Keys = { PC = { "Q", "E", "Spazio" }, Touch = "◀🪝  🪝▶  💨", Gamepad = { "L1", "R1", "A" } },
+		Goal = { Kind = "Rings" },
+		Hint = "Aggancia la torre vicino all'anello, tieni premuto Spazio per salire e rilascia il rampino per oscillare dentro l'anello.",
+		SkipAfter = 75,
+	},
+	-- COMBATTIMENTO -------------------------------------------------------------------------------------
+	{
+		Id = "Fendente",
+		Section = 3,
+		Title = "Fendente",
+		Text = "Le lame colpiscono in combo da quattro. Prova qualche fendente.",
+		Keys = { PC = { "Clic sinistro" }, Touch = "Tocca ⚔️", Gamepad = { "R2" } },
+		Goal = { Kind = "Action", Action = "Attack", Count = 3 },
+	},
+	{
+		Id = "Nuca",
+		Section = 3,
+		Title = "Colpisci la NUCA",
+		Text = "Il punto debole di ogni gigante è la nuca, dietro il collo. Quando la punti il mirino diventa ORO: abbatti una sagoma colpendola lì!",
+		Keys = { PC = { "Clic sinistro" }, Touch = "Tocca ⚔️", Gamepad = { "R2" } },
+		Goal = { Kind = "NapeKill" },
+		Target = Tutorial.DummyArea,
+		Hint = "Giragli attorno e colpiscilo da dietro, in alto: aggancia un rampino per arrivarci.",
+		SkipAfter = 90,
+	},
+	{
+		Id = "Abilita",
+		Section = 3,
+		Title = "Abilità delle lame",
+		Text = "Z, X, C e V sono le abilità delle lame. Z si usa da subito: le altre si sbloccano con la maestria, colpendo con le stesse lame.",
+		Keys = { PC = { "Z" }, Touch = "Tocca Z in basso", Gamepad = { "X" } },
+		Goal = { Kind = "Action", Action = "SkillZ", Count = 1 },
+	},
+	{
+		Id = "Lame",
+		Section = 3,
+		Title = "Lame nuove",
+		Text = "Le lame si consumano a ogni colpo. Quando sono rovinate, sostituiscile al volo.",
+		Keys = { PC = { "R" }, Touch = "Tocca R" },
+		Goal = { Kind = "Action", Action = "Reload", Count = 1 },
+	},
+	{
+		Id = "Rifornimento",
+		Section = 3,
+		Title = "Rifornimento",
+		Text = "Gas e lame finiscono! Ai Depositi di Rifornimento, la cassa con le bombole, ricarichi tutto. Avvicinati e tieni premuto il tasto.",
+		Keys = { PC = { "F" }, Touch = "Tocca il pulsante che compare", Gamepad = { "X" } },
+		Note = { PC = "Tieni premuto F vicino alla cassa" },
+		Goal = { Kind = "Refill" },
+		Target = Tutorial.SupplyPoint,
+		Hint = "Segui la colonna di luce dorata fino alla cassa con le bombole.",
+	},
+	-- INTERFACCIA -------------------------------------------------------------------------------------
+	{
+		Id = "Menu",
+		Section = 4,
+		Title = "Il menu",
+		Text = "Nel menu trovi equipaggiamento, statistiche, sieri, storia, traguardi e impostazioni. Aprilo e poi richiudilo.",
+		Keys = { PC = { "M" }, Touch = "Tocca 🎒 sulla destra" },
+		Goal = { Kind = "Panel", Panel = "Menu" },
+	},
+	{
+		Id = "Mappa",
+		Section = 4,
+		Title = "La mappa",
+		Text = "La mappa dell'arcipelago: zone colorate in base al tuo livello, porti, negozi e il tuo obiettivo. Aprila e poi richiudila.",
+		Keys = { PC = { "B" }, Touch = "Tocca la minimappa", Gamepad = { "Select" } },
+		Goal = { Kind = "Panel", Panel = "Mappa" },
+	},
+}
+
+-- PARTE 2: L'ARCIPELAGO (mappa animata, un'isola alla volta) ---------------------------------------------
+Tutorial.Islands = {
+	{ Island = "Vermiglia", Text = "La tua casa. Qui cominci: Campo di Addestramento, Recinto dei giganti catturati, Quartier Generale e il Distretto di Calaneth. Fuori dalle Mura: pianure e foresta." },
+	{ Island = "Edenia", Text = "Foreste di alberi giganti e la Gola. Il Corpo dei Falchi si accampa qui per le missioni oltre le Mura." },
+	{ Island = "Aurea", Text = "La capitale Aurion, la Città Sotterranea e la Caverna di Cristallo. Intrighi, polizia militare e segreti." },
+	{ Island = "Cenere", Text = "Le rovine di Halvar, dove tutto è cominciato. Nel seminterrato si nasconde la verità sulla tua fiala." },
+	{ Island = "Valdoria", Text = "Il continente oltre il mare: trincee, fortezze e la Grande Marcia dei giganti." },
+	{ Island = "Arena", Text = "L'Isola dell'Arena: raid a ondate con boss enormi, da soli o in squadra. Si sblocca al livello 120." },
+}
+Tutorial.SeaText = "In mezzo al mare ci sono isolotti con giganti, relitti e forzieri nascosti. Ti sposti con i Corrieri 🐎 (viaggio rapido), con la barca ⛵ dai pontili (F) o con il cavallo (H)."
+Tutorial.LevelText = "Ogni isola ha un livello consigliato: sulla mappa le zone GIALLE sono giuste per te, quelle ROSSE troppo pericolose."
+
+-- le zone principali di un'isola (per la scheda della mappa)
+function Tutorial.IslandZones(islandId: string, max: number?): { string }
+	local names = {}
+	for _, zone in Zones.List do
+		if zone.Island == islandId and not zone.Islet and not zone.Underground then
+			table.insert(names, zone.Name)
+			if #names >= (max or 4) then
+				break
+			end
+		end
+	end
+	return names
+end
+
+-- PARTE 2: L'INTERFACCIA (riflettore sugli elementi del HUD) ----------------------------------------------
+-- Element = nome dell'elemento (vedi HUD.Element)
+Tutorial.Spotlight = {
+	{ Element = "Tracker", Title = "📜 Le missioni", Text = "In alto a destra c'è la STORIA: la missione principale che sblocca capitoli, isole e poteri. Sotto, la missione secondaria attiva." },
+	{ Element = "Compass", Title = "◆ Dove andare", Text = "La bussola e la colonna di luce dorata indicano sempre il tuo obiettivo, con la distanza in metri." },
+	{ Element = "Player", Title = "⭐ Livello e oro", Text = "Livello, esperienza, oro e gemme. A ogni livello guadagni punti statistica da spendere nel menu (M)." },
+	{ Element = "Bars", Title = "❤️ Salute, gas e lame", Text = "Se il gas finisce in volo, cadi! Ricarica ai Depositi di Rifornimento. Le lame si cambiano con R." },
+	{ Element = "Rewards", Title = "🎁 Premi", Text = "Calendario dei premi giornalieri, regali a tempo, ruota della fortuna, classifiche e invito agli amici." },
+	{ Element = "MenuButtons", Title = "🎒 Menu rapido", Text = "Equipaggiamento, mappa, cavallo, statistiche e negozio a portata di clic." },
+	{ Element = "Minimap", Title = "🗺️ Minimappa", Text = "Il nord è sempre in alto. Puntini rossi = giganti vicini, ◆ oro = il tuo obiettivo." },
+}
+Tutorial.QuestText = "Le missioni secondarie te le danno i personaggi con ❗ sopra la testa: XP e oro extra. Una alla volta."
+
+-- PARTE 2: COSA TI ASPETTA (schede finali) -------------------------------------------------------------
+Tutorial.Outro = {
+	{ Icon = "📜", Title = "Storia", Text = "4 stagioni e 5 isole: segui i capitoli per scoprire chi fabbrica i Sieri." },
+	{ Icon = "❗", Title = "Missioni", Text = Tutorial.QuestText },
+	{ Icon = "🔱", Title = "Raid ed eventi", Text = "Raid con boss enormi, eventi a tempo con XP doppia e il Colosso d'Oro." },
+	{ Icon = "💉", Title = "Sieri", Text = "Più avanti potrai iniettarti un siero e trasformarti in gigante (T)." },
+}
+
+-- premio dell'addestramento completato (una volta sola)
+Tutorial.Reward = { XP = 0.8, Gold = 300, Items = { Razione = 2 } }
+-- secondi minimi per completarlo davvero (sotto non si riceve il premio)
+Tutorial.MinSeconds = 45
+
+return Tutorial
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="37">
+          <Properties>
             <string name="Name">WorldLayout</string>
             <string name="Source"><![CDATA[--[[
 	WorldLayout - la geografia del mondo: un arcipelago di isole separate dal mare
@@ -8550,7 +8800,7 @@ return W
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">Zones</string>
             <string name="Source"><![CDATA[--[[
@@ -9193,11 +9443,11 @@ return Zones
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="38">
+      <Item class="Folder" referent="39">
         <Properties>
           <string name="Name">Lib</string>
         </Properties>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[--[[
@@ -9245,7 +9495,11 @@ Net.EventNames = {
 	"AdminAction",
 	"Horse",
 	"PvPToggle",
+	"TutorialProgress",
+	"TutorialDone",
+	"TutorialReplay",
 	-- server -> client
+	"Tutorial",
 	"PvPState",
 	"RaidState",
 	"WheelResult",
@@ -9341,7 +9595,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">Signal</string>
             <string name="Source"><![CDATA[--[[
@@ -9422,7 +9676,7 @@ return Signal
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">Util</string>
             <string name="Source"><![CDATA[--[[
@@ -9716,11 +9970,11 @@ return Util
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="42">
+      <Item class="Folder" referent="43">
         <Properties>
           <string name="Name">Modules</string>
         </Properties>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">ODMPhysicsModule</string>
             <string name="Source"><![CDATA[--[[
@@ -9956,15 +10210,15 @@ return ODMPhysics
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="44">
+  <Item class="ServerScriptService" referent="45">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="45">
+    <Item class="Folder" referent="46">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="46">
+      <Item class="Script" referent="47">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -9999,6 +10253,7 @@ local ORDER = {
 	"ODMService",
 	"QuestService",
 	"StoryService",
+	"TutorialService",
 	"SerumService",
 	"ShifterService",
 	"ShopService",
@@ -10063,11 +10318,11 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="47">
+      <Item class="Folder" referent="48">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">AbuseService</string>
             <string name="Source"><![CDATA[--[[
@@ -10509,7 +10764,7 @@ return AbuseService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">AchievementService</string>
             <string name="Source"><![CDATA[--[[
@@ -10600,7 +10855,7 @@ return AchievementService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--[[
@@ -11268,7 +11523,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -11332,7 +11587,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -11900,7 +12155,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">CommunityService</string>
             <string name="Source"><![CDATA[--[[
@@ -12036,7 +12291,7 @@ return CommunityService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -12092,6 +12347,8 @@ local TEMPLATE = {
 	StoredSerums = {},
 	Quest = { Id = "", Progress = 0 },
 	Story = { Chapter = 1, Step = 1, Progress = 0, Done = false },
+	-- Addestramento di base (vedi TutorialService)
+	Tutorial = { Done = false, Step = 1, Rewarded = false },
 	Visited = { CampoAddestramento = true },
 	SpawnZone = "CampoAddestramento",
 	Kills = { Titans = 0, Napes = 0, Enemies = 0, Bosses = 0, Players = 0 },
@@ -12412,7 +12669,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -12432,6 +12689,7 @@ return DataService
 	/giri N             aggiunge N giri della Ruota della Fortuna
 	/resetpremi         azzera calendario, regali a tempo e giro gratis (per riprovarli)
 	/tempo N            aggiunge N minuti ai regali a tempo di oggi
+	/tutorial           rifà l'Addestramento di base da capo (come un giocatore nuovo)
 ]]
 
 local Players = game:GetService("Players")
@@ -12448,7 +12706,7 @@ local Leveling = require(Shared.Data.Leveling)
 local DevCommandsService = {}
 local S
 
-local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N"
+local HELP = "/livello N • /oro N • /gemme N • /capitolo N • /passo • /vai Zona • /zone • /cura • /giri N • /resetpremi • /tempo N • /tutorial"
 
 local function allowed(player: Player): boolean
 	if player:GetAttribute("Admin") == true or RunService:IsStudio() then
@@ -12604,6 +12862,9 @@ local function run(player: Player, text: string)
 			player:SetAttribute("PlayToday", profile.PlayToday.Seconds)
 			say(player, ("+%d minuti di gioco oggi"):format(math.floor(value)))
 		end
+	elseif command == "/tutorial" then
+		S.TutorialService.Reset(player)
+		say(player, "Addestramento di base da capo")
 	elseif command == "/cura" then
 		S.PlayerService.Heal(player, 1)
 		pcall(S.PlayerService.RefillWeapons, player)
@@ -12633,7 +12894,7 @@ local function handle(player: Player, text: string)
 	end
 end
 
-local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura", "/giri", "/resetpremi", "/tempo" }
+local ALIASES = { "/aiuto", "/comandi", "/livello", "/oro", "/gemme", "/capitolo", "/passo", "/vai", "/zone", "/cura", "/giri", "/resetpremi", "/tempo", "/tutorial" }
 
 function DevCommandsService.Init(services)
 	S = services
@@ -12683,7 +12944,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -13156,7 +13417,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -13269,7 +13530,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">ExploreService</string>
             <string name="Source"><![CDATA[--[[
@@ -13464,7 +13725,7 @@ return ExploreService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">FestivalService</string>
             <string name="Source"><![CDATA[--[[
@@ -14115,7 +14376,7 @@ return FestivalService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">HorseService</string>
             <string name="Source"><![CDATA[--[[
@@ -14418,7 +14679,7 @@ return HorseService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -14602,7 +14863,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">LeaderboardService</string>
             <string name="Source"><![CDATA[--[[
@@ -14835,7 +15096,7 @@ return LeaderboardService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -15035,7 +15296,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -15446,7 +15707,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -15726,6 +15987,12 @@ function NPCService.Interact(player: Player, npcId: string)
 	if not npc or not profile or not isNear(player, npc) then
 		return
 	end
+	-- durante l'Addestramento di base Brehm aspetta e Mira fa da guida
+	if S.TutorialService and S.TutorialService.Pending(player) and (npcId == "Brehm" or npcId == "Mira") then
+		local line = if npcId == "Brehm" then "Prima le basi con Mira, recluta. Poi vieni a presentarti da me." else "Segui le mie istruzioni in alto: ti mostro tutto io, poi ti porto da Brehm."
+		send(player, npc, { line }, { { Id = "close", Text = "Continua" } })
+		return
+	end
 	if S.StoryService.TryTalk(player, npcId) then
 		return
 	end
@@ -15984,7 +16251,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -16385,7 +16652,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -16922,7 +17189,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -17681,7 +17948,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">PvPService</string>
             <string name="Source"><![CDATA[--[[
@@ -17931,7 +18198,7 @@ return PvPService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -18053,7 +18320,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -18536,7 +18803,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">RewardsService</string>
             <string name="Source"><![CDATA[--[[
@@ -18800,7 +19067,7 @@ return RewardsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">SeaService</string>
             <string name="Source"><![CDATA[--[[
@@ -19312,7 +19579,7 @@ return SeaService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -19637,7 +19904,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -20444,7 +20711,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -20661,7 +20928,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -20740,6 +21007,10 @@ local function startStep(player: Player)
 	if not chapter or not step or not profile then
 		return
 	end
+	-- l'Addestramento di base viene prima di questo passo: la storia aspetta che finisca
+	if S.TutorialService and S.TutorialService.Gate(player) then
+		return
+	end
 	profile.Story.Progress = 0
 	S.DataService.MarkDirty(player)
 	if step.Type == "Cutscene" then
@@ -20813,6 +21084,9 @@ function StoryService.TryTalk(player: Player, npcId: string): boolean
 	if not step or step.Type ~= "Talk" or step.Npc ~= npcId then
 		return false
 	end
+	if S.TutorialService and S.TutorialService.Pending(player) then
+		return false
+	end
 	local lines = {}
 	for _, line in step.Dialogue do
 		table.insert(lines, { Speaker = line.Speaker, Name = npcSpeakerName(line.Speaker), Text = line.Text })
@@ -20831,7 +21105,7 @@ function StoryService.OnDialogueChoice(player: Player, npcId: string, choiceId: 
 		return
 	end
 	local _, step = StoryService.Current(player)
-	if step and step.Type == "Talk" and step.Npc == npcId then
+	if step and step.Type == "Talk" and step.Npc == npcId and not (S.TutorialService and S.TutorialService.Pending(player)) then
 		StoryService.Advance(player)
 	end
 end
@@ -20878,6 +21152,13 @@ function StoryService.OnClientReady(player: Player)
 		task.delay(1.5, function()
 			if player.Parent then
 				sendCutscene(player, step.Cutscene)
+			end
+		end)
+	elseif S.TutorialService and S.TutorialService.Pending(player) then
+		-- rientrato a metà dell'Addestramento di base: riprende da dove era rimasto
+		task.delay(1.5, function()
+			if player.Parent then
+				S.TutorialService.Gate(player)
 			end
 		end)
 	end
@@ -21037,7 +21318,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -21112,7 +21393,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -22758,7 +23039,176 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
+          <Properties>
+            <string name="Name">TutorialService</string>
+            <string name="Source"><![CDATA[--[[
+	TutorialService
+	L'Addestramento di base (vedi Data/Tutorial): parte dopo il prologo, al posto del passo della
+	storia "Presentati all'Istruttore Brehm", e finché non è finito quel passo aspetta.
+	Il client guida i passi (sono comandi da provare) e comunica a che punto è, così chi esce a metà
+	riprende da lì. Alla fine (o se lo salta) la storia riparte con Brehm. Il premio si riceve una
+	volta sola e solo completandolo davvero. Dal menu si può rivedere quando si vuole (senza premio).
+	Chi aveva già superato quel punto della storia non lo vede (giocatori di prima del tutorial).
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Lib.Net)
+local Tutorial = require(Shared.Data.Tutorial)
+local Leveling = require(Shared.Data.Leveling)
+
+local TutorialService = {}
+local S
+
+type Session = { Started: number, Replay: boolean, Reached: number, From: number }
+local sessions: { [Player]: Session } = {}
+
+local function data(profile)
+	profile.Tutorial = profile.Tutorial or { Done = false, Step = 1, Rewarded = false }
+	return profile.Tutorial
+end
+
+-- la storia è ferma sul passo che il tutorial sostituisce?
+local function atGate(profile): boolean
+	local story = profile.Story
+	return story ~= nil and not story.Done and story.Chapter == Tutorial.StoryChapter and story.Step == Tutorial.StoryStep
+end
+
+-- true finché il tutorial deve ancora essere fatto (la storia aspetta)
+function TutorialService.Pending(player: Player): boolean
+	local profile = S.DataService.Get(player)
+	return profile ~= nil and not data(profile).Done and atGate(profile)
+end
+
+local function send(player: Player, step: number, replay: boolean)
+	sessions[player] = { Started = os.clock(), Replay = replay, Reached = step, From = step }
+	Net.Event("Tutorial"):FireClient(player, { Step = step, Replay = replay, Total = #Tutorial.Steps })
+end
+
+-- Chiamata dalla storia quando arriva al passo del tutorial (o quando il giocatore rientra):
+-- se il tutorial va fatto lo fa partire e restituisce true (la storia aspetta)
+function TutorialService.Gate(player: Player): boolean
+	local profile = S.DataService.Get(player)
+	if not profile or not TutorialService.Pending(player) then
+		return false
+	end
+	local t = data(profile)
+	send(player, math.clamp(t.Step or 1, 1, #Tutorial.Steps + 1), false)
+	return true
+end
+
+local function finish(player: Player, completed: boolean)
+	local profile = S.DataService.Get(player)
+	local session = sessions[player]
+	sessions[player] = nil
+	if not profile then
+		return
+	end
+	local t = data(profile)
+	if session and session.Replay then
+		if completed then
+			S.EventService.Notify(player, "Addestramento ripassato. Vola oltre la paura!", "Successo", 4)
+		end
+		return
+	end
+	if t.Done then
+		return
+	end
+	t.Done = true
+	t.Step = #Tutorial.Steps + 1
+	-- premio solo a chi l'ha fatto davvero: tutti i passi e (partendo da capo) un minimo di tempo
+	local honest = session ~= nil and session.Reached > #Tutorial.Steps and (session.From > 1 or os.clock() - session.Started >= Tutorial.MinSeconds)
+	if completed and honest and not t.Rewarded then
+		t.Rewarded = true
+		local reward = Tutorial.Reward
+		S.PlayerService.GiveRewards(player, {
+			XP = if reward.XP then Leveling.QuestXP(math.max(1, profile.Level)) * reward.XP else 0,
+			Gold = reward.Gold,
+			Items = reward.Items,
+		}, Tutorial.Title)
+	end
+	S.DataService.MarkDirty(player)
+	-- ora la storia riparte: "Presentati all'Istruttore Brehm"
+	if S.StoryService then
+		S.StoryService.RestartStep(player)
+	end
+end
+
+function TutorialService.Init(services)
+	S = services
+end
+
+function TutorialService.Start()
+	-- chi aveva già superato quel punto della storia (o è già cresciuto) non deve rifarlo
+	S.DataService.OnLoaded(function(player, profile)
+		local t = data(profile)
+		local story = profile.Story
+		local past = story.Done or story.Chapter > Tutorial.StoryChapter or (story.Chapter == Tutorial.StoryChapter and story.Step > Tutorial.StoryStep)
+		if not t.Done and (past or profile.Level > 3) then
+			t.Done = true
+			S.DataService.MarkDirty(player)
+		end
+	end)
+	-- a che passo è arrivato il client (per riprendere da lì): avanti di uno alla volta
+	Net.Event("TutorialProgress").OnServerEvent:Connect(function(player, step)
+		local session = sessions[player]
+		local profile = S.DataService.Get(player)
+		if not session or not profile or type(step) ~= "number" or step ~= step then
+			return
+		end
+		step = math.floor(step)
+		if step == session.Reached + 1 and step <= #Tutorial.Steps + 1 then
+			session.Reached = step
+			local t = data(profile)
+			if not session.Replay and not t.Done then
+				t.Step = step
+				S.DataService.MarkDirty(player)
+			end
+		end
+	end)
+	Net.Event("TutorialDone").OnServerEvent:Connect(function(player, how)
+		if sessions[player] and (how == "complete" or how == "skip") then
+			finish(player, how == "complete")
+		end
+	end)
+	-- rivedi il tutorial dal menu (senza premio e senza toccare la storia)
+	Net.Event("TutorialReplay").OnServerEvent:Connect(function(player)
+		local profile = S.DataService.Get(player)
+		if profile and not sessions[player] and data(profile).Done then
+			send(player, 1, true)
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		sessions[player] = nil
+	end)
+end
+
+-- comandi di prova: rifà il tutorial da capo (come la prima volta)
+function TutorialService.Reset(player: Player)
+	local profile = S.DataService.Get(player)
+	if not profile then
+		return
+	end
+	local t = data(profile)
+	t.Done = false
+	t.Step = 1
+	profile.Story.Chapter = Tutorial.StoryChapter
+	profile.Story.Step = Tutorial.StoryStep
+	profile.Story.Progress = 0
+	profile.Story.Done = false
+	S.DataService.MarkDirty(player)
+	sessions[player] = nil
+	TutorialService.Gate(player)
+end
+
+return TutorialService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -25537,11 +25987,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="81">
+  <Item class="ServerStorage" referent="83">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="82">
+    <Item class="ModuleScript" referent="84">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -25564,6 +26014,7 @@ dello schermo e in **Menu (M) → Storia**. Con i personaggi si parla con **F**.
 | `/vai Zona` | teletrasporto (es. `/vai Recinto`, `/vai Aurion`, `/vai Halvar`) |
 | `/zone` | elenco delle zone |
 | `/cura` | vita, gas e lame al massimo |
+| `/tutorial` | rifà l'Addestramento di base da capo (come un giocatore nuovo) |
 
 Per verificare un capitolo: `/livello` al livello richiesto, `/capitolo N`, poi segui gli obiettivi
 (oppure `/passo` per saltarli uno alla volta).
@@ -25575,6 +26026,7 @@ Per verificare un capitolo: `/livello` al livello richiesto, `/capitolo N`, poi 
 _Cinque anni dopo la caduta di Halvar, entri nel Corpo Cadetti con una sola cosa al collo: una fiala spezzata._
 
 1. 🎬 Filmato: Il giorno della caduta
+   - 🎓 **Missione 0 - Addestramento di base** (tutorial, con Mira): comandi passo per passo, le isole sulla mappa, l'interfaccia e i giganti. Si rivede da Menu (M) → Opzioni.
 2. 💬 Parla (tasto F): Presentati all'Istruttore Brehm
 3. 📍 Raggiungi: Usa i Rampini (Q / E) e raggiungi la cima della Torre di Addestramento
 4. ⚔️ Uccidi: Abbatti 5 Sagome di legno colpendo la NUCA (clic sinistro)
@@ -25768,19 +26220,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="83">
+  <Item class="SoundService" referent="85">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="84">
+  <Item class="StarterGui" referent="86">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="85">
+  <Item class="StarterPlayer" referent="87">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -25791,11 +26243,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="86">
+    <Item class="StarterCharacterScripts" referent="88">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="87">
+      <Item class="LocalScript" referent="89">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -25808,19 +26260,19 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="88">
+    <Item class="StarterPlayerScripts" referent="90">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="89">
+      <Item class="Folder" referent="91">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="90">
+        <Item class="Folder" referent="92">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">AbuseEventController</string>
               <string name="Source"><![CDATA[--[[
@@ -26947,7 +27399,7 @@ SHOWS.CadutaMuro = function(after)
 	-- 5. da fuori, in basso dietro la sua gamba: tenendosi al Muro, il calcio sfonda il cancello
 	after(11.0, function()
 		shotPath(function(k)
-			local e = Util.Ease(k, "SineOut")
+			local e = Util.Ease(k, "QuadOut")
 			return look(at(st, -160 + 30 * e, 270 - 40 * e, 16 + 10 * e), at(st, 0, 20, 64))
 		end, 2.2)
 	end)
@@ -27741,6 +28193,7 @@ local function busy(): boolean
 	return (C.CutsceneController ~= nil and C.CutsceneController.IsPlaying())
 		or (C.Intro ~= nil and C.Intro.IsShowing ~= nil and C.Intro.IsShowing())
 		or (C.Dialogue ~= nil and C.Dialogue.IsOpen ~= nil and C.Dialogue.IsOpen())
+		or (C.Tutorial ~= nil and C.Tutorial.IsActive ~= nil and C.Tutorial.IsActive())
 end
 
 local function refresh()
@@ -27887,7 +28340,7 @@ return AbuseEventController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -28205,7 +28658,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -28741,7 +29194,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">BoatController</string>
               <string name="Source"><![CDATA[--[[
@@ -28930,7 +29383,7 @@ return BoatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -29265,7 +29718,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">CitizenController</string>
               <string name="Source"><![CDATA[--[[
@@ -29594,7 +30047,7 @@ return CitizenController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -29653,7 +30106,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -30395,7 +30848,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -30489,7 +30942,18 @@ local function buildUI()
 	}, function()
 		skipRequested = true
 	end)
-	ui = { Holder = holder, Top = top, Bottom = bottom, Speaker = speaker, Text = text, Fade = fade, Title = title, Skip = skip }
+	-- scheda informativa a sinistra (usata dalla scena dei giganti del tutorial)
+	local card = Theme.New("CanvasGroup", { Name = "Scheda", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 40, 0.42, 0), Size = UDim2.fromOffset(360, 200), BackgroundTransparency = 1, GroupTransparency = 1, ZIndex = 7, Parent = holder })
+	C.UIController.AttachScale(card)
+	local cardBack = Theme.New("Frame", { Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4), BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 0.12, ZIndex = 7, Parent = card })
+	Theme.Corner(cardBack, 12)
+	Theme.Stroke(cardBack, Theme.Colors.Gold, 2, 0.15)
+	Theme.Gradient(cardBack, Color3.fromRGB(62, 50, 38), Color3.fromRGB(26, 20, 16), 90)
+	local cardTitle = Theme.Label("", { Position = UDim2.fromOffset(18, 14), Size = UDim2.new(1, -36, 0, 30), Font = Theme.Fonts.Header, TextSize = 22, TextColor3 = Theme.Colors.GoldBright, ZIndex = 8, Parent = card })
+	local cardLine = Theme.New("Frame", { Position = UDim2.fromOffset(18, 48), Size = UDim2.new(1, -36, 0, 2), BackgroundColor3 = Theme.Colors.Gold, BorderSizePixel = 0, ZIndex = 8, Parent = card })
+	Theme.New("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = cardLine })
+	local cardText = Theme.Label("", { Position = UDim2.fromOffset(18, 58), Size = UDim2.new(1, -36, 1, -70), Font = Theme.Fonts.Body, TextSize = 15, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 8, Parent = card })
+	ui = { Holder = holder, Top = top, Bottom = bottom, Speaker = speaker, Text = text, Fade = fade, Title = title, Skip = skip, Card = card, CardTitle = cardTitle, CardText = cardText }
 end
 
 local function letterbox(on: boolean)
@@ -30540,6 +31004,67 @@ function api.Title(text: string, duration: number)
 	TweenService:Create(ui.Title, TweenInfo.new(0.8), { TextTransparency = 0 }):Play()
 	api.Wait(duration)
 	TweenService:Create(ui.Title, TweenInfo.new(0.8), { TextTransparency = 1 }):Play()
+end
+
+-- Scheda informativa a sinistra: entra scorrendo, sostituisce quella di prima
+function api.Card(title: string, lines: { string })
+	local card = ui.Card
+	local function fill()
+		ui.CardTitle.Text = title
+		ui.CardText.Text = "•  " .. table.concat(lines, "\n•  ")
+		card.Position = UDim2.new(0, 10, 0.42, 0)
+		TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0, 40, 0.42, 0), GroupTransparency = 0 }):Play()
+	end
+	if card.GroupTransparency < 0.99 then
+		TweenService:Create(card, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(0, 20, 0.42, 0), GroupTransparency = 1 }):Play()
+		task.delay(0.22, fill)
+	else
+		fill()
+	end
+end
+
+function api.HideCard()
+	TweenService:Create(ui.Card, TweenInfo.new(0.3), { GroupTransparency = 1 }):Play()
+end
+
+-- Segno luminoso che pulsa su un punto (o che segue una parte): nuca, occhi, caviglie...
+function api.Highlight(target: BasePart | Vector3, color: Color3, size: number, text: string?): Part
+	local mark = api.Part({ Name = "Evidenzia", Shape = Enum.PartType.Ball, Size = Vector3.one * size, Material = Enum.Material.Neon, Color = color, Transparency = 0.35, CastShadow = false })
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = size * 4
+	light.Brightness = 2
+	light.Parent = mark
+	if text then
+		local board = Instance.new("BillboardGui")
+		board.Size = UDim2.fromOffset(140, 30)
+		board.StudsOffset = Vector3.new(0, size * 0.9 + 1.5, 0)
+		board.AlwaysOnTop = true
+		board.LightInfluence = 0
+		board.Parent = mark
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.GothamBlack
+		label.TextSize = 20
+		label.TextColor3 = color
+		label.TextStrokeTransparency = 0.2
+		label.Text = text
+		label.Parent = board
+	end
+	local start = os.clock()
+	task.spawn(function()
+		while mark.Parent do
+			local t = os.clock() - start
+			local pos = if typeof(target) == "Vector3" then target else (target :: BasePart).Position
+			local pulse = 1 + math.sin(t * 6) * 0.18
+			mark.Size = Vector3.one * size * pulse
+			mark.CFrame = CFrame.new(pos)
+			mark.Transparency = 0.3 + (1 - pulse) * 0.8
+			RunService.RenderStepped:Wait()
+		end
+	end)
+	return mark
 end
 
 function api.FadeOut(t: number)
@@ -31051,19 +31576,129 @@ Scenes.Inaugurazione = function()
 	letterbox(false)
 end
 
+-- Addestramento di base: Mira spiega i giganti (taglie, nuca, occhi e arti, presa, anomali, boss, sieri).
+-- Si gira su un prato nel cielo con un tratto di Muro sullo sfondo; i giganti guardano verso -Z.
+Scenes.TutorialGiganti = function()
+	local base = Vector3.new(1400, 2700, -1200)
+	api.Part({ Name = "Prato", Size = Vector3.new(900, 4, 900), CFrame = CFrame.new(base - Vector3.new(0, 2, 0)), Material = Enum.Material.Grass, Color = Color3.fromRGB(98, 138, 74) })
+	for i = -5, 5 do
+		api.Part({ Name = "Muro", Size = Vector3.new(80, 120, 26), CFrame = CFrame.new(base + Vector3.new(i * 78, 60, 340)), Material = Enum.Material.Slate, Color = Color3.fromRGB(190, 182, 166) })
+	end
+	local rng = Random.new(77)
+	for _ = 1, 16 do
+		local p = base + Vector3.new(rng:NextNumber(-400, 400), 0, rng:NextNumber(280, 320))
+		local h = rng:NextNumber(30, 55)
+		api.Part({ Name = "Tronco", Size = Vector3.new(4, h, 4), CFrame = CFrame.new(p + Vector3.new(0, h / 2, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 48) })
+		api.Part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * rng:NextNumber(26, 38), CFrame = CFrame.new(p + Vector3.new(0, h, 0)), Material = Enum.Material.LeafyGrass, Color = Color3.fromRGB(70, 112, 58) })
+	end
+	local small = api.Titan("Puro", 10, base + Vector3.new(-70, 0, 40), 0)
+	local mid = api.Titan("Puro", 22, base + Vector3.new(-12, 0, 50), 0)
+	local big = api.Titan("Puro", 48, base + Vector3.new(78, 0, 70), 0)
+	api.Walk(small, 0)
+	letterbox(true)
+	api.FadeIn(1)
+
+	-- 1. le taglie, in fila
+	api.ShotAsync(api.Look(base + Vector3.new(-150, 10, -60), base + Vector3.new(-60, 8, 40)), api.Look(base + Vector3.new(150, 26, -110), base + Vector3.new(50, 26, 60)), 7.5)
+	api.Card("🧍 Le taglie", { "Da 3 a 15 metri: più sono grandi, più sono lenti ma forti", "Vivono fuori dalle Mura, nelle zone colorate della mappa", "Più sali di livello, più grandi li affronti" })
+	api.Say("Mira", "Ce ne sono di tutte le taglie: da 3 a 15 metri. Più sono grandi, più sono lenti... e più fanno male.", 4)
+	api.Say("Mira", "Li trovi fuori dalle Mura. Sulla mappa le zone gialle sono quelle giuste per il tuo livello.", 3.5)
+
+	-- 2. la nuca del più grande, vista da dietro
+	local napePart = big:FindFirstChild("Nape", true)
+	local nape = if napePart and napePart:IsA("BasePart") then napePart.Position else big:GetPivot().Position + Vector3.new(0, 20, 6)
+	api.Highlight(if napePart and napePart:IsA("BasePart") then napePart else nape, Color3.fromRGB(255, 200, 80), 5, "NUCA")
+	api.ShotAsync(api.Look(nape + Vector3.new(34, 6, 46), nape), api.Look(nape + Vector3.new(16, 10, 30), nape), 6.5)
+	api.Card("🎯 La nuca", { "È il punto debole di OGNI gigante", "Mirino ORO = colpo mortale", "Più vai veloce, più il colpo è forte: TAGLIO PERFETTO" })
+	api.Say("Mira", "Il punto debole è sempre la NUCA, dietro il collo. Un taglio profondo e cade.", 3.5)
+	api.Say("Mira", "Vola veloce con i rampini e colpisci in corsa: è così che si abbattono i più grandi.", 3)
+
+	-- 3. occhi e caviglie del gigante medio, visto da davanti
+	for _, name in { "LeftEye", "RightEye" } do
+		local eye = mid:FindFirstChild(name, true)
+		if eye and eye:IsA("BasePart") then
+			api.Highlight(eye, Color3.fromRGB(120, 200, 255), 1.4)
+		end
+	end
+	for _, name in { "LeftFoot", "RightFoot" } do
+		local foot = mid:FindFirstChild(name, true)
+		if foot and foot:IsA("BasePart") then
+			api.Highlight(foot, Color3.fromRGB(255, 150, 80), 2.6)
+		end
+	end
+	local face = mid:GetPivot().Position + Vector3.new(0, 4, 0)
+	api.ShotAsync(api.Look(face + Vector3.new(-12, 2, -46), face), api.Look(face + Vector3.new(8, 0, -36), face - Vector3.new(0, 2, 0)), 7.6)
+	api.Card("👁️ Occhi e arti", { "Occhi colpiti = gigante cieco per qualche secondo", "Arto reciso = gigante più lento", "Poi gira dietro e prendi la nuca" })
+	api.Say("Mira", "Colpisci gli OCCHI per accecarlo e le CAVIGLIE per rallentarlo. Poi gira dietro e prendi la nuca.", 4)
+	-- 4. la presa
+	api.Animate(mid, "Grab")
+	api.Card("✋ La presa", { "Se ti afferra: SPAZIO più volte per liberarti", "Meglio schivare prima (Ctrl)", "Mai fermarsi davanti alle sue mani" })
+	api.Say("Mira", "Attento alle mani! Se ti afferra, premi SPAZIO più volte per liberarti. Meglio schivare prima.", 3.6)
+
+	-- 5. l'anomalo che corre attraverso il prato
+	local runner = api.Titan("Puro", 32, base + Vector3.new(-280, 0, 130), -90)
+	api.Walk(runner, 1, 1)
+	local runnerHip = runner:GetAttribute("HipHeight") :: number
+	api.Move(runner, CFrame.new(base + Vector3.new(260, runnerHip, 130)) * CFrame.Angles(0, math.rad(-90), 0), 6)
+	api.ShotAsync(api.Look(base + Vector3.new(-120, 14, -40), base + Vector3.new(-120, 20, 130)), api.Look(base + Vector3.new(120, 18, -50), base + Vector3.new(160, 22, 130)), 6)
+	api.Card("⚡ Anomali", { "Corrono, saltano e cambiano direzione", "Non seguono nessuno schema", "Durante alcuni eventi valgono gemme 💎" })
+	api.Say("Mira", "Gli ANOMALI invece corrono e saltano senza nessuna regola. Non perderli mai di vista.", 3.8)
+
+	-- 6. il boss che ruggisce
+	local bossAt = base + Vector3.new(90, 0, 200)
+	local boss = api.Titan("Ghignante", 40, bossAt, 0)
+	api.ShotAsync(api.Look(bossAt + Vector3.new(30, 6, -110), bossAt + Vector3.new(0, 30, 0)), api.Look(bossAt + Vector3.new(14, 4, -80), bossAt + Vector3.new(0, 36, 0)), 5)
+	api.Card("👑 Boss", { "Giganti unici con la barra della vita", "Attacchi speciali: impara a schivarli", "La prima volta che li abbatti: gemme 💎" })
+	api.Wait(0.6)
+	api.Animate(boss, "Roar")
+	if C.SoundController then
+		C.SoundController.Play("Roar", bossAt, { Range = 3000, Volume = 1 })
+	end
+	fx().Shockwave(bossAt + Vector3.new(0, 34, 0), 90, Color3.fromRGB(255, 190, 120), 1.2, 3)
+	if C.CameraController then
+		C.CameraController.Shake(0.45, 1)
+	end
+	api.Say("Mira", "E poi ci sono i BOSS: giganti unici, con attacchi speciali. Meglio affrontarli in squadra.", 3.8)
+
+	-- 7. i sieri: il fulmine e un mutaforma che si alza nel vapore
+	local shifterAt = base + Vector3.new(-90, 0, 250)
+	local shifter = api.Titan("Furia", 48, shifterAt - Vector3.new(0, 70, 0), 0)
+	local shifterHip = shifter:GetAttribute("HipHeight") :: number
+	api.ShotAsync(api.Look(shifterAt + Vector3.new(-60, 20, -130), shifterAt + Vector3.new(0, 36, 0)), api.Look(shifterAt + Vector3.new(-40, 28, -110), shifterAt + Vector3.new(0, 46, 0)), 5)
+	fx().Lightning(shifterAt + Vector3.new(0, 600, 0), shifterAt + Vector3.new(0, 30, 0), Color3.fromRGB(255, 236, 130), 4)
+	fx().Flash(Color3.fromRGB(255, 240, 200), 0.4, 0.6)
+	if C.SoundController then
+		C.SoundController.Play("Thunder")
+	end
+	api.Move(shifter, CFrame.new(shifterAt + Vector3.new(0, shifterHip, 0)), 2.4)
+	for i = 0, 3 do
+		task.delay(i * 0.4, function()
+			fx().Steam(shifterAt + Vector3.new(math.random(-20, 20), 30 + i * 8, 0), 30, 8, 3)
+		end)
+	end
+	api.Card("💉 Sieri", { "Li scoprirai andando avanti nella storia", "Con un siero iniettato, T ti trasforma in gigante", "Ogni siero ha i suoi poteri" })
+	api.Say("Mira", "E i SIERI... chi li inietta può trasformarsi in gigante. Questo lo scoprirai nella storia.", 4)
+	api.HideCard()
+	api.FadeOut(1)
+	letterbox(false)
+end
+
 -- RIPRODUZIONE --------------------------------------------------------------------------------------
 
 function CutsceneController.IsPlaying(): boolean
 	return playing
 end
 
-function CutsceneController.Play(id: string)
+-- silent = true: scena locale (es. il tutorial), il server non viene avvisato della fine
+function CutsceneController.Play(id: string, silent: boolean?)
 	if playing then
 		return
 	end
 	local scene = Scenes[id]
 	if not scene then
-		Net.Event("CutsceneDone"):FireServer(id)
+		if not silent then
+			Net.Event("CutsceneDone"):FireServer(id)
+		end
 		return
 	end
 	playing = true
@@ -31094,6 +31729,7 @@ function CutsceneController.Play(id: string)
 	ui.Speaker.Text = ""
 	ui.Text.Text = ""
 	ui.Title.TextTransparency = 1
+	ui.Card.GroupTransparency = 1
 	TweenService:Create(ui.Fade, TweenInfo.new(0.8), { BackgroundTransparency = 1 }):Play()
 	task.delay(0.8, function()
 		if not playing then
@@ -31106,7 +31742,16 @@ function CutsceneController.Play(id: string)
 		C.HUD.SetVisible(true)
 	end
 	playing = false
-	Net.Event("CutsceneDone"):FireServer(id)
+	if not silent then
+		Net.Event("CutsceneDone"):FireServer(id)
+	end
+end
+
+-- Interrompe la scena in corso (come il pulsante "Salta")
+function CutsceneController.Skip()
+	if playing then
+		skipRequested = true
+	end
 end
 
 function CutsceneController.Init(c)
@@ -31130,7 +31775,7 @@ function CutsceneController.Start()
 		task.spawn(function()
 			while #queue > 0 do
 				-- aspetta che l'intro, l'eventuale dialogo e la scena precedente siano finiti
-				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) do
+				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) or (C.Tutorial and C.Tutorial.IsActive()) do
 					task.wait(0.2)
 				end
 				local nextId = table.remove(queue, 1)
@@ -31160,7 +31805,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -32297,7 +32942,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">ExploreController</string>
               <string name="Source"><![CDATA[--[[
@@ -32363,7 +33008,7 @@ return ExploreController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">FireworksController</string>
               <string name="Source"><![CDATA[--[[
@@ -32837,7 +33482,7 @@ return FireworksController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">HorseController</string>
               <string name="Source"><![CDATA[--[[
@@ -33005,7 +33650,7 @@ return HorseController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -33168,7 +33813,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">NatureController</string>
               <string name="Source"><![CDATA[--[[
@@ -33654,7 +34299,7 @@ return NatureController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="106">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -34554,7 +35199,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="109">
             <Properties>
               <string name="Name">SkyController</string>
               <string name="Source"><![CDATA[--[[
@@ -34917,7 +35562,7 @@ return SkyController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -35007,7 +35652,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -35481,7 +36126,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -35592,7 +36237,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="111">
+        <Item class="LocalScript" referent="113">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -35642,6 +36287,8 @@ local ORDER = {
 	{ UI, "RewardsPanel" },
 	{ UI, "AdminPanel" },
 	{ Controllers, "WaypointController" },
+	{ UI, "TutorialTour" },
+	{ UI, "Tutorial" },
 	{ UI, "Intro" },
 }
 
@@ -35686,11 +36333,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="112">
+        <Item class="Folder" referent="114">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -36328,7 +36975,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -36484,7 +37131,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -37140,7 +37787,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">Festival</string>
               <string name="Source"><![CDATA[--[[
@@ -37266,7 +37913,8 @@ local function update(dt: number)
 	local active = ReplicatedStorage:GetAttribute("FestaAttiva") == true
 	local cinematic = C.CameraController and C.CameraController.IsCinematic()
 	local intro = C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()
-	banner.Visible = active and not cinematic and not intro
+	local tutorial = C.Tutorial and C.Tutorial.IsActive()
+	banner.Visible = active and not cinematic and not intro and not tutorial
 	banner.Position = UDim2.new(0.5, 0, 0, math.floor(14 + 62 * C.UIController.Scale))
 	if not active then
 		if C.UIController.IsOpen("Inaugurazione") then
@@ -37330,7 +37978,7 @@ return FestivalUI
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -37384,6 +38032,7 @@ local isMobile = UserInputService.TouchEnabled and not UserInputService.Keyboard
 
 local function buildPlayerPanel()
 	local panel = Theme.Panel({ Name = "Giocatore", Position = UDim2.fromOffset(16, 16), Size = UDim2.fromOffset(320, 108), Parent = root })
+	refs.PlayerPanel = panel
 	C.UIController.AttachScale(panel)
 	local badge = New("Frame", { BackgroundColor3 = Colors.Background, Position = UDim2.fromOffset(10, 10), Size = UDim2.fromOffset(72, 72), Parent = panel })
 	Theme.Corner(badge, 36)
@@ -37414,6 +38063,7 @@ end
 
 local function buildBars()
 	local panel = Theme.Panel({ Name = "Barre", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.fromOffset(330, 150), Parent = root })
+	refs.BarsPanel = panel
 	C.UIController.AttachScale(panel)
 	refs.SetHP, refs.HPText = barRow(panel, 12, "❤️", Colors.Health, "Salute")
 	refs.SetGas, refs.GasText = barRow(panel, 36, "💨", Colors.Gas, "Gas")
@@ -37591,6 +38241,7 @@ local function buildMenuButtons()
 		{ Icon = "💎", Tab = "Premium", Hint = "N" },
 	}
 	local holder = New("Frame", { Name = "Menu", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(60, #entries * 60 + (#entries - 1) * 8), BackgroundTransparency = 1, Parent = root })
+	refs.MenuButtons = holder
 	C.UIController.AttachScale(holder)
 	New("UIListLayout", { Padding = UDim.new(0, 8), Parent = holder })
 	for i, entry in entries do
@@ -37701,6 +38352,8 @@ local function objectiveTarget(step): Vector3?
 	return nil
 end
 
+local tutorialInfo: { Title: string, Objective: string, Target: Vector3? }? = nil
+
 local function updateData()
 	local profile = C.ClientData.Profile
 	if not profile then
@@ -37736,6 +38389,12 @@ local function updateData()
 			refs.StoryObjective.Text = "▶ " .. step.Objective .. progress
 			refs.ObjectivePos = objectiveTarget(step)
 		end
+	end
+	-- Addestramento di base in corso: il pannello e la colonna di luce seguono il tutorial
+	if tutorialInfo then
+		refs.ChapterTitle.Text = tutorialInfo.Title
+		refs.StoryObjective.Text = "▶ " .. tutorialInfo.Objective
+		refs.ObjectivePos = tutorialInfo.Target
 	end
 	-- missione
 	local quest = profile.Quest.Id ~= "" and Quests.Get(profile.Quest.Id)
@@ -37962,6 +38621,25 @@ function HUD.ObjectivePosition(): Vector3?
 	return refs.ObjectivePos
 end
 
+-- Durante l'Addestramento di base il pannello degli obiettivi mostra il passo del tutorial
+-- (nil = di nuovo la storia)
+function HUD.SetTutorial(info: { Title: string, Objective: string, Target: Vector3? }?)
+	tutorialInfo = info
+	updateData()
+end
+
+-- Gli elementi dell'interfaccia (per il riflettore del tutorial)
+function HUD.Element(name: string): GuiObject?
+	local map = {
+		Tracker = refs.Tracker,
+		Compass = refs.Compass,
+		Player = refs.PlayerPanel,
+		Bars = refs.BarsPanel,
+		MenuButtons = refs.MenuButtons,
+	}
+	return map[name]
+end
+
 function HUD.SetVisible(visible: boolean)
 	if root then
 		root.Visible = visible
@@ -38059,7 +38737,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -38573,7 +39251,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -39146,6 +39824,17 @@ local function showSettings()
 			showSettings()
 		end)
 	end
+	-- rivedi l'Addestramento di base (comandi, isole, missioni e giganti)
+	local replayRow = Theme.Panel({ Size = UDim2.new(1, -8, 0, 64), LayoutOrder = 20, Parent = list })
+	Theme.Padding(replayRow, 8)
+	Theme.Label("📘 Addestramento di base", { Size = UDim2.new(0.7, 0, 0, 22), Font = Theme.Fonts.Bold, TextSize = 15, Parent = replayRow })
+	Theme.Label("Ripassa comandi, isole, missioni e giganti quando vuoi", { Position = UDim2.fromOffset(0, 24), Size = UDim2.new(0.7, 0, 0, 24), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = replayRow })
+	Theme.Button("RIVEDI", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(110, 34), BackgroundColor3 = Colors.Green, Parent = replayRow }, function()
+		if C.Tutorial then
+			C.UIController.Close("Menu")
+			C.Tutorial.Replay()
+		end
+	end)
 	local sliders = { { Key = "Sfx", Name = "Volume effetti", Default = 0.8 }, { Key = "Music", Name = "Volume musica", Default = 0.5 } }
 	for i, sl in sliders do
 		local value = C.ClientData.Setting(sl.Key, sl.Default)
@@ -39260,7 +39949,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -39540,7 +40229,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -39864,7 +40553,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -39992,7 +40681,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -40627,7 +41316,7 @@ function RewardsPanel.Start()
 	task.spawn(function()
 		local p = C.ClientData.WaitReady()
 		task.wait(10)
-		while (C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()) or (C.CutsceneController and C.CutsceneController.IsPlaying()) do
+		while (C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()) or (C.CutsceneController and C.CutsceneController.IsPlaying()) or (C.Tutorial and C.Tutorial.IsActive()) or (C.CameraController and C.CameraController.IsCinematic()) do
 			task.wait(2)
 		end
 		p = profile() or p
@@ -40638,7 +41327,7 @@ function RewardsPanel.Start()
 
 	-- offerta di benvenuto dopo 6 minuti di gioco (una volta per sessione, solo nei primi 3 giorni)
 	task.delay(360, function()
-		while (C.CutsceneController and C.CutsceneController.IsPlaying()) or C.UIController.IsOpen("Menu") or C.UIController.IsOpen("Rewards") do
+		while (C.CutsceneController and C.CutsceneController.IsPlaying()) or C.UIController.IsOpen("Menu") or C.UIController.IsOpen("Rewards") or (C.Tutorial and C.Tutorial.IsActive()) do
 			task.wait(5)
 		end
 		showStarterOffer()
@@ -40664,7 +41353,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -41347,7 +42036,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -41592,7 +42281,1838 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="128">
+            <Properties>
+              <string name="Name">Tutorial</string>
+              <string name="Source"><![CDATA[--[[
+	Tutorial - l'Addestramento di base (vedi Data/Tutorial e il server TutorialService)
+
+	PARTE 1, I COMANDI: una scheda in alto guida un comando alla volta. Ogni passo si completa
+	facendo davvero la cosa: il tasto disegnato si illumina quando lo premi, la medaglia verde e il
+	suono confermano, poi il passo successivo entra da destra. Tra una sezione e l'altra (Movimento,
+	Rampini, Combattimento, Interfaccia) compare il titolo grande della sezione. Gli anelli d'oro
+	attorno alla torre insegnano a volare con i rampini.
+	PARTE 2, IL MONDO: TutorialTour (mappa dell'arcipelago, interfaccia, giganti) e il finale.
+
+	Mentre è in corso, il pannello degli obiettivi e la colonna di luce seguono il tutorial; il
+	calendario dei premi e le scene della storia aspettano che finisca (Tutorial.IsActive).
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared.Lib.Net)
+local Util = require(Shared.Lib.Util)
+local W = require(Shared.Data.WorldLayout)
+local NPCs = require(Shared.Data.NPCs)
+local TutorialData = require(Shared.Data.Tutorial)
+
+local Theme = require(script.Parent.Theme)
+local New = Theme.New
+local Colors = Theme.Colors
+
+local Tutorial = {}
+local C
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local CARD_W, CARD_H = 600, 244
+local KEY_BG = Color3.fromRGB(58, 47, 37)
+local GOLD = Color3.fromRGB(255, 210, 110)
+local TRACKER_TITLE = "📘 " .. TutorialData.Title
+
+local active = false
+local replaying = false
+local token = 0 -- cambia a ogni avvio o interruzione: le attese della volta prima si fermano
+local ui: any = nil
+local current: any = nil -- passo in corso
+local rings: { any } = {}
+local lastFlash = 0
+
+local towerTop = W.Landmarks.TorreAddestramento
+local towerBase = Vector3.new(towerTop.X, W.GroundY, towerTop.Z)
+
+-- DISPOSITIVO E TASTI ------------------------------------------------------------------------------
+
+local function device(): string
+	local last = UserInputService:GetLastInputType()
+	if string.find(last.Name, "Gamepad") then
+		return "Gamepad"
+	end
+	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+		return "Touch"
+	end
+	return "PC"
+end
+
+local PC_INPUTS = {
+	Spazio = { Enum.KeyCode.Space },
+	Ctrl = { Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl },
+	["Clic sinistro"] = { Enum.UserInputType.MouseButton1 },
+	Mouse = { Enum.UserInputType.MouseMovement, Enum.UserInputType.MouseButton2 },
+}
+local PAD_INPUTS = {
+	A = { Enum.KeyCode.ButtonA },
+	B = { Enum.KeyCode.ButtonB },
+	X = { Enum.KeyCode.ButtonX },
+	Y = { Enum.KeyCode.ButtonY },
+	L1 = { Enum.KeyCode.ButtonL1 },
+	R1 = { Enum.KeyCode.ButtonR1 },
+	L2 = { Enum.KeyCode.ButtonL2 },
+	R2 = { Enum.KeyCode.ButtonR2 },
+	Select = { Enum.KeyCode.ButtonSelect },
+	["Levetta sinistra"] = { Enum.KeyCode.Thumbstick1 },
+	["Levetta destra"] = { Enum.KeyCode.Thumbstick2 },
+}
+
+local function inputsFor(dev: string, name: string): { any }
+	if dev == "Gamepad" then
+		return PAD_INPUTS[name] or {}
+	end
+	local list = PC_INPUTS[name]
+	if list then
+		return list
+	end
+	local ok, code = pcall(function()
+		return (Enum.KeyCode :: any)[name]
+	end)
+	return if ok and code then { code } else {}
+end
+
+local function matches(input: InputObject, list: { any }): boolean
+	for _, item in list do
+		if input.KeyCode == item or input.UserInputType == item then
+			return true
+		end
+	end
+	return false
+end
+
+local function sound(name: string)
+	if C.SoundController then
+		C.SoundController.Play(name)
+	end
+end
+
+local function waitFor(seconds: number, myToken: number): boolean
+	local start = os.clock()
+	while os.clock() - start < seconds do
+		if token ~= myToken then
+			return false
+		end
+		task.wait()
+	end
+	return token == myToken
+end
+
+-- INTERFACCIA ------------------------------------------------------------------------------------
+
+local function label(text: string, props: { [string]: any }): TextLabel
+	return Theme.Label(text, props)
+end
+
+local function buildUI()
+	local root = New("Frame", { Name = "Addestramento", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Visible = false, Parent = C.UIController.Layers.Overlay })
+
+	-- la scheda in alto (sotto la bussola): holder fermo, la scheda scivola dentro
+	local holder = New("Frame", { Name = "Posto", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 80), Size = UDim2.fromOffset(CARD_W, CARD_H), BackgroundTransparency = 1, Parent = root })
+	C.UIController.AttachScale(holder)
+	local card = New("CanvasGroup", { Name = "Scheda", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, GroupTransparency = 1, Parent = holder })
+	local back = New("Frame", { Name = "Fondo", Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4), BackgroundColor3 = Colors.Panel, BackgroundTransparency = 0.04, Parent = card })
+	Theme.Corner(back, 12)
+	Theme.Stroke(back, Colors.Gold, 2, 0.15)
+	Theme.Gradient(back, Color3.fromRGB(62, 50, 38), Color3.fromRGB(28, 22, 18), 90)
+
+	-- intestazione: sezione, titolo del tutorial, contatore, "salta tutto"
+	local chip = New("Frame", { Name = "Sezione", Position = UDim2.fromOffset(16, 14), Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Colors.Gold, Parent = card })
+	Theme.Corner(chip, 12)
+	New("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = chip })
+	local chipText = label("", { Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Font = Theme.Fonts.Bold, TextSize = 13, TextColor3 = Colors.Background, Parent = chip })
+	local header = label(string.upper(TutorialData.Title), { Name = "Titolo", Position = UDim2.fromOffset(200, 14), Size = UDim2.fromOffset(220, 24), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = card })
+	local counter = label("", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -112, 0, 14), Size = UDim2.fromOffset(70, 24), TextXAlignment = Enum.TextXAlignment.Right, Font = Theme.Fonts.Number, TextSize = 18, TextColor3 = Colors.GoldBright, Parent = card })
+	local skipAll = Theme.Button("Salta tutto", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 12), Size = UDim2.fromOffset(90, 26), TextSize = 12, BackgroundColor3 = Colors.PanelLight, Parent = card }, function()
+		Tutorial.AskSkip()
+	end)
+
+	-- barra dei progressi
+	local track = New("Frame", { Position = UDim2.fromOffset(16, 46), Size = UDim2.new(1, -32, 0, 6), BackgroundColor3 = Color3.fromRGB(20, 16, 13), Parent = card })
+	Theme.Corner(track, 3)
+	local fill = New("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Colors.GoldBright, Parent = track })
+	Theme.Corner(fill, 3)
+	Theme.Gradient(fill, Color3.fromRGB(255, 236, 170), Color3.fromRGB(214, 158, 70), 0)
+
+	-- corpo (cambia a ogni passo con una transizione)
+	local body = New("CanvasGroup", { Name = "Corpo", Position = UDim2.fromOffset(16, 62), Size = UDim2.new(1, -32, 1, -100), BackgroundTransparency = 1, Parent = card })
+	local avatar = New("Frame", { Size = UDim2.fromOffset(46, 46), Position = UDim2.fromOffset(0, 4), BackgroundColor3 = Color3.fromRGB(70, 92, 76), Parent = body })
+	Theme.Corner(avatar, 23)
+	Theme.Stroke(avatar, Colors.Gold, 2, 0)
+	Theme.Gradient(avatar, Color3.fromRGB(96, 130, 104), Color3.fromRGB(40, 60, 48), 90)
+	label("M", { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Title, TextSize = 28, TextColor3 = Colors.GoldBright, Parent = avatar })
+	label(string.upper(NPCs.SpeakerName(TutorialData.Guide)), { Position = UDim2.fromOffset(-8, 52), Size = UDim2.fromOffset(62, 14), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 10, TextColor3 = Colors.Gold, TextScaled = true, Parent = body })
+	local title = label("", { Position = UDim2.fromOffset(60, 0), Size = UDim2.new(1, -60, 0, 28), Font = Theme.Fonts.Header, TextSize = 22, TextColor3 = Colors.GoldBright, Parent = body })
+	local text = label("", { Position = UDim2.fromOffset(60, 30), Size = UDim2.new(1, -60, 0, 58), Font = Theme.Fonts.Body, TextSize = 14, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, Parent = body })
+	local keys = New("Frame", { Name = "Tasti", Position = UDim2.fromOffset(60, 92), Size = UDim2.new(1, -60, 0, 32), BackgroundTransparency = 1, Parent = body })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Parent = keys })
+	local stepTrack = New("Frame", { Position = UDim2.fromOffset(60, 130), Size = UDim2.new(1, -60, 0, 4), BackgroundColor3 = Color3.fromRGB(20, 16, 13), Visible = false, Parent = body })
+	Theme.Corner(stepTrack, 3)
+	local stepFill = New("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Colors.GreenBright, Parent = stepTrack })
+	Theme.Corner(stepFill, 3)
+
+	-- piede: consiglio e pulsanti
+	local hint = label("", { Position = UDim2.fromOffset(16, CARD_H - 34), Size = UDim2.new(1, -190, 0, 26), Font = Theme.Fonts.UI, TextSize = 12, TextWrapped = true, TextColor3 = Color3.fromRGB(255, 228, 160), TextTransparency = 1, Parent = card })
+	local nextButton = Theme.Button("Avanti (Invio) ▶", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, CARD_H - 36), Size = UDim2.fromOffset(150, 28), TextSize = 13, BackgroundColor3 = Colors.Green, Visible = false, Parent = card }, function()
+		if current and not current.Done then
+			current.Done = true
+		end
+	end)
+	local skipStep = Theme.Button("Salta passo (Invio) ▶▶", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, CARD_H - 36), Size = UDim2.fromOffset(176, 28), TextSize = 12, BackgroundColor3 = Colors.PanelLight, Visible = false, Parent = card }, function()
+		if current and not current.Done then
+			current.Skipped = true
+			current.Done = true
+		end
+	end)
+
+	-- medaglia del passo fatto, come un timbro sul ritratto di Mira (fuori dalla scheda, così l'anello
+	-- che si allarga non viene tagliato)
+	local medal = New("Frame", { Name = "Medaglia", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(39, 89), Size = UDim2.fromOffset(60, 60), BackgroundColor3 = Colors.Green, Visible = false, ZIndex = 5, Parent = holder })
+	Theme.Corner(medal, 30)
+	Theme.Stroke(medal, Colors.GreenBright, 3, 0)
+	Theme.Gradient(medal, Color3.fromRGB(120, 210, 130), Color3.fromRGB(40, 110, 60), 90)
+	label("✓", { Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 36, TextColor3 = Colors.White, ZIndex = 6, Parent = medal })
+	local medalScale = New("UIScale", { Parent = medal })
+	local burst = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(39, 89), Size = UDim2.fromOffset(60, 60), BackgroundTransparency = 1, ZIndex = 4, Parent = holder })
+	Theme.Corner(burst, 999)
+	local burstStroke = New("UIStroke", { Color = Colors.GreenBright, Thickness = 3, Transparency = 1, Parent = burst })
+
+	-- titolo grande (inizio, sezioni, parti)
+	local banner = New("CanvasGroup", { Name = "Titolone", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.34), Size = UDim2.fromOffset(900, 190), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false, Parent = root })
+	C.UIController.AttachScale(banner)
+	local bannerTop = label("", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 16, TextColor3 = Colors.Gold, Parent = banner })
+	local bannerTitle = label("", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 38), Size = UDim2.new(1, 0, 0, 84), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Title, TextSize = 70, TextColor3 = Colors.GoldBright, TextStrokeColor3 = Color3.fromRGB(40, 18, 8), TextStrokeTransparency = 0.2, Parent = banner })
+	Theme.Gradient(bannerTitle, Color3.fromRGB(255, 240, 200), Color3.fromRGB(210, 150, 70), 90)
+	local bannerScale = New("UIScale", { Parent = bannerTitle })
+	local bannerLine = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 128), Size = UDim2.fromOffset(0, 2), BackgroundColor3 = Colors.Gold, BorderSizePixel = 0, Parent = banner })
+	New("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = bannerLine })
+	local bannerSub = label("", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 138), Size = UDim2.new(1, 0, 0, 40), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, Font = Theme.Fonts.Body, TextSize = 18, TextColor3 = Colors.Text, Parent = banner })
+
+	-- conferma per saltare tutto
+	local confirm = Theme.Panel({ Name = "ConfermaAddestramento", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(460, 190), Visible = false, ZIndex = 60, Parent = C.UIController.Layers.Top })
+	C.UIController.AttachScale(confirm)
+	Theme.Padding(confirm, 16)
+	label("Saltare l'addestramento?", { Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Header, TextSize = 22, TextColor3 = Colors.GoldBright, ZIndex = 61, Parent = confirm })
+	label("Niente premio dell'addestramento. Potrai rivederlo quando vuoi dal Menu (M) → Opzioni.", { Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 0, 48), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, Font = Theme.Fonts.Body, TextSize = 15, ZIndex = 61, Parent = confirm })
+	Theme.Button("No, continuo", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 10, 1, 0), Size = UDim2.new(0.5, -20, 0, 40), BackgroundColor3 = Colors.Green, ZIndex = 61, Parent = confirm }, function()
+		Tutorial.CloseSkip()
+	end)
+	Theme.Button("Sì, salta", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, 0), Size = UDim2.new(0.5, -20, 0, 40), BackgroundColor3 = Colors.Red, ZIndex = 61, Parent = confirm }, function()
+		Tutorial.CloseSkip()
+		Tutorial.Stop("skip")
+	end)
+
+	ui = {
+		Root = root,
+		Holder = holder,
+		Card = card,
+		Chip = chip,
+		ChipText = chipText,
+		Header = header,
+		Counter = counter,
+		SkipAll = skipAll,
+		Fill = fill,
+		Body = body,
+		Title = title,
+		Text = text,
+		Keys = keys,
+		StepTrack = stepTrack,
+		StepFill = stepFill,
+		Hint = hint,
+		Next = nextButton,
+		SkipStep = skipStep,
+		Medal = medal,
+		MedalScale = medalScale,
+		Burst = burst,
+		BurstStroke = burstStroke,
+		Banner = banner,
+		BannerTop = bannerTop,
+		BannerTitle = bannerTitle,
+		BannerScale = bannerScale,
+		BannerLine = bannerLine,
+		BannerSub = bannerSub,
+		Confirm = confirm,
+		Caps = {},
+		CardShown = false,
+	}
+end
+
+-- TASTI DISEGNATI ------------------------------------------------------------------------------------
+
+local function keyCap(name: string, order: number)
+	local cap = New("TextLabel", {
+		BackgroundColor3 = KEY_BG,
+		Size = UDim2.fromOffset(0, 30),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Font = Theme.Fonts.Bold,
+		TextSize = 15,
+		TextColor3 = Colors.GoldBright,
+		Text = name,
+		LayoutOrder = order,
+		Parent = ui.Keys,
+	})
+	New("UIPadding", { PaddingLeft = UDim.new(0, 11), PaddingRight = UDim.new(0, 11), Parent = cap })
+	Theme.Corner(cap, 7)
+	Theme.Stroke(cap, Colors.Gold, 1.5, 0.15)
+	Theme.Gradient(cap, Color3.fromRGB(255, 255, 255), Color3.fromRGB(170, 160, 150), 90)
+	local scale = New("UIScale", { Parent = cap })
+	table.insert(ui.Caps, { Frame = cap, Scale = scale, Name = name })
+end
+
+local function note(text: string, order: number)
+	label(text, { Size = UDim2.fromOffset(0, 30), AutomaticSize = Enum.AutomaticSize.X, Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, LayoutOrder = order, Parent = ui.Keys })
+end
+
+local function renderKeys(step)
+	for _, child in ui.Keys:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+	table.clear(ui.Caps)
+	local dev = device()
+	local keys = step.Keys or {}
+	if dev == "Touch" then
+		if keys.Touch then
+			note("📱  " .. keys.Touch, 1)
+		end
+	else
+		local list = if dev == "Gamepad" then keys.Gamepad else keys.PC
+		for i, name in list or {} do
+			keyCap(name, i)
+		end
+		local extra = step.Note and step.Note[dev]
+		if extra then
+			note("  " .. extra, 99)
+		end
+	end
+end
+
+-- l'utente ha premuto un tasto della scheda: il tasto si abbassa e si accende
+local function pressCap(cap)
+	cap.Scale.Scale = 0.84
+	Theme.Tween(cap.Scale, 0.3, { Scale = 1 }, Enum.EasingStyle.Back)
+	cap.Frame.BackgroundColor3 = Colors.GoldBright
+	cap.Frame.TextColor3 = Colors.Background
+	Theme.Tween(cap.Frame, 0.55, { BackgroundColor3 = KEY_BG, TextColor3 = Colors.GoldBright })
+end
+
+local function onInput(input: InputObject)
+	if not current or #ui.Caps == 0 then
+		return
+	end
+	local dev = device()
+	local now = os.clock()
+	for _, cap in ui.Caps do
+		if matches(input, inputsFor(dev, cap.Name)) then
+			-- movimenti continui (mouse, levette): un lampo ogni tanto, non a ogni fotogramma
+			local continuous = input.UserInputType == Enum.UserInputType.MouseMovement or input.KeyCode == Enum.KeyCode.Thumbstick1 or input.KeyCode == Enum.KeyCode.Thumbstick2
+			if not continuous or now - lastFlash > 0.45 then
+				lastFlash = now
+				pressCap(cap)
+			end
+		end
+	end
+end
+
+-- SCHEDA: ENTRATA, CAMBIO PASSO, USCITA ------------------------------------------------------------------
+
+local function setProgress(done: number)
+	local total = #TutorialData.Steps
+	ui.Counter.Text = ("%d / %d"):format(math.min(done + 1, total), total)
+	Theme.Tween(ui.Fill, 0.6, { Size = UDim2.fromScale(math.clamp(done / total, 0, 1), 1) }, Enum.EasingStyle.Quint)
+end
+
+local function showCard()
+	ui.CardShown = true
+	ui.Card.Position = UDim2.fromOffset(0, -34)
+	Theme.Tween(ui.Card, 0.5, { Position = UDim2.fromOffset(0, 0), GroupTransparency = 0 }, Enum.EasingStyle.Quint)
+	sound("UI")
+end
+
+local function hideCard()
+	if not ui.CardShown then
+		return
+	end
+	ui.CardShown = false
+	Theme.Tween(ui.Card, 0.32, { Position = UDim2.fromOffset(0, -34), GroupTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+end
+
+-- titolo grande al centro dello schermo (attende la fine)
+function Tutorial.Banner(top: string, title: string, subtitle: string, hold: number, myToken: number): boolean
+	ui.Banner.Visible = true
+	ui.BannerTop.Text = top
+	ui.BannerTitle.Text = title
+	ui.BannerSub.Text = subtitle
+	ui.Banner.GroupTransparency = 1
+	ui.BannerScale.Scale = 1.3
+	ui.BannerLine.Size = UDim2.fromOffset(0, 2)
+	Theme.Tween(ui.Banner, 0.45, { GroupTransparency = 0 }, Enum.EasingStyle.Sine)
+	Theme.Tween(ui.BannerScale, 0.9, { Scale = 1 }, Enum.EasingStyle.Quint)
+	Theme.Tween(ui.BannerLine, 0.9, { Size = UDim2.fromOffset(560, 2) }, Enum.EasingStyle.Quint)
+	sound("Reward")
+	local ok = waitFor(0.9 + hold, myToken)
+	Theme.Tween(ui.Banner, 0.45, { GroupTransparency = 1 }, Enum.EasingStyle.Sine)
+	Theme.Tween(ui.BannerScale, 0.45, { Scale = 0.94 }, Enum.EasingStyle.Sine)
+	ok = waitFor(0.45, myToken) and ok
+	ui.Banner.Visible = false
+	return ok
+end
+
+-- dove punta la colonna di luce per questo passo
+local function targetFor(step): Vector3?
+	if step.Goal.Kind == "Rings" then
+		for _, r in rings do
+			if r.State == "Active" then
+				return r.Center
+			end
+		end
+		return nil
+	end
+	return step.Target
+end
+
+local function updateTracker()
+	if not current or not C.HUD or not C.HUD.SetTutorial then
+		return
+	end
+	local step = current.Step
+	local objective = step.Title
+	if step.Goal.Kind == "Rings" then
+		objective = ("%s (%d/%d)"):format(step.Title, current.Amount, #TutorialData.Rings)
+	end
+	C.HUD.SetTutorial({ Title = TRACKER_TITLE, Objective = objective, Target = targetFor(step) })
+end
+
+local function fillContent(step, index: number)
+	local section = TutorialData.Sections[step.Section]
+	ui.ChipText.Text = ("%s  %s"):format(section.Icon, string.upper(section.Name))
+	ui.Title.Text = step.Title
+	ui.Title.TextColor3 = Colors.GoldBright
+	ui.Text.Text = step.Text
+	ui.Hint.Text = "💡 " .. (step.Hint or "")
+	ui.Hint.TextTransparency = 1
+	ui.StepFill.Size = UDim2.fromScale(0, 1)
+	renderKeys(step)
+	setProgress(index - 1)
+end
+
+-- il passo nuovo entra da destra mentre il vecchio esce a sinistra
+local function transitionTo(step, index: number, fresh: boolean)
+	if fresh or not ui.CardShown then
+		fillContent(step, index)
+		ui.Body.Position = UDim2.fromOffset(16, 62)
+		ui.Body.GroupTransparency = 0
+		showCard()
+		return
+	end
+	Theme.Tween(ui.Body, 0.2, { Position = UDim2.fromOffset(-14, 62), GroupTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	task.wait(0.2)
+	fillContent(step, index)
+	ui.Body.Position = UDim2.fromOffset(56, 62)
+	Theme.Tween(ui.Body, 0.42, { Position = UDim2.fromOffset(16, 62), GroupTransparency = 0 }, Enum.EasingStyle.Quint)
+	sound("UI")
+end
+
+-- la medaglia verde del passo fatto
+local function celebrate(skipped: boolean)
+	ui.Next.Visible = false
+	ui.SkipStep.Visible = false
+	ui.StepTrack.Visible = false
+	if skipped then
+		Theme.Tween(ui.Title, 0.25, { TextColor3 = Colors.TextDim })
+		return
+	end
+	ui.Medal.Visible = true
+	ui.MedalScale.Scale = 0.2
+	ui.Medal.Rotation = -30
+	Theme.Tween(ui.MedalScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+	Theme.Tween(ui.Medal, 0.45, { Rotation = 0 }, Enum.EasingStyle.Back)
+	ui.Burst.Size = UDim2.fromOffset(60, 60)
+	ui.BurstStroke.Transparency = 0
+	Theme.Tween(ui.Burst, 0.65, { Size = UDim2.fromOffset(150, 150) }, Enum.EasingStyle.Quint)
+	Theme.Tween(ui.BurstStroke, 0.65, { Transparency = 1 }, Enum.EasingStyle.Quad)
+	Theme.Tween(ui.Title, 0.25, { TextColor3 = Colors.GreenBright })
+	sound("Reward")
+	if C.CameraController then
+		C.CameraController.Shake(0.05, 0.15)
+	end
+end
+
+local function hideMedal()
+	if ui.Medal.Visible then
+		local t = Theme.Tween(ui.MedalScale, 0.2, { Scale = 0 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+		t.Completed:Connect(function()
+			ui.Medal.Visible = false
+		end)
+	end
+end
+
+-- ANELLI D'ORO ----------------------------------------------------------------------------------------
+
+local RING_SEGMENTS = 22
+
+local function effectsFolder(): Instance
+	return workspace:FindFirstChild("EffettiLocali") or workspace
+end
+
+local function newRing(center: Vector3, index: number)
+	local model = Instance.new("Model")
+	model.Name = "AnelloAddestramento"
+	local parts = {}
+	for _ = 1, RING_SEGMENTS do
+		local p = Instance.new("Part")
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Material = Enum.Material.Neon
+		p.Color = GOLD
+		p.Size = Vector3.new(1, 1, 3)
+		p.Parent = model
+		table.insert(parts, p)
+	end
+	local core = Instance.new("Part")
+	core.Name = "Centro"
+	core.Anchored = true
+	core.CanCollide = false
+	core.CanQuery = false
+	core.CanTouch = false
+	core.Transparency = 1
+	core.Size = Vector3.one
+	core.CFrame = CFrame.new(center)
+	core.Parent = model
+	local light = Instance.new("PointLight")
+	light.Color = GOLD
+	light.Range = 30
+	light.Brightness = 1.5
+	light.Parent = core
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	sparkle.Color = ColorSequence.new(GOLD)
+	sparkle.LightEmission = 1
+	sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(1, 0) })
+	sparkle.Lifetime = NumberRange.new(0.8, 1.4)
+	sparkle.Speed = NumberRange.new(2, 5)
+	sparkle.SpreadAngle = Vector2.new(180, 180)
+	sparkle.Rate = 12
+	sparkle.Parent = core
+	local board = Instance.new("BillboardGui")
+	board.Size = UDim2.fromOffset(70, 34)
+	board.StudsOffset = Vector3.new(0, TutorialData.RingRadius + 4, 0)
+	board.AlwaysOnTop = true
+	board.LightInfluence = 0
+	board.Parent = core
+	local number = Instance.new("TextLabel")
+	number.BackgroundTransparency = 1
+	number.Size = UDim2.fromScale(1, 1)
+	number.Font = Enum.Font.GothamBold
+	number.TextSize = 22
+	number.TextColor3 = GOLD
+	number.TextStrokeTransparency = 0.3
+	number.Text = ("%d/%d"):format(index, #TutorialData.Rings)
+	number.Parent = board
+	model.Parent = effectsFolder()
+	-- gli anelli girano attorno alla torre: si attraversano volando in tondo
+	local around = Util.SafeUnit(Util.Flat(center - towerBase), Vector3.xAxis)
+	return {
+		Model = model,
+		Parts = parts,
+		Core = core,
+		Light = light,
+		Sparkle = sparkle,
+		Board = board,
+		Center = center,
+		Normal = around:Cross(Vector3.yAxis),
+		Index = index,
+		State = "Waiting",
+		Grow = 1,
+		Fade = 0,
+	}
+end
+
+local function placeRing(r, now: number)
+	local active_ = r.State == "Active"
+	local pulse = if active_ then 1 + 0.05 * math.sin(now * 4) else 0.8
+	local radius = TutorialData.RingRadius * pulse * r.Grow
+	local frame = CFrame.lookAt(r.Center, r.Center + r.Normal)
+	local spin = now * (if active_ then 0.7 else 0.25) + r.Index
+	local n = #r.Parts
+	local length = 2 * math.pi * radius / n * 1.1
+	local thick = if active_ then 1.3 else 0.8
+	for i, p in r.Parts do
+		local a = spin + (i - 1) / n * math.pi * 2
+		local pos = frame * Vector3.new(math.cos(a) * radius, math.sin(a) * radius, 0)
+		local tangent = frame:VectorToWorldSpace(Vector3.new(-math.sin(a), math.cos(a), 0))
+		p.CFrame = CFrame.lookAt(pos, pos + tangent)
+		p.Size = Vector3.new(thick, thick, length)
+		p.Transparency = if active_ then r.Fade else math.max(0.55, r.Fade)
+	end
+	r.Light.Enabled = active_
+	r.Sparkle.Enabled = active_
+	r.Board.Enabled = active_
+end
+
+local function clearRings()
+	for _, r in rings do
+		if r.Model.Parent then
+			r.Model:Destroy()
+		end
+	end
+	table.clear(rings)
+end
+
+local function buildRings()
+	clearRings()
+	for i, center in TutorialData.Rings do
+		table.insert(rings, newRing(center, i))
+	end
+	rings[1].State = "Active"
+end
+
+-- anello attraversato: si allarga, si dissolve, scintille e il successivo si accende
+local function collectRing(r)
+	r.State = "Done"
+	local start = os.clock()
+	task.spawn(function()
+		while r.Model.Parent do
+			local k = math.clamp((os.clock() - start) / 0.55, 0, 1)
+			r.Grow = 1 + Util.Ease(k, "ExpoOut") * 0.8
+			r.Fade = k
+			placeRing(r, os.clock())
+			if k >= 1 then
+				r.Model:Destroy()
+				break
+			end
+			RunService.RenderStepped:Wait()
+		end
+	end)
+	if C.EffectsController then
+		C.EffectsController.Sparks(r.Center, GOLD, 40, 60)
+	end
+	sound("Coins")
+	current.Amount += 1
+	local nextRing = rings[r.Index + 1]
+	if nextRing then
+		nextRing.State = "Active"
+	else
+		current.Done = true
+	end
+	updateTracker()
+end
+
+-- CONTROLLO DEI PASSI ----------------------------------------------------------------------------------
+
+local function stepProgress(k: number)
+	ui.StepTrack.Visible = true
+	ui.StepFill.Size = UDim2.fromScale(math.clamp(k, 0, 1), 1)
+end
+
+local function check(dt: number)
+	local cur = current
+	if not cur or cur.Done or cur.Info then
+		return
+	end
+	local goal = cur.Step.Goal
+	local character = player.Character
+	local root = Util.GetRoot(character)
+	local kind = goal.Kind
+	if kind == "Look" then
+		local look = camera.CFrame.LookVector
+		if Vector3.new(look.X, 0, look.Z).Magnitude > 0.05 then
+			local angle = math.deg(math.atan2(look.X, look.Z))
+			if cur.LastAngle then
+				cur.Amount += math.abs((angle - cur.LastAngle + 540) % 360 - 180)
+			end
+			cur.LastAngle = angle
+		end
+		stepProgress(cur.Amount / goal.Amount)
+		if cur.Amount >= goal.Amount then
+			cur.Done = true
+		end
+	elseif kind == "Walk" then
+		if root then
+			local pos = root.Position
+			if cur.LastPos then
+				local d = Util.FlatDistance(pos, cur.LastPos)
+				local flying = C.ODMController and C.ODMController.IsFlying()
+				if not flying and d < 6 then
+					cur.Amount += d
+				end
+			end
+			cur.LastPos = pos
+		end
+		stepProgress(cur.Amount / goal.Amount)
+		if cur.Amount >= goal.Amount then
+			cur.Done = true
+		end
+	elseif kind == "Hook" then
+		local hooks = C.ODMController and C.ODMController.HookStates() or {}
+		for _, h in hooks do
+			if h.Phase == "Attached" then
+				cur.Done = true
+				break
+			end
+		end
+	elseif kind == "Boost" then
+		if C.ODMController and C.ODMController.IsFlying() and C.InputController.IsHeld("Boost") then
+			cur.Amount += dt
+		end
+		stepProgress(cur.Amount / goal.Amount)
+		if cur.Amount >= goal.Amount then
+			cur.Done = true
+		end
+	elseif kind == "Rings" then
+		if root then
+			for _, r in rings do
+				if r.State == "Active" and (root.Position - r.Center).Magnitude <= TutorialData.RingRadius + 3 then
+					collectRing(r)
+					break
+				end
+			end
+		end
+		stepProgress(cur.Amount / #TutorialData.Rings)
+	elseif kind == "Panel" then
+		if C.UIController.IsOpen(goal.Panel) then
+			cur.Opened = true
+		elseif cur.Opened then
+			cur.Done = true
+		end
+	end
+end
+
+local function onAction(action: string)
+	local cur = current
+	if not cur or cur.Done or cur.Info or cur.Step.Goal.Kind ~= "Action" or cur.Step.Goal.Action ~= action then
+		return
+	end
+	cur.Amount += 1
+	local count = cur.Step.Goal.Count or 1
+	if count > 1 then
+		stepProgress(cur.Amount / count)
+	end
+	if cur.Amount >= count then
+		cur.Done = true
+	end
+end
+
+local function onEvent(kind: string)
+	local cur = current
+	if cur and not cur.Done and not cur.Info and cur.Step.Goal.Kind == kind then
+		cur.Done = true
+	end
+end
+
+-- un passo: scheda, attesa (con consiglio e "salta passo" se ci metti molto), medaglia
+local function runStep(index: number, fresh: boolean, myToken: number): boolean
+	local step = TutorialData.Steps[index]
+	local dev = device()
+	local hasKeys = if dev == "Touch" then step.Keys.Touch ~= nil elseif dev == "Gamepad" then step.Keys.Gamepad ~= nil else step.Keys.PC ~= nil
+	current = { Step = step, Index = index, Done = false, Amount = 0, Started = os.clock(), Info = not hasKeys }
+	if step.Goal.Kind == "Rings" then
+		buildRings()
+	end
+	transitionTo(step, index, fresh)
+	updateTracker()
+	if current.Info then
+		-- su questo dispositivo il comando non c'è: solo la spiegazione
+		ui.Next.Visible = true
+	end
+	local hintShown = false
+	while token == myToken and not current.Done do
+		local elapsed = os.clock() - current.Started
+		if not hintShown and step.Hint and elapsed > (step.HintAfter or 15) then
+			hintShown = true
+			Theme.Tween(ui.Hint, 0.6, { TextTransparency = 0 })
+		end
+		if not current.Info and not ui.SkipStep.Visible and elapsed > (step.SkipAfter or 40) then
+			ui.SkipStep.Visible = true
+		end
+		task.wait()
+	end
+	if token ~= myToken then
+		return false
+	end
+	celebrate(current.Skipped == true)
+	clearRings()
+	local ok = waitFor(if current.Skipped then 0.3 else 1.0, myToken)
+	hideMedal()
+	return ok
+end
+
+local function runSteps(from: number, myToken: number): boolean
+	local lastSection = nil
+	for i = from, #TutorialData.Steps do
+		local step = TutorialData.Steps[i]
+		local fresh = false
+		if step.Section ~= lastSection then
+			-- nuova sezione: la scheda sale, il titolo grande della sezione, la scheda torna
+			if lastSection ~= nil or i > 1 then
+				hideCard()
+				local section = TutorialData.Sections[step.Section]
+				if not Tutorial.Banner(("PARTE 1  •  SEZIONE %d DI %d"):format(step.Section, #TutorialData.Sections), section.Icon .. "  " .. string.upper(section.Name), "", 0.7, myToken) then
+					return false
+				end
+			end
+			lastSection = step.Section
+			fresh = true
+		end
+		if not runStep(i, fresh, myToken) then
+			return false
+		end
+		Net.Event("TutorialProgress"):FireServer(i + 1)
+	end
+	setProgress(#TutorialData.Steps)
+	hideCard()
+	current = nil
+	return true
+end
+
+-- AVVIO E FINE --------------------------------------------------------------------------------------
+
+local function cleanup()
+	current = nil
+	clearRings()
+	if ui then
+		hideCard()
+		ui.Banner.Visible = false
+		ui.Confirm.Visible = false
+		ui.Medal.Visible = false
+		task.delay(0.4, function()
+			if not active then
+				ui.Root.Visible = false
+			end
+		end)
+	end
+	if C.HUD and C.HUD.SetTutorial then
+		C.HUD.SetTutorial(nil)
+	end
+	C.UIController.RequestCursor("tutorial", false)
+end
+
+function Tutorial.IsActive(): boolean
+	return active
+end
+
+-- il passo in corso (Id), nil fuori dalla prima parte
+function Tutorial.CurrentStep(): string?
+	return if current then current.Step.Id else nil
+end
+
+-- Interrompe il tutorial ("skip" = saltato dal giocatore)
+function Tutorial.Stop(how: string)
+	if not active then
+		return
+	end
+	token += 1
+	active = false
+	if C.TutorialTour then
+		C.TutorialTour.Cancel()
+	end
+	cleanup()
+	Net.Event("TutorialDone"):FireServer(how)
+end
+
+function Tutorial.AskSkip()
+	if not active then
+		return
+	end
+	ui.Confirm.Visible = true
+	C.UIController.RequestCursor("tutorialSkip", true)
+end
+
+function Tutorial.CloseSkip()
+	ui.Confirm.Visible = false
+	C.UIController.RequestCursor("tutorialSkip", false)
+end
+
+-- Rivedi il tutorial (dal menu)
+function Tutorial.Replay()
+	if not active then
+		Net.Event("TutorialReplay"):FireServer()
+	end
+end
+
+local function begin(info)
+	if active or type(info) ~= "table" then
+		return
+	end
+	active = true
+	replaying = info.Replay == true
+	token += 1
+	local myToken = token
+	task.spawn(function()
+		-- aspetta che finiscano schermata iniziale, filmati ed eventuali dialoghi
+		while (C.Intro and C.Intro.IsShowing()) or (C.CutsceneController and C.CutsceneController.IsPlaying()) or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) or (C.Dialogue and C.Dialogue.IsOpen()) do
+			task.wait(0.3)
+		end
+		C.ClientData.WaitReady()
+		if not waitFor(1, myToken) then
+			return
+		end
+		ui.Root.Visible = true
+		local from = math.clamp(math.floor(tonumber(info.Step) or 1), 1, #TutorialData.Steps + 1)
+		local subtitle = if from == 1 then "Comandi, isole, missioni e giganti: tutto quello che serve a una recluta." elseif from <= #TutorialData.Steps then "Riprendiamo da dove eravamo rimasti." else "Manca l'ultima parte: come funziona il mondo."
+		if not Tutorial.Banner(if replaying then "RIPASSO" else "MISSIONE 0", string.upper(TutorialData.Title), subtitle, 1.4, myToken) then
+			return
+		end
+		local ok = true
+		if from <= #TutorialData.Steps then
+			ok = runSteps(from, myToken)
+		end
+		-- parte 2: il mondo (mappa, interfaccia, giganti) e il finale con il premio
+		if ok and C.TutorialTour then
+			ok = C.TutorialTour.Run(myToken, replaying)
+		end
+		if not ok or token ~= myToken then
+			return
+		end
+		-- fatto: la storia riparte (Brehm) mentre la telecamera vola da lui; il tutorial resta
+		-- "attivo" fino alla fine del volo, così calendario e scene non partono in mezzo
+		cleanup()
+		Net.Event("TutorialDone"):FireServer("complete")
+		if C.TutorialTour then
+			C.TutorialTour.AfterDone(replaying)
+		end
+		active = false
+		ui.Root.Visible = false
+	end)
+end
+
+function Tutorial.Init(c)
+	C = c
+end
+
+function Tutorial.Start()
+	buildUI()
+	Net.Event("Tutorial").OnClientEvent:Connect(begin)
+	-- azioni da provare
+	for _, action in { "Dodge", "Attack", "SkillZ", "Reload" } do
+		C.InputController.On(action, function(began)
+			if began then
+				onAction(action)
+			end
+		end)
+	end
+	Net.Event("HitConfirm").OnClientEvent:Connect(function(data)
+		if type(data) == "table" and data.Kind == "NapeKill" then
+			onEvent("NapeKill")
+		end
+	end)
+	Net.Event("Refilled").OnClientEvent:Connect(function()
+		onEvent("Refill")
+	end)
+	-- il salto: lo stato "Jumping" del personaggio
+	local function watchCharacter(character: Model)
+		local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
+		if humanoid then
+			humanoid.StateChanged:Connect(function(_, new)
+				if new == Enum.HumanoidStateType.Jumping then
+					onEvent("Jump")
+				end
+			end)
+		end
+	end
+	if player.Character then
+		task.spawn(watchCharacter, player.Character)
+	end
+	player.CharacterAdded:Connect(watchCharacter)
+	-- i tasti della scheda si accendono quando li premi
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not active then
+			return
+		end
+		onInput(input)
+		-- Invio = "Avanti" o "Salta passo" (anche con il mouse bloccato dallo shift lock); non mentre si scrive in chat
+		if not processed and (input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter) and current and not current.Done then
+			if ui.Next.Visible then
+				current.Done = true
+			elseif ui.SkipStep.Visible then
+				current.Skipped = true
+				current.Done = true
+			end
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if active then
+			onInput(input)
+		end
+	end)
+	-- se cambia il dispositivo (tastiera ↔ controller) cambiano i tasti disegnati
+	UserInputService.LastInputTypeChanged:Connect(function()
+		if active and current then
+			renderKeys(current.Step)
+		end
+	end)
+	RunService.RenderStepped:Connect(function(dt)
+		if not active then
+			return
+		end
+		-- la scheda sta sotto la bussola (che si ingrandisce con lo schermo)
+		ui.Holder.Position = UDim2.new(0.5, 0, 0, math.floor(14 + 66 * C.UIController.Scale))
+		if #rings > 0 then
+			local now = os.clock()
+			for _, r in rings do
+				if r.State ~= "Done" then
+					placeRing(r, now)
+				end
+			end
+		end
+		local ok, err = pcall(check, dt)
+		if not ok then
+			warn("[Addestramento] " .. tostring(err))
+		end
+	end)
+end
+
+return Tutorial
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="129">
+            <Properties>
+              <string name="Name">TutorialTour</string>
+              <string name="Source"><![CDATA[--[[
+	TutorialTour - la seconda parte dell'Addestramento di base: come funziona il mondo
+	  1. L'ARCIPELAGO: una mappa animata a tutto schermo vola da un'isola all'altra (stagione,
+	     livello consigliato, zone principali), poi il mare aperto e i modi per viaggiare.
+	  2. L'INTERFACCIA: un riflettore scivola da un elemento del HUD all'altro e lo spiega.
+	  3. I GIGANTI: la scena "TutorialGiganti" (CutsceneController) raccontata da Mira.
+	  4. IL FINALE: cosa ti aspetta, il premio, poi (TutorialTour.AfterDone) la telecamera vola
+	     fino all'Istruttore Brehm, la prossima missione, e torna dolcemente al personaggio.
+	Ogni pagina va avanti da sola (la barretta mostra quanto manca) o con "Avanti".
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Lib.Util)
+local W = require(Shared.Data.WorldLayout)
+local Zones = require(Shared.Data.Zones)
+local NPCs = require(Shared.Data.NPCs)
+local Items = require(Shared.Data.Items)
+local Tutorial = require(Shared.Data.Tutorial)
+
+local Theme = require(script.Parent.Theme)
+local New = Theme.New
+local Colors = Theme.Colors
+
+local TutorialTour = {}
+local C
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local GOLD = Color3.fromRGB(255, 210, 110)
+local PAGE_TIME = 8 -- secondi di ogni pagina se non premi "Avanti"
+
+local cancelled = false
+local ui: any = nil
+local map: any = nil -- la tela della mappa (creata la prima volta)
+local mapView = { Center = Vector3.zero, Scale = 0.05 }
+local mapFrom = { Center = Vector3.zero, Scale = 0.05 }
+local mapTo = { Center = Vector3.zero, Scale = 0.05 }
+local mapMove = { Start = 0, Duration = 0 }
+local highlights: { { Frame: Frame, Stroke: UIStroke, Phase: number } } = {}
+-- rettangoli dello schermo: { X0, Y0, X1, Y1 } in pixel
+type Box = { X0: number, Y0: number, X1: number, Y1: number }
+local function box(x0: number, y0: number, x1: number, y1: number): Box
+	return { X0 = x0, Y0 = y0, X1 = x1, Y1 = y1 }
+end
+local spot = { From = box(0, 0, 0, 0), To = box(0, 0, 0, 0), Start = 0, Duration = 0.01, On = false }
+local orbit: { Center: Vector3, Angle: number }? = nil
+local advance = false
+
+local function alive(): boolean
+	return not cancelled and C.Tutorial ~= nil and C.Tutorial.IsActive()
+end
+
+local function waitFor(seconds: number): boolean
+	local start = os.clock()
+	while os.clock() - start < seconds do
+		if not alive() then
+			return false
+		end
+		task.wait()
+	end
+	return alive()
+end
+
+-- aspetta la fine della pagina: tempo scaduto o "Avanti" (anche con Invio)
+local function waitPage(seconds: number, timer: Frame?): boolean
+	advance = false
+	if timer then
+		timer.Size = UDim2.fromScale(0, 1)
+		Theme.Tween(timer, seconds, { Size = UDim2.fromScale(1, 1) }, Enum.EasingStyle.Linear)
+	end
+	local start = os.clock()
+	while os.clock() - start < seconds and not advance do
+		if not alive() then
+			return false
+		end
+		task.wait()
+	end
+	return alive()
+end
+
+local function sound(name: string)
+	if C.SoundController then
+		C.SoundController.Play(name)
+	end
+end
+
+local function pill(parent: Instance, text: string, color: Color3, order: number): TextLabel
+	local chip = Theme.Label(text, {
+		Size = UDim2.fromOffset(0, 24),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = color,
+		Font = Theme.Fonts.Bold,
+		TextSize = 13,
+		TextColor3 = Colors.Background,
+		LayoutOrder = order,
+		Parent = parent,
+	})
+	New("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = chip })
+	Theme.Corner(chip, 12)
+	return chip
+end
+
+-- scheda con titolo, testo, barretta del tempo e "Avanti" (mappa e riflettore)
+local function infoCard(parent: Instance, name: string, size: Vector2): any
+	local card = New("CanvasGroup", { Name = name, Size = UDim2.fromOffset(size.X, size.Y), BackgroundTransparency = 1, GroupTransparency = 1, Parent = parent })
+	C.UIController.AttachScale(card)
+	local back = New("Frame", { Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4), BackgroundColor3 = Colors.Panel, BackgroundTransparency = 0.05, Parent = card })
+	Theme.Corner(back, 12)
+	Theme.Stroke(back, Colors.Gold, 2, 0.15)
+	Theme.Gradient(back, Color3.fromRGB(62, 50, 38), Color3.fromRGB(26, 20, 16), 90)
+	local top = Theme.Label("", { Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -36, 0, 16), Font = Theme.Fonts.Bold, TextSize = 12, TextColor3 = Colors.Gold, Parent = card })
+	local title = Theme.Label("", { Position = UDim2.fromOffset(18, 28), Size = UDim2.new(1, -36, 0, 36), Font = Theme.Fonts.Title, TextSize = 32, TextColor3 = Colors.GoldBright, TextScaled = true, Parent = card })
+	local chips = New("Frame", { Position = UDim2.fromOffset(18, 68), Size = UDim2.new(1, -36, 0, 24), BackgroundTransparency = 1, Parent = card })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = chips })
+	local text = Theme.Label("", { Position = UDim2.fromOffset(18, 100), Size = UDim2.new(1, -36, 1, -150), Font = Theme.Fonts.Body, TextSize = 15, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, Parent = card })
+	local track = New("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 18, 1, -46), Size = UDim2.new(1, -36, 0, 3), BackgroundColor3 = Color3.fromRGB(20, 16, 13), Parent = card })
+	local timer = New("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Colors.Gold, Parent = track })
+	local counter = Theme.Label("", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 18, 1, -12), Size = UDim2.fromOffset(120, 26), Font = Theme.Fonts.Number, TextSize = 16, TextColor3 = Colors.TextDim, Parent = card })
+	Theme.Button("Avanti ▶", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -16, 1, -12), Size = UDim2.fromOffset(120, 30), TextSize = 14, BackgroundColor3 = Colors.Green, Parent = card }, function()
+		advance = true
+	end)
+	return { Card = card, Top = top, Title = title, Chips = chips, Text = text, Timer = timer, Counter = counter }
+end
+
+local function setChips(card, list: { { string } })
+	for _, child in card.Chips:GetChildren() do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+	for i, entry in list do
+		pill(card.Chips, entry[1], if entry[2] == "green" then Colors.GreenBright elseif entry[2] == "blue" then Colors.XP else Colors.Gold, i)
+	end
+end
+
+-- la scheda cambia contenuto: esce verso il basso, rientra dall'alto
+local function swapCard(card, fill: () -> ())
+	local base = card.Card.Position
+	if card.Card.GroupTransparency < 0.99 then
+		Theme.Tween(card.Card, 0.2, { GroupTransparency = 1, Position = base + UDim2.fromOffset(0, 14) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		task.wait(0.2)
+	end
+	fill()
+	card.Card.Position = base - UDim2.fromOffset(0, 16)
+	Theme.Tween(card.Card, 0.45, { GroupTransparency = 0, Position = base }, Enum.EasingStyle.Quint)
+end
+
+-- INTERFACCIA ----------------------------------------------------------------------------------------
+
+local function buildUI()
+	local layer = C.UIController.Layers.Top
+	-- 1. mappa a tutto schermo
+	local mapRoot = New("CanvasGroup", { Name = "TourMappa", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(14, 34, 52), GroupTransparency = 1, Visible = false, ZIndex = 5, Parent = layer })
+	local holder = New("Frame", { Name = "Vista", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(24, 62, 92), ClipsDescendants = true, Parent = mapRoot })
+	local vignette = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Colors.Black, ZIndex = 20, Parent = mapRoot })
+	New("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(0.2, 1), NumberSequenceKeypoint.new(0.8, 1), NumberSequenceKeypoint.new(1, 0.35) }), Parent = vignette })
+	local heading = Theme.Label("L'ARCIPELAGO DEI GIGANTI", { Position = UDim2.fromOffset(32, 22), Size = UDim2.fromOffset(700, 44), Font = Theme.Fonts.Title, TextSize = 38, TextColor3 = Colors.GoldBright, TextStrokeTransparency = 0.3, ZIndex = 21, Parent = mapRoot })
+	C.UIController.AttachScale(heading)
+	local mapCard = infoCard(mapRoot, "Scheda", Vector2.new(400, 330))
+	mapCard.Card.AnchorPoint = Vector2.new(1, 0.5)
+	mapCard.Card.Position = UDim2.new(1, -36, 0.55, 0)
+	mapCard.Card.ZIndex = 22
+	local skipMap = Theme.Button("Salta tutto", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 0, 22), Size = UDim2.fromOffset(100, 30), TextSize = 12, BackgroundColor3 = Colors.PanelLight, ZIndex = 22, Parent = mapRoot }, function()
+		C.Tutorial.AskSkip()
+	end)
+	C.UIController.AttachScale(skipMap)
+
+	-- 2. riflettore sul HUD: quattro pannelli scuri attorno al "buco" e il contorno d'oro
+	local spotRoot = New("Frame", { Name = "Riflettore", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = layer })
+	local dims = {}
+	for i = 1, 4 do
+		dims[i] = New("Frame", { BackgroundColor3 = Colors.Black, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 5, Parent = spotRoot })
+	end
+	local outline = New("Frame", { BackgroundTransparency = 1, ZIndex = 6, Parent = spotRoot })
+	Theme.Corner(outline, 10)
+	local outlineStroke = New("UIStroke", { Color = GOLD, Thickness = 3, Transparency = 1, Parent = outline })
+	local spotCard = infoCard(spotRoot, "Fumetto", Vector2.new(380, 250))
+	spotCard.Card.ZIndex = 8
+	local arrow = Theme.Label("◀", { Size = UDim2.fromOffset(30, 30), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 28, TextColor3 = GOLD, TextTransparency = 1, ZIndex = 9, Parent = spotRoot })
+
+	-- 3. finale
+	local final = New("CanvasGroup", { Name = "Finale", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Colors.Black, BackgroundTransparency = 0.35, GroupTransparency = 1, Visible = false, ZIndex = 5, Parent = layer })
+	local column = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(1000, 600), BackgroundTransparency = 1, Parent = final })
+	C.UIController.AttachScale(column)
+	local finalTop = Theme.Label("MISSIONE 0 SUPERATA", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 20), Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 18, TextColor3 = Colors.Gold, Parent = column })
+	local finalTitle = Theme.Label("ADDESTRAMENTO COMPLETATO", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 48), Size = UDim2.new(1, 0, 0, 80), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Title, TextSize = 64, TextColor3 = Colors.GoldBright, TextStrokeColor3 = Color3.fromRGB(40, 18, 8), TextStrokeTransparency = 0.2, Parent = column })
+	Theme.Gradient(finalTitle, Color3.fromRGB(255, 240, 200), Color3.fromRGB(210, 150, 70), 90)
+	local finalScale = New("UIScale", { Parent = finalTitle })
+	local finalLine = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 134), Size = UDim2.fromOffset(0, 2), BackgroundColor3 = Colors.Gold, BorderSizePixel = 0, Parent = column })
+	New("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = finalLine })
+	Theme.Label("COSA TI ASPETTA", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 152), Size = UDim2.new(1, 0, 0, 22), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 15, TextColor3 = Colors.TextDim, Parent = column })
+	local cards = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 182), Size = UDim2.fromOffset(4 * 230 + 3 * 14, 190), BackgroundTransparency = 1, Parent = column })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 14), Parent = cards })
+	local outro = {}
+	for i, entry in Tutorial.Outro do
+		local slot = New("Frame", { Size = UDim2.fromOffset(230, 190), BackgroundTransparency = 1, LayoutOrder = i, Parent = cards })
+		local box = Theme.Panel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), Parent = slot })
+		Theme.Padding(box, 12)
+		Theme.Label(entry.Icon, { Size = UDim2.new(1, 0, 0, 44), TextXAlignment = Enum.TextXAlignment.Center, TextSize = 36, Font = Theme.Fonts.Bold, Parent = box })
+		Theme.Label(entry.Title, { Position = UDim2.fromOffset(0, 48), Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Header, TextSize = 18, TextColor3 = Colors.GoldBright, Parent = box })
+		Theme.Label(entry.Text, { Position = UDim2.fromOffset(0, 76), Size = UDim2.new(1, 0, 1, -76), TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Font = Theme.Fonts.Body, TextSize = 13, Parent = box })
+		local scale = New("UIScale", { Scale = 0, Parent = box })
+		table.insert(outro, scale)
+	end
+	local rewards = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 398), Size = UDim2.fromOffset(700, 40), BackgroundTransparency = 1, Parent = column })
+	New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 10), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Parent = rewards })
+	local continue = Theme.Button("Continua ▶", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 470), Size = UDim2.fromOffset(240, 52), Font = Theme.Fonts.Title, TextSize = 28, TextColor3 = Colors.GoldBright, BackgroundColor3 = Color3.fromRGB(70, 40, 26), Parent = column }, function()
+		advance = true
+	end)
+	local continueScale = New("UIScale", { Scale = 0, Parent = continue })
+
+	-- didascalia "prossima missione" (in basso, mentre la telecamera vola da Brehm)
+	local caption = New("CanvasGroup", { Name = "ProssimaMissione", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -120), Size = UDim2.fromOffset(620, 96), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false, ZIndex = 5, Parent = layer })
+	C.UIController.AttachScale(caption)
+	local capBack = New("Frame", { Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4), BackgroundColor3 = Colors.Panel, BackgroundTransparency = 0.08, Parent = caption })
+	Theme.Corner(capBack, 12)
+	Theme.Stroke(capBack, Colors.Gold, 2, 0.15)
+	Theme.Label("PROSSIMA MISSIONE", { Position = UDim2.fromOffset(20, 12), Size = UDim2.new(1, -40, 0, 18), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 13, TextColor3 = Colors.Gold, Parent = caption })
+	local capText = Theme.Label("", { Position = UDim2.fromOffset(20, 34), Size = UDim2.new(1, -40, 0, 46), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Title, TextSize = 34, TextColor3 = Colors.GoldBright, Parent = caption })
+
+	-- nero per le dissolvenze
+	local black = New("Frame", { Name = "Nero", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Colors.Black, BackgroundTransparency = 1, Visible = false, ZIndex = 50, Parent = layer })
+
+	ui = {
+		Black = black,
+		MapRoot = mapRoot,
+		MapHolder = holder,
+		MapCard = mapCard,
+		SpotRoot = spotRoot,
+		Dims = dims,
+		Outline = outline,
+		OutlineStroke = outlineStroke,
+		SpotCard = spotCard,
+		Arrow = arrow,
+		Final = final,
+		FinalTop = finalTop,
+		FinalTitle = finalTitle,
+		FinalScale = finalScale,
+		FinalLine = finalLine,
+		Outro = outro,
+		Rewards = rewards,
+		ContinueScale = continueScale,
+		Caption = caption,
+		CaptionText = capText,
+	}
+end
+
+-- 1. L'ARCIPELAGO ----------------------------------------------------------------------------------------
+
+local function moveMap(center: Vector3, scale: number, duration: number)
+	mapFrom = { Center = mapView.Center, Scale = mapView.Scale }
+	mapTo = { Center = center, Scale = scale }
+	mapMove = { Start = os.clock(), Duration = math.max(duration, 0.01) }
+end
+
+local function updateMap()
+	if not map then
+		return
+	end
+	local k = Util.Ease((os.clock() - mapMove.Start) / mapMove.Duration, "SineInOut")
+	-- la scala cambia in modo "logaritmico": lo zoom sembra uniforme
+	local s = math.exp(math.log(mapFrom.Scale) + (math.log(mapTo.Scale) - math.log(mapFrom.Scale)) * k)
+	mapView = { Center = mapFrom.Center:Lerp(mapTo.Center, k), Scale = s }
+	map.SetScale(s)
+	map.CenterOn(mapView.Center)
+	local details, icons = s >= 0.11, s >= 0.16
+	for _, d in map.Details do
+		d.Visible = details
+	end
+	for _, d in map.Icons do
+		d.Visible = icons
+	end
+	local now = os.clock()
+	for _, h in highlights do
+		local pulse = 0.5 + 0.5 * math.sin(now * 4 + h.Phase)
+		h.Stroke.Transparency = 0.05 + pulse * 0.45
+		h.Stroke.Thickness = 3 + pulse * 3
+	end
+end
+
+local function clearHighlights()
+	for _, h in highlights do
+		h.Frame:Destroy()
+	end
+	table.clear(highlights)
+end
+
+local function highlight(center: Vector3, radius: number, phase: number?)
+	local u, v = map.UV(center)
+	local size = map.WorldSize
+	local frame = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(u, v),
+		Size = UDim2.fromScale(radius * 2 / size.X, radius * 2 / size.Y),
+		BackgroundTransparency = 1,
+		ZIndex = 15,
+		Parent = map.World,
+	})
+	New("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = frame })
+	local stroke = New("UIStroke", { Color = GOLD, Thickness = 4, Transparency = 0.1, Parent = frame })
+	table.insert(highlights, { Frame = frame, Stroke = stroke, Phase = phase or 0 })
+end
+
+local function ensureMap()
+	if map or not C.WorldMap or not C.WorldMap.NewCanvas then
+		return
+	end
+	map = C.WorldMap.NewCanvas(ui.MapHolder, 0.05)
+	-- "sei qui": il punto dove si trova il giocatore
+	local root = Util.GetRoot(player.Character)
+	local camp = Zones.Get("CampoAddestramento")
+	local pos = if root then root.Position elseif camp then camp.Center else Vector3.zero
+	local u, v = map.UV(pos)
+	local dot = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(u, v), Size = UDim2.fromOffset(14, 14), BackgroundColor3 = Colors.RedBright, ZIndex = 18, Parent = map.World })
+	Theme.Corner(dot, 7)
+	Theme.Stroke(dot, Colors.White, 2, 0)
+	Theme.Label("Sei qui", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -4), Size = UDim2.fromOffset(80, 18), TextXAlignment = Enum.TextXAlignment.Center, Font = Theme.Fonts.Bold, TextSize = 13, TextStrokeTransparency = 0.2, ZIndex = 18, Parent = dot })
+end
+
+-- tutta la mappa nello schermo (lasciando posto alla scheda a destra)
+local function overview(): (Vector3, number)
+	local hs = ui.MapHolder.AbsoluteSize
+	local size = map.WorldSize
+	local cardW = 440 * C.UIController.Scale
+	local scale = math.max(math.min((hs.X - cardW) / size.X, hs.Y / size.Y) * 0.92, 0.002)
+	local B = W.SeaBounds
+	local center = Vector3.new((B.MinX + B.MaxX) / 2, 0, (B.MinZ + B.MaxZ) / 2)
+	return center + Vector3.new(cardW * 0.5 / scale, 0, 0), scale
+end
+
+local function focusIsland(isl): (Vector3, number)
+	local hs = ui.MapHolder.AbsoluteSize
+	local cardW = 440 * C.UIController.Scale
+	local scale = math.max(math.min((hs.X - cardW) * 0.8, hs.Y * 0.72) / (2 * isl.Water), 0.002)
+	return isl.Center + Vector3.new(cardW * 0.5 / scale, 0, 0), scale
+end
+
+local function runMap(): boolean
+	ensureMap()
+	if not map then
+		return alive()
+	end
+	local card = ui.MapCard
+	local islands = Tutorial.Islands
+	local pages = #islands + 2
+	C.UIController.RequestCursor("tutorialTour", true)
+	ui.MapRoot.Visible = true
+	ui.MapRoot.GroupTransparency = 1
+	local center, scale = overview()
+	mapView = { Center = center, Scale = scale * 0.7 }
+	moveMap(center, scale, 2.2)
+	Theme.Tween(ui.MapRoot, 0.6, { GroupTransparency = 0 }, Enum.EasingStyle.Sine)
+	sound("UI")
+	-- pagina 1: tutto l'arcipelago
+	swapCard(card, function()
+		card.Top.Text = "PARTE 2  •  IL MONDO"
+		card.Title.Text = "Cinque isole e il mare"
+		setChips(card, { { "4 stagioni" }, { "5 isole + Arena", "blue" } })
+		card.Text.Text = "Ogni stagione della storia si svolge su un'isola diversa. " .. Tutorial.LevelText
+		card.Counter.Text = ("1 / %d"):format(pages)
+	end)
+	for i, id in W.IslandOrder do
+		highlight(W.Islands[id].Center, W.Islands[id].Land * 1.04, i)
+	end
+	if not waitPage(PAGE_TIME, card.Timer) then
+		return false
+	end
+	clearHighlights()
+	-- un'isola alla volta
+	for i, entry in islands do
+		local isl = W.Islands[entry.Island]
+		local c, s = focusIsland(isl)
+		moveMap(c, s, 1.8)
+		highlight(isl.Center, isl.Land * 1.04)
+		local zones = Tutorial.IslandZones(isl.Id, 4)
+		swapCard(card, function()
+			card.Top.Text = if isl.Raid then "RAID" else ("STAGIONE %d"):format(isl.Season)
+			card.Title.Text = isl.Name
+			local chips = { { ("Lv. %d+"):format(isl.LevelReq) } }
+			if isl.Id == "Vermiglia" then
+				table.insert(chips, { "📍 Sei qui", "green" })
+			end
+			if W.Walls[isl.Id] then
+				table.insert(chips, { "Mura", "blue" })
+			end
+			setChips(card, chips)
+			card.Text.Text = entry.Text .. (if #zones > 0 then "\n\nZone: " .. table.concat(zones, " • ") else "")
+			card.Counter.Text = ("%d / %d"):format(i + 1, pages)
+		end)
+		sound("UI")
+		if not waitPage(PAGE_TIME, card.Timer) then
+			return false
+		end
+		clearHighlights()
+	end
+	-- il mare aperto, gli isolotti e i viaggi
+	center, scale = overview()
+	moveMap(center, scale, 2)
+	for i, islet in W.Islets do
+		highlight(islet.Center, islet.Radius + 60, i * 0.7)
+	end
+	swapCard(card, function()
+		card.Top.Text = "MARE APERTO"
+		card.Title.Text = "Isolotti e viaggi"
+		setChips(card, { { "🐎 Corrieri" }, { "⛵ Barca", "blue" }, { "🐴 Cavallo (H)", "green" } })
+		card.Text.Text = Tutorial.SeaText
+		card.Counter.Text = ("%d / %d"):format(pages, pages)
+	end)
+	sound("UI")
+	if not waitPage(PAGE_TIME, card.Timer) then
+		return false
+	end
+	clearHighlights()
+	Theme.Tween(card.Card, 0.3, { GroupTransparency = 1 })
+	Theme.Tween(ui.MapRoot, 0.6, { GroupTransparency = 1 }, Enum.EasingStyle.Sine)
+	local ok = waitFor(0.6)
+	ui.MapRoot.Visible = false
+	C.UIController.RequestCursor("tutorialTour", false)
+	return ok
+end
+
+-- 2. L'INTERFACCIA (riflettore) --------------------------------------------------------------------------------
+
+local function element(name: string): GuiObject?
+	if name == "Rewards" then
+		local found = C.UIController.Layers.HUD:FindFirstChild("Premi")
+		return if found and found:IsA("GuiObject") then found else nil
+	elseif name == "Minimap" then
+		return C.WorldMap and C.WorldMap.MiniFrame and C.WorldMap.MiniFrame() or nil
+	end
+	return C.HUD and C.HUD.Element and C.HUD.Element(name) or nil
+end
+
+local function rectOf(gui: GuiObject): Box
+	local p, s = gui.AbsolutePosition, gui.AbsoluteSize
+	local pad = 8
+	return box(p.X - pad, p.Y - pad, p.X + s.X + pad, p.Y + s.Y + pad)
+end
+
+local function lerpBox(a: Box, b: Box, k: number): Box
+	return box(a.X0 + (b.X0 - a.X0) * k, a.Y0 + (b.Y0 - a.Y0) * k, a.X1 + (b.X1 - a.X1) * k, a.Y1 + (b.Y1 - a.Y1) * k)
+end
+
+local function placeSpot(r: Box)
+	local screen = ui.SpotRoot.AbsoluteSize
+	local x0, y0, x1, y1 = r.X0, r.Y0, r.X1, r.Y1
+	local d = ui.Dims
+	d[1].Position, d[1].Size = UDim2.fromOffset(0, 0), UDim2.fromOffset(screen.X, math.max(0, y0))
+	d[2].Position, d[2].Size = UDim2.fromOffset(0, y1), UDim2.fromOffset(screen.X, math.max(0, screen.Y - y1))
+	d[3].Position, d[3].Size = UDim2.fromOffset(0, y0), UDim2.fromOffset(math.max(0, x0), math.max(0, y1 - y0))
+	d[4].Position, d[4].Size = UDim2.fromOffset(x1, y0), UDim2.fromOffset(math.max(0, screen.X - x1), math.max(0, y1 - y0))
+	ui.Outline.Position = UDim2.fromOffset(x0, y0)
+	ui.Outline.Size = UDim2.fromOffset(x1 - x0, y1 - y0)
+end
+
+local function updateSpot()
+	if not spot.On then
+		return
+	end
+	local k = Util.Ease((os.clock() - spot.Start) / spot.Duration, "SineInOut")
+	placeSpot(lerpBox(spot.From, spot.To, k))
+	ui.OutlineStroke.Thickness = 3 + math.sin(os.clock() * 5) * 1.2
+end
+
+-- il fumetto accanto al buco, dal lato con più spazio, con la freccia verso l'elemento
+local function placeBubble(r: Box)
+	local screen = ui.SpotRoot.AbsoluteSize
+	local scale = C.UIController.Scale
+	local bw, bh = 380 * scale, 250 * scale
+	local cx, cy = (r.X0 + r.X1) / 2, (r.Y0 + r.Y1) / 2
+	local right = cx < screen.X / 2
+	local x = if right then r.X1 + 34 else r.X0 - 34 - bw
+	if x < 12 or x + bw > screen.X - 12 then
+		-- non c'è spazio ai lati: sotto (o sopra) l'elemento
+		x = math.clamp(cx - bw / 2, 12, math.max(12, screen.X - bw - 12))
+		local below = r.Y1 + 34
+		local y = if below + bh < screen.Y - 12 then below else r.Y0 - 34 - bh
+		ui.SpotCard.Card.Position = UDim2.fromOffset(x, y)
+		ui.Arrow.Text = if y > r.Y1 then "▲" else "▼"
+		ui.Arrow.Position = UDim2.fromOffset(cx - 15, if y > r.Y1 then r.Y1 + 4 else r.Y0 - 34)
+		return
+	end
+	local y = math.clamp(cy - bh / 2, 12, math.max(12, screen.Y - bh - 12))
+	ui.SpotCard.Card.Position = UDim2.fromOffset(x, y)
+	ui.Arrow.Text = if right then "◀" else "▶"
+	ui.Arrow.Position = UDim2.fromOffset(if right then r.X1 + 4 else r.X0 - 34, cy - 15)
+end
+
+local function runSpotlight(): boolean
+	local entries = {}
+	for _, entry in Tutorial.Spotlight do
+		local gui = element(entry.Element)
+		if gui and gui.Visible and gui.AbsoluteSize.X > 0 then
+			table.insert(entries, { Entry = entry, Gui = gui })
+		end
+	end
+	if #entries == 0 then
+		return alive()
+	end
+	-- il pannello degli obiettivi torna a mostrare la storia (è quello che il riflettore spiega)
+	if C.HUD and C.HUD.SetTutorial then
+		C.HUD.SetTutorial(nil)
+	end
+	C.UIController.RequestCursor("tutorialTour", true)
+	ui.SpotRoot.Visible = true
+	local screen = ui.SpotRoot.AbsoluteSize
+	local first = rectOf(entries[1].Gui)
+	-- si parte da tutto lo schermo e il buco si stringe sul primo elemento
+	spot = { From = box(0, 0, screen.X, screen.Y), To = first, Start = os.clock(), Duration = 0.8, On = true }
+	for _, d in ui.Dims do
+		d.BackgroundTransparency = 1
+		Theme.Tween(d, 0.6, { BackgroundTransparency = 0.38 })
+	end
+	Theme.Tween(ui.OutlineStroke, 0.6, { Transparency = 0 })
+	local card = ui.SpotCard
+	for i, item in entries do
+		local target = rectOf(item.Gui)
+		if i > 1 then
+			Theme.Tween(card.Card, 0.18, { GroupTransparency = 1 })
+			Theme.Tween(ui.Arrow, 0.18, { TextTransparency = 1 })
+			if not waitFor(0.18) then
+				return false
+			end
+			spot = { From = spot.To, To = target, Start = os.clock(), Duration = 0.55, On = true }
+			if not waitFor(0.5) then
+				return false
+			end
+		else
+			if not waitFor(0.6) then
+				return false
+			end
+		end
+		card.Top.Text = "PARTE 2  •  L'INTERFACCIA"
+		card.Title.Text = item.Entry.Title
+		setChips(card, {})
+		card.Text.Text = item.Entry.Text
+		card.Counter.Text = ("%d / %d"):format(i, #entries)
+		placeBubble(target)
+		local base = card.Card.Position
+		card.Card.Position = base + UDim2.fromOffset(0, 12)
+		Theme.Tween(card.Card, 0.35, { GroupTransparency = 0, Position = base }, Enum.EasingStyle.Quint)
+		Theme.Tween(ui.Arrow, 0.35, { TextTransparency = 0 })
+		sound("UI")
+		if not waitPage(PAGE_TIME - 1, card.Timer) then
+			return false
+		end
+	end
+	-- il buco si allarga a tutto lo schermo e il riflettore si spegne
+	spot = { From = spot.To, To = box(0, 0, screen.X, screen.Y), Start = os.clock(), Duration = 0.6, On = true }
+	Theme.Tween(card.Card, 0.25, { GroupTransparency = 1 })
+	Theme.Tween(ui.Arrow, 0.25, { TextTransparency = 1 })
+	Theme.Tween(ui.OutlineStroke, 0.5, { Transparency = 1 })
+	for _, d in ui.Dims do
+		Theme.Tween(d, 0.5, { BackgroundTransparency = 1 })
+	end
+	local ok = waitFor(0.6)
+	spot.On = false
+	ui.SpotRoot.Visible = false
+	C.UIController.RequestCursor("tutorialTour", false)
+	return ok
+end
+
+-- 3. I GIGANTI -------------------------------------------------------------------------------------
+
+local function runGiants(): boolean
+	if not C.CutsceneController then
+		return alive()
+	end
+	-- dissolvenza al nero: la scena parte dal nero e si apre da sola
+	ui.Black.Visible = true
+	ui.Black.BackgroundTransparency = 1
+	Theme.Tween(ui.Black, 0.5, { BackgroundTransparency = 0 }, Enum.EasingStyle.Sine)
+	if not waitFor(0.55) then
+		ui.Black.Visible = false
+		return false
+	end
+	task.delay(0.15, function()
+		ui.Black.Visible = false
+	end)
+	C.CutsceneController.Play("TutorialGiganti", true)
+	return alive()
+end
+
+-- 4. IL FINALE ---------------------------------------------------------------------------------------
+
+local function rewardChip(text: string, order: number)
+	local chip = pill(ui.Rewards, text, Colors.GoldBright, order)
+	chip.TextSize = 18
+	chip.Size = UDim2.fromOffset(0, 36)
+	Theme.Corner(chip, 18)
+	local scale = New("UIScale", { Scale = 0, Parent = chip })
+	return scale
+end
+
+local function runFinale(replaying: boolean): boolean
+	-- la telecamera gira piano attorno al personaggio, senza interfaccia di gioco
+	if C.HUD then
+		C.HUD.SetVisible(false)
+	end
+	local root = Util.GetRoot(player.Character)
+	if root and C.CameraController then
+		C.CameraController.SetCinematic(true)
+		orbit = { Center = root.Position, Angle = math.atan2(camera.CFrame.LookVector.X, camera.CFrame.LookVector.Z) + math.pi }
+	end
+	C.UIController.RequestCursor("tutorialTour", true)
+	for _, child in ui.Rewards:GetChildren() do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+	ui.FinalTop.Text = if replaying then "RIPASSO COMPLETATO" else "MISSIONE 0 SUPERATA"
+	ui.Final.Visible = true
+	ui.Final.GroupTransparency = 1
+	ui.FinalScale.Scale = 1.3
+	ui.FinalLine.Size = UDim2.fromOffset(0, 2)
+	ui.ContinueScale.Scale = 0
+	for _, s in ui.Outro do
+		s.Scale = 0
+	end
+	Theme.Tween(ui.Final, 0.6, { GroupTransparency = 0 }, Enum.EasingStyle.Sine)
+	Theme.Tween(ui.FinalScale, 1, { Scale = 1 }, Enum.EasingStyle.Quint)
+	Theme.Tween(ui.FinalLine, 1, { Size = UDim2.fromOffset(640, 2) }, Enum.EasingStyle.Quint)
+	sound("Reward")
+	if C.EffectsController and root then
+		C.EffectsController.Sparks(root.Position + Vector3.new(0, 4, 0), GOLD, 50, 50)
+	end
+	if not waitFor(0.8) then
+		return false
+	end
+	-- le quattro schede compaiono una dopo l'altra
+	for _, s in ui.Outro do
+		Theme.Tween(s, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+		sound("UI")
+		if not waitFor(0.18) then
+			return false
+		end
+	end
+	-- il premio (solo la prima volta)
+	if not replaying then
+		local chips = {}
+		local reward = Tutorial.Reward
+		if reward.Gold then
+			table.insert(chips, rewardChip(("💰 +%d oro"):format(reward.Gold), 1))
+		end
+		if reward.XP then
+			table.insert(chips, rewardChip("⭐ Esperienza", 2))
+		end
+		for id, count in reward.Items or {} do
+			local def = Items.Get(id)
+			table.insert(chips, rewardChip(("🎁 %s x%d"):format(def and def.Name or id, count), 3))
+		end
+		for _, s in chips do
+			Theme.Tween(s, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+			sound("Coins")
+			if not waitFor(0.25) then
+				return false
+			end
+		end
+	end
+	Theme.Tween(ui.ContinueScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+	if not waitPage(14) then
+		return false
+	end
+	Theme.Tween(ui.Final, 0.5, { GroupTransparency = 1 }, Enum.EasingStyle.Sine)
+	local ok = waitFor(0.5)
+	ui.Final.Visible = false
+	-- la rotazione si ferma qui: il volo verso Brehm (AfterDone) parte da dove è la telecamera
+	orbit = nil
+	C.UIController.RequestCursor("tutorialTour", false)
+	return ok
+end
+
+-- la telecamera torna dolcemente dietro al personaggio, poi il controllo torna al giocatore
+local function blendToPlayer(duration: number)
+	orbit = nil
+	local root = Util.GetRoot(player.Character)
+	if root then
+		local from = camera.CFrame
+		local look = Util.SafeUnit(Util.Flat(root.CFrame.LookVector), Vector3.new(0, 0, -1))
+		local focus = root.Position + Vector3.new(0, 2.5, 0)
+		local to = CFrame.lookAt(focus - look * 14 + Vector3.new(0, 4.5, 0), focus)
+		local start = os.clock()
+		while os.clock() - start < duration do
+			camera.CFrame = from:Lerp(to, Util.Ease((os.clock() - start) / duration, "SineInOut"))
+			RunService.RenderStepped:Wait()
+		end
+		camera.CFrame = to
+	end
+	if C.CameraController then
+		C.CameraController.SetCinematic(false)
+	end
+	if C.HUD then
+		C.HUD.SetVisible(true)
+	end
+end
+
+-- API ----------------------------------------------------------------------------------------------
+
+-- La seconda parte del tutorial (attende la fine). false = interrotta.
+function TutorialTour.Run(myToken: number, replaying: boolean): boolean
+	cancelled = false
+	if not C.Tutorial.Banner("PARTE 2", "IL MONDO", "Le isole, l'interfaccia e i giganti. Puoi andare avanti quando vuoi.", 1.2, myToken) then
+		return false
+	end
+	if not runMap() then
+		return false
+	end
+	if not runSpotlight() then
+		return false
+	end
+	if not C.Tutorial.Banner("PARTE 2", "I GIGANTI", "Conoscere il nemico è metà della vittoria.", 0.8, myToken) then
+		return false
+	end
+	if not runGiants() then
+		return false
+	end
+	return runFinale(replaying)
+end
+
+-- la telecamera vola fino a Brehm (la prossima missione) e torna al personaggio
+local function flyToBrehm(replaying: boolean)
+	local npc = NPCs.Get("Brehm")
+	local zone = npc and Zones.Get(npc.Zone)
+	if replaying or not npc or not zone or not C.CameraController then
+		blendToPlayer(0.9)
+		return
+	end
+	C.CameraController.SetCinematic(true)
+	orbit = nil
+	local brehm = zone.Center + npc.Offset + Vector3.new(0, 5, 0)
+	local facing = math.rad(npc.Facing or 0)
+	local front = Vector3.new(math.sin(facing), 0, math.cos(facing))
+	local from = camera.CFrame
+	local to = CFrame.lookAt(brehm + front * 16 + Vector3.new(6, 3, 0), brehm)
+	ui.Caption.Visible = true
+	ui.CaptionText.Text = "Presentati all'Istruttore Brehm"
+	local start = os.clock()
+	while os.clock() - start < 1.8 do
+		camera.CFrame = from:Lerp(to, Util.Ease((os.clock() - start) / 1.8, "SineInOut"))
+		RunService.RenderStepped:Wait()
+	end
+	Theme.Tween(ui.Caption, 0.4, { GroupTransparency = 0 }, Enum.EasingStyle.Sine)
+	sound("Reward")
+	local hold = os.clock()
+	while os.clock() - hold < 2.6 do
+		camera.CFrame = to * CFrame.new(0, 0, -(os.clock() - hold) * 0.8)
+		RunService.RenderStepped:Wait()
+	end
+	Theme.Tween(ui.Caption, 0.4, { GroupTransparency = 1 }, Enum.EasingStyle.Sine)
+	blendToPlayer(1.3)
+	ui.Caption.Visible = false
+end
+
+-- Dopo il tutorial: il volo fino a Brehm (attende la fine); se qualcosa va storto telecamera e
+-- interfaccia tornano comunque al giocatore
+function TutorialTour.AfterDone(replaying: boolean)
+	local ok, err = pcall(flyToBrehm, replaying)
+	if not ok then
+		warn("[Addestramento] " .. tostring(err))
+		orbit = nil
+		ui.Caption.Visible = false
+		if C.CameraController then
+			C.CameraController.SetCinematic(false)
+		end
+		if C.HUD then
+			C.HUD.SetVisible(true)
+		end
+	end
+end
+
+-- Interrompe la seconda parte (il giocatore ha saltato il tutorial)
+function TutorialTour.Cancel()
+	cancelled = true
+	advance = true
+	spot.On = false
+	if ui then
+		ui.MapRoot.Visible = false
+		ui.SpotRoot.Visible = false
+		ui.Final.Visible = false
+		ui.Black.Visible = false
+		clearHighlights()
+	end
+	if C.HUD then
+		C.HUD.SetVisible(true)
+	end
+	if C.CutsceneController and C.CutsceneController.Skip then
+		C.CutsceneController.Skip()
+	end
+	C.UIController.RequestCursor("tutorialTour", false)
+	if orbit or (C.CameraController and C.CameraController.IsCinematic() and not (C.CutsceneController and C.CutsceneController.IsPlaying())) then
+		task.spawn(blendToPlayer, 0.6)
+	end
+end
+
+function TutorialTour.Init(c)
+	C = c
+end
+
+function TutorialTour.Start()
+	buildUI()
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if not processed and (input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.KeypadEnter) then
+			advance = true
+		end
+	end)
+	RunService.RenderStepped:Connect(function(dt)
+		if ui.MapRoot.Visible then
+			updateMap()
+		end
+		updateSpot()
+		local o = orbit
+		if o then
+			o.Angle += dt * 0.12
+			local eye = o.Center + Vector3.new(math.sin(o.Angle) * 26, 9, math.cos(o.Angle) * 26)
+			camera.CFrame = CFrame.lookAt(eye, o.Center + Vector3.new(0, 3, 0))
+		end
+	end)
+end
+
+return TutorialTour
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="130">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -41790,7 +44310,7 @@ return UIController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="127">
+          <Item class="ModuleScript" referent="131">
             <Properties>
               <string name="Name">WorldMap</string>
               <string name="Source"><![CDATA[--[[
@@ -42190,17 +44710,21 @@ local function drawMarkers(canvas: Canvas, detailed: boolean, myRoot: BasePart?)
 end
 
 -- Ricolora le zone quando cambia il livello del giocatore
+local function colorZones(canvas: Canvas, level: number)
+	for id, frame in canvas.Zones do
+		local zone = Zones.Get(id)
+		if zone then
+			local color, transparency = zoneColor(zone, level)
+			frame.BackgroundColor3 = color
+			frame.BackgroundTransparency = transparency
+		end
+	end
+end
+
 local function recolorZones(level: number)
 	for _, canvas in { mini, big } do
 		if canvas then
-			for id, frame in canvas.Zones do
-				local zone = Zones.Get(id)
-				if zone then
-					local color, transparency = zoneColor(zone, level)
-					frame.BackgroundColor3 = color
-					frame.BackgroundTransparency = transparency
-				end
-			end
+			colorZones(canvas, level)
 		end
 	end
 end
@@ -42480,6 +45004,34 @@ function WorldMap.Toggle()
 	C.UIController.Toggle("Mappa")
 end
 
+-- Tela con l'arcipelago disegnato come nella mappa grande (usata dal tutorial per la sua mappa
+-- animata): scale = pixel per stud. Restituisce la tela e le funzioni per muoverla.
+function WorldMap.NewCanvas(holder: Frame, scale: number)
+	local canvas = newCanvas(holder, scale, true)
+	if C.ClientData.Profile then
+		colorZones(canvas, C.ClientData.Profile.Level)
+	end
+	return {
+		Canvas = canvas,
+		World = canvas.World,
+		SetScale = function(s: number)
+			setScale(canvas, s)
+		end,
+		CenterOn = function(pos: Vector3)
+			centerOn(canvas, pos)
+		end,
+		UV = uv,
+		WorldSize = Vector2.new(WORLD_W, WORLD_H),
+		Details = canvas.Details,
+		Icons = canvas.Icons,
+	}
+end
+
+-- La minimappa (per il riflettore del tutorial)
+function WorldMap.MiniFrame(): GuiObject?
+	return miniRoot
+end
+
 function WorldMap.Init(c)
 	C = c
 end
@@ -42510,7 +45062,7 @@ return WorldMap
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="128">
+  <Item class="Workspace" referent="132">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>
@@ -42525,7 +45077,7 @@ return WorldMap
       <token name="StreamingIntegrityMode">2</token>
       <int name="StreamingTargetRadius">1600</int>
     </Properties>
-    <Item class="Terrain" referent="129">
+    <Item class="Terrain" referent="133">
       <Properties>
         <string name="Name">Terrain</string>
         <bool name="Decoration">true</bool>

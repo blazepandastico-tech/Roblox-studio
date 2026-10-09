@@ -133,6 +133,177 @@ if C.CutsceneController then
 	check(#WARNINGS == before, "la cerimonia d'apertura ha dato un errore: " .. tostring(WARNINGS[#WARNINGS]))
 	LOG("Cerimonia d'apertura riprodotta fino alla fine")
 end
+-- 📘 Addestramento di base: tutto il tutorial dall'inizio alla fine. L'orologio è finto (ogni
+-- task.wait fa passare 1/30 di secondo) e un giocatore finto esegue ogni passo; nella seconda parte
+-- preme Invio per andare avanti. La scena dei giganti gira tutta.
+do
+	local TutorialData = require(SHARED.Data.Tutorial)
+	local Zones = require(SHARED.Data.Zones)
+	local Net = require(SHARED.Lib.Net)
+	local UIS = game:GetService("UserInputService")
+	load("UI", "TutorialTour")
+	load("UI", "Tutorial")
+	local hookAttached, flying = false, false
+	C.ODMController = {
+		IsFlying = function()
+			return flying
+		end,
+		HookStates = function()
+			return if hookAttached then { Left = { Phase = "Attached" } } else {}
+		end,
+	}
+	local tracker = nil
+	C.HUD.SetTutorial = function(info)
+		tracker = info
+	end
+	C.HUD.Element = function()
+		return nil
+	end
+	C.UIController.RegisterPanel("Menu", Instance.new("Frame"))
+	for _, name in { "TutorialTour", "Tutorial" } do
+		local m = C[name]
+		if m then
+			local okI, errI = pcall(m.Init, C)
+			check(okI, name .. ".Init: " .. tostring(errI))
+			local okS, errS = pcall(m.Start)
+			check(okS, name .. ".Start: " .. tostring(errS))
+		end
+	end
+	-- un personaggio al Campo di Addestramento
+	local camp = Zones.Get("CampoAddestramento")
+	local character = Instance.new("Model")
+	character.Name = "Recluta"
+	local rootPart = Instance.new("Part")
+	rootPart.Name = "HumanoidRootPart"
+	rootPart.CFrame = CFrame.new(camp.Center + Vector3.new(0, 3, 0))
+	rootPart.Parent = character
+	local humanoid = Instance.new("Humanoid")
+	humanoid.Parent = character
+	character.Parent = workspace
+	player.Character = character
+	player.CharacterAdded:Fire(character)
+	C.ClientData.Ready = true
+	C.ClientData.Profile.Level = 1
+	C.ClientData.Profile.Story = { Chapter = 1, Step = 2, Progress = 0, Done = false }
+	-- misure dello schermo per la mappa animata e il riflettore (nel finto restano a zero)
+	local top = C.UIController.Layers.Top
+	local mapRoot = top:FindFirstChild("TourMappa")
+	if mapRoot and mapRoot:FindFirstChild("Vista") then
+		(mapRoot :: any).Vista.AbsoluteSize = Vector2.new(1500, 900)
+	end
+	local spotRoot = top:FindFirstChild("Riflettore")
+	if spotRoot then
+		spotRoot.AbsoluteSize = Vector2.new(1500, 900)
+	end
+	local mini = C.WorldMap and C.WorldMap.MiniFrame()
+	if mini then
+		mini.AbsolutePosition = Vector2.new(16, 160)
+		mini.AbsoluteSize = Vector2.new(208, 236)
+	end
+
+	local seen = {}
+	local ticks = 0
+	local ring = 0
+	local function act()
+		local id = C.Tutorial.CurrentStep()
+		if id then
+			seen[id] = true
+		end
+		-- le parti della seconda parte: mappa, riflettore, scena dei giganti, finale
+		if mapRoot and mapRoot.Visible then
+			seen.Mappa2 = true
+		end
+		if spotRoot and spotRoot.Visible then
+			seen.Riflettore = true
+		end
+		if C.CutsceneController.IsPlaying() then
+			seen.Giganti = true
+		end
+		local final = top:FindFirstChild("Finale")
+		if final and final.Visible then
+			seen.Finale = true
+		end
+		if id == "Guarda" then
+			camera.CFrame = camera.CFrame * CFrame.Angles(0, math.rad(15), 0)
+		elseif id == "Cammina" then
+			rootPart.CFrame = rootPart.CFrame + Vector3.new(2, 0, 0)
+		elseif id == "Salta" then
+			humanoid.StateChanged:Fire(Enum.HumanoidStateType.Running, Enum.HumanoidStateType.Jumping)
+		elseif id == "Schiva" or id == "Fendente" or id == "Abilita" or id == "Lame" then
+			local action = ({ Schiva = "Dodge", Fendente = "Attack", Abilita = "SkillZ", Lame = "Reload" })[id]
+			C.InputController.Trigger(action, true)
+			C.InputController.Trigger(action, false)
+		elseif id == "Rampino" then
+			hookAttached = true
+		elseif id == "Gas" then
+			flying = true
+			C.InputController.Trigger("Boost", true)
+		elseif id == "Anelli" then
+			ring = ring % #TutorialData.Rings + 1
+			rootPart.CFrame = CFrame.new(TutorialData.Rings[ring])
+		elseif id == "Nuca" then
+			Net.Event("HitConfirm").OnClientEvent:Fire({ Kind = "NapeKill" })
+		elseif id == "Rifornimento" then
+			Net.Event("Refilled").OnClientEvent:Fire("Tutto")
+		elseif id == "Menu" or id == "Mappa" then
+			C.UIController.Toggle(id)
+		else
+			hookAttached, flying = false, false
+			if C.InputController.IsHeld("Boost") then
+				C.InputController.Trigger("Boost", false)
+			end
+			-- seconda parte: "Avanti" con Invio
+			UIS.InputBegan:Fire({ KeyCode = Enum.KeyCode.Return, UserInputType = Enum.UserInputType.Keyboard }, false)
+		end
+	end
+	local now = os.clock()
+	MOCK_HOOKS.Clock = function()
+		return now
+	end
+	MOCK_HOOKS.Wait = function()
+		ticks += 1
+		if ticks > 20000 then
+			error("l'addestramento non finisce (passo: " .. tostring(C.Tutorial.CurrentStep()) .. ")")
+		end
+		now += 1 / 30
+		RunService.RenderStepped:Fire(1 / 30)
+		act()
+		return 1 / 30
+	end
+	-- solo la funzione principale del tutorial gira davvero; le animazioni che partono da lì no (come nel finto)
+	local depth = 0
+	MOCK_HOOKS.Spawn = function(fn, ...)
+		if depth > 0 then
+			-- i tasti premuti (InputController.Trigger) arrivano subito al tutorial, come nel gioco
+			local caller = debug.info(3, "s")
+			if caller and string.find(caller, "InputController") and string.find(debug.info(fn, "s"), "Tutorial") then
+				fn(...)
+			else
+				SPAWNED += 1
+			end
+			return
+		end
+		depth += 1
+		local ok, err = pcall(fn, ...)
+		depth -= 1
+		check(ok, "addestramento: " .. tostring(err))
+	end
+	-- la mappa grande aperta prima libera il cursore (e con il cursore libero le azioni non partono)
+	C.UIController.CloseAll()
+	local before = #WARNINGS
+	Net.Event("Tutorial").OnClientEvent:Fire({ Step = 1, Replay = false, Total = #TutorialData.Steps })
+	MOCK_HOOKS.Clock, MOCK_HOOKS.Wait, MOCK_HOOKS.Spawn = nil, nil, nil
+	check(#WARNINGS == before, "l'addestramento ha dato un errore: " .. tostring(WARNINGS[#WARNINGS]))
+	for _, step in TutorialData.Steps do
+		check(seen[step.Id], "passo dell'addestramento mai raggiunto: " .. step.Id)
+	end
+	for _, part in { "Mappa2", "Riflettore", "Giganti", "Finale" } do
+		check(seen[part], "seconda parte dell'addestramento mai mostrata: " .. part)
+	end
+	check(not C.Tutorial.IsActive(), "l'addestramento non si è chiuso")
+	check(tracker == nil, "il pannello degli obiettivi è rimasto sul tutorial")
+	LOG(("Addestramento di base: %d passi e la seconda parte (mappa, interfaccia, giganti, finale) in %d fotogrammi"):format(#TutorialData.Steps, ticks))
+end
 -- pannello dell'evento
 if C.Festival then
 	local replicated = game:GetService("ReplicatedStorage")

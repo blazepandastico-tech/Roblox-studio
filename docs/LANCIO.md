@@ -11,7 +11,7 @@ Apri `SieriPerduti.rbxlx` → **Play**. Controlla in quest'ordine:
 
 | # | Cosa provare | Cosa deve succedere |
 |---|---|---|
-| 1 | Ingresso | Filmato iniziale, poi si apre il **Calendario dei premi** (Giorno 1) |
+| 1 | Ingresso | Filmato iniziale, poi l'**Addestramento di base** con Mira (comandi, anelli d'oro, sagoma, mappa animata, interfaccia, giganti); alla fine la telecamera vola da Brehm e si apre il **Calendario dei premi** (Giorno 1). Per rifarlo: `/tutorial` |
 | 2 | Movimento | Camminata/corsa da battaglia, **Shift** = shift lock, salto e **caduta** con le braccia che si agitano |
 | 3 | Obiettivo | Colonna di luce dorata + "◆ xx m" sull'obiettivo; parla con Brehm (**F**) |
 | 4 | Rampini | **Q / E** per agganciarti, sali in cima alla torre |

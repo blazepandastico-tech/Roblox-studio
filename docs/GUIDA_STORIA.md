@@ -17,6 +17,7 @@ dello schermo e in **Menu (M) → Storia**. Con i personaggi si parla con **F**.
 | `/vai Zona` | teletrasporto (es. `/vai Recinto`, `/vai Aurion`, `/vai Halvar`) |
 | `/zone` | elenco delle zone |
 | `/cura` | vita, gas e lame al massimo |
+| `/tutorial` | rifà l'Addestramento di base da capo (come un giocatore nuovo) |
 
 Per verificare un capitolo: `/livello` al livello richiesto, `/capitolo N`, poi segui gli obiettivi
 (oppure `/passo` per saltarli uno alla volta).
@@ -28,6 +29,7 @@ Per verificare un capitolo: `/livello` al livello richiesto, `/capitolo N`, poi 
 _Cinque anni dopo la caduta di Halvar, entri nel Corpo Cadetti con una sola cosa al collo: una fiala spezzata._
 
 1. 🎬 Filmato: Il giorno della caduta
+   - 🎓 **Missione 0 - Addestramento di base** (tutorial, con Mira): comandi passo per passo, le isole sulla mappa, l'interfaccia e i giganti. Si rivede da Menu (M) → Opzioni.
 2. 💬 Parla (tasto F): Presentati all'Istruttore Brehm
 3. 📍 Raggiungi: Usa i Rampini (Q / E) e raggiungi la cima della Torre di Addestramento
 4. ⚔️ Uccidi: Abbatti 5 Sagome di legno colpendo la NUCA (clic sinistro)

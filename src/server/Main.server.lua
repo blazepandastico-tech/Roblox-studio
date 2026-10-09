@@ -29,6 +29,7 @@ local ORDER = {
 	"ODMService",
 	"QuestService",
 	"StoryService",
+	"TutorialService",
 	"SerumService",
 	"ShifterService",
 	"ShopService",

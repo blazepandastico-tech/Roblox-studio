@@ -49,6 +49,7 @@ local isMobile = UserInputService.TouchEnabled and not UserInputService.Keyboard
 
 local function buildPlayerPanel()
 	local panel = Theme.Panel({ Name = "Giocatore", Position = UDim2.fromOffset(16, 16), Size = UDim2.fromOffset(320, 108), Parent = root })
+	refs.PlayerPanel = panel
 	C.UIController.AttachScale(panel)
 	local badge = New("Frame", { BackgroundColor3 = Colors.Background, Position = UDim2.fromOffset(10, 10), Size = UDim2.fromOffset(72, 72), Parent = panel })
 	Theme.Corner(badge, 36)
@@ -79,6 +80,7 @@ end
 
 local function buildBars()
 	local panel = Theme.Panel({ Name = "Barre", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16), Size = UDim2.fromOffset(330, 150), Parent = root })
+	refs.BarsPanel = panel
 	C.UIController.AttachScale(panel)
 	refs.SetHP, refs.HPText = barRow(panel, 12, "❤️", Colors.Health, "Salute")
 	refs.SetGas, refs.GasText = barRow(panel, 36, "💨", Colors.Gas, "Gas")
@@ -256,6 +258,7 @@ local function buildMenuButtons()
 		{ Icon = "💎", Tab = "Premium", Hint = "N" },
 	}
 	local holder = New("Frame", { Name = "Menu", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -16, 0.5, 0), Size = UDim2.fromOffset(60, #entries * 60 + (#entries - 1) * 8), BackgroundTransparency = 1, Parent = root })
+	refs.MenuButtons = holder
 	C.UIController.AttachScale(holder)
 	New("UIListLayout", { Padding = UDim.new(0, 8), Parent = holder })
 	for i, entry in entries do
@@ -366,6 +369,8 @@ local function objectiveTarget(step): Vector3?
 	return nil
 end
 
+local tutorialInfo: { Title: string, Objective: string, Target: Vector3? }? = nil
+
 local function updateData()
 	local profile = C.ClientData.Profile
 	if not profile then
@@ -401,6 +406,12 @@ local function updateData()
 			refs.StoryObjective.Text = "▶ " .. step.Objective .. progress
 			refs.ObjectivePos = objectiveTarget(step)
 		end
+	end
+	-- Addestramento di base in corso: il pannello e la colonna di luce seguono il tutorial
+	if tutorialInfo then
+		refs.ChapterTitle.Text = tutorialInfo.Title
+		refs.StoryObjective.Text = "▶ " .. tutorialInfo.Objective
+		refs.ObjectivePos = tutorialInfo.Target
 	end
 	-- missione
 	local quest = profile.Quest.Id ~= "" and Quests.Get(profile.Quest.Id)
@@ -625,6 +636,25 @@ end
 -- Posizione dell'obiettivo attuale della storia (usata dal segnalino 3D)
 function HUD.ObjectivePosition(): Vector3?
 	return refs.ObjectivePos
+end
+
+-- Durante l'Addestramento di base il pannello degli obiettivi mostra il passo del tutorial
+-- (nil = di nuovo la storia)
+function HUD.SetTutorial(info: { Title: string, Objective: string, Target: Vector3? }?)
+	tutorialInfo = info
+	updateData()
+end
+
+-- Gli elementi dell'interfaccia (per il riflettore del tutorial)
+function HUD.Element(name: string): GuiObject?
+	local map = {
+		Tracker = refs.Tracker,
+		Compass = refs.Compass,
+		Player = refs.PlayerPanel,
+		Bars = refs.BarsPanel,
+		MenuButtons = refs.MenuButtons,
+	}
+	return map[name]
 end
 
 function HUD.SetVisible(visible: boolean)

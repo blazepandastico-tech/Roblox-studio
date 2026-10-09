@@ -45,6 +45,8 @@ local ORDER = {
 	{ UI, "RewardsPanel" },
 	{ UI, "AdminPanel" },
 	{ Controllers, "WaypointController" },
+	{ UI, "TutorialTour" },
+	{ UI, "Tutorial" },
 	{ UI, "Intro" },
 }
 

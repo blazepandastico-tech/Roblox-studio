@@ -43,7 +43,11 @@ Net.EventNames = {
 	"AdminAction",
 	"Horse",
 	"PvPToggle",
+	"TutorialProgress",
+	"TutorialDone",
+	"TutorialReplay",
 	-- server -> client
+	"Tutorial",
 	"PvPState",
 	"RaidState",
 	"WheelResult",

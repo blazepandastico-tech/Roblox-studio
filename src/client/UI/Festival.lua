@@ -121,7 +121,8 @@ local function update(dt: number)
 	local active = ReplicatedStorage:GetAttribute("FestaAttiva") == true
 	local cinematic = C.CameraController and C.CameraController.IsCinematic()
 	local intro = C.Intro and C.Intro.IsShowing and C.Intro.IsShowing()
-	banner.Visible = active and not cinematic and not intro
+	local tutorial = C.Tutorial and C.Tutorial.IsActive()
+	banner.Visible = active and not cinematic and not intro and not tutorial
 	banner.Position = UDim2.new(0.5, 0, 0, math.floor(14 + 62 * C.UIController.Scale))
 	if not active then
 		if C.UIController.IsOpen("Inaugurazione") then

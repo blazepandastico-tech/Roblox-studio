@@ -568,6 +568,17 @@ local function showSettings()
 			showSettings()
 		end)
 	end
+	-- rivedi l'Addestramento di base (comandi, isole, missioni e giganti)
+	local replayRow = Theme.Panel({ Size = UDim2.new(1, -8, 0, 64), LayoutOrder = 20, Parent = list })
+	Theme.Padding(replayRow, 8)
+	Theme.Label("📘 Addestramento di base", { Size = UDim2.new(0.7, 0, 0, 22), Font = Theme.Fonts.Bold, TextSize = 15, Parent = replayRow })
+	Theme.Label("Ripassa comandi, isole, missioni e giganti quando vuoi", { Position = UDim2.fromOffset(0, 24), Size = UDim2.new(0.7, 0, 0, 24), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = replayRow })
+	Theme.Button("RIVEDI", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(110, 34), BackgroundColor3 = Colors.Green, Parent = replayRow }, function()
+		if C.Tutorial then
+			C.UIController.Close("Menu")
+			C.Tutorial.Replay()
+		end
+	end)
 	local sliders = { { Key = "Sfx", Name = "Volume effetti", Default = 0.8 }, { Key = "Music", Name = "Volume musica", Default = 0.5 } }
 	for i, sl in sliders do
 		local value = C.ClientData.Setting(sl.Key, sl.Default)

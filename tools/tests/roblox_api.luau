@@ -35,6 +35,7 @@ ROBLOX_API = {
 		Fire = { S = "Instance", P = { Color = "Color3", Enabled = "boolean", Heat = "number", LocalTransparencyModifier = "number", SecondaryColor = "Color3", Size = "number", TimeScale = "number" } },
 		Folder = { S = "Instance", P = {  } },
 		FormFactorPart = { S = "BasePart", P = {  } },
+		CanvasGroup = { S = "GuiObject", P = { GroupColor3 = "Color3", GroupTransparency = "number" } },
 		Frame = { S = "GuiObject", P = { Style = "EnumFrameStyle" } },
 		GroupService = { S = "Instance", P = {  } },
 		GuiBase = { S = "Instance", P = {  } },

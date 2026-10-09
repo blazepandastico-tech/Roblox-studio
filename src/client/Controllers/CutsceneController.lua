@@ -89,7 +89,18 @@ local function buildUI()
 	}, function()
 		skipRequested = true
 	end)
-	ui = { Holder = holder, Top = top, Bottom = bottom, Speaker = speaker, Text = text, Fade = fade, Title = title, Skip = skip }
+	-- scheda informativa a sinistra (usata dalla scena dei giganti del tutorial)
+	local card = Theme.New("CanvasGroup", { Name = "Scheda", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 40, 0.42, 0), Size = UDim2.fromOffset(360, 200), BackgroundTransparency = 1, GroupTransparency = 1, ZIndex = 7, Parent = holder })
+	C.UIController.AttachScale(card)
+	local cardBack = Theme.New("Frame", { Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -4), BackgroundColor3 = Theme.Colors.Panel, BackgroundTransparency = 0.12, ZIndex = 7, Parent = card })
+	Theme.Corner(cardBack, 12)
+	Theme.Stroke(cardBack, Theme.Colors.Gold, 2, 0.15)
+	Theme.Gradient(cardBack, Color3.fromRGB(62, 50, 38), Color3.fromRGB(26, 20, 16), 90)
+	local cardTitle = Theme.Label("", { Position = UDim2.fromOffset(18, 14), Size = UDim2.new(1, -36, 0, 30), Font = Theme.Fonts.Header, TextSize = 22, TextColor3 = Theme.Colors.GoldBright, ZIndex = 8, Parent = card })
+	local cardLine = Theme.New("Frame", { Position = UDim2.fromOffset(18, 48), Size = UDim2.new(1, -36, 0, 2), BackgroundColor3 = Theme.Colors.Gold, BorderSizePixel = 0, ZIndex = 8, Parent = card })
+	Theme.New("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = cardLine })
+	local cardText = Theme.Label("", { Position = UDim2.fromOffset(18, 58), Size = UDim2.new(1, -36, 1, -70), Font = Theme.Fonts.Body, TextSize = 15, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 8, Parent = card })
+	ui = { Holder = holder, Top = top, Bottom = bottom, Speaker = speaker, Text = text, Fade = fade, Title = title, Skip = skip, Card = card, CardTitle = cardTitle, CardText = cardText }
 end
 
 local function letterbox(on: boolean)
@@ -140,6 +151,67 @@ function api.Title(text: string, duration: number)
 	TweenService:Create(ui.Title, TweenInfo.new(0.8), { TextTransparency = 0 }):Play()
 	api.Wait(duration)
 	TweenService:Create(ui.Title, TweenInfo.new(0.8), { TextTransparency = 1 }):Play()
+end
+
+-- Scheda informativa a sinistra: entra scorrendo, sostituisce quella di prima
+function api.Card(title: string, lines: { string })
+	local card = ui.Card
+	local function fill()
+		ui.CardTitle.Text = title
+		ui.CardText.Text = "•  " .. table.concat(lines, "\n•  ")
+		card.Position = UDim2.new(0, 10, 0.42, 0)
+		TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0, 40, 0.42, 0), GroupTransparency = 0 }):Play()
+	end
+	if card.GroupTransparency < 0.99 then
+		TweenService:Create(card, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(0, 20, 0.42, 0), GroupTransparency = 1 }):Play()
+		task.delay(0.22, fill)
+	else
+		fill()
+	end
+end
+
+function api.HideCard()
+	TweenService:Create(ui.Card, TweenInfo.new(0.3), { GroupTransparency = 1 }):Play()
+end
+
+-- Segno luminoso che pulsa su un punto (o che segue una parte): nuca, occhi, caviglie...
+function api.Highlight(target: BasePart | Vector3, color: Color3, size: number, text: string?): Part
+	local mark = api.Part({ Name = "Evidenzia", Shape = Enum.PartType.Ball, Size = Vector3.one * size, Material = Enum.Material.Neon, Color = color, Transparency = 0.35, CastShadow = false })
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = size * 4
+	light.Brightness = 2
+	light.Parent = mark
+	if text then
+		local board = Instance.new("BillboardGui")
+		board.Size = UDim2.fromOffset(140, 30)
+		board.StudsOffset = Vector3.new(0, size * 0.9 + 1.5, 0)
+		board.AlwaysOnTop = true
+		board.LightInfluence = 0
+		board.Parent = mark
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Font = Enum.Font.GothamBlack
+		label.TextSize = 20
+		label.TextColor3 = color
+		label.TextStrokeTransparency = 0.2
+		label.Text = text
+		label.Parent = board
+	end
+	local start = os.clock()
+	task.spawn(function()
+		while mark.Parent do
+			local t = os.clock() - start
+			local pos = if typeof(target) == "Vector3" then target else (target :: BasePart).Position
+			local pulse = 1 + math.sin(t * 6) * 0.18
+			mark.Size = Vector3.one * size * pulse
+			mark.CFrame = CFrame.new(pos)
+			mark.Transparency = 0.3 + (1 - pulse) * 0.8
+			RunService.RenderStepped:Wait()
+		end
+	end)
+	return mark
 end
 
 function api.FadeOut(t: number)
@@ -651,19 +723,129 @@ Scenes.Inaugurazione = function()
 	letterbox(false)
 end
 
+-- Addestramento di base: Mira spiega i giganti (taglie, nuca, occhi e arti, presa, anomali, boss, sieri).
+-- Si gira su un prato nel cielo con un tratto di Muro sullo sfondo; i giganti guardano verso -Z.
+Scenes.TutorialGiganti = function()
+	local base = Vector3.new(1400, 2700, -1200)
+	api.Part({ Name = "Prato", Size = Vector3.new(900, 4, 900), CFrame = CFrame.new(base - Vector3.new(0, 2, 0)), Material = Enum.Material.Grass, Color = Color3.fromRGB(98, 138, 74) })
+	for i = -5, 5 do
+		api.Part({ Name = "Muro", Size = Vector3.new(80, 120, 26), CFrame = CFrame.new(base + Vector3.new(i * 78, 60, 340)), Material = Enum.Material.Slate, Color = Color3.fromRGB(190, 182, 166) })
+	end
+	local rng = Random.new(77)
+	for _ = 1, 16 do
+		local p = base + Vector3.new(rng:NextNumber(-400, 400), 0, rng:NextNumber(280, 320))
+		local h = rng:NextNumber(30, 55)
+		api.Part({ Name = "Tronco", Size = Vector3.new(4, h, 4), CFrame = CFrame.new(p + Vector3.new(0, h / 2, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 48) })
+		api.Part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * rng:NextNumber(26, 38), CFrame = CFrame.new(p + Vector3.new(0, h, 0)), Material = Enum.Material.LeafyGrass, Color = Color3.fromRGB(70, 112, 58) })
+	end
+	local small = api.Titan("Puro", 10, base + Vector3.new(-70, 0, 40), 0)
+	local mid = api.Titan("Puro", 22, base + Vector3.new(-12, 0, 50), 0)
+	local big = api.Titan("Puro", 48, base + Vector3.new(78, 0, 70), 0)
+	api.Walk(small, 0)
+	letterbox(true)
+	api.FadeIn(1)
+
+	-- 1. le taglie, in fila
+	api.ShotAsync(api.Look(base + Vector3.new(-150, 10, -60), base + Vector3.new(-60, 8, 40)), api.Look(base + Vector3.new(150, 26, -110), base + Vector3.new(50, 26, 60)), 7.5)
+	api.Card("🧍 Le taglie", { "Da 3 a 15 metri: più sono grandi, più sono lenti ma forti", "Vivono fuori dalle Mura, nelle zone colorate della mappa", "Più sali di livello, più grandi li affronti" })
+	api.Say("Mira", "Ce ne sono di tutte le taglie: da 3 a 15 metri. Più sono grandi, più sono lenti... e più fanno male.", 4)
+	api.Say("Mira", "Li trovi fuori dalle Mura. Sulla mappa le zone gialle sono quelle giuste per il tuo livello.", 3.5)
+
+	-- 2. la nuca del più grande, vista da dietro
+	local napePart = big:FindFirstChild("Nape", true)
+	local nape = if napePart and napePart:IsA("BasePart") then napePart.Position else big:GetPivot().Position + Vector3.new(0, 20, 6)
+	api.Highlight(if napePart and napePart:IsA("BasePart") then napePart else nape, Color3.fromRGB(255, 200, 80), 5, "NUCA")
+	api.ShotAsync(api.Look(nape + Vector3.new(34, 6, 46), nape), api.Look(nape + Vector3.new(16, 10, 30), nape), 6.5)
+	api.Card("🎯 La nuca", { "È il punto debole di OGNI gigante", "Mirino ORO = colpo mortale", "Più vai veloce, più il colpo è forte: TAGLIO PERFETTO" })
+	api.Say("Mira", "Il punto debole è sempre la NUCA, dietro il collo. Un taglio profondo e cade.", 3.5)
+	api.Say("Mira", "Vola veloce con i rampini e colpisci in corsa: è così che si abbattono i più grandi.", 3)
+
+	-- 3. occhi e caviglie del gigante medio, visto da davanti
+	for _, name in { "LeftEye", "RightEye" } do
+		local eye = mid:FindFirstChild(name, true)
+		if eye and eye:IsA("BasePart") then
+			api.Highlight(eye, Color3.fromRGB(120, 200, 255), 1.4)
+		end
+	end
+	for _, name in { "LeftFoot", "RightFoot" } do
+		local foot = mid:FindFirstChild(name, true)
+		if foot and foot:IsA("BasePart") then
+			api.Highlight(foot, Color3.fromRGB(255, 150, 80), 2.6)
+		end
+	end
+	local face = mid:GetPivot().Position + Vector3.new(0, 4, 0)
+	api.ShotAsync(api.Look(face + Vector3.new(-12, 2, -46), face), api.Look(face + Vector3.new(8, 0, -36), face - Vector3.new(0, 2, 0)), 7.6)
+	api.Card("👁️ Occhi e arti", { "Occhi colpiti = gigante cieco per qualche secondo", "Arto reciso = gigante più lento", "Poi gira dietro e prendi la nuca" })
+	api.Say("Mira", "Colpisci gli OCCHI per accecarlo e le CAVIGLIE per rallentarlo. Poi gira dietro e prendi la nuca.", 4)
+	-- 4. la presa
+	api.Animate(mid, "Grab")
+	api.Card("✋ La presa", { "Se ti afferra: SPAZIO più volte per liberarti", "Meglio schivare prima (Ctrl)", "Mai fermarsi davanti alle sue mani" })
+	api.Say("Mira", "Attento alle mani! Se ti afferra, premi SPAZIO più volte per liberarti. Meglio schivare prima.", 3.6)
+
+	-- 5. l'anomalo che corre attraverso il prato
+	local runner = api.Titan("Puro", 32, base + Vector3.new(-280, 0, 130), -90)
+	api.Walk(runner, 1, 1)
+	local runnerHip = runner:GetAttribute("HipHeight") :: number
+	api.Move(runner, CFrame.new(base + Vector3.new(260, runnerHip, 130)) * CFrame.Angles(0, math.rad(-90), 0), 6)
+	api.ShotAsync(api.Look(base + Vector3.new(-120, 14, -40), base + Vector3.new(-120, 20, 130)), api.Look(base + Vector3.new(120, 18, -50), base + Vector3.new(160, 22, 130)), 6)
+	api.Card("⚡ Anomali", { "Corrono, saltano e cambiano direzione", "Non seguono nessuno schema", "Durante alcuni eventi valgono gemme 💎" })
+	api.Say("Mira", "Gli ANOMALI invece corrono e saltano senza nessuna regola. Non perderli mai di vista.", 3.8)
+
+	-- 6. il boss che ruggisce
+	local bossAt = base + Vector3.new(90, 0, 200)
+	local boss = api.Titan("Ghignante", 40, bossAt, 0)
+	api.ShotAsync(api.Look(bossAt + Vector3.new(30, 6, -110), bossAt + Vector3.new(0, 30, 0)), api.Look(bossAt + Vector3.new(14, 4, -80), bossAt + Vector3.new(0, 36, 0)), 5)
+	api.Card("👑 Boss", { "Giganti unici con la barra della vita", "Attacchi speciali: impara a schivarli", "La prima volta che li abbatti: gemme 💎" })
+	api.Wait(0.6)
+	api.Animate(boss, "Roar")
+	if C.SoundController then
+		C.SoundController.Play("Roar", bossAt, { Range = 3000, Volume = 1 })
+	end
+	fx().Shockwave(bossAt + Vector3.new(0, 34, 0), 90, Color3.fromRGB(255, 190, 120), 1.2, 3)
+	if C.CameraController then
+		C.CameraController.Shake(0.45, 1)
+	end
+	api.Say("Mira", "E poi ci sono i BOSS: giganti unici, con attacchi speciali. Meglio affrontarli in squadra.", 3.8)
+
+	-- 7. i sieri: il fulmine e un mutaforma che si alza nel vapore
+	local shifterAt = base + Vector3.new(-90, 0, 250)
+	local shifter = api.Titan("Furia", 48, shifterAt - Vector3.new(0, 70, 0), 0)
+	local shifterHip = shifter:GetAttribute("HipHeight") :: number
+	api.ShotAsync(api.Look(shifterAt + Vector3.new(-60, 20, -130), shifterAt + Vector3.new(0, 36, 0)), api.Look(shifterAt + Vector3.new(-40, 28, -110), shifterAt + Vector3.new(0, 46, 0)), 5)
+	fx().Lightning(shifterAt + Vector3.new(0, 600, 0), shifterAt + Vector3.new(0, 30, 0), Color3.fromRGB(255, 236, 130), 4)
+	fx().Flash(Color3.fromRGB(255, 240, 200), 0.4, 0.6)
+	if C.SoundController then
+		C.SoundController.Play("Thunder")
+	end
+	api.Move(shifter, CFrame.new(shifterAt + Vector3.new(0, shifterHip, 0)), 2.4)
+	for i = 0, 3 do
+		task.delay(i * 0.4, function()
+			fx().Steam(shifterAt + Vector3.new(math.random(-20, 20), 30 + i * 8, 0), 30, 8, 3)
+		end)
+	end
+	api.Card("💉 Sieri", { "Li scoprirai andando avanti nella storia", "Con un siero iniettato, T ti trasforma in gigante", "Ogni siero ha i suoi poteri" })
+	api.Say("Mira", "E i SIERI... chi li inietta può trasformarsi in gigante. Questo lo scoprirai nella storia.", 4)
+	api.HideCard()
+	api.FadeOut(1)
+	letterbox(false)
+end
+
 -- RIPRODUZIONE --------------------------------------------------------------------------------------
 
 function CutsceneController.IsPlaying(): boolean
 	return playing
 end
 
-function CutsceneController.Play(id: string)
+-- silent = true: scena locale (es. il tutorial), il server non viene avvisato della fine
+function CutsceneController.Play(id: string, silent: boolean?)
 	if playing then
 		return
 	end
 	local scene = Scenes[id]
 	if not scene then
-		Net.Event("CutsceneDone"):FireServer(id)
+		if not silent then
+			Net.Event("CutsceneDone"):FireServer(id)
+		end
 		return
 	end
 	playing = true
@@ -694,6 +876,7 @@ function CutsceneController.Play(id: string)
 	ui.Speaker.Text = ""
 	ui.Text.Text = ""
 	ui.Title.TextTransparency = 1
+	ui.Card.GroupTransparency = 1
 	TweenService:Create(ui.Fade, TweenInfo.new(0.8), { BackgroundTransparency = 1 }):Play()
 	task.delay(0.8, function()
 		if not playing then
@@ -706,7 +889,16 @@ function CutsceneController.Play(id: string)
 		C.HUD.SetVisible(true)
 	end
 	playing = false
-	Net.Event("CutsceneDone"):FireServer(id)
+	if not silent then
+		Net.Event("CutsceneDone"):FireServer(id)
+	end
+end
+
+-- Interrompe la scena in corso (come il pulsante "Salta")
+function CutsceneController.Skip()
+	if playing then
+		skipRequested = true
+	end
 end
 
 function CutsceneController.Init(c)
@@ -730,7 +922,7 @@ function CutsceneController.Start()
 		task.spawn(function()
 			while #queue > 0 do
 				-- aspetta che l'intro, l'eventuale dialogo e la scena precedente siano finiti
-				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) do
+				while (C.Intro and C.Intro.IsShowing()) or (C.Dialogue and C.Dialogue.IsOpen()) or playing or (C.AbuseEventController and C.AbuseEventController.IsCinematic()) or (C.Tutorial and C.Tutorial.IsActive()) do
 					task.wait(0.2)
 				end
 				local nextId = table.remove(queue, 1)

@@ -320,6 +320,89 @@ Abuse.Launch("CadutaMuro", 5)
 check(Abuse.Stop("Admin") and replicated:GetAttribute("AbuseEvento") == nil, "Termina evento non funziona")
 table.clear(MOCK_PLAYERS)
 
+-- ADDESTRAMENTO DI BASE (server): dopo il prologo la storia aspetta il tutorial, il premio arriva
+-- una volta sola e solo completandolo, poi la storia riparte con Brehm ----------------------------------
+do
+	local Net = require(SHARED.Lib.Net)
+	local TutorialData = require(SHARED.Data.Tutorial)
+	local Story = require(SERVER.Services.StoryService)
+	local Tut = require(SERVER.Services.TutorialService)
+	local tprofile: any = { Level = 1, Story = { Chapter = 1, Step = 1, Progress = 0, Done = false } }
+	local notes: { string } = {}
+	local rewards = nil
+	local onLoaded = nil
+	local TS: any = {
+		DataService = {
+			Get = function()
+				return tprofile
+			end,
+			MarkDirty = function() end,
+			OnLoaded = function(fn)
+				onLoaded = fn
+			end,
+		},
+		PlayerService = {
+			GiveRewards = function(_, r)
+				rewards = r
+			end,
+		},
+		EventService = {
+			Notify = function(_, text)
+				table.insert(notes, text)
+			end,
+			AnnounceTo = function() end,
+		},
+		StoryService = Story,
+		TutorialService = Tut,
+		TitanService = { ReleasePlayer = function() end },
+	}
+	Story.Init(TS)
+	Tut.Init(TS)
+	local okT, errT = pcall(Tut.Start)
+	check(okT, "TutorialService.Start: " .. tostring(errT))
+	onLoaded(player, tprofile)
+	check(tprofile.Tutorial and not tprofile.Tutorial.Done, "un giocatore nuovo deve fare l'addestramento")
+	-- fine del prologo: la storia passa a Brehm ma aspetta l'addestramento (nessun "Nuovo obiettivo")
+	Story.Advance(player)
+	check(tprofile.Story.Step == TutorialData.StoryStep and Tut.Pending(player), "dopo il prologo l'addestramento non parte")
+	check(#notes == 0, "la storia non dovrebbe dare obiettivi durante l'addestramento: " .. tostring(notes[1]))
+	check(not Story.TryTalk(player, "Brehm"), "parlando con Brehm durante l'addestramento la storia va avanti")
+	-- progressi: un passo alla volta (un salto in avanti viene ignorato)
+	Net.Event("TutorialProgress").OnServerEvent:Fire(player, 5)
+	check(tprofile.Tutorial.Step == 1, "un salto di passi è stato accettato")
+	for i = 2, #TutorialData.Steps + 1 do
+		Net.Event("TutorialProgress").OnServerEvent:Fire(player, i)
+	end
+	check(tprofile.Tutorial.Step == #TutorialData.Steps + 1, "i progressi dell'addestramento non vengono salvati")
+	-- completato (dopo il tempo minimo): premio e la storia riparte con Brehm
+	local start = os.clock()
+	MOCK_HOOKS.Clock = function()
+		return start + TutorialData.MinSeconds + 5
+	end
+	Net.Event("TutorialDone").OnServerEvent:Fire(player, "complete")
+	MOCK_HOOKS.Clock = nil
+	check(tprofile.Tutorial.Done and tprofile.Tutorial.Rewarded and rewards ~= nil, "premio dell'addestramento non dato")
+	check(notes[#notes] ~= nil and string.find(notes[#notes], "Brehm") ~= nil, "dopo l'addestramento la storia non riparte con Brehm")
+	check(not Tut.Pending(player), "l'addestramento resta da fare dopo averlo finito")
+	-- rivisto dal menu: nessun altro premio e la storia non cambia
+	rewards = nil
+	local step = tprofile.Story.Step
+	Net.Event("TutorialReplay").OnServerEvent:Fire(player)
+	Net.Event("TutorialDone").OnServerEvent:Fire(player, "complete")
+	check(rewards == nil and tprofile.Story.Step == step, "rivedere l'addestramento dà premi o cambia la storia")
+	-- saltato: niente premio, la storia riparte comunque
+	tprofile = { Level = 1, Story = { Chapter = 1, Step = TutorialData.StoryStep, Progress = 0, Done = false } }
+	onLoaded(player, tprofile)
+	check(Tut.Gate(player), "l'addestramento non parte per chi rientra a metà")
+	Net.Event("TutorialDone").OnServerEvent:Fire(player, "skip")
+	check(tprofile.Tutorial.Done and not tprofile.Tutorial.Rewarded, "saltare l'addestramento dà il premio")
+	-- chi aveva già superato quel punto della storia non lo rifà
+	tprofile = { Level = 40, Story = { Chapter = 3, Step = 2, Progress = 0, Done = false } }
+	onLoaded(player, tprofile)
+	check(tprofile.Tutorial.Done, "un giocatore già avanti nella storia deve saltare l'addestramento")
+	LOG("Addestramento di base (server): parte dopo il prologo, salva i passi, premio una volta sola, poi Brehm")
+end
+
 for _, w in WARNINGS do
 	table.insert(ERRORS, "Avviso: " .. w)
 end
