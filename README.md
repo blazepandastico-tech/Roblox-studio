@@ -332,6 +332,8 @@ Le animazioni sono **procedurali** (calcolate dal codice): funzionano subito sen
 python3 tools/check_refs.py   # riferimenti tra servizi, remote e require
 python3 tools/test_data.py    # coerenza di storia, missioni, isole, raid, negozi (serve 'luau')
 python3 tools/test_world.py   # costruisce tutta la mappa, forzieri, cavallo, barca e mappa UI con un Roblox finto
+                              # e fa tutto l'Addestramento di base (client e server) con un orologio finto
+python3 tools/scene_photo.py cartella [--scena TutorialGiganti]   # foto di una scena animata, dalla telecamera della regia
 ```
 
 `tools/test_world.py` controlla ogni proprietà assegnata con l'elenco ufficiale di Roblox

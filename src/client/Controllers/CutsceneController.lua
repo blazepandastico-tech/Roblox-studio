@@ -738,15 +738,16 @@ Scenes.TutorialGiganti = function()
 		api.Part({ Name = "Tronco", Size = Vector3.new(4, h, 4), CFrame = CFrame.new(p + Vector3.new(0, h / 2, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 48) })
 		api.Part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * rng:NextNumber(26, 38), CFrame = CFrame.new(p + Vector3.new(0, h, 0)), Material = Enum.Material.LeafyGrass, Color = Color3.fromRGB(70, 112, 58) })
 	end
-	local small = api.Titan("Puro", 10, base + Vector3.new(-70, 0, 40), 0)
-	local mid = api.Titan("Puro", 22, base + Vector3.new(-12, 0, 50), 0)
-	local big = api.Titan("Puro", 48, base + Vector3.new(78, 0, 70), 0)
+	-- in fila dal più piccolo al più grande, da sinistra a destra (guardando verso +Z, +X è a sinistra)
+	local small = api.Titan("Puro", 10, base + Vector3.new(70, 0, 40), 0)
+	local mid = api.Titan("Puro", 22, base + Vector3.new(10, 0, 50), 0)
+	local big = api.Titan("Puro", 48, base + Vector3.new(-80, 0, 70), 0)
 	api.Walk(small, 0)
 	letterbox(true)
 	api.FadeIn(1)
 
-	-- 1. le taglie, in fila
-	api.ShotAsync(api.Look(base + Vector3.new(-150, 10, -60), base + Vector3.new(-60, 8, 40)), api.Look(base + Vector3.new(150, 26, -110), base + Vector3.new(50, 26, 60)), 7.5)
+	-- 1. le taglie: la telecamera parte dal più piccolo e scorre fino al più grande, dal basso
+	api.ShotAsync(api.Look(base + Vector3.new(88, 5, 8), base + Vector3.new(70, 5, 40)), api.Look(base + Vector3.new(-32, 8, -18), base + Vector3.new(-80, 24, 70)), 7.5)
 	api.Card("🧍 Le taglie", { "Da 3 a 15 metri: più sono grandi, più sono lenti ma forti", "Vivono fuori dalle Mura, nelle zone colorate della mappa", "Più sali di livello, più grandi li affronti" })
 	api.Say("Mira", "Ce ne sono di tutte le taglie: da 3 a 15 metri. Più sono grandi, più sono lenti... e più fanno male.", 4)
 	api.Say("Mira", "Li trovi fuori dalle Mura. Sulla mappa le zone gialle sono quelle giuste per il tuo livello.", 3.5)
@@ -755,7 +756,7 @@ Scenes.TutorialGiganti = function()
 	local napePart = big:FindFirstChild("Nape", true)
 	local nape = if napePart and napePart:IsA("BasePart") then napePart.Position else big:GetPivot().Position + Vector3.new(0, 20, 6)
 	api.Highlight(if napePart and napePart:IsA("BasePart") then napePart else nape, Color3.fromRGB(255, 200, 80), 5, "NUCA")
-	api.ShotAsync(api.Look(nape + Vector3.new(34, 6, 46), nape), api.Look(nape + Vector3.new(16, 10, 30), nape), 6.5)
+	api.ShotAsync(api.Look(nape + Vector3.new(28, 6, 44), nape), api.Look(nape + Vector3.new(16, 9, 32), nape), 6.5)
 	api.Card("🎯 La nuca", { "È il punto debole di OGNI gigante", "Mirino ORO = colpo mortale", "Più vai veloce, più il colpo è forte: TAGLIO PERFETTO" })
 	api.Say("Mira", "Il punto debole è sempre la NUCA, dietro il collo. Un taglio profondo e cade.", 3.5)
 	api.Say("Mira", "Vola veloce con i rampini e colpisci in corsa: è così che si abbattono i più grandi.", 3)
@@ -764,13 +765,13 @@ Scenes.TutorialGiganti = function()
 	for _, name in { "LeftEye", "RightEye" } do
 		local eye = mid:FindFirstChild(name, true)
 		if eye and eye:IsA("BasePart") then
-			api.Highlight(eye, Color3.fromRGB(120, 200, 255), 1.4)
+			api.Highlight(eye, Color3.fromRGB(120, 200, 255), 2.4)
 		end
 	end
 	for _, name in { "LeftFoot", "RightFoot" } do
 		local foot = mid:FindFirstChild(name, true)
 		if foot and foot:IsA("BasePart") then
-			api.Highlight(foot, Color3.fromRGB(255, 150, 80), 2.6)
+			api.Highlight(foot, Color3.fromRGB(255, 150, 80), 4.2)
 		end
 	end
 	local face = mid:GetPivot().Position + Vector3.new(0, 4, 0)
@@ -787,14 +788,15 @@ Scenes.TutorialGiganti = function()
 	api.Walk(runner, 1, 1)
 	local runnerHip = runner:GetAttribute("HipHeight") :: number
 	api.Move(runner, CFrame.new(base + Vector3.new(260, runnerHip, 130)) * CFrame.Angles(0, math.rad(-90), 0), 6)
-	api.ShotAsync(api.Look(base + Vector3.new(-120, 14, -40), base + Vector3.new(-120, 20, 130)), api.Look(base + Vector3.new(120, 18, -50), base + Vector3.new(160, 22, 130)), 6)
+	-- la telecamera gli corre accanto con lo stesso passo (stessa durata e stessa curva del movimento)
+	api.ShotAsync(api.Look(base + Vector3.new(-330, 10, 88), base + Vector3.new(-280, 18, 130)), api.Look(base + Vector3.new(210, 12, 88), base + Vector3.new(260, 18, 130)), 6)
 	api.Card("⚡ Anomali", { "Corrono, saltano e cambiano direzione", "Non seguono nessuno schema", "Durante alcuni eventi valgono gemme 💎" })
 	api.Say("Mira", "Gli ANOMALI invece corrono e saltano senza nessuna regola. Non perderli mai di vista.", 3.8)
 
 	-- 6. il boss che ruggisce
 	local bossAt = base + Vector3.new(90, 0, 200)
 	local boss = api.Titan("Ghignante", 40, bossAt, 0)
-	api.ShotAsync(api.Look(bossAt + Vector3.new(30, 6, -110), bossAt + Vector3.new(0, 30, 0)), api.Look(bossAt + Vector3.new(14, 4, -80), bossAt + Vector3.new(0, 36, 0)), 5)
+	api.ShotAsync(api.Look(bossAt + Vector3.new(24, 5, -72), bossAt + Vector3.new(0, 28, 0)), api.Look(bossAt + Vector3.new(12, 4, -56), bossAt + Vector3.new(0, 34, 0)), 5)
 	api.Card("👑 Boss", { "Giganti unici con la barra della vita", "Attacchi speciali: impara a schivarli", "La prima volta che li abbatti: gemme 💎" })
 	api.Wait(0.6)
 	api.Animate(boss, "Roar")
@@ -811,7 +813,7 @@ Scenes.TutorialGiganti = function()
 	local shifterAt = base + Vector3.new(-90, 0, 250)
 	local shifter = api.Titan("Furia", 48, shifterAt - Vector3.new(0, 70, 0), 0)
 	local shifterHip = shifter:GetAttribute("HipHeight") :: number
-	api.ShotAsync(api.Look(shifterAt + Vector3.new(-60, 20, -130), shifterAt + Vector3.new(0, 36, 0)), api.Look(shifterAt + Vector3.new(-40, 28, -110), shifterAt + Vector3.new(0, 46, 0)), 5)
+	api.ShotAsync(api.Look(shifterAt + Vector3.new(-40, 10, -84), shifterAt + Vector3.new(0, 34, 0)), api.Look(shifterAt + Vector3.new(-28, 16, -68), shifterAt + Vector3.new(0, 42, 0)), 5)
 	fx().Lightning(shifterAt + Vector3.new(0, 600, 0), shifterAt + Vector3.new(0, 30, 0), Color3.fromRGB(255, 236, 130), 4)
 	fx().Flash(Color3.fromRGB(255, 240, 200), 0.4, 0.6)
 	if C.SoundController then
