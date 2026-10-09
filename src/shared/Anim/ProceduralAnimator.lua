@@ -39,6 +39,8 @@ function Animator.new(model: Model, absolute: boolean?)
 	self.Context = {}
 	self.Result = {} :: Pose
 	self.Paused = 0
+	-- funzione opzionale (posa, dt) chiamata dopo layer e clip: può correggere la posa (vedi ArmReach)
+	self.PostStep = nil :: ((Pose, number) -> ())?
 	self:Refresh()
 	return self
 end
@@ -316,6 +318,15 @@ function Animator:Step(dt: number)
 				end
 			end
 			i += 1
+		end
+	end
+
+	-- correzioni finali della posa (es. ArmReach: le mani che afferrano un punto del mondo)
+	if self.PostStep then
+		local ok, err = pcall(self.PostStep, result, dt)
+		if not ok and not self.PostWarned then
+			self.PostWarned = true
+			warn(("[Animazioni] Errore nella correzione della posa di %s: %s"):format(self.Model.Name, tostring(err)))
 		end
 	end
 

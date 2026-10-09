@@ -849,6 +849,15 @@ addTitan(clip("Kick", {
 	K(1.05, { RightHip = A(10, 0, 5), RightKnee = A(-10, 0, 0), Root = A(0, 0, 0) }, "QuadOut"),
 }, { FadeOut = 0.3 }))
 
+-- Calcio dei filmati con le mani aggrappate al Muro (ArmReach): solo la gamba e un po' il busto,
+-- senza girare il corpo, così le mani restano ferme sul bordo. Il colpo arriva a 0.62 s.
+addTitan(clip("WallKick", {
+	K(0, {}),
+	K(0.45, { RightHip = A(-30, 0, 6), RightKnee = A(-75, 0, 0), RightAnkle = A(-15, 0, 0), Waist = A(6, 0, 0), Root = A(4, 0, 0), LeftKnee = A(-10, 0, 0) }, "QuadOut"),
+	K(0.62, { RightHip = A(64, 0, 4), RightKnee = A(-6, 0, 0), RightAnkle = A(20, 0, 0), Waist = A(-10, 0, 0), Root = A(-6, 0, 0), LeftKnee = A(-14, 0, 0) }, "ExpoOut"),
+	K(1.4, { RightHip = A(12, 0, 2), RightKnee = A(-14, 0, 0), LeftKnee = A(-4, 0, 0) }, "QuadOut"),
+}, { FadeOut = 0.35 }))
+
 addTitan(clip("Punch", {
 	K(0, {}),
 	K(0.4, { RightShoulder = A(25, 0, 35), RightElbow = A(125, 0, 0), Waist = A(0, -30, 0), LeftShoulder = A(60, 0, -20), LeftElbow = A(80, 0, 0) }, "QuadOut"),

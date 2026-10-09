@@ -331,8 +331,53 @@ end
 function CFMethods.GetComponents(a)
 	return a.x, a.y, a.z, a.r00, a.r01, a.r02, a.r10, a.r11, a.r12, a.r20, a.r21, a.r22
 end
+-- rotazione -> quaternione (w, x, y, z)
+local function toQuat(a)
+	local tr = a.r00 + a.r11 + a.r22
+	if tr > 0 then
+		local s = math.sqrt(tr + 1) * 2
+		return 0.25 * s, (a.r21 - a.r12) / s, (a.r02 - a.r20) / s, (a.r10 - a.r01) / s
+	elseif a.r00 > a.r11 and a.r00 > a.r22 then
+		local s = math.sqrt(1 + a.r00 - a.r11 - a.r22) * 2
+		return (a.r21 - a.r12) / s, 0.25 * s, (a.r01 + a.r10) / s, (a.r02 + a.r20) / s
+	elseif a.r11 > a.r22 then
+		local s = math.sqrt(1 + a.r11 - a.r00 - a.r22) * 2
+		return (a.r02 - a.r20) / s, (a.r01 + a.r10) / s, 0.25 * s, (a.r12 + a.r21) / s
+	end
+	local s = math.sqrt(1 + a.r22 - a.r00 - a.r11) * 2
+	return (a.r10 - a.r01) / s, (a.r02 + a.r20) / s, (a.r12 + a.r21) / s, 0.25 * s
+end
+-- come Roblox: posizione in linea retta e rotazione sferica (slerp)
 function CFMethods.Lerp(a, b, t)
-	return cfraw(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.r00, a.r01, a.r02, a.r10, a.r11, a.r12, a.r20, a.r21, a.r22)
+	local aw, ax, ay, az = toQuat(a)
+	local bw, bx, by, bz = toQuat(b)
+	local dot = aw * bw + ax * bx + ay * by + az * bz
+	if dot < 0 then
+		bw, bx, by, bz, dot = -bw, -bx, -by, -bz, -dot
+	end
+	local k0, k1 = 1 - t, t
+	if dot < 0.9995 then
+		local th = math.acos(math.min(dot, 1))
+		local s = math.sin(th)
+		k0, k1 = math.sin((1 - t) * th) / s, math.sin(t * th) / s
+	end
+	local w, x, y, z = aw * k0 + bw * k1, ax * k0 + bx * k1, ay * k0 + by * k1, az * k0 + bz * k1
+	local n = math.sqrt(w * w + x * x + y * y + z * z)
+	w, x, y, z = w / n, x / n, y / n, z / n
+	return cfraw(
+		a.x + (b.x - a.x) * t,
+		a.y + (b.y - a.y) * t,
+		a.z + (b.z - a.z) * t,
+		1 - 2 * (y * y + z * z),
+		2 * (x * y - w * z),
+		2 * (x * z + w * y),
+		2 * (x * y + w * z),
+		1 - 2 * (x * x + z * z),
+		2 * (y * z - w * x),
+		2 * (x * z - w * y),
+		2 * (y * z + w * x),
+		1 - 2 * (x * x + y * y)
+	)
 end
 function CFMethods.Orthonormalize(a)
 	return a

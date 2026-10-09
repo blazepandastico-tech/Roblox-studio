@@ -26,6 +26,7 @@ local AbuseEvents = require(Shared.Data.AbuseEvents)
 local TitanBuilder = require(Shared.Anim.TitanBuilder)
 local ProceduralAnimator = require(Shared.Anim.ProceduralAnimator)
 local Poses = require(Shared.Anim.Poses)
+local ArmReach = require(Shared.Anim.ArmReach)
 
 local AbuseEventController = {}
 local C
@@ -72,14 +73,16 @@ local followers: { () -> () } = {}
 
 -- regia: quando è attiva la telecamera segue l'inquadratura attuale (camShot) e il giocatore è bloccato
 local cinematic = false
-type Shot = { Path: (number) -> CFrame, Start: number, Duration: number, Blend: number, From: CFrame? }
+type Shot = { Path: (number) -> CFrame, Start: number, Duration: number, Blend: number, From: CFrame?, Fov: number, FromFov: number? }
 local camShot: Shot? = nil
 
 -- blend: secondi in cui la telecamera scivola dall'inquadratura precedente a questa (0 = stacco netto)
-local function shotPath(path: (number) -> CFrame, duration: number, blend: number?)
+-- fov: campo visivo (70 normale; più basso = teleobiettivo, i giganti lontani sembrano enormi)
+local function shotPath(path: (number) -> CFrame, duration: number, blend: number?, fov: number?)
 	local cam = workspace.CurrentCamera
 	local from = if cinematic and camShot and cam then cam.CFrame else nil
-	camShot = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration), Blend = blend or 0, From = from }
+	local fromFov = if from and cam then cam.FieldOfView else nil
+	camShot = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration), Blend = blend or 0, From = from, Fov = fov or 70, FromFov = fromFov }
 end
 
 local function moveAlong(target: Instance, path: (number) -> CFrame, duration: number, done: (() -> ())?)
@@ -137,13 +140,17 @@ local function step(dt: number)
 		cam.CameraType = Enum.CameraType.Scriptable
 		local wobble = if C.CameraController and C.CameraController.CinematicShake then C.CameraController.CinematicShake() else CFrame.identity
 		local cf = s.Path(k)
+		local fov = s.Fov
 		if s.From and s.Blend > 0 then
 			local b = (now - s.Start) / s.Blend
 			if b < 1 then
-				cf = s.From:Lerp(cf, Util.Ease(b, "SineInOut"))
+				local e = Util.Ease(b, "SineInOut")
+				cf = s.From:Lerp(cf, e)
+				fov = (s.FromFov or fov) + (fov - (s.FromFov or fov)) * e
 			end
 		end
 		cam.CFrame = cf * wobble
+		cam.FieldOfView = fov
 	end
 end
 
@@ -240,11 +247,11 @@ local function look(from: Vector3, target: Vector3): CFrame
 	return CFrame.lookAt(from, target)
 end
 
--- l'inquadratura va da "from" a "to" in "duration" secondi (senza attendere); blend come shotPath
-local function shot(from: CFrame, to: CFrame, duration: number, style: string?, blend: number?)
+-- l'inquadratura va da "from" a "to" in "duration" secondi (senza attendere); blend e fov come shotPath
+local function shot(from: CFrame, to: CFrame, duration: number, style: string?, blend: number?, fov: number?)
 	shotPath(function(k)
 		return from:Lerp(to, Util.Ease(k, style or "SineInOut"))
-	end, duration, blend)
+	end, duration, blend, fov)
 end
 
 local HOUSE_WALLS = { Color3.fromRGB(226, 214, 190), Color3.fromRGB(214, 200, 172), Color3.fromRGB(236, 226, 206), Color3.fromRGB(206, 196, 180) }
@@ -375,6 +382,23 @@ local function headPosition(model: Model, height: number): Vector3
 		return att.WorldPosition
 	end
 	return model:GetPivot().Position + Vector3.new(0, height * 0.55, 0)
+end
+
+-- il vapore che esce dal collo del colosso dei filmati (emettitori "VaporeCollo" di TitanBuilder)
+local function neckSteam(model: Model, rate: number)
+	for _, d in model:GetDescendants() do
+		if d:IsA("ParticleEmitter") and d.Name == "VaporeCollo" then
+			d.Rate = rate
+		end
+	end
+end
+
+local function neckPosition(model: Model, height: number): Vector3
+	local att = model:FindFirstChild("VaporeCollo", true)
+	if att and att:IsA("Attachment") then
+		return att.WorldPosition
+	end
+	return headPosition(model, height) - Vector3.new(0, height * 0.12, 0)
 end
 
 local function glowLight(parent: Instance, color: Color3, range: number, brightness: number): PointLight
@@ -992,8 +1016,9 @@ local function roarAt(model: Model, height: number, color: Color3, pitch: number
 	end
 end
 
--- 🧱 La Caduta del Muro: il distretto tranquillo, il fulmine, il Vulcano che si alza oltre il Muro,
--- il ruggito visto da fuori (tutto il corpo) e il calcio che sfonda il cancello
+-- 🧱 La Caduta del Muro: il distretto tranquillo, il fulmine, il Vulcano che si alza oltre il Muro e si
+-- aggrappa al bordo con le mani (il vapore gli esce dal collo), il ruggito visto da fuori (tutto il
+-- corpo) e il calcio che sfonda il cancello
 SHOWS.CadutaMuro = function(after)
 	local st = setStage(Color3.fromRGB(118, 108, 92), Enum.Material.Ground)
 	district(st, -360, 360, -640, -80, function(x, _)
@@ -1002,18 +1027,28 @@ SHOWS.CadutaMuro = function(after)
 	-- la campagna oltre il Muro (si vede nelle inquadrature da fuori)
 	hills(st, 10, Color3.fromRGB(112, 120, 78), 460)
 	local wall = wallSegment(st, 0, 1400, 160, "Cancello")
-	local H = 190
-	local spot = at(st, 0, 85)
+	-- più alto del Muro (160): da dentro il distretto si vedono testa, spalle e mani sopra il bordo
+	local H = 230
+	-- dietro il Muro, abbastanza vicino da appoggiare le mani in cima e da arrivare al cancello col piede
+	local spot = at(st, 0, 78)
 	local face = st.ToCamera
-	local vulcano = titan("Vulcano", H, spot - Vector3.new(0, 215, 0), face)
+	local vulcano = titan("Vulcano", H, spot - Vector3.new(0, 270, 0), face)
 	local glow = glowLight(vulcano.PrimaryPart or vulcano, Color3.fromRGB(255, 140, 60), 180, 0)
 	local wallTop = at(st, 0, 0, 165)
+	-- le mani in cima al Muro, sul bordo esterno (i merli arrivano a 165 e sono spessi 34)
+	local animator = animatorOf(vulcano)
+	local grip = if animator then ArmReach.WallGrip(animator, H, at(st, 0, 17, 165), -st.Fwd) else nil
+	neckSteam(vulcano, 0)
 	local function head(): Vector3
 		return headPosition(vulcano, H)
 	end
 	local function chest(): Vector3
 		return vulcano:GetPivot().Position + Vector3.new(0, H * 0.28, 0)
 	end
+	local function neck(): Vector3
+		return neckPosition(vulcano, H)
+	end
+	local STEAM = Color3.fromRGB(255, 240, 230)
 
 	-- 1. la strada del distretto verso il cancello: tutto tranquillo (sotto il titolo)
 	shot(look(at(st, 10, -400, 7), at(st, 0, 0, 70)), look(at(st, 6, -330, 8), at(st, 0, 0, 84)), 3.8)
@@ -1029,45 +1064,62 @@ SHOWS.CadutaMuro = function(after)
 			fx().Flash(Color3.fromRGB(255, 240, 200), 0.6, 0.9)
 			fx().Explosion(spot + Vector3.new(0, 50, 0), 70, true)
 		end
-		steamBurst(spot + Vector3.new(0, 80, 0), 200, 36, 7, Color3.fromRGB(255, 230, 210))
+		-- lo scoppio di vapore resta basso dietro il Muro e svanisce presto: il gigante si vede bene
+		steamBurst(spot + Vector3.new(0, 30, 0), 120, 16, 3, Color3.fromRGB(255, 230, 210))
 		tweenTo(vulcano, standing(vulcano, spot, face), 3.6, "SineInOut")
 		TweenService:Create(glow, TweenInfo.new(2), { Brightness = 4 }):Play()
-		for i = 0, 7 do
-			task.delay(i * 0.42, function()
-				steamBurst(spot + st.Right * rng:NextNumber(-50, 50) + Vector3.new(0, rng:NextNumber(40, 180), 0), 70, 9, 5, Color3.fromRGB(255, 236, 220))
+		-- da qui in poi il vapore esce dal collo
+		neckSteam(vulcano, 8)
+		for i = 1, 4 do
+			task.delay(0.6 + i * 0.55, function()
+				if vulcano.Parent then
+					steamBurst(neck(), 50, 6, 3, STEAM)
+				end
 			end)
 		end
 		shake(0.28, 3.4)
-		local base = at(st, -40, -245, 10)
+		-- teleobiettivo dal fondo della strada: il Muro riempie il quadro e il gigante lo sovrasta
+		local base = at(st, -50, -460, 46)
 		shotPath(function(k)
 			-- guarda il bordo del Muro finché la testa non spunta, poi la segue mentre sale
 			local h = head()
-			local target = Vector3.new(h.X, math.max(h.Y - 12, wallTop.Y), h.Z)
+			local target = Vector3.new(h.X, math.max(h.Y - 30, wallTop.Y + 10), h.Z)
 			return look(base + rel(st, 6 * k, -16 * k, 2 * k), target)
-		end, 3.7, 0.9)
+		end, 3.7, 0.9, 20)
 	end)
-	-- 3. da fuori, oltre il Muro: tutto il corpo, la telecamera gli gira attorno mentre ruggisce
+	-- mentre sale, le mani arrivano da dietro e si aggrappano in cima al Muro
+	after(5.5, function()
+		if grip then
+			grip:Set(1, 1.1)
+		end
+	end)
+	-- 3. da fuori, oltre il Muro: tutto il corpo aggrappato al Muro, la telecamera gli gira attorno mentre ruggisce
 	after(7.3, function()
 		shotPath(function(k)
 			local e = Util.Ease(k, "SineInOut")
 			local a = math.rad(28 + 62 * e)
-			local r = 300 - 50 * e
-			local from = spot + st.Right * (math.sin(a) * r) + st.Fwd * (math.cos(a) * r) + Vector3.new(0, 38 + 46 * e, 0)
+			local r = 340 - 50 * e
+			local from = spot + st.Right * (math.sin(a) * r) + st.Fwd * (math.cos(a) * r) + Vector3.new(0, 44 + 56 * e, 0)
 			return look(from, chest():Lerp(head(), 0.25 + 0.25 * e))
-		end, 2.4)
+		end, 2.4, 0.8)
 	end)
 	after(7.7, function()
 		roarAt(vulcano, H, Color3.fromRGB(255, 190, 120), 0.16)
-		steamBurst(head(), 140, 26, 6, Color3.fromRGB(255, 240, 230))
+		-- il ruggito: il vapore del collo esce più forte (la faccia resta libera)
+		neckSteam(vulcano, 16)
+		steamBurst(neck(), 70, 12, 4, STEAM)
 	end)
-	-- 4. la testa sopra il Muro che guarda giù nel distretto
+	after(9.4, function()
+		neckSteam(vulcano, 8)
+	end)
+	-- 4. la testa sopra il Muro che guarda giù nel distretto, con la mano aggrappata in primo piano
 	after(9.7, function()
 		shotPath(function(k)
 			local h = head()
-			return look(at(st, 66 - 14 * k, -112 + 22 * k, 168 + 6 * k), h)
-		end, 1.3)
+			return look(at(st, 66 - 14 * k, -112 + 22 * k, 168 + 6 * k), h - Vector3.new(0, 14, 0))
+		end, 1.3, 0, 58)
 	end)
-	-- 5. da fuori, in basso dietro la sua gamba: il calcio sfonda il cancello
+	-- 5. da fuori, in basso dietro la sua gamba: tenendosi al Muro, il calcio sfonda il cancello
 	after(11.0, function()
 		shotPath(function(k)
 			local e = Util.Ease(k, "SineOut")
@@ -1075,7 +1127,7 @@ SHOWS.CadutaMuro = function(after)
 		end, 2.2)
 	end)
 	after(11.1, function()
-		animate(vulcano, "Kick")
+		animate(vulcano, "WallKick")
 	end)
 	after(11.7, function()
 		local g = at(st, 0, 0, 30)
@@ -1095,13 +1147,19 @@ SHOWS.CadutaMuro = function(after)
 		playSound("Explosion", nil, 1, 0.35)
 		shake(0.85, 1.3)
 	end)
-	-- 6. dal distretto: la breccia fumante e il gigante oltre il Muro, poi in alto mentre sparisce nel vapore
+	-- 6. dal distretto: la breccia fumante e il gigante oltre il Muro, poi in alto mentre lascia la presa e sparisce
 	after(13.2, function()
 		shot(look(at(st, 20, -270, 26), at(st, 0, 60, 120)), look(at(st, 120, -420, 150), at(st, 0, 40, 70)), 2.4, "SineInOut")
-		steamBurst(spot + Vector3.new(0, 100, 0), 240, 46, 6, Color3.fromRGB(255, 240, 230))
+		neckSteam(vulcano, 16)
+		steamBurst(neck(), 110, 20, 5, STEAM)
+	end)
+	after(13.5, function()
+		if grip then
+			grip:Set(0, 0.6)
+		end
 	end)
 	after(13.9, function()
-		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 230, 0), face), 2.2, "QuadIn")
+		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 290, 0), face), 2.2, "QuadIn")
 	end)
 end
 

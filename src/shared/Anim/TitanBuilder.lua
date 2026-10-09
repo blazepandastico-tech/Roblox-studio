@@ -423,6 +423,40 @@ local function makeProfile(look: string, rng: Random)
 	return p
 end
 
+-- Vapore del colosso dei filmati: esce dal COLLO (sulla nuca e ai due lati), sale sopra la testa e
+-- lascia vedere il corpo. I filmati ne cambiano la forza con Rate sugli emettitori "VaporeCollo".
+local NECK_STEAM = { Vector3.new(0, 0.012, 0.03), Vector3.new(0.045, -0.008, 0.008), Vector3.new(-0.045, -0.008, 0.008) }
+local function addNeckSteam(model: Model, H: number)
+	local neck = model:FindFirstChild("Neck", true)
+	if not (neck and neck:IsA("Motor6D") and neck.Part0) then
+		return
+	end
+	for _, offset in NECK_STEAM do
+		local att = Instance.new("Attachment")
+		att.Name = "VaporeCollo"
+		att.Position = neck.C0.Position + offset * H
+		att.Parent = neck.Part0
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "VaporeCollo"
+		e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		e.Color = ColorSequence.new(Color3.fromRGB(255, 250, 244), Color3.fromRGB(226, 220, 212))
+		e.LightEmission = 0.25
+		e.LightInfluence = 0.5
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(0.5, 0.5), NumberSequenceKeypoint.new(1, 1) })
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.035), NumberSequenceKeypoint.new(0.4, H * 0.11), NumberSequenceKeypoint.new(1, H * 0.2) })
+		e.Lifetime = NumberRange.new(2.2, 3.6)
+		e.Rate = 5
+		e.Speed = NumberRange.new(H * 0.06, H * 0.12)
+		e.SpreadAngle = Vector2.new(22, 22)
+		e.EmissionDirection = Enum.NormalId.Top
+		e.Acceleration = Vector3.new(0, H * 0.025, 0)
+		e.Drag = 0.7
+		e.Rotation = NumberRange.new(0, 360)
+		e.RotSpeed = NumberRange.new(-25, 25)
+		e.Parent = att
+	end
+end
+
 -- Sagoma di legno per l'addestramento --------------------------------------------------
 
 local function buildDummy(height: number, name: string?): Model
@@ -543,19 +577,7 @@ function TitanBuilder.Build(params): Model
 		if MeshTitan.Has("Colosso") then
 			local ok, meshModel = pcall(MeshTitan.Build, { Height = H, Look = "Colosso", Seed = seed, Name = params.Name or "Vulcano", CFrame = params.CFrame })
 			if ok and meshModel then
-				local steam = Instance.new("ParticleEmitter")
-				steam.Name = "Vapore"
-				steam.Texture = "rbxasset://textures/particles/smoke_main.dds"
-				steam.Color = ColorSequence.new(Color3.fromRGB(245, 240, 235))
-				steam.LightEmission = 0.15
-				steam.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) })
-				steam.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.05), NumberSequenceKeypoint.new(1, H * 0.18) })
-				steam.Lifetime = NumberRange.new(2.5, 4)
-				steam.Rate = 6
-				steam.Speed = NumberRange.new(H * 0.03, H * 0.08)
-				steam.SpreadAngle = Vector2.new(40, 40)
-				steam.Acceleration = Vector3.new(0, H * 0.05, 0)
-				steam.Parent = meshModel:FindFirstChild("Torso")
+				addNeckSteam(meshModel, H)
 				meshModel:SetAttribute("JawIdle", 6)
 				return meshModel
 			end
@@ -567,6 +589,7 @@ function TitanBuilder.Build(params): Model
 		end
 		local ok, colosso = pcall(ColossoAnatomico.Build, params)
 		if ok and colosso then
+			addNeckSteam(colosso, H)
 			return colosso
 		end
 		warn("[Giganti] Errore nel colosso dei filmati: " .. tostring(colosso))

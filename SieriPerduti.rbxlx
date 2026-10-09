@@ -55,6 +55,237 @@
         </Properties>
         <Item class="ModuleScript" referent="7">
           <Properties>
+            <string name="Name">ArmReach</string>
+            <string name="Source"><![CDATA[--[[
+	ArmReach - le mani di un gigante afferrano punti precisi del mondo (es. il bordo del Muro)
+
+	Si aggancia a un ProceduralAnimator in modo assoluto (Animator.PostStep): dopo che layer e clip
+	hanno calcolato la posa, sposta spalla, gomito e polso di ogni braccio perché il centro della
+	mano arrivi sul punto scelto (cinematica inversa a due ossa). Il gomito si gira verso "Pole" e la
+	mano si allinea a "Dir". Il resto del corpo continua ad animarsi (ruggito, calcio...): le mani
+	restano attaccate finché il punto è raggiungibile.
+
+	Funziona con tutti i giganti che usano i nomi delle articolazioni di TitanBuilder (colosso fatto
+	con le parti, modello 3D importato con MeshTitan, giganti a blocchi).
+]]
+
+local Util = require(script.Parent.Parent.Lib.Util)
+
+local ArmReach = {}
+
+local IDENTITY = CFrame.identity
+local MAX_BEND = math.rad(150) -- il gomito non si piega oltre
+local MAX_WRIST = math.rad(95) -- e il polso nemmeno
+
+export type Target = { Target: Vector3, Dir: Vector3, Pole: Vector3 }
+
+type Chain = {
+	Root: BasePart,
+	Up: { Motor6D },
+	Shoulder: Motor6D,
+	Elbow: Motor6D,
+	Wrist: Motor6D,
+}
+
+-- posa di riposo della giuntura (come la usa l'animatore)
+local function base(animator, m: Motor6D): CFrame
+	local b = animator.BaseC0[m] or m.C0
+	local s = animator.BaseScale or 1
+	if s ~= 1 then
+		b = CFrame.new(b.Position * s) * b.Rotation
+	end
+	return b
+end
+
+local function perp(v: Vector3, axis: Vector3): Vector3
+	return v - axis * v:Dot(axis)
+end
+
+-- rotazione più breve che porta la direzione u su v (entrambe unitarie), al massimo maxAngle
+local function turn(u: Vector3, v: Vector3, maxAngle: number): CFrame
+	local axis = u:Cross(v)
+	local s = axis.Magnitude
+	if s < 1e-6 then
+		return IDENTITY
+	end
+	return CFrame.fromAxisAngle(axis / s, math.min(math.atan2(s, u:Dot(v)), maxAngle))
+end
+
+local function motorDriving(model: Model, part: BasePart): Motor6D?
+	for _, d in model:GetDescendants() do
+		if d:IsA("Motor6D") and d.Part1 == part then
+			return d
+		end
+	end
+	return nil
+end
+
+-- le giunture del braccio ("Right"/"Left") e quelle dalla radice al busto
+local function chainOf(animator, side: string): Chain?
+	local motors = animator.Motors
+	local shoulder, elbow, wrist = motors[side .. "Shoulder"], motors[side .. "Elbow"], motors[side .. "Wrist"]
+	if not (shoulder and elbow and wrist and shoulder.Part0) then
+		return nil
+	end
+	local up = {}
+	local part = shoulder.Part0 :: BasePart
+	for _ = 1, 16 do
+		local m = motorDriving(animator.Model, part)
+		if not (m and m.Part0) then
+			break
+		end
+		table.insert(up, 1, m)
+		part = m.Part0 :: BasePart
+	end
+	return { Root = part, Up = up, Shoulder = shoulder, Elbow = elbow, Wrist = wrist }
+end
+
+-- sposta spalla, gomito e polso di un braccio nella posa "result" (peso w: 0 = posa animata, 1 = presa)
+local function solve(animator, c: Chain, result, spec: Target, w: number)
+	-- dove si trova la spalla con la posa di questo fotogramma (seguendo le giunture dalla radice)
+	local cf = c.Root.CFrame
+	for _, m in c.Up do
+		cf = cf * base(animator, m) * (result[m.Name] or IDENTITY) * m.C1:Inverse()
+	end
+	local s0 = cf * base(animator, c.Shoulder)
+
+	-- il gomito e il polso visti dalla spalla (posa di riposo)
+	local fe = c.Shoulder.C1:Inverse() * base(animator, c.Elbow)
+	local fw = c.Elbow.C1:Inverse() * base(animator, c.Wrist)
+	local handOffset = c.Wrist.C1:Inverse().Position
+	local handLength = handOffset.Magnitude
+	local handAxis = if handLength > 1e-4 then handOffset / handLength else Vector3.new(0, -1, 0)
+
+	local dir = spec.Dir.Unit
+	local goal = s0:PointToObjectSpace(spec.Target - dir * handLength)
+	local function wristAt(theta: number): Vector3
+		return fe * CFrame.Angles(theta, 0, 0) * fw.Position
+	end
+
+	-- piega del gomito: la distanza spalla-polso deve essere quella del bersaglio
+	local d = goal.Magnitude
+	local lo, hi = 0, MAX_BEND
+	local theta
+	if d >= wristAt(lo).Magnitude then
+		theta = lo
+	elseif d <= wristAt(hi).Magnitude then
+		theta = hi
+	else
+		for _ = 1, 22 do
+			local mid = (lo + hi) * 0.5
+			if wristAt(mid).Magnitude > d then
+				lo = mid
+			else
+				hi = mid
+			end
+		end
+		theta = (lo + hi) * 0.5
+	end
+
+	-- rotazione della spalla: il polso sulla linea del bersaglio, il gomito verso "Pole"
+	local v = wristAt(theta)
+	local a0 = v.Unit
+	local p0 = perp(fe.Position, a0)
+	if p0.Magnitude < 1e-3 then
+		p0 = perp(fe:VectorToWorldSpace(Vector3.zAxis), a0)
+	end
+	local a1 = if d > 1e-4 then goal.Unit else a0
+	local p1 = perp(s0:VectorToObjectSpace(spec.Pole), a1)
+	if p1.Magnitude < 1e-3 then
+		p1 = perp(p0, a1)
+	end
+	if p0.Magnitude < 1e-6 or p1.Magnitude < 1e-6 then
+		return
+	end
+	p0, p1 = p0.Unit, p1.Unit
+	local from = CFrame.fromMatrix(Vector3.zero, a0, p0, a0:Cross(p0))
+	local to = CFrame.fromMatrix(Vector3.zero, a1, p1, a1:Cross(p1))
+	local shoulder = to * from:Inverse()
+	local elbow = CFrame.Angles(theta, 0, 0)
+
+	-- il polso gira la mano verso "Dir"
+	local w0 = s0 * shoulder * fe * elbow * fw
+	local wrist = turn(handAxis, w0:VectorToObjectSpace(dir).Unit, MAX_WRIST)
+
+	local names = { c.Shoulder.Name, c.Elbow.Name, c.Wrist.Name }
+	local poses = { shoulder, elbow, wrist }
+	for i, name in names do
+		result[name] = if w >= 0.999 then poses[i] else (result[name] or IDENTITY):Lerp(poses[i], w)
+	end
+end
+
+export type Grip = {
+	Weight: number,
+	Goal: number,
+	Speed: number,
+	Arms: { [string]: Target },
+	Lean: CFrame?,
+	Set: (self: Grip, weight: number, seconds: number?) -> (),
+}
+
+-- Aggancia la presa all'animatore. arms = { Right = Target, Left = Target } (anche uno solo);
+-- lean = piega del busto mentre tiene la presa. Con grip:Set(1, secondi) le mani vanno sui punti,
+-- con grip:Set(0, secondi) tornano all'animazione normale.
+function ArmReach.Attach(animator, arms: { [string]: Target }, lean: CFrame?): Grip
+	local chains: { [string]: Chain } = {}
+	for side in arms do
+		local c = chainOf(animator, side)
+		if c then
+			chains[side] = c
+		end
+	end
+	local grip = {
+		Weight = 0,
+		Goal = 0,
+		Speed = 1,
+		Arms = arms,
+		Lean = lean,
+	} :: any
+	function grip.Set(self, weight: number, seconds: number?)
+		self.Goal = math.clamp(weight, 0, 1)
+		self.Speed = 1 / math.max(seconds or 0.5, 0.01)
+	end
+	animator.PostStep = function(result, dt: number)
+		local diff = grip.Goal - grip.Weight
+		local stepSize = grip.Speed * dt
+		grip.Weight = if math.abs(diff) <= stepSize then grip.Goal else grip.Weight + math.sign(diff) * stepSize
+		if grip.Weight <= 0.001 then
+			return
+		end
+		local w = Util.Ease(grip.Weight, "SineInOut")
+		if grip.Lean then
+			result.Waist = (result.Waist or IDENTITY):Lerp(grip.Lean, w * 0.75)
+		end
+		for side, c in chains do
+			solve(animator, c, result, grip.Arms[side], w)
+		end
+	end
+	return grip
+end
+
+-- Le due mani sul bordo di un muro. "edge" = punto sul bordo in cima al muro, dal lato del gigante;
+-- "toward" = direzione dal gigante verso il muro. Le mani si appoggiano in cima, ben oltre il bordo
+-- (le dita arrivano al lato opposto) e più larghe delle spalle, con i gomiti in basso e in fuori.
+function ArmReach.WallGrip(animator, height: number, edge: Vector3, toward: Vector3): Grip
+	local f = Vector3.new(toward.X, 0, toward.Z).Unit
+	local right = f:Cross(Vector3.yAxis)
+	local arms = {}
+	for side, s in { Right = 1, Left = -1 } do
+		arms[side] = {
+			Target = edge + right * (s * 0.22 * height) + f * (0.1 * height) + Vector3.yAxis * (0.013 * height),
+			Dir = (f * 0.9 - Vector3.yAxis * 0.42).Unit,
+			Pole = (right * (s * 0.7) - Vector3.yAxis - f * 0.25).Unit,
+		}
+	end
+	return ArmReach.Attach(animator, arms, CFrame.Angles(math.rad(-8), 0, 0))
+end
+
+return ArmReach
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="8">
+          <Properties>
             <string name="Name">ColossoAnatomico</string>
             <string name="Source"><![CDATA[--[[
 	ColossoAnatomico - il Gigante Vulcano dei FILMATI, il più realistico possibile.
@@ -438,23 +669,10 @@ function ColossoAnatomico.Build(params): Model
 	buildLeg(1, "Right")
 	buildLeg(-1, "Left")
 
-	-- vapore che sale dal corpo
+	-- punto per gli effetti sul corpo (il vapore esce dal collo: lo aggiunge TitanBuilder, "VaporeCollo")
 	local steamAtt = Instance.new("Attachment")
 	steamAtt.Name = "SteamAtt"
 	steamAtt.Parent = torso
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Name = "Vapore"
-	emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	emitter.Color = ColorSequence.new(Color3.fromRGB(245, 240, 235))
-	emitter.LightEmission = 0.15
-	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) })
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.05), NumberSequenceKeypoint.new(1, H * 0.18) })
-	emitter.Lifetime = NumberRange.new(2.5, 4)
-	emitter.Rate = 6
-	emitter.Speed = NumberRange.new(H * 0.03, H * 0.08)
-	emitter.SpreadAngle = Vector2.new(40, 40)
-	emitter.Acceleration = Vector3.new(0, H * 0.05, 0)
-	emitter.Parent = torso
 
 	model.PrimaryPart = root
 	model:SetAttribute("Height", H)
@@ -474,7 +692,7 @@ return ColossoAnatomico
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="8">
+        <Item class="ModuleScript" referent="9">
           <Properties>
             <string name="Name">MeshTitan</string>
             <string name="Source"><![CDATA[--[[
@@ -1004,7 +1222,7 @@ return MeshTitan
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="9">
+        <Item class="ModuleScript" referent="10">
           <Properties>
             <string name="Name">Poses</string>
             <string name="Source"><![CDATA[--[[
@@ -1858,6 +2076,15 @@ addTitan(clip("Kick", {
 	K(1.05, { RightHip = A(10, 0, 5), RightKnee = A(-10, 0, 0), Root = A(0, 0, 0) }, "QuadOut"),
 }, { FadeOut = 0.3 }))
 
+-- Calcio dei filmati con le mani aggrappate al Muro (ArmReach): solo la gamba e un po' il busto,
+-- senza girare il corpo, così le mani restano ferme sul bordo. Il colpo arriva a 0.62 s.
+addTitan(clip("WallKick", {
+	K(0, {}),
+	K(0.45, { RightHip = A(-30, 0, 6), RightKnee = A(-75, 0, 0), RightAnkle = A(-15, 0, 0), Waist = A(6, 0, 0), Root = A(4, 0, 0), LeftKnee = A(-10, 0, 0) }, "QuadOut"),
+	K(0.62, { RightHip = A(64, 0, 4), RightKnee = A(-6, 0, 0), RightAnkle = A(20, 0, 0), Waist = A(-10, 0, 0), Root = A(-6, 0, 0), LeftKnee = A(-14, 0, 0) }, "ExpoOut"),
+	K(1.4, { RightHip = A(12, 0, 2), RightKnee = A(-14, 0, 0), LeftKnee = A(-4, 0, 0) }, "QuadOut"),
+}, { FadeOut = 0.35 }))
+
 addTitan(clip("Punch", {
 	K(0, {}),
 	K(0.4, { RightShoulder = A(25, 0, 35), RightElbow = A(125, 0, 0), Waist = A(0, -30, 0), LeftShoulder = A(60, 0, -20), LeftElbow = A(80, 0, 0) }, "QuadOut"),
@@ -1961,7 +2188,7 @@ return Poses
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="10">
+        <Item class="ModuleScript" referent="11">
           <Properties>
             <string name="Name">ProceduralAnimator</string>
             <string name="Source"><![CDATA[--[[
@@ -2005,6 +2232,8 @@ function Animator.new(model: Model, absolute: boolean?)
 	self.Context = {}
 	self.Result = {} :: Pose
 	self.Paused = 0
+	-- funzione opzionale (posa, dt) chiamata dopo layer e clip: può correggere la posa (vedi ArmReach)
+	self.PostStep = nil :: ((Pose, number) -> ())?
 	self:Refresh()
 	return self
 end
@@ -2285,6 +2514,15 @@ function Animator:Step(dt: number)
 		end
 	end
 
+	-- correzioni finali della posa (es. ArmReach: le mani che afferrano un punto del mondo)
+	if self.PostStep then
+		local ok, err = pcall(self.PostStep, result, dt)
+		if not ok and not self.PostWarned then
+			self.PostWarned = true
+			warn(("[Animazioni] Errore nella correzione della posa di %s: %s"):format(self.Model.Name, tostring(err)))
+		end
+	end
+
 	self.Result = result
 end
 
@@ -2331,7 +2569,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="11">
+        <Item class="ModuleScript" referent="12">
           <Properties>
             <string name="Name">TitanBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -2759,6 +2997,40 @@ local function makeProfile(look: string, rng: Random)
 	return p
 end
 
+-- Vapore del colosso dei filmati: esce dal COLLO (sulla nuca e ai due lati), sale sopra la testa e
+-- lascia vedere il corpo. I filmati ne cambiano la forza con Rate sugli emettitori "VaporeCollo".
+local NECK_STEAM = { Vector3.new(0, 0.012, 0.03), Vector3.new(0.045, -0.008, 0.008), Vector3.new(-0.045, -0.008, 0.008) }
+local function addNeckSteam(model: Model, H: number)
+	local neck = model:FindFirstChild("Neck", true)
+	if not (neck and neck:IsA("Motor6D") and neck.Part0) then
+		return
+	end
+	for _, offset in NECK_STEAM do
+		local att = Instance.new("Attachment")
+		att.Name = "VaporeCollo"
+		att.Position = neck.C0.Position + offset * H
+		att.Parent = neck.Part0
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "VaporeCollo"
+		e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		e.Color = ColorSequence.new(Color3.fromRGB(255, 250, 244), Color3.fromRGB(226, 220, 212))
+		e.LightEmission = 0.25
+		e.LightInfluence = 0.5
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(0.5, 0.5), NumberSequenceKeypoint.new(1, 1) })
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.035), NumberSequenceKeypoint.new(0.4, H * 0.11), NumberSequenceKeypoint.new(1, H * 0.2) })
+		e.Lifetime = NumberRange.new(2.2, 3.6)
+		e.Rate = 5
+		e.Speed = NumberRange.new(H * 0.06, H * 0.12)
+		e.SpreadAngle = Vector2.new(22, 22)
+		e.EmissionDirection = Enum.NormalId.Top
+		e.Acceleration = Vector3.new(0, H * 0.025, 0)
+		e.Drag = 0.7
+		e.Rotation = NumberRange.new(0, 360)
+		e.RotSpeed = NumberRange.new(-25, 25)
+		e.Parent = att
+	end
+end
+
 -- Sagoma di legno per l'addestramento --------------------------------------------------
 
 local function buildDummy(height: number, name: string?): Model
@@ -2879,19 +3151,7 @@ function TitanBuilder.Build(params): Model
 		if MeshTitan.Has("Colosso") then
 			local ok, meshModel = pcall(MeshTitan.Build, { Height = H, Look = "Colosso", Seed = seed, Name = params.Name or "Vulcano", CFrame = params.CFrame })
 			if ok and meshModel then
-				local steam = Instance.new("ParticleEmitter")
-				steam.Name = "Vapore"
-				steam.Texture = "rbxasset://textures/particles/smoke_main.dds"
-				steam.Color = ColorSequence.new(Color3.fromRGB(245, 240, 235))
-				steam.LightEmission = 0.15
-				steam.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) })
-				steam.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.05), NumberSequenceKeypoint.new(1, H * 0.18) })
-				steam.Lifetime = NumberRange.new(2.5, 4)
-				steam.Rate = 6
-				steam.Speed = NumberRange.new(H * 0.03, H * 0.08)
-				steam.SpreadAngle = Vector2.new(40, 40)
-				steam.Acceleration = Vector3.new(0, H * 0.05, 0)
-				steam.Parent = meshModel:FindFirstChild("Torso")
+				addNeckSteam(meshModel, H)
 				meshModel:SetAttribute("JawIdle", 6)
 				return meshModel
 			end
@@ -2903,6 +3163,7 @@ function TitanBuilder.Build(params): Model
 		end
 		local ok, colosso = pcall(ColossoAnatomico.Build, params)
 		if ok and colosso then
+			addNeckSteam(colosso, H)
 			return colosso
 		end
 		warn("[Giganti] Errore nel colosso dei filmati: " .. tostring(colosso))
@@ -3495,7 +3756,7 @@ return TitanBuilder
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="13">
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--[[
@@ -3752,11 +4013,11 @@ return Config
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="13">
+      <Item class="Folder" referent="14">
         <Properties>
           <string name="Name">Data</string>
         </Properties>
-        <Item class="ModuleScript" referent="14">
+        <Item class="ModuleScript" referent="15">
           <Properties>
             <string name="Name">AbuseEvents</string>
             <string name="Source"><![CDATA[--[[
@@ -3977,7 +4238,7 @@ return AbuseEvents
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="15">
+        <Item class="ModuleScript" referent="16">
           <Properties>
             <string name="Name">Achievements</string>
             <string name="Source"><![CDATA[--[[
@@ -4083,7 +4344,7 @@ return Achievements
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="16">
+        <Item class="ModuleScript" referent="17">
           <Properties>
             <string name="Name">AnimationIds</string>
             <string name="Source"><![CDATA[--[[
@@ -4118,7 +4379,7 @@ return AnimationIds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="17">
+        <Item class="ModuleScript" referent="18">
           <Properties>
             <string name="Name">Bloodlines</string>
             <string name="Source"><![CDATA[--[[
@@ -4211,7 +4472,7 @@ return Bloodlines
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="18">
+        <Item class="ModuleScript" referent="19">
           <Properties>
             <string name="Name">Enemies</string>
             <string name="Source"><![CDATA[--[[
@@ -4342,7 +4603,7 @@ return Enemies
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="19">
+        <Item class="ModuleScript" referent="20">
           <Properties>
             <string name="Name">Festival</string>
             <string name="Source"><![CDATA[--[[
@@ -4453,7 +4714,7 @@ return Festival
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="20">
+        <Item class="ModuleScript" referent="21">
           <Properties>
             <string name="Name">Items</string>
             <string name="Source"><![CDATA[--[[
@@ -5339,7 +5600,7 @@ return Items
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Leveling</string>
             <string name="Source"><![CDATA[--[[
@@ -5400,7 +5661,7 @@ return Leveling
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="22">
+        <Item class="ModuleScript" referent="23">
           <Properties>
             <string name="Name">Monetization</string>
             <string name="Source"><![CDATA[--[[
@@ -5542,7 +5803,7 @@ return Monetization
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="24">
           <Properties>
             <string name="Name">NPCs</string>
             <string name="Source"><![CDATA[--[[
@@ -5939,7 +6200,7 @@ return NPCs
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="25">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[
@@ -6052,7 +6313,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Raids</string>
             <string name="Source"><![CDATA[--[[
@@ -6167,7 +6428,7 @@ return Raids
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="27">
           <Properties>
             <string name="Name">Rewards</string>
             <string name="Source"><![CDATA[--[[
@@ -6245,7 +6506,7 @@ return Rewards
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">Serums</string>
             <string name="Source"><![CDATA[--[[
@@ -6537,7 +6798,7 @@ return Serums
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="28">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">Shops</string>
             <string name="Source"><![CDATA[--[[
@@ -6608,7 +6869,7 @@ return Shops
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="30">
           <Properties>
             <string name="Name">Skills</string>
             <string name="Source"><![CDATA[--[[
@@ -6681,7 +6942,7 @@ return Skills
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="30">
+        <Item class="ModuleScript" referent="31">
           <Properties>
             <string name="Name">Sounds</string>
             <string name="Source"><![CDATA[--[[
@@ -6744,7 +7005,7 @@ return Sounds
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">StatsCalc</string>
             <string name="Source"><![CDATA[--[[
@@ -6906,7 +7167,7 @@ return StatsCalc
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">Story</string>
             <string name="Source"><![CDATA[--[[
@@ -7589,7 +7850,7 @@ return Story
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="34">
           <Properties>
             <string name="Name">Titans</string>
             <string name="Source"><![CDATA[--[[
@@ -7953,7 +8214,7 @@ return Titans
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="34">
+        <Item class="ModuleScript" referent="35">
           <Properties>
             <string name="Name">Treasures</string>
             <string name="Source"><![CDATA[--[[
@@ -8074,7 +8335,7 @@ return Treasures
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="36">
           <Properties>
             <string name="Name">WorldLayout</string>
             <string name="Source"><![CDATA[--[[
@@ -8289,7 +8550,7 @@ return W
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">Zones</string>
             <string name="Source"><![CDATA[--[[
@@ -8932,11 +9193,11 @@ return Zones
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="37">
+      <Item class="Folder" referent="38">
         <Properties>
           <string name="Name">Lib</string>
         </Properties>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[--[[
@@ -9080,7 +9341,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Signal</string>
             <string name="Source"><![CDATA[--[[
@@ -9161,7 +9422,7 @@ return Signal
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">Util</string>
             <string name="Source"><![CDATA[--[[
@@ -9455,11 +9716,11 @@ return Util
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="41">
+      <Item class="Folder" referent="42">
         <Properties>
           <string name="Name">Modules</string>
         </Properties>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">ODMPhysicsModule</string>
             <string name="Source"><![CDATA[--[[
@@ -9695,15 +9956,15 @@ return ODMPhysics
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="43">
+  <Item class="ServerScriptService" referent="44">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="44">
+    <Item class="Folder" referent="45">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="Script" referent="45">
+      <Item class="Script" referent="46">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -9802,11 +10063,11 @@ print("[Sieri Perduti] Server avviato. Volate oltre la paura!")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="46">
+      <Item class="Folder" referent="47">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">AbuseService</string>
             <string name="Source"><![CDATA[--[[
@@ -10248,7 +10509,7 @@ return AbuseService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">AchievementService</string>
             <string name="Source"><![CDATA[--[[
@@ -10339,7 +10600,7 @@ return AchievementService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--[[
@@ -11007,7 +11268,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">CodesService</string>
             <string name="Source"><![CDATA[--[[
@@ -11071,7 +11332,7 @@ return CodesService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">CombatService</string>
             <string name="Source"><![CDATA[--[[
@@ -11639,7 +11900,7 @@ return CombatService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">CommunityService</string>
             <string name="Source"><![CDATA[--[[
@@ -11775,7 +12036,7 @@ return CommunityService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">DataService</string>
             <string name="Source"><![CDATA[--[[
@@ -12151,7 +12412,7 @@ return DataService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">DevCommandsService</string>
             <string name="Source"><![CDATA[--[[
@@ -12422,7 +12683,7 @@ return DevCommandsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--[[
@@ -12895,7 +13156,7 @@ return EnemyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">EventService</string>
             <string name="Source"><![CDATA[--[[
@@ -13008,7 +13269,7 @@ return EventService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">ExploreService</string>
             <string name="Source"><![CDATA[--[[
@@ -13203,7 +13464,7 @@ return ExploreService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">FestivalService</string>
             <string name="Source"><![CDATA[--[[
@@ -13854,7 +14115,7 @@ return FestivalService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">HorseService</string>
             <string name="Source"><![CDATA[--[[
@@ -14157,7 +14418,7 @@ return HorseService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">InventoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -14341,7 +14602,7 @@ return InventoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">LeaderboardService</string>
             <string name="Source"><![CDATA[--[[
@@ -14574,7 +14835,7 @@ return LeaderboardService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">LightingService</string>
             <string name="Source"><![CDATA[--[[
@@ -14774,7 +15035,7 @@ return LightingService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">MonetizationService</string>
             <string name="Source"><![CDATA[--[[
@@ -15185,7 +15446,7 @@ return MonetizationService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">NPCService</string>
             <string name="Source"><![CDATA[--[[
@@ -15723,7 +15984,7 @@ return NPCService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">ODMService</string>
             <string name="Source"><![CDATA[--[[
@@ -16124,7 +16385,7 @@ return ODMService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">OutfitService</string>
             <string name="Source"><![CDATA[--[[
@@ -16661,7 +16922,7 @@ return OutfitService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">PlayerService</string>
             <string name="Source"><![CDATA[--[[
@@ -17420,7 +17681,7 @@ return PlayerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">PvPService</string>
             <string name="Source"><![CDATA[--[[
@@ -17670,7 +17931,7 @@ return PvPService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">QuestService</string>
             <string name="Source"><![CDATA[--[[
@@ -17792,7 +18053,7 @@ return QuestService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">RaidService</string>
             <string name="Source"><![CDATA[--[[
@@ -18275,7 +18536,7 @@ return RaidService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">RewardsService</string>
             <string name="Source"><![CDATA[--[[
@@ -18539,7 +18800,7 @@ return RewardsService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">SeaService</string>
             <string name="Source"><![CDATA[--[[
@@ -19051,7 +19312,7 @@ return SeaService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">SerumService</string>
             <string name="Source"><![CDATA[--[[
@@ -19376,7 +19637,7 @@ return SerumService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">ShifterService</string>
             <string name="Source"><![CDATA[--[[
@@ -20183,7 +20444,7 @@ return ShifterService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">ShopService</string>
             <string name="Source"><![CDATA[--[[
@@ -20400,7 +20661,7 @@ return ShopService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">StoryService</string>
             <string name="Source"><![CDATA[--[[
@@ -20776,7 +21037,7 @@ return StoryService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">SupplyService</string>
             <string name="Source"><![CDATA[--[[
@@ -20851,7 +21112,7 @@ return SupplyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">TitanService</string>
             <string name="Source"><![CDATA[--[[
@@ -22497,7 +22758,7 @@ return TitanService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">WorldBuilder</string>
             <string name="Source"><![CDATA[--[[
@@ -25276,11 +25537,11 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="ServerStorage" referent="80">
+  <Item class="ServerStorage" referent="81">
     <Properties>
       <string name="Name">ServerStorage</string>
     </Properties>
-    <Item class="ModuleScript" referent="81">
+    <Item class="ModuleScript" referent="82">
       <Properties>
         <string name="Name">LEGGIMI_GuidaStoria</string>
         <string name="Source"><![CDATA[--[==[
@@ -25507,19 +25768,19 @@ return {}
       </Properties>
     </Item>
   </Item>
-  <Item class="SoundService" referent="82">
+  <Item class="SoundService" referent="83">
     <Properties>
       <string name="Name">SoundService</string>
       <bool name="RespectFilteringEnabled">true</bool>
     </Properties>
   </Item>
-  <Item class="StarterGui" referent="83">
+  <Item class="StarterGui" referent="84">
     <Properties>
       <string name="Name">StarterGui</string>
       <bool name="ResetPlayerGuiOnSpawn">false</bool>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="84">
+  <Item class="StarterPlayer" referent="85">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">45</float>
@@ -25530,11 +25791,11 @@ return {}
       <bool name="EnableMouseLockOption">false</bool>
       <token name="GameSettingsAvatar">1</token>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="85">
+    <Item class="StarterCharacterScripts" referent="86">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="86">
+      <Item class="LocalScript" referent="87">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[--[[
@@ -25547,19 +25808,19 @@ return {}
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="87">
+    <Item class="StarterPlayerScripts" referent="88">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="88">
+      <Item class="Folder" referent="89">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="Folder" referent="89">
+        <Item class="Folder" referent="90">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">AbuseEventController</string>
               <string name="Source"><![CDATA[--[[
@@ -25590,6 +25851,7 @@ local AbuseEvents = require(Shared.Data.AbuseEvents)
 local TitanBuilder = require(Shared.Anim.TitanBuilder)
 local ProceduralAnimator = require(Shared.Anim.ProceduralAnimator)
 local Poses = require(Shared.Anim.Poses)
+local ArmReach = require(Shared.Anim.ArmReach)
 
 local AbuseEventController = {}
 local C
@@ -25636,14 +25898,16 @@ local followers: { () -> () } = {}
 
 -- regia: quando è attiva la telecamera segue l'inquadratura attuale (camShot) e il giocatore è bloccato
 local cinematic = false
-type Shot = { Path: (number) -> CFrame, Start: number, Duration: number, Blend: number, From: CFrame? }
+type Shot = { Path: (number) -> CFrame, Start: number, Duration: number, Blend: number, From: CFrame?, Fov: number, FromFov: number? }
 local camShot: Shot? = nil
 
 -- blend: secondi in cui la telecamera scivola dall'inquadratura precedente a questa (0 = stacco netto)
-local function shotPath(path: (number) -> CFrame, duration: number, blend: number?)
+-- fov: campo visivo (70 normale; più basso = teleobiettivo, i giganti lontani sembrano enormi)
+local function shotPath(path: (number) -> CFrame, duration: number, blend: number?, fov: number?)
 	local cam = workspace.CurrentCamera
 	local from = if cinematic and camShot and cam then cam.CFrame else nil
-	camShot = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration), Blend = blend or 0, From = from }
+	local fromFov = if from and cam then cam.FieldOfView else nil
+	camShot = { Path = path, Start = os.clock(), Duration = math.max(0.01, duration), Blend = blend or 0, From = from, Fov = fov or 70, FromFov = fromFov }
 end
 
 local function moveAlong(target: Instance, path: (number) -> CFrame, duration: number, done: (() -> ())?)
@@ -25701,13 +25965,17 @@ local function step(dt: number)
 		cam.CameraType = Enum.CameraType.Scriptable
 		local wobble = if C.CameraController and C.CameraController.CinematicShake then C.CameraController.CinematicShake() else CFrame.identity
 		local cf = s.Path(k)
+		local fov = s.Fov
 		if s.From and s.Blend > 0 then
 			local b = (now - s.Start) / s.Blend
 			if b < 1 then
-				cf = s.From:Lerp(cf, Util.Ease(b, "SineInOut"))
+				local e = Util.Ease(b, "SineInOut")
+				cf = s.From:Lerp(cf, e)
+				fov = (s.FromFov or fov) + (fov - (s.FromFov or fov)) * e
 			end
 		end
 		cam.CFrame = cf * wobble
+		cam.FieldOfView = fov
 	end
 end
 
@@ -25804,11 +26072,11 @@ local function look(from: Vector3, target: Vector3): CFrame
 	return CFrame.lookAt(from, target)
 end
 
--- l'inquadratura va da "from" a "to" in "duration" secondi (senza attendere); blend come shotPath
-local function shot(from: CFrame, to: CFrame, duration: number, style: string?, blend: number?)
+-- l'inquadratura va da "from" a "to" in "duration" secondi (senza attendere); blend e fov come shotPath
+local function shot(from: CFrame, to: CFrame, duration: number, style: string?, blend: number?, fov: number?)
 	shotPath(function(k)
 		return from:Lerp(to, Util.Ease(k, style or "SineInOut"))
-	end, duration, blend)
+	end, duration, blend, fov)
 end
 
 local HOUSE_WALLS = { Color3.fromRGB(226, 214, 190), Color3.fromRGB(214, 200, 172), Color3.fromRGB(236, 226, 206), Color3.fromRGB(206, 196, 180) }
@@ -25939,6 +26207,23 @@ local function headPosition(model: Model, height: number): Vector3
 		return att.WorldPosition
 	end
 	return model:GetPivot().Position + Vector3.new(0, height * 0.55, 0)
+end
+
+-- il vapore che esce dal collo del colosso dei filmati (emettitori "VaporeCollo" di TitanBuilder)
+local function neckSteam(model: Model, rate: number)
+	for _, d in model:GetDescendants() do
+		if d:IsA("ParticleEmitter") and d.Name == "VaporeCollo" then
+			d.Rate = rate
+		end
+	end
+end
+
+local function neckPosition(model: Model, height: number): Vector3
+	local att = model:FindFirstChild("VaporeCollo", true)
+	if att and att:IsA("Attachment") then
+		return att.WorldPosition
+	end
+	return headPosition(model, height) - Vector3.new(0, height * 0.12, 0)
 end
 
 local function glowLight(parent: Instance, color: Color3, range: number, brightness: number): PointLight
@@ -26556,8 +26841,9 @@ local function roarAt(model: Model, height: number, color: Color3, pitch: number
 	end
 end
 
--- 🧱 La Caduta del Muro: il distretto tranquillo, il fulmine, il Vulcano che si alza oltre il Muro,
--- il ruggito visto da fuori (tutto il corpo) e il calcio che sfonda il cancello
+-- 🧱 La Caduta del Muro: il distretto tranquillo, il fulmine, il Vulcano che si alza oltre il Muro e si
+-- aggrappa al bordo con le mani (il vapore gli esce dal collo), il ruggito visto da fuori (tutto il
+-- corpo) e il calcio che sfonda il cancello
 SHOWS.CadutaMuro = function(after)
 	local st = setStage(Color3.fromRGB(118, 108, 92), Enum.Material.Ground)
 	district(st, -360, 360, -640, -80, function(x, _)
@@ -26566,18 +26852,28 @@ SHOWS.CadutaMuro = function(after)
 	-- la campagna oltre il Muro (si vede nelle inquadrature da fuori)
 	hills(st, 10, Color3.fromRGB(112, 120, 78), 460)
 	local wall = wallSegment(st, 0, 1400, 160, "Cancello")
-	local H = 190
-	local spot = at(st, 0, 85)
+	-- più alto del Muro (160): da dentro il distretto si vedono testa, spalle e mani sopra il bordo
+	local H = 230
+	-- dietro il Muro, abbastanza vicino da appoggiare le mani in cima e da arrivare al cancello col piede
+	local spot = at(st, 0, 78)
 	local face = st.ToCamera
-	local vulcano = titan("Vulcano", H, spot - Vector3.new(0, 215, 0), face)
+	local vulcano = titan("Vulcano", H, spot - Vector3.new(0, 270, 0), face)
 	local glow = glowLight(vulcano.PrimaryPart or vulcano, Color3.fromRGB(255, 140, 60), 180, 0)
 	local wallTop = at(st, 0, 0, 165)
+	-- le mani in cima al Muro, sul bordo esterno (i merli arrivano a 165 e sono spessi 34)
+	local animator = animatorOf(vulcano)
+	local grip = if animator then ArmReach.WallGrip(animator, H, at(st, 0, 17, 165), -st.Fwd) else nil
+	neckSteam(vulcano, 0)
 	local function head(): Vector3
 		return headPosition(vulcano, H)
 	end
 	local function chest(): Vector3
 		return vulcano:GetPivot().Position + Vector3.new(0, H * 0.28, 0)
 	end
+	local function neck(): Vector3
+		return neckPosition(vulcano, H)
+	end
+	local STEAM = Color3.fromRGB(255, 240, 230)
 
 	-- 1. la strada del distretto verso il cancello: tutto tranquillo (sotto il titolo)
 	shot(look(at(st, 10, -400, 7), at(st, 0, 0, 70)), look(at(st, 6, -330, 8), at(st, 0, 0, 84)), 3.8)
@@ -26593,45 +26889,62 @@ SHOWS.CadutaMuro = function(after)
 			fx().Flash(Color3.fromRGB(255, 240, 200), 0.6, 0.9)
 			fx().Explosion(spot + Vector3.new(0, 50, 0), 70, true)
 		end
-		steamBurst(spot + Vector3.new(0, 80, 0), 200, 36, 7, Color3.fromRGB(255, 230, 210))
+		-- lo scoppio di vapore resta basso dietro il Muro e svanisce presto: il gigante si vede bene
+		steamBurst(spot + Vector3.new(0, 30, 0), 120, 16, 3, Color3.fromRGB(255, 230, 210))
 		tweenTo(vulcano, standing(vulcano, spot, face), 3.6, "SineInOut")
 		TweenService:Create(glow, TweenInfo.new(2), { Brightness = 4 }):Play()
-		for i = 0, 7 do
-			task.delay(i * 0.42, function()
-				steamBurst(spot + st.Right * rng:NextNumber(-50, 50) + Vector3.new(0, rng:NextNumber(40, 180), 0), 70, 9, 5, Color3.fromRGB(255, 236, 220))
+		-- da qui in poi il vapore esce dal collo
+		neckSteam(vulcano, 8)
+		for i = 1, 4 do
+			task.delay(0.6 + i * 0.55, function()
+				if vulcano.Parent then
+					steamBurst(neck(), 50, 6, 3, STEAM)
+				end
 			end)
 		end
 		shake(0.28, 3.4)
-		local base = at(st, -40, -245, 10)
+		-- teleobiettivo dal fondo della strada: il Muro riempie il quadro e il gigante lo sovrasta
+		local base = at(st, -50, -460, 46)
 		shotPath(function(k)
 			-- guarda il bordo del Muro finché la testa non spunta, poi la segue mentre sale
 			local h = head()
-			local target = Vector3.new(h.X, math.max(h.Y - 12, wallTop.Y), h.Z)
+			local target = Vector3.new(h.X, math.max(h.Y - 30, wallTop.Y + 10), h.Z)
 			return look(base + rel(st, 6 * k, -16 * k, 2 * k), target)
-		end, 3.7, 0.9)
+		end, 3.7, 0.9, 20)
 	end)
-	-- 3. da fuori, oltre il Muro: tutto il corpo, la telecamera gli gira attorno mentre ruggisce
+	-- mentre sale, le mani arrivano da dietro e si aggrappano in cima al Muro
+	after(5.5, function()
+		if grip then
+			grip:Set(1, 1.1)
+		end
+	end)
+	-- 3. da fuori, oltre il Muro: tutto il corpo aggrappato al Muro, la telecamera gli gira attorno mentre ruggisce
 	after(7.3, function()
 		shotPath(function(k)
 			local e = Util.Ease(k, "SineInOut")
 			local a = math.rad(28 + 62 * e)
-			local r = 300 - 50 * e
-			local from = spot + st.Right * (math.sin(a) * r) + st.Fwd * (math.cos(a) * r) + Vector3.new(0, 38 + 46 * e, 0)
+			local r = 340 - 50 * e
+			local from = spot + st.Right * (math.sin(a) * r) + st.Fwd * (math.cos(a) * r) + Vector3.new(0, 44 + 56 * e, 0)
 			return look(from, chest():Lerp(head(), 0.25 + 0.25 * e))
-		end, 2.4)
+		end, 2.4, 0.8)
 	end)
 	after(7.7, function()
 		roarAt(vulcano, H, Color3.fromRGB(255, 190, 120), 0.16)
-		steamBurst(head(), 140, 26, 6, Color3.fromRGB(255, 240, 230))
+		-- il ruggito: il vapore del collo esce più forte (la faccia resta libera)
+		neckSteam(vulcano, 16)
+		steamBurst(neck(), 70, 12, 4, STEAM)
 	end)
-	-- 4. la testa sopra il Muro che guarda giù nel distretto
+	after(9.4, function()
+		neckSteam(vulcano, 8)
+	end)
+	-- 4. la testa sopra il Muro che guarda giù nel distretto, con la mano aggrappata in primo piano
 	after(9.7, function()
 		shotPath(function(k)
 			local h = head()
-			return look(at(st, 66 - 14 * k, -112 + 22 * k, 168 + 6 * k), h)
-		end, 1.3)
+			return look(at(st, 66 - 14 * k, -112 + 22 * k, 168 + 6 * k), h - Vector3.new(0, 14, 0))
+		end, 1.3, 0, 58)
 	end)
-	-- 5. da fuori, in basso dietro la sua gamba: il calcio sfonda il cancello
+	-- 5. da fuori, in basso dietro la sua gamba: tenendosi al Muro, il calcio sfonda il cancello
 	after(11.0, function()
 		shotPath(function(k)
 			local e = Util.Ease(k, "SineOut")
@@ -26639,7 +26952,7 @@ SHOWS.CadutaMuro = function(after)
 		end, 2.2)
 	end)
 	after(11.1, function()
-		animate(vulcano, "Kick")
+		animate(vulcano, "WallKick")
 	end)
 	after(11.7, function()
 		local g = at(st, 0, 0, 30)
@@ -26659,13 +26972,19 @@ SHOWS.CadutaMuro = function(after)
 		playSound("Explosion", nil, 1, 0.35)
 		shake(0.85, 1.3)
 	end)
-	-- 6. dal distretto: la breccia fumante e il gigante oltre il Muro, poi in alto mentre sparisce nel vapore
+	-- 6. dal distretto: la breccia fumante e il gigante oltre il Muro, poi in alto mentre lascia la presa e sparisce
 	after(13.2, function()
 		shot(look(at(st, 20, -270, 26), at(st, 0, 60, 120)), look(at(st, 120, -420, 150), at(st, 0, 40, 70)), 2.4, "SineInOut")
-		steamBurst(spot + Vector3.new(0, 100, 0), 240, 46, 6, Color3.fromRGB(255, 240, 230))
+		neckSteam(vulcano, 16)
+		steamBurst(neck(), 110, 20, 5, STEAM)
+	end)
+	after(13.5, function()
+		if grip then
+			grip:Set(0, 0.6)
+		end
 	end)
 	after(13.9, function()
-		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 230, 0), face), 2.2, "QuadIn")
+		tweenTo(vulcano, standing(vulcano, spot - Vector3.new(0, 290, 0), face), 2.2, "QuadIn")
 	end)
 end
 
@@ -27568,7 +27887,7 @@ return AbuseEventController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">AmbienceController</string>
               <string name="Source"><![CDATA[--[[
@@ -27886,7 +28205,7 @@ return AmbienceController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">AnimationController</string>
               <string name="Source"><![CDATA[--[[
@@ -28422,7 +28741,7 @@ return AnimationController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">BoatController</string>
               <string name="Source"><![CDATA[--[[
@@ -28611,7 +28930,7 @@ return BoatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">CameraController</string>
               <string name="Source"><![CDATA[--[[
@@ -28946,7 +29265,7 @@ return CameraController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">CitizenController</string>
               <string name="Source"><![CDATA[--[[
@@ -29275,7 +29594,7 @@ return CitizenController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">ClientData</string>
               <string name="Source"><![CDATA[--[[
@@ -29334,7 +29653,7 @@ return ClientData
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">CombatController</string>
               <string name="Source"><![CDATA[--[[
@@ -30076,7 +30395,7 @@ return CombatController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">CutsceneController</string>
               <string name="Source"><![CDATA[--[[
@@ -30841,7 +31160,7 @@ return CutsceneController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">EffectsController</string>
               <string name="Source"><![CDATA[--[[
@@ -31978,7 +32297,7 @@ return EffectsController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">ExploreController</string>
               <string name="Source"><![CDATA[--[[
@@ -32044,7 +32363,7 @@ return ExploreController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">FireworksController</string>
               <string name="Source"><![CDATA[--[[
@@ -32518,7 +32837,7 @@ return FireworksController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">HorseController</string>
               <string name="Source"><![CDATA[--[[
@@ -32686,7 +33005,7 @@ return HorseController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--[[
@@ -32849,7 +33168,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">NatureController</string>
               <string name="Source"><![CDATA[--[[
@@ -33335,7 +33654,7 @@ return NatureController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">ODMController</string>
               <string name="Source"><![CDATA[--[[
@@ -34235,7 +34554,7 @@ return ODMController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="106">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">SkyController</string>
               <string name="Source"><![CDATA[--[[
@@ -34598,7 +34917,7 @@ return SkyController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">SoundController</string>
               <string name="Source"><![CDATA[--[[
@@ -34688,7 +35007,7 @@ return SoundController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="109">
             <Properties>
               <string name="Name">TitanAnimator</string>
               <string name="Source"><![CDATA[--[[
@@ -35162,7 +35481,7 @@ return TitanAnimator
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">WaypointController</string>
               <string name="Source"><![CDATA[--[[
@@ -35273,7 +35592,7 @@ return WaypointController
             </Properties>
           </Item>
         </Item>
-        <Item class="LocalScript" referent="110">
+        <Item class="LocalScript" referent="111">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[--[[
@@ -35367,11 +35686,11 @@ end
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="111">
+        <Item class="Folder" referent="112">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">AdminPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -36009,7 +36328,7 @@ return AdminPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">DamageNumbers</string>
               <string name="Source"><![CDATA[--[[
@@ -36165,7 +36484,7 @@ return DamageNumbers
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">Dialogue</string>
               <string name="Source"><![CDATA[--[[
@@ -36821,7 +37140,7 @@ return Dialogue
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">Festival</string>
               <string name="Source"><![CDATA[--[[
@@ -37011,7 +37330,7 @@ return FestivalUI
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">HUD</string>
               <string name="Source"><![CDATA[--[[
@@ -37740,7 +38059,7 @@ return HUD
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">Intro</string>
               <string name="Source"><![CDATA[--[[
@@ -38254,7 +38573,7 @@ return Intro
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">Menu</string>
               <string name="Source"><![CDATA[--[[
@@ -38941,7 +39260,7 @@ return Menu
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">Notifications</string>
               <string name="Source"><![CDATA[--[[
@@ -39221,7 +39540,7 @@ return Notifications
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">Premium</string>
               <string name="Source"><![CDATA[--[[
@@ -39545,7 +39864,7 @@ return Premium
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">Raid</string>
               <string name="Source"><![CDATA[--[[
@@ -39673,7 +39992,7 @@ return Raid
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">RewardsPanel</string>
               <string name="Source"><![CDATA[--[[
@@ -40345,7 +40664,7 @@ return RewardsPanel
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">Shop</string>
               <string name="Source"><![CDATA[--[[
@@ -41028,7 +41347,7 @@ return Shop
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[--[[
@@ -41273,7 +41592,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">UIController</string>
               <string name="Source"><![CDATA[--[[
@@ -41471,7 +41790,7 @@ return UIController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">WorldMap</string>
               <string name="Source"><![CDATA[--[[
@@ -42191,7 +42510,7 @@ return WorldMap
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="127">
+  <Item class="Workspace" referent="128">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-1200</float>
@@ -42206,7 +42525,7 @@ return WorldMap
       <token name="StreamingIntegrityMode">2</token>
       <int name="StreamingTargetRadius">1600</int>
     </Properties>
-    <Item class="Terrain" referent="128">
+    <Item class="Terrain" referent="129">
       <Properties>
         <string name="Name">Terrain</string>
         <bool name="Decoration">true</bool>

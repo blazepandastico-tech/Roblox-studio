@@ -380,23 +380,10 @@ function ColossoAnatomico.Build(params): Model
 	buildLeg(1, "Right")
 	buildLeg(-1, "Left")
 
-	-- vapore che sale dal corpo
+	-- punto per gli effetti sul corpo (il vapore esce dal collo: lo aggiunge TitanBuilder, "VaporeCollo")
 	local steamAtt = Instance.new("Attachment")
 	steamAtt.Name = "SteamAtt"
 	steamAtt.Parent = torso
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Name = "Vapore"
-	emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	emitter.Color = ColorSequence.new(Color3.fromRGB(245, 240, 235))
-	emitter.LightEmission = 0.15
-	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) })
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, H * 0.05), NumberSequenceKeypoint.new(1, H * 0.18) })
-	emitter.Lifetime = NumberRange.new(2.5, 4)
-	emitter.Rate = 6
-	emitter.Speed = NumberRange.new(H * 0.03, H * 0.08)
-	emitter.SpreadAngle = Vector2.new(40, 40)
-	emitter.Acceleration = Vector3.new(0, H * 0.05, 0)
-	emitter.Parent = torso
 
 	model.PrimaryPart = root
 	model:SetAttribute("Height", H)

@@ -245,6 +245,14 @@ Finché non è importato, i filmati usano il colosso costruito con le parti (`Co
 gioco non cambia. Video di prova dell'animazione: `python3 tools/mesh_titan/video.py assets/modelli/GiganteColosso.glb cartella`
 (il risultato è in `assets/colosso_filmati/colosso_animato.mp4`).
 
+In "La Caduta del Muro" il colosso è alto 230 (il Muro 160) e **si aggrappa al Muro**: mentre sale le mani
+arrivano da dietro e si appoggiano in cima, con le dita oltre il bordo, e ci restano mentre ruggisce e calcia il
+cancello (`src/shared/Anim/ArmReach.lua`: calcola spalla, gomito e polso perché le mani arrivino esattamente sul
+punto, per tutti e due i modelli). Il **vapore esce dal collo** (sulla nuca e ai lati) e sale sopra la testa,
+senza coprire il corpo. Foto di prova con le inquadrature del filmato:
+`python3 tools/mesh_titan/muro.py cartella [--glb assets/modelli/GiganteColosso.glb]` (senza `--glb` usa il
+colosso fatto con le parti); i risultati sono in `assets/colosso_filmati/muro_*.png`.
+
 ## 7. Codici regalo
 
 `SIERIPERDUTI`, `ARCIPELAGO`, `CORPODEIFALCHI`, `BENVENUTORECLUTA`, `OLTREILMARE`, `PRIMORAID`

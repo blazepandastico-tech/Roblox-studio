@@ -88,8 +88,26 @@ def lua_v3(p):
 
 
 def animate(parts, joints, look, fps):
-    lines = ["MESH_LOOK = %s" % json.dumps(look), "ANIM_HEIGHT = %.3f" % HEIGHT, "ANIM_FPS = %d" % fps, "ANIM_DURATION = %.3f" % DURATION]
-    lines.append("MESH_PARTS = {")
+    lines = mesh_lines(parts, joints, look)
+    lines += ["ANIM_HEIGHT = %.3f" % HEIGHT, "ANIM_FPS = %d" % fps, "ANIM_DURATION = %.3f" % DURATION]
+    plan = ", ".join("{ %.3f, %s, %s }" % (t, json.dumps(a), json.dumps(v) if isinstance(v, str) else repr(v)) for t, a, v in PLAN)
+    lines.append("ANIM_PLAN = { %s }" % plan)
+    out = run_luau(lines, "anima.luau")
+    rest, frames = {}, []
+    for line in out.splitlines():
+        f = line.split("\t")
+        if f[0] == "R":
+            rest[f[1]] = cf_matrix(f[2:14])
+        elif f[0] == "F":
+            frames.append({"t": float(f[2]), "parts": {}})
+        elif f[0] == "P":
+            frames[-1]["parts"][f[1]] = cf_matrix(f[2:14])
+    return rest, frames
+
+
+def mesh_lines(parts, joints, look):
+    """Le parti SP_ e i segnaposto J_ del .glb come variabili Luau (MESH_LOOK, MESH_PARTS, MESH_JOINTS)."""
+    lines = ["MESH_LOOK = %s" % json.dumps(look), "MESH_PARTS = {"]
     for name, p in parts.items():
         lo, hi = p["V"].min(0), p["V"].max(0)
         lines.append("\t%s = { Center = %s, Size = %s }," % (name, lua_v3((lo + hi) / 2), lua_v3(np.maximum(hi - lo, 0.05))))
@@ -98,8 +116,11 @@ def animate(parts, joints, look, fps):
     for name, p in joints.items():
         lines.append("\t%s = %s," % (name, lua_v3(p)))
     lines.append("}")
-    plan = ", ".join("{ %.3f, %s, %s }" % (t, json.dumps(a), json.dumps(v) if isinstance(v, str) else repr(v)) for t, a, v in PLAN)
-    lines.append("ANIM_PLAN = { %s }" % plan)
+    return lines
+
+
+def run_luau(lines, script):
+    """Esegue uno script di questa cartella nel Roblox finto delle prove, con tutto il codice del gioco."""
     sources = []
     for prefix, folder in (("Shared", os.path.join(ROOT, "src", "shared")), ("Server/Services", os.path.join(ROOT, "src", "server", "Services")), ("Client", os.path.join(ROOT, "src", "client"))):
         for base, _, names in os.walk(folder):
@@ -111,25 +132,16 @@ def animate(parts, joints, look, fps):
     for name in ("roblox_api.luau", "roblox_mock.luau"):
         bundle += open(os.path.join(ROOT, "tools", "tests", name), encoding="utf-8").read() + "\n"
     bundle += "\n".join(lines) + "\n"
-    bundle += "do\n" + open(os.path.join(HERE, "anima.luau"), encoding="utf-8").read() + "\nend\n"
+    bundle += "do\n" + open(os.path.join(HERE, script), encoding="utf-8").read() + "\nend\n"
     luau = os.environ.get("LUAU") or shutil.which("luau") or "luau"
     with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "anima.luau")
+        path = os.path.join(tmp, script)
         open(path, "w", encoding="utf-8").write(bundle)
         res = subprocess.run([luau, path], capture_output=True, text=True, timeout=600)
     out = res.stdout + res.stderr
     if "FINE" not in out:
         raise SystemExit("animazione non riuscita:\n" + out[-3000:])
-    rest, frames = {}, []
-    for line in out.splitlines():
-        f = line.split("\t")
-        if f[0] == "R":
-            rest[f[1]] = cf_matrix(f[2:14])
-        elif f[0] == "F":
-            frames.append({"t": float(f[2]), "parts": {}})
-        elif f[0] == "P":
-            frames[-1]["parts"][f[1]] = cf_matrix(f[2:14])
-    return rest, frames
+    return out
 
 
 def cf_matrix(values):
