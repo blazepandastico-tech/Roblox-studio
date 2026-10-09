@@ -2,7 +2,7 @@
 <roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
 <Meta name="ExplicitAutoJoints">true</Meta>
 <Item class="Workspace" referent="RBX1"><Properties><string name="Name">Workspace</string></Properties></Item>
-<Item class="Players" referent="RBX2"><Properties><string name="Name">Players</string><bool name="CharacterAutoLoad">false</bool></Properties></Item>
+<Item class="Players" referent="RBX2"><Properties><string name="Name">Players</string><bool name="CharacterAutoLoads">false</bool></Properties></Item>
 <Item class="Lighting" referent="RBX3"><Properties><string name="Name">Lighting</string><token name="Technology">3</token></Properties></Item>
 <Item class="ReplicatedStorage" referent="RBX6"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">Config</string><ProtectedString name="Source"><![CDATA[-- Tutti i numeri di bilanciamento del gioco stanno qui.
 local Config = {}
@@ -203,7 +203,7 @@ local Actions = require(Server:WaitForChild("Actions"))
 local Lobby = require(Server:WaitForChild("Lobby"))
 local Match = require(Server:WaitForChild("Match"))
 
-Players.CharacterAutoLoad = false
+Players.CharacterAutoLoads = false
 
 MapBuilder.Build()
 Lobby.Init()

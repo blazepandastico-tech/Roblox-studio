@@ -72,7 +72,7 @@ def main():
     items = []
     items.append(container_item("Workspace", "Workspace", ""))
     items.append(
-        container_item("Players", "Players", "", '<bool name="CharacterAutoLoad">false</bool>')
+        container_item("Players", "Players", "", '<bool name="CharacterAutoLoads">false</bool>')
     )
     # Luce con ombre dal sole e dai faretti (ShadowMap = 3). Technology non si puo' impostare da script, solo dal file.
     items.append(container_item("Lighting", "Lighting", "", '<token name="Technology">3</token>'))

@@ -10,6 +10,9 @@ non e' il render di Roblox (luci, nebbia, texture e terreno sono simulati).
 - `render_map.mjs` + `viewer_map.html` + `views.json`: disegnano il JSON (terreno a voxel con marching cubes, parti, testi dei cartelli, neon con bagliore).
 - `geom_check.py`: controlla che niente di solido entri nel campo e che spawn e porte siano liberi.
 - `ambient_test.py`, `server_smoke.py`: provano il modulo client `Ambient` e il caricamento dei moduli server.
+- `sim.lua` + `play_sim.py`, `play_sim2.py`, `play_client.py`: **eseguono davvero** `Main.server.lua` (e `Client.client.lua`) con uno scheduler a tempo simulato
+  e giocatori finti: ciclo di partita, calci, scivolate, goal, HUD. `server_smoke.py` NON esegue Main: un nome di proprieta' sbagliato in `Main.server.lua`
+  (`Players.CharacterAutoLoad` invece di `CharacterAutoLoads`) era passato inosservato e impediva di costruire la mappa.
 - `lint.cjs`: controllo di sintassi (luaparse).
 
 ## Come si usa
@@ -20,6 +23,9 @@ python3 tools/preview/run_map.py src out.json        # costruisce la mappa nello
 python3 tools/preview/geom_check.py out.json
 python3 tools/preview/ambient_test.py src
 python3 tools/preview/server_smoke.py src
+python3 tools/preview/play_sim.py src 9              # esegue Main + ciclo di partita per 9 minuti simulati
+python3 tools/preview/play_sim2.py src               # + azioni dei giocatori (calcio, scivolata, scatto, goal, rientro in lobby)
+python3 tools/preview/play_client.py src             # + client (HUD, effetti, ambiente)
 
 cd tools/preview && npm install                      # three + playwright-core (serve un Chromium: CHROMIUM_PATH=...)
 node render_map.mjs ../../out.json shots all         # immagini in tools/preview/shots/

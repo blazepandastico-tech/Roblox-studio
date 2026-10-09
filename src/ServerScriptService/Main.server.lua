@@ -12,7 +12,7 @@ local Actions = require(Server:WaitForChild("Actions"))
 local Lobby = require(Server:WaitForChild("Lobby"))
 local Match = require(Server:WaitForChild("Match"))
 
-Players.CharacterAutoLoad = false
+Players.CharacterAutoLoads = false
 
 MapBuilder.Build()
 Lobby.Init()
