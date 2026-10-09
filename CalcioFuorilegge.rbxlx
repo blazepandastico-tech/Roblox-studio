@@ -113957,7 +113957,6 @@ Vince chi segna di piu'</string>
   <Item class="Players" referent="3538">
     <Properties>
       <string name="Name">Players</string>
-      <bool name="CharacterAutoLoads">false</bool>
     </Properties>
   </Item>
   <Item class="Lighting" referent="3539">
@@ -114048,7 +114047,7 @@ Vince chi segna di piu'</string>
     <Item class="ModuleScript" referent="3545">
       <Properties>
         <string name="Name">Config</string>
-        <string name="Source"><![CDATA[-- Tutti i numeri di bilanciamento del gioco stanno qui.
+        <ProtectedString name="Source"><![CDATA[-- Tutti i numeri di bilanciamento del gioco stanno qui.
 local Config = {}
 
 Config.GameName = "Calcio Fuorilegge"
@@ -114189,13 +114188,13 @@ Config.Controls = {
 }
 
 return Config
-]]></string>
+]]></ProtectedString>
       </Properties>
     </Item>
     <Item class="ModuleScript" referent="3546">
       <Properties>
         <string name="Name">Net</string>
-        <string name="Source"><![CDATA[-- Crea (server) e recupera (client) tutti i RemoteEvent del gioco.
+        <ProtectedString name="Source"><![CDATA[-- Crea (server) e recupera (client) tutti i RemoteEvent del gioco.
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -114238,7 +114237,7 @@ function Net.Get(name)
 end
 
 return Net
-]]></string>
+]]></ProtectedString>
       </Properties>
     </Item>
   </Item>
@@ -114249,7 +114248,8 @@ return Net
     <Item class="Script" referent="3548">
       <Properties>
         <string name="Name">Main</string>
-        <string name="Source"><![CDATA[-- Punto d'ingresso del server di Calcio Fuorilegge.
+        <ProtectedString name="Source"><![CDATA[-- Punto d'ingresso del server di Calcio Fuorilegge.
+print("[Calcio Fuorilegge] server avviato")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -114263,12 +114263,21 @@ local Actions = require(Server:WaitForChild("Actions"))
 local Lobby = require(Server:WaitForChild("Lobby"))
 local Match = require(Server:WaitForChild("Match"))
 
-Players.CharacterAutoLoads = false
+-- Ogni passo di avvio e' protetto: se uno fallisce, l'errore compare nell'Output come avviso e gli altri partono lo stesso.
+local function step(name, fn, ...)
+	local ok, err = xpcall(fn, function(e)
+		return debug.traceback(tostring(e), 2)
+	end, ...)
+	if not ok then
+		warn("[Calcio Fuorilegge] " .. name .. " non riuscito:\n" .. tostring(err))
+	end
+	return ok
+end
 
-MapBuilder.Build()
-Lobby.Init()
-Ball.Create()
-Actions.Init(Match.IsPlaying)
+step("mappa", MapBuilder.Build)
+step("lobby", Lobby.Init)
+step("palla", Ball.Create)
+step("azioni", Actions.Init, Match.IsPlaying)
 
 Net.Get("JoinQueue").OnServerEvent:Connect(function(plr)
 	if Match.GetPhase() == "Intermission" then
@@ -114286,13 +114295,16 @@ RunService.Heartbeat:Connect(function(dt)
 	Ball.Step(dt)
 end)
 
+-- Da qui il personaggio lo carica Match (lobby -> campo). Questa riga e' volutamente l'ultima prima dei giocatori: se lo script
+-- si fosse fermato prima, il caricamento automatico resterebbe acceso e il personaggio comparirebbe lo stesso nella lobby.
+Players.CharacterAutoLoads = false
 Players.PlayerAdded:Connect(Match.OnPlayerAdded)
 for _, plr in ipairs(Players:GetPlayers()) do
 	task.spawn(Match.OnPlayerAdded, plr)
 end
 
 task.spawn(Match.Run)
-]]></string>
+]]></ProtectedString>
       </Properties>
     </Item>
     <Item class="Folder" referent="3549">
@@ -114302,7 +114314,7 @@ task.spawn(Match.Run)
       <Item class="ModuleScript" referent="3550">
         <Properties>
           <string name="Name">Actions</string>
-          <string name="Source"><![CDATA[-- Gestione dei RemoteEvent di gioco: calci, scivolata, scatto, sprint, chiedi palla.
+          <ProtectedString name="Source"><![CDATA[-- Gestione dei RemoteEvent di gioco: calci, scivolata, scatto, sprint, chiedi palla.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -114522,13 +114534,13 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 return Actions
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="3551">
         <Properties>
           <string name="Name">Ball</string>
-          <string name="Source"><![CDATA[-- Palla: fisica autorevole sul server, conduzione, calci, effetto, goal.
+          <ProtectedString name="Source"><![CDATA[-- Palla: fisica autorevole sul server, conduzione, calci, effetto, goal.
 local Players = game:GetService("Players")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -115002,13 +115014,13 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 return Ball
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="3552">
         <Properties>
           <string name="Name">Lobby</string>
-          <string name="Source"><![CDATA[-- Squadre (servizio Teams), pedane della lobby e assegnazione automatica.
+          <ProtectedString name="Source"><![CDATA[-- Squadre (servizio Teams), pedane della lobby e assegnazione automatica.
 local Players = game:GetService("Players")
 local Teams = game:GetService("Teams")
 
@@ -115145,7 +115157,7 @@ function Lobby.ClearTeams()
 end
 
 return Lobby
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="Folder" referent="3553">
@@ -115155,7 +115167,7 @@ return Lobby
         <Item class="ModuleScript" referent="3554">
           <Properties>
             <string name="Name">Arena</string>
-            <string name="Source"><![CDATA[-- Lo stadio intorno al campo: piazza, pareti di vetro con tabelloni pubblicitari, tribune con tifosi,
+            <ProtectedString name="Source"><![CDATA[-- Lo stadio intorno al campo: piazza, pareti di vetro con tabelloni pubblicitari, tribune con tifosi,
 -- tabelloni segnapunti, torri faro e angoli arrotondati.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 local Util = require(script.Parent.Util)
@@ -115166,6 +115178,8 @@ local Arena = {}
 local HL, HW = Layout.HL, Layout.HW
 local XB, WH = Layout.XB, Layout.WALL_H
 local ST = Layout.STAND
+
+local SM = Enum.Material.SmoothPlastic
 
 local STEEL = Color3.fromRGB(40, 44, 66)
 local STEEL_LIGHT = Color3.fromRGB(78, 84, 112)
@@ -115593,13 +115607,13 @@ function Arena.Build(root)
 end
 
 return Arena
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3555">
           <Properties>
             <string name="Name">Atmosphere</string>
-            <string name="Source"><![CDATA[-- Luce da tramonto, cielo, nuvole ed effetti di post-produzione.
+            <ProtectedString name="Source"><![CDATA[-- Luce da tramonto, cielo, nuvole ed effetti di post-produzione.
 local Lighting = game:GetService("Lighting")
 
 local Atmosphere = {}
@@ -115671,13 +115685,13 @@ function Atmosphere.Build()
 end
 
 return Atmosphere
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3556">
           <Properties>
             <string name="Name">Goals</string>
-            <string name="Source"><![CDATA[-- Le due porte: pali spessi color pietra, rete a nido d'ape luminosa del colore della squadra che difende.
+            <ProtectedString name="Source"><![CDATA[-- Le due porte: pali spessi color pietra, rete a nido d'ape luminosa del colore della squadra che difende.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 local Util = require(script.Parent.Util)
 local Layout = require(script.Parent.Layout)
@@ -115799,13 +115813,13 @@ function Goals.Build(field)
 end
 
 return Goals
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3557">
           <Properties>
             <string name="Name">Layout</string>
-            <string name="Source"><![CDATA[-- Misure condivise da tutti i moduli della mappa (derivate da Config.Field).
+            <ProtectedString name="Source"><![CDATA[-- Misure condivise da tutti i moduli della mappa (derivate da Config.Field).
 -- Sistema di coordinate: asse X = lunghezza del campo (Rossi difendono -X, Blu +X), asse Z = larghezza, Y verso l'alto.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 
@@ -115845,13 +115859,13 @@ Layout.TOWER_Z = 98
 Layout.LOBBY = Config.Lobby.Center
 
 return Layout
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3558">
           <Properties>
             <string name="Name">LobbyBuilder</string>
-            <string name="Source"><![CDATA[-- La lobby: baita di legno con vetrate panoramiche sul belvedere sopra il canyon, terrazza con le due pedane
+            <ProtectedString name="Source"><![CDATA[-- La lobby: baita di legno con vetrate panoramiche sul belvedere sopra il canyon, terrazza con le due pedane
 -- squadra (ROSSA e BLU), cartelli, camino, trofeo e telescopi puntati sul campo.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 local Util = require(script.Parent.Util)
@@ -116198,13 +116212,13 @@ function LobbyBuilder.Build(root)
 end
 
 return LobbyBuilder
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3559">
           <Properties>
             <string name="Name">Pitch</string>
-            <string name="Source"><![CDATA[-- Campo di terra a strisce con righe luminose bianco-lilla, aree di rigore colorate e stemma al centro.
+            <ProtectedString name="Source"><![CDATA[-- Campo di terra a strisce con righe luminose bianco-lilla, aree di rigore colorate e stemma al centro.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 local Util = require(script.Parent.Util)
 local Layout = require(script.Parent.Layout)
@@ -116320,13 +116334,13 @@ function Pitch.Build(field)
 end
 
 return Pitch
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3560">
           <Properties>
             <string name="Name">Props</string>
-            <string name="Source"><![CDATA[-- Il deserto intorno allo stadio: cactus, cespugli, rocce agganciabili, parabole, pali della luce con cavi,
+            <ProtectedString name="Source"><![CDATA[-- Il deserto intorno allo stadio: cactus, cespugli, rocce agganciabili, parabole, pali della luce con cavi,
 -- relitto d'aereo, mulini a vento, passerella con ponte e cartelli.
 local CollectionService = game:GetService("CollectionService")
 local Util = require(script.Parent.Util)
@@ -116831,13 +116845,13 @@ function Props.Build(root)
 end
 
 return Props
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3561">
           <Properties>
             <string name="Name">Terrain</string>
-            <string name="Source"><![CDATA[-- Il canyon: pavimento di sabbia, pareti di roccia a strati rosso/arancio, torri isolate, dune, fiume e il
+            <ProtectedString name="Source"><![CDATA[-- Il canyon: pavimento di sabbia, pareti di roccia a strati rosso/arancio, torri isolate, dune, fiume e il
 -- belvedere della lobby. Tutto ricavato con le funzioni Fill* del Terrain, in modo ripetibile (niente Random).
 -- Il canyon corre lungo X, come il campo; il sole al tramonto sta in fondo al canyon (asse X), cosi' le pareti
 -- alte (lungo Z) non fanno ombra sullo stadio.
@@ -117151,13 +117165,13 @@ function Terrain.Build()
 end
 
 return Terrain
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3562">
           <Properties>
             <string name="Name">Util</string>
-            <string name="Source"><![CDATA[-- Attrezzi comuni per costruire la mappa: parti, cilindri, testi, numeri casuali ripetibili.
+            <ProtectedString name="Source"><![CDATA[-- Attrezzi comuni per costruire la mappa: parti, cilindri, testi, numeri casuali ripetibili.
 local CollectionService = game:GetService("CollectionService")
 
 local Util = {}
@@ -117379,14 +117393,14 @@ function Util.fbm(x, z, octaves)
 end
 
 return Util
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
       </Item>
       <Item class="ModuleScript" referent="3563">
         <Properties>
           <string name="Name">MapBuilder</string>
-          <string name="Source"><![CDATA[-- Costruisce da codice la mappa Canyon del Deserto (campo, stadio, canyon, lobby) e la luce da tramonto.
+          <ProtectedString name="Source"><![CDATA[-- Costruisce da codice la mappa Canyon del Deserto (campo, stadio, canyon, lobby) e la luce da tramonto.
 -- Ogni parte "di contorno" e' protetta da pcall: se una decorazione fallisce il gioco parte lo stesso.
 --
 -- Due modi di avere la mappa:
@@ -117436,15 +117450,22 @@ end
 
 -- Il canyon (Terrain a voxel) non sta nel file: richiede qualche secondo, quindi si costruisce all'avvio, in parallelo.
 function MapBuilder.BuildTerrain()
-	try("terreno", function()
+	local t0 = workspace:GetServerTimeNow()
+	local ok = try("terreno", function()
 		require(script.Parent.Map.Terrain).Build()
 	end)
+	if ok then
+		print(string.format("[Calcio Fuorilegge] canyon (Terrain) pronto in %.0f secondi", workspace:GetServerTimeNow() - t0))
+	end
 end
 
 function MapBuilder.Build()
 	local root = workspace:FindFirstChild("World")
-	if not (root and root:GetAttribute("Baked")) then
+	if root and root:GetAttribute("Baked") then
+		print("[Calcio Fuorilegge] mappa gia' nel file: " .. #root:GetDescendants() .. " oggetti in workspace.World")
+	else
 		root = MapBuilder.BuildStatic()
+		print("[Calcio Fuorilegge] mappa costruita da codice: " .. #root:GetDescendants() .. " oggetti in workspace.World")
 	end
 	-- il resto e' gia' giocabile mentre il terreno si costruisce
 	task.spawn(MapBuilder.BuildTerrain)
@@ -117458,13 +117479,13 @@ function MapBuilder.LobbySpawnCFrame()
 end
 
 return MapBuilder
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="3564">
         <Properties>
           <string name="Name">Match</string>
-          <string name="Source"><![CDATA[-- Ciclo di partita: intervallo -> calcio d'inizio -> partita -> goal/reset -> fine -> lobby.
+          <ProtectedString name="Source"><![CDATA[-- Ciclo di partita: intervallo -> calcio d'inizio -> partita -> goal/reset -> fine -> lobby.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -117780,8 +117801,14 @@ function Match.Run()
 end
 
 function Match.OnPlayerAdded(plr)
-	addStats(plr)
-	Stamina.Init(plr)
+	local ok, err = pcall(function()
+		addStats(plr)
+		Stamina.Init(plr)
+	end)
+	if not ok then
+		warn("[Match] preparazione del giocatore non riuscita: " .. tostring(err))
+	end
+	-- il personaggio compare comunque
 	Match.Spawn(plr)
 end
 
@@ -117792,13 +117819,13 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 return Match
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="3565">
         <Properties>
           <string name="Name">Ragdoll</string>
-          <string name="Source"><![CDATA[-- Ragdoll fisico temporaneo per personaggi R15 (Motor6D e AnimationConstraint).
+          <ProtectedString name="Source"><![CDATA[-- Ragdoll fisico temporaneo per personaggi R15 (Motor6D e AnimationConstraint).
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 
 local Ragdoll = {}
@@ -117919,13 +117946,13 @@ function Ragdoll.Apply(char, duration, impulse)
 end
 
 return Ragdoll
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="3566">
         <Properties>
           <string name="Name">Stamina</string>
-          <string name="Source"><![CDATA[-- Stamina a 4 tacche: unico serbatoio per sprint, calci, scivolate, scatti e (poi) gadget.
+          <ProtectedString name="Source"><![CDATA[-- Stamina a 4 tacche: unico serbatoio per sprint, calci, scivolate, scatti e (poi) gadget.
 local Players = game:GetService("Players")
 
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
@@ -118022,7 +118049,7 @@ end
 Players.PlayerRemoving:Connect(Stamina.Remove)
 
 return Stamina
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
     </Item>
@@ -118038,7 +118065,7 @@ return Stamina
       <Item class="LocalScript" referent="3569">
         <Properties>
           <string name="Name">Client</string>
-          <string name="Source"><![CDATA[-- Input del giocatore (PC): calcio con carica, passaggio, flick, lancio, scivolata, dribbling, sprint.
+          <ProtectedString name="Source"><![CDATA[-- Input del giocatore (PC): calcio con carica, passaggio, flick, lancio, scivolata, dribbling, sprint.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -118226,7 +118253,7 @@ bind("LobbyAction", function(_, state)
 	end
 	return PASS
 end, C.Lobby)
-]]></string>
+]]></ProtectedString>
         </Properties>
       </Item>
       <Item class="Folder" referent="3570">
@@ -118236,7 +118263,7 @@ end, C.Lobby)
         <Item class="ModuleScript" referent="3571">
           <Properties>
             <string name="Name">Ambient</string>
-            <string name="Source"><![CDATA[-- Vita della mappa lato client: tifosi che saltellano (e impazziscono al goal), tabelloni segnapunti,
+            <ProtectedString name="Source"><![CDATA[-- Vita della mappa lato client: tifosi che saltellano (e impazziscono al goal), tabelloni segnapunti,
 -- pale e parabole che girano, luci di segnalazione che lampeggiano.
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
@@ -118486,13 +118513,13 @@ function Ambient.Start()
 end
 
 return Ambient
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3572">
           <Properties>
             <string name="Name">Effects</string>
-            <string name="Source"><![CDATA[-- Effetti solo-client: anelli sotto giocatori e palla, indicatore palla libera, scia, barretta stamina.
+            <ProtectedString name="Source"><![CDATA[-- Effetti solo-client: anelli sotto giocatori e palla, indicatore palla libera, scia, barretta stamina.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -118652,13 +118679,13 @@ function Effects.Start()
 end
 
 return Effects
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="3573">
           <Properties>
             <string name="Name">Hud</string>
-            <string name="Source"><![CDATA[-- HUD pulito: bianco con testi scuri e angoli arrotondati.
+            <ProtectedString name="Source"><![CDATA[-- HUD pulito: bianco con testi scuri e angoli arrotondati.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -119099,7 +119126,7 @@ function Hud.Update()
 end
 
 return Hud
-]]></string>
+]]></ProtectedString>
           </Properties>
         </Item>
       </Item>

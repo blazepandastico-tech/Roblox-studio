@@ -1,7 +1,7 @@
 // rbxbake: converte i record di export_world.lua (+ gli script del progetto) in un place .rbxlx con l'encoder ufficiale rbx_xml,
 // e rilegge un .rbxlx stampando gli stessi record (per i controlli di andata e ritorno).
-//   rbxbake build <record.txt>... -o <uscita.rbxlx>
-//   rbxbake dump  <file.rbxlx>            (stampa i record su stdout)
+//   rbxbake build <record.txt>... -o <uscita.rbxlx> [--binary <uscita.rbxl>]
+//   rbxbake dump  <file.rbxlx|file.rbxl>  (stampa i record su stdout; il formato si riconosce dal contenuto)
 use std::{collections::{BTreeMap, HashMap}, env, fs::File, io::{BufReader, BufWriter, Write}, process};
 
 use rbx_dom_weak::{
@@ -252,10 +252,14 @@ fn apply(db: &ReflectionDatabase, b: &mut InstanceBuilder, n: &Node, refs: &Hash
 fn cmd_build(args: &[String]) {
     let mut files = Vec::new();
     let mut out = None;
+    let mut binary = None;
     let mut i = 0;
     while i < args.len() {
         if args[i] == "-o" {
             out = Some(args[i + 1].clone());
+            i += 2;
+        } else if args[i] == "--binary" {
+            binary = Some(args[i + 1].clone());
             i += 2;
         } else {
             files.push(args[i].clone());
@@ -308,6 +312,12 @@ fn cmd_build(args: &[String]) {
     let opts = rbx_xml::EncodeOptions::new().property_behavior(rbx_xml::EncodePropertyBehavior::ErrorOnUnknown);
     rbx_xml::to_writer(w, &dom, dom.root().children(), opts).expect("scrittura XML (proprieta' non scrivibile?)");
     println!("scritto {} ({} istanze)", out, dom.descendants().count() - 1);
+    if let Some(bin) = binary {
+        // stesso albero nel formato nativo di Studio (.rbxl)
+        let w = BufWriter::new(File::create(&bin).expect("creazione file binario"));
+        rbx_binary::to_writer(w, &dom, dom.root().children()).expect("scrittura binaria");
+        println!("scritto {} (formato binario)", bin);
+    }
 }
 
 fn fmt_f(x: f64) -> String {
@@ -370,8 +380,17 @@ fn rec_of(v: &Variant, ids: &HashMap<Ref, u64>) -> Option<String> {
 
 fn cmd_dump(args: &[String]) {
     let path = &args[0];
+    let mut magic = [0u8; 8];
+    {
+        use std::io::Read;
+        File::open(path).expect("apertura").read_exact(&mut magic).expect("file troppo corto");
+    }
     let r = BufReader::with_capacity(1 << 20, File::open(path).expect("apertura"));
-    let dom = rbx_xml::from_reader(r, rbx_xml::DecodeOptions::new().property_behavior(rbx_xml::DecodePropertyBehavior::ErrorOnUnknown)).expect("lettura XML (proprieta' sconosciuta?)");
+    let dom = if &magic == b"<roblox!" {
+        rbx_binary::from_reader(r).expect("lettura binaria")
+    } else {
+        rbx_xml::from_reader(r, rbx_xml::DecodeOptions::new().property_behavior(rbx_xml::DecodePropertyBehavior::ErrorOnUnknown)).expect("lettura XML (proprieta' sconosciuta?)")
+    };
     // numerazione in preordine, come l'esportatore
     let mut ids: HashMap<Ref, u64> = HashMap::new();
     let mut order: Vec<(Ref, u64)> = Vec::new();

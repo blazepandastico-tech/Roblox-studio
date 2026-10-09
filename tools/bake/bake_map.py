@@ -112,10 +112,8 @@ def add_dir(rec, parent, path):
 
 def script_records(out_path):
     rec = Records()
-    # Players: il personaggio non compare da solo, lo carica Match (lobby -> campo)
-    players = rec.inst(0, "Players", "Players")
-    rec.prop(players, "CharacterAutoLoads", "b", "0")
-    rec.lines.append("S Players %d" % players)
+    # Players resta com'e': CharacterAutoLoads e' acceso, cosi' il personaggio compare nella lobby (SpawnLocation) anche se uno script
+    # non parte; Main.server.lua lo spegne appena parte, poi il personaggio lo carica Match
     for folder in SERVICES:
         path = os.path.join(SRC, folder)
         if os.path.isdir(path):
@@ -127,12 +125,41 @@ def script_records(out_path):
 
 
 # ------------------------------------------------------------------ 4-5. scrittura e controllo
+def protect_sources(xml):
+    """Studio scrive il testo degli script come <ProtectedString name="Source">; rbx_xml lo scrive come <string>. Si riscrive come Studio:
+    cosi' il file e' identico a uno salvato da Studio anche su questo punto. Restituisce (xml, quanti)."""
+    start_tag = '<string name="Source">'
+    out, pos, n = [], 0, 0
+    while True:
+        i = xml.find(start_tag, pos)
+        if i < 0:
+            out.append(xml[pos:])
+            break
+        out.append(xml[pos:i])
+        k = i + len(start_tag)
+        if xml.startswith("<![CDATA[", k):
+            while True:  # una o piu' sezioni CDATA di fila (rbx_xml spezza il contenuto se contiene "]]>")
+                e = xml.index("]]>", k) + 3
+                k = e
+                if xml.startswith("<![CDATA[", k):
+                    continue
+                break
+            assert xml.startswith("</string>", k), "fine inattesa dell'elemento Source"
+        else:
+            k = xml.index("</string>", k)
+        out.append('<ProtectedString name="Source">' + xml[i + len(start_tag):k] + "</ProtectedString>")
+        pos = k + len("</string>")
+        n += 1
+    return "".join(out), n
+
+
+
 def find_rbxbake():
     exe = os.path.join(HERE, "rbxbake", "target", "release", "rbxbake")
     if os.path.exists(exe):
         return exe
     print("compilo rbxbake...")
-    subprocess.check_call(["cargo", "build", "--release", "--offline"], cwd=os.path.join(HERE, "rbxbake"))
+    subprocess.check_call(["cargo", "build", "--release"], cwd=os.path.join(HERE, "rbxbake"))
     return exe
 
 
@@ -240,12 +267,15 @@ def main():
     world_txt = os.path.join(work, "world.records")
     script_txt = os.path.join(work, "scripts.records")
     tmp_out = os.path.join(work, "bake.rbxlx")
+    tmp_bin = os.path.join(work, "bake.rbxl")
+    out_bin = os.path.splitext(args.out)[0] + ".rbxl"
 
     print("1/5 costruisco la mappa nello shim ed esporto:", export_world(args.api_index, world_txt))
     print("2/5 script del progetto:", script_records(script_txt), "oggetti")
     exe = find_rbxbake()
-    print("3/5 scrivo il file con rbxbake")
-    subprocess.check_call([exe, "build", script_txt, world_txt, "-o", tmp_out])
+    print("3/5 scrivo i file con rbxbake (XML .rbxlx e binario .rbxl)")
+    subprocess.check_call([exe, "build", script_txt, world_txt, "-o", tmp_out, "--binary", tmp_bin])
+    shutil.copyfile(tmp_bin, out_bin)
 
     # intestazione come quella scritta da Studio (rbx_xml scrive solo <roblox version="4">)
     xml = open(tmp_out, encoding="utf-8").read()
@@ -257,21 +287,25 @@ def main():
         'xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">\n'
         '\t<Meta name="ExplicitAutoJoints">true</Meta>' + xml[len(head):]
     )
+    xml, n_sources = protect_sources(xml)
+    print("   %d script scritti come ProtectedString" % n_sources)
     open(args.out, "w", encoding="utf-8").write(xml)
 
-    print("4/5 rileggo il file in modo rigoroso (proprieta' sconosciute = errore)")
-    dumped = subprocess.run([exe, "dump", args.out], check=True, capture_output=True, text=True).stdout.splitlines()
     # ids riletti: preordine su tutto il file; ids esportati: script 1..N, mondo WORLD_BASE+1.. -> stesso preordine per servizio
     original = open(script_txt, encoding="utf-8").read().splitlines() + open(world_txt, encoding="utf-8").read().splitlines()
-    id_map = build_id_map(original, dumped)
-    problems, extra = compare(original, dumped, id_map)
-    print("5/5 confronto con i record di partenza:", len(problems), "differenze,", len(extra), "proprieta' in piu' nel file")
-    for p in problems[:30]:
-        print("   ", p)
-    for k in extra[:15]:
-        print("    in piu':", k)
-    size = os.path.getsize(args.out)
-    print("scritto %s (%.2f MiB)" % (args.out, size / 1048576))
+    problems = []
+    for label, path in (("XML", args.out), ("binario", out_bin)):
+        print("4/5 rileggo il file %s in modo rigoroso (proprieta' sconosciute = errore)" % label)
+        dumped = subprocess.run([exe, "dump", path], check=True, capture_output=True, text=True).stdout.splitlines()
+        id_map = build_id_map(original, dumped)
+        probs, extra = compare(original, dumped, id_map)
+        print("5/5 %s: confronto con i record di partenza: %d differenze, %d proprieta' in piu' nel file" % (label, len(probs), len(extra)))
+        for p in probs[:30]:
+            print("   ", p)
+        for k in extra[:15]:
+            print("    in piu':", k)
+        problems += probs
+        print("scritto %s (%.2f MiB)" % (path, os.path.getsize(path) / 1048576))
     if args.keep is None:
         shutil.rmtree(work, ignore_errors=True)
     return 1 if problems else 0

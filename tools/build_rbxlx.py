@@ -73,9 +73,7 @@ def build_dir(path, top=False):
 def main():
     items = []
     items.append(container_item("Workspace", "Workspace", ""))
-    items.append(
-        container_item("Players", "Players", "", '<bool name="CharacterAutoLoads">false</bool>')
-    )
+    items.append(container_item("Players", "Players", ""))
     # Luce con ombre dal sole e dai faretti (ShadowMap = 3). Technology non si puo' impostare da script, solo dal file.
     items.append(container_item("Lighting", "Lighting", "", '<token name="Technology">3</token>'))
     for folder, cls in SERVICES.items():

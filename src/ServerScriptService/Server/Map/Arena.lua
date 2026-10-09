@@ -10,6 +10,8 @@ local HL, HW = Layout.HL, Layout.HW
 local XB, WH = Layout.XB, Layout.WALL_H
 local ST = Layout.STAND
 
+local SM = Enum.Material.SmoothPlastic
+
 local STEEL = Color3.fromRGB(40, 44, 66)
 local STEEL_LIGHT = Color3.fromRGB(78, 84, 112)
 local LILAC = Color3.fromRGB(190, 132, 255)

@@ -314,8 +314,14 @@ function Match.Run()
 end
 
 function Match.OnPlayerAdded(plr)
-	addStats(plr)
-	Stamina.Init(plr)
+	local ok, err = pcall(function()
+		addStats(plr)
+		Stamina.Init(plr)
+	end)
+	if not ok then
+		warn("[Match] preparazione del giocatore non riuscita: " .. tostring(err))
+	end
+	-- il personaggio compare comunque
 	Match.Spawn(plr)
 end
 

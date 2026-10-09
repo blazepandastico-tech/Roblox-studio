@@ -8,7 +8,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def rbxbake_exe():
     exe = os.path.join(HERE, "rbxbake", "target", "release", "rbxbake")
     if not os.path.exists(exe):
-        subprocess.check_call(["cargo", "build", "--release", "--offline"], cwd=os.path.join(HERE, "rbxbake"))
+        subprocess.check_call(["cargo", "build", "--release"], cwd=os.path.join(HERE, "rbxbake"))
     return exe
 
 

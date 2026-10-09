@@ -3,9 +3,11 @@
 Calcio caotico 4 contro 4 per Roblox (nome provvisorio). Tutto il codice e' originale.
 
 ## Come aprirlo
-- **Facile:** apri `CalcioFuorilegge.rbxlx` con Roblox Studio (File > Open from File). La mappa (stadio, lobby, scenario) e' gia'
-  dentro il file; il canyon di Terrain si costruisce in pochi secondi quando premi Play (oppure a mano, vedi `tools/bake/README.md`).
+- **Facile:** apri `CalcioFuorilegge.rbxl` con Roblox Studio (File > Open from File; `CalcioFuorilegge.rbxlx` e' lo stesso contenuto in
+  XML, da usare se il primo non si apre). La mappa (stadio, lobby, scenario) e' gia' dentro il file: la vedi appena apri, nell'Explorer
+  sta in `Workspace > World`. Il canyon di Terrain si costruisce in pochi secondi quando premi Play (oppure a mano, vedi `tools/bake/README.md`).
   In *Game Settings > Avatar* imposta **R15**. Premi Play (o Test > Clients and Servers con 2+ giocatori).
+  Nella finestra *Output* compaiono righe `[Calcio Fuorilegge] ...` che dicono a che punto e' l'avvio; se qualcosa non va, l'errore e' li'.
 - **Con Rojo:** `rojo serve` (usa `default.project.json`): place vuoto, la mappa si costruisce tutta da codice al Play.
 - Per rigenerare il file dopo modifiche a `src/`: `python3 tools/bake/bake_map.py` (vedi `tools/bake/README.md`).
   `python3 tools/build_rbxlx.py` scrive invece un file leggero con i soli script (`CalcioFuorilegge_solo_script.rbxlx`).

@@ -159,7 +159,9 @@ function M.load(lines)
 		if o and node.refs then
 			for _, r in ipairs(node.refs) do
 				local target = inst[r.id]
-				if target then
+				if r.id == 0 then
+					-- riferimento nullo (il formato binario scrive PrimaryPart = null anche sui Model che non ne hanno uno)
+				elseif target then
 					local ok, err = pcall(function() o[r.name] = target end)
 					if not ok then problems[#problems + 1] = node.class .. "." .. r.name .. ": " .. tostring(err) end
 				else

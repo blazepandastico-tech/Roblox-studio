@@ -48,15 +48,22 @@ end
 
 -- Il canyon (Terrain a voxel) non sta nel file: richiede qualche secondo, quindi si costruisce all'avvio, in parallelo.
 function MapBuilder.BuildTerrain()
-	try("terreno", function()
+	local t0 = workspace:GetServerTimeNow()
+	local ok = try("terreno", function()
 		require(script.Parent.Map.Terrain).Build()
 	end)
+	if ok then
+		print(string.format("[Calcio Fuorilegge] canyon (Terrain) pronto in %.0f secondi", workspace:GetServerTimeNow() - t0))
+	end
 end
 
 function MapBuilder.Build()
 	local root = workspace:FindFirstChild("World")
-	if not (root and root:GetAttribute("Baked")) then
+	if root and root:GetAttribute("Baked") then
+		print("[Calcio Fuorilegge] mappa gia' nel file: " .. #root:GetDescendants() .. " oggetti in workspace.World")
+	else
 		root = MapBuilder.BuildStatic()
+		print("[Calcio Fuorilegge] mappa costruita da codice: " .. #root:GetDescendants() .. " oggetti in workspace.World")
 	end
 	-- il resto e' gia' giocabile mentre il terreno si costruisce
 	task.spawn(MapBuilder.BuildTerrain)
