@@ -1,5 +1,10 @@
 -- Costruisce da codice la mappa Canyon del Deserto (campo, stadio, canyon, lobby) e la luce da tramonto.
 -- Ogni parte "di contorno" e' protetta da pcall: se una decorazione fallisce il gioco parte lo stesso.
+--
+-- Due modi di avere la mappa:
+--  * file .rbxlx "cotto" (tools/bake): le parti fisse sono gia' nel file dentro workspace.World (attributo Baked),
+--    all'avvio resta da costruire solo il terreno;
+--  * place vuoto (Rojo): Build() costruisce tutto da codice, come prima.
 local Config = require(game:GetService("ReplicatedStorage"):WaitForChild("Config"))
 local Layout = require(script.Parent.Map.Layout)
 local Util = require(script.Parent.Map.Util)
@@ -14,7 +19,8 @@ local function try(name, fn, ...)
 	return ok
 end
 
-function MapBuilder.Build()
+-- Tutto cio' che e' fisso: luce, campo, stadio, lobby, scenario. E' la parte che tools/bake scrive dentro il file.
+function MapBuilder.BuildStatic()
 	local root = Instance.new("Folder")
 	root.Name = "World"
 	root.Parent = workspace
@@ -37,12 +43,23 @@ function MapBuilder.Build()
 	try("scenario", function()
 		require(Map.Props).Build(root)
 	end)
-	-- il canyon (Terrain) richiede qualche secondo: lo costruiamo in parallelo, il resto e' gia' giocabile
-	task.spawn(function()
-		try("terreno", function()
-			require(Map.Terrain).Build()
-		end)
+	return root
+end
+
+-- Il canyon (Terrain a voxel) non sta nel file: richiede qualche secondo, quindi si costruisce all'avvio, in parallelo.
+function MapBuilder.BuildTerrain()
+	try("terreno", function()
+		require(script.Parent.Map.Terrain).Build()
 	end)
+end
+
+function MapBuilder.Build()
+	local root = workspace:FindFirstChild("World")
+	if not (root and root:GetAttribute("Baked")) then
+		root = MapBuilder.BuildStatic()
+	end
+	-- il resto e' gia' giocabile mentre il terreno si costruisce
+	task.spawn(MapBuilder.BuildTerrain)
 	return root
 end
 

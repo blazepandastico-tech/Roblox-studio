@@ -1,0 +1,12 @@
+[package]
+name = "rbxbake"
+version = "0.1.0"
+edition = "2021"
+description = "Converte i record esportati da export_world.lua (mappa + script) in un place .rbxlx con l'encoder ufficiale rbx_xml, e viceversa (dump per i controlli)"
+
+# Le stesse librerie che usa Rojo (https://github.com/rojo-rbx/rbx-dom), versioni fissate: database delle API di Roblox 741.
+[dependencies]
+rbx_xml = "=3.0.1"
+rbx_dom_weak = "=4.2.0"
+rbx_reflection_database = "=3.0.1"
+rbx_reflection = "=7.0.0"

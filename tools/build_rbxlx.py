@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Impacchetta la cartella src/ in un place Roblox (.rbxlx) apribile con Roblox Studio.
+"""Impacchetta la cartella src/ in un place Roblox (.rbxlx) apribile con Roblox Studio: versione LEGGERA, con i soli script.
+La mappa non e' nel file: si costruisce da codice quando parte il gioco (MapBuilder.Build).
+Per il file completo, con la mappa gia' dentro e visibile anche prima di premere Play, usa  python3 tools/bake/bake_map.py
 
 Convenzioni (le stesse di Rojo):
   *.server.lua -> Script
@@ -13,7 +15,7 @@ from xml.sax.saxutils import escape
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
-OUT = os.path.join(ROOT, "CalcioFuorilegge.rbxlx")
+OUT = os.path.join(ROOT, "CalcioFuorilegge_solo_script.rbxlx")
 
 # nome cartella -> classe del servizio
 SERVICES = {

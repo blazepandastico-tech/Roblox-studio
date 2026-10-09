@@ -3,16 +3,19 @@
 Calcio caotico 4 contro 4 per Roblox (nome provvisorio). Tutto il codice e' originale.
 
 ## Come aprirlo
-- **Facile:** apri `CalcioFuorilegge.rbxlx` con Roblox Studio (File > Open from File).
+- **Facile:** apri `CalcioFuorilegge.rbxlx` con Roblox Studio (File > Open from File). La mappa (stadio, lobby, scenario) e' gia'
+  dentro il file; il canyon di Terrain si costruisce in pochi secondi quando premi Play (oppure a mano, vedi `tools/bake/README.md`).
   In *Game Settings > Avatar* imposta **R15**. Premi Play (o Test > Clients and Servers con 2+ giocatori).
-- **Con Rojo:** `rojo serve` (usa `default.project.json`).
-- Per rigenerare il file dopo modifiche a `src/`: `python3 tools/build_rbxlx.py`.
+- **Con Rojo:** `rojo serve` (usa `default.project.json`): place vuoto, la mappa si costruisce tutta da codice al Play.
+- Per rigenerare il file dopo modifiche a `src/`: `python3 tools/bake/bake_map.py` (vedi `tools/bake/README.md`).
+  `python3 tools/build_rbxlx.py` scrive invece un file leggero con i soli script (`CalcioFuorilegge_solo_script.rbxlx`).
 
 Tutti i numeri di bilanciamento sono in `src/ReplicatedStorage/Config.lua`.
 
 ## La mappa: Canyon del Deserto
-Si costruisce da codice all'avvio del server (`MapBuilder.lua` + moduli in `src/ServerScriptService/Server/Map/`).
-Il canyon (Terrain) richiede qualche secondo: viene creato in parallelo, il resto e' subito giocabile.
+Si costruisce da codice (`MapBuilder.lua` + moduli in `src/ServerScriptService/Server/Map/`): `tools/bake` la scrive anche dentro il
+file `.rbxlx`, e allora `MapBuilder.Build()` la salta (attributo `Baked` su `workspace.World`). Il canyon (Terrain) richiede qualche
+secondo: viene creato in parallelo all'avvio, il resto e' subito giocabile.
 
 | Modulo | Cosa fa |
 |---|---|
@@ -42,3 +45,5 @@ parabole, luci di segnalazione, avvoltoi e i coriandoli del goal.
 ## Strumenti di sviluppo (opzionali)
 `tools/preview/`: esegue il codice della mappa fuori da Studio con una mini-emulazione dell'API Roblox, controlla ogni
 proprieta'/enum/metodo contro l'API reale e produce un'anteprima 3D approssimata. Vedi `tools/preview/README.md`.
+
+`tools/bake/`: scrive la mappa dentro il `.rbxlx` e prova il file nell'emulazione. Vedi `tools/bake/README.md`.

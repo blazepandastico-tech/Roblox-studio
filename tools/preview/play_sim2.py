@@ -15,6 +15,11 @@ for dp, dn, fn in os.walk(src):
         if f.endswith('.lua'): files.append(os.path.relpath(os.path.join(dp, f), src))
 lua.execute("function __mount(root, ...) __SHIM.mountFiles(root, {...}) end")
 lua.globals().__mount(src, *sorted(files))
+if os.environ.get('BAKED'):  # prova partendo dal .rbxlx "cotto" (tools/bake): la mappa arriva dal file
+    sys.path.insert(0, os.path.join(here, '..', 'bake'))
+    import bakedlib
+    _n, _prob = bakedlib.import_baked(lua, os.environ['BAKED'])
+    print('mappa importata dal file:', _n, 'istanze', ('PROBLEMI: ' + _prob) if _prob else '')
 lua.globals().MAIN_SRC = open(os.path.join(src, 'ServerScriptService', 'Main.server.lua'), encoding='utf-8').read()
 code = r'''
 local sss = game:GetService("ServerScriptService")

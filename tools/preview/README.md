@@ -26,6 +26,7 @@ python3 tools/preview/server_smoke.py src
 python3 tools/preview/play_sim.py src 9              # esegue Main + ciclo di partita per 9 minuti simulati
 python3 tools/preview/play_sim2.py src               # + azioni dei giocatori (calcio, scivolata, scatto, goal, rientro in lobby)
 python3 tools/preview/play_client.py src             # + client (HUD, effetti, ambiente)
+BAKED=CalcioFuorilegge.rbxlx python3 tools/preview/play_sim.py src 4   # lo stesso, ma con la mappa letta DAL FILE .rbxlx (vedi tools/bake)
 
 cd tools/preview && npm install                      # three + playwright-core (serve un Chromium: CHROMIUM_PATH=...)
 node render_map.mjs ../../out.json shots all         # immagini in tools/preview/shots/

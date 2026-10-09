@@ -285,6 +285,10 @@ local function rocks(rng)
 end
 
 function Terrain.Build()
+	-- gia' costruito (a mano da Studio con la Command Bar, oppure in questa sessione): non si rifa'
+	if T:GetAttribute("CanyonBuilt") then
+		return
+	end
 	local rng = Util.Rng(2024)
 	for mat, col in pairs(COLORS) do
 		T:SetMaterialColor(mat, col)
@@ -304,6 +308,7 @@ function Terrain.Build()
 	dunes(rng)
 	rocks(rng)
 	river()
+	T:SetAttribute("CanyonBuilt", true)
 end
 
 return Terrain
