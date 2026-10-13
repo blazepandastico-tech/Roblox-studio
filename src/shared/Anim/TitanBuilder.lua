@@ -915,6 +915,11 @@ function TitanBuilder.Build(params): Model
 				px = side * e * 0.24
 			end
 			onFace(head, name .. "Pupilla", Vector3.new(pupil, math.min(pupil, eh * 0.9), headD * 0.03), pupilColor, ex + px, ey - eh * 0.05, headD * 0.03)
+			-- riflesso di luce sulla pupilla: lo sguardo sembra vivo (solo grafica)
+			if traits.Eyes ~= "Vuoti" then
+				local glint = pupil * 0.34
+				onFace(head, name .. "Riflesso", Vector3.new(glint, glint, headD * 0.02), Color3.fromRGB(255, 255, 255), ex + px - pupil * 0.2, ey - eh * 0.05 + pupil * 0.2, headD * 0.045)
+			end
 		end
 		-- palpebre: occhi socchiusi o occhiolino (coprono la parte alta dell'occhio)
 		local lid = if traits.Eyes == "Socchiusi" then 0.5 elseif traits.Eyes == "Occhiolino" and side > 0 then 1.05 else 0
@@ -1117,6 +1122,46 @@ function TitanBuilder.Build(params): Model
 		decor(model, head, "BarbaPelo", Vector3.new(headW * 0.8, headH * 0.35, headD * 0.4), hair, CFrame.new(0, -headH * 0.42, -headD * 0.28), { Material = Enum.Material.Fabric })
 	end
 	-- (Calvo: niente capelli)
+
+	-- DETTAGLI FINI (solo grafica, generatore a parte: aspetto e punti deboli restano quelli di prima)
+	local fine = Random.new(seed * 4813 + 29)
+	local plainBody = not p.Armor and not p.Bones and not p.Skinless and not p.Fur
+	for _, prefix in { "Left", "Right" } do
+		local foot = model:FindFirstChild(prefix .. "Foot") :: BasePart?
+		if foot and not p.Armor then
+			-- dita dei piedi a blocchetti sul davanti
+			local fs = foot.Size
+			for i = -1, 1 do
+				local toe = Vector3.new(fs.X * 0.27, fs.Y * 0.5, fs.Z * 0.1)
+				decor(model, foot, prefix .. "Dito" .. (i + 2), toe, darker(skin, 0.97 - math.abs(i) * 0.03), CFrame.new(i * fs.X * 0.31, -fs.Y * 0.25, -fs.Z * 0.5 - toe.Z * 0.3))
+			end
+		end
+		local lower = model:FindFirstChild(prefix .. "LowerLeg") :: BasePart?
+		if lower and plainBody then
+			-- rotula
+			local ls = lower.Size
+			decor(model, lower, prefix .. "Rotula", Vector3.new(ls.X * 0.52, ls.X * 0.46, ls.Z * 0.12), darker(skin, 0.94), CFrame.new(0, ls.Y * 0.42, -ls.Z * 0.5 - ls.Z * 0.04))
+		end
+		local hand = model:FindFirstChild(prefix .. "Hand") :: BasePart?
+		if hand and not p.Claws and not p.Armor then
+			-- nocche: le dita chiuse si leggono come una fila di blocchetti
+			local hs = hand.Size
+			for i = 1, 3 do
+				decor(model, hand, prefix .. "Nocca" .. i, Vector3.new(hs.X * 0.26, hs.Y * 0.12, hs.Z * 0.12), darker(skin, 0.95), CFrame.new((i - 2) * hs.X * 0.31, -hs.Y * 0.3, -hs.Z * 0.5 - hs.Z * 0.04))
+			end
+		end
+	end
+	if plainBody and not p.Muscle then
+		-- clavicole e un'ombra leggera sotto il petto
+		for _, side in { -1, 1 } do
+			decor(model, torso, "Clavicola" .. side, Vector3.new(torsoW * 0.3, torsoH * 0.028, torsoD * 0.03), darker(skin, 0.86), CFrame.new(side * torsoW * 0.18, torsoH * 0.43, frontZ - torsoD * 0.01) * CFrame.Angles(0, 0, rad(side * fine:NextNumber(5, 10))))
+		end
+		if p.Belly == 0 and p.ThickMul >= 0.8 then
+			for _, side in { -1, 1 } do
+				decor(model, torso, "Petto" .. side, Vector3.new(torsoW * 0.36, torsoH * 0.03, torsoD * 0.03), darker(skin, 0.9), CFrame.new(side * torsoW * 0.2, torsoH * 0.13, frontZ - torsoD * 0.01) * CFrame.Angles(0, 0, rad(-side * 6)))
+			end
+		end
+	end
 
 	-- Vapore costante (Vulcano, Strisciante, Primordiale)
 	if p.Steam then

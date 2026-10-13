@@ -37,6 +37,8 @@ local alignOri: AlignOrientation? = nil
 local alignAtt: Attachment? = nil
 local controls: any = nil
 local boostEmitter: ParticleEmitter? = nil
+local windPart: BasePart? = nil -- scie di vento attorno al giocatore quando vola veloce (solo grafica)
+local windEmitter: ParticleEmitter? = nil
 local windSound: Sound? = nil
 local lastGroundCheck = 0
 local airTime = 0
@@ -360,6 +362,12 @@ local function land(root: BasePart)
 	if C.SoundController then
 		C.SoundController.Play("Land", root.Position, { Volume = math.clamp(speed / 80, 0.3, 1) })
 	end
+	-- sbuffo di polvere sotto i piedi (più forte se si atterra veloci)
+	if speed > 35 and C.EffectsController and C.EffectsController.GroundDust then
+		local hum = humanoid()
+		local hip = if hum then hum.HipHeight else 2
+		C.EffectsController.GroundDust(root.Position - Vector3.new(0, hip + root.Size.Y / 2, 0), math.clamp(speed / 30, 1.4, 4), nil, math.clamp(math.floor(speed / 12), 4, 10))
+	end
 end
 
 -- RAMPINI ----------------------------------------------------------------------------------
@@ -541,6 +549,64 @@ local function ensureBoostEmitter(): ParticleEmitter?
 	return e
 end
 
+-- Scie di vento: righe sottili che sfrecciano attorno al giocatore in volo veloce. Nascono su una
+-- scatola davanti a lui (sulle facce, non al centro dello schermo) e restano indietro nel mondo.
+local function updateWindStreaks(root: BasePart?, velocity: Vector3, active: boolean)
+	local speed = velocity.Magnitude
+	local rate = if active and root then math.clamp((speed - 70) / 90, 0, 1) * 85 else 0
+	if rate <= 0 then
+		if windEmitter then
+			windEmitter.Rate = 0
+		end
+		return
+	end
+	if not windPart or not windPart.Parent then
+		local p = Instance.new("Part")
+		p.Name = "ScieVento"
+		p.Anchored = true
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Transparency = 1
+		p.Size = Vector3.new(30, 20, 46)
+		p.Parent = workspace.CurrentCamera
+		local e = Instance.new("ParticleEmitter")
+		e.Name = "Scie"
+		e.Texture = "rbxasset://textures/particles/fire_sparks_main.dds"
+		e.Color = ColorSequence.new(Color3.fromRGB(236, 242, 250))
+		e.LightEmission = 0.5
+		e.LightInfluence = 0.3
+		e.Orientation = Enum.ParticleOrientation.VelocityParallel
+		e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 0.16) })
+		e.Squash = NumberSequence.new(2.4)
+		e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.2, 0.62), NumberSequenceKeypoint.new(1, 1) })
+		e.Lifetime = NumberRange.new(0.16, 0.3)
+		e.Speed = NumberRange.new(26, 40)
+		e.EmissionDirection = Enum.NormalId.Back
+		e.Shape = Enum.ParticleEmitterShape.Box
+		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+		e.Rate = 0
+		e.Parent = p
+		windPart = p
+		windEmitter = e
+	end
+	local r = root :: BasePart
+	local box = windPart :: BasePart
+	local emitter = windEmitter :: ParticleEmitter
+	local dir = velocity.Unit
+	local center = r.Position + dir * 20
+	box.CFrame = CFrame.lookAt(center, center + dir)
+	local quality = 1
+	pcall(function()
+		local level = UserSettings().GameSettings.SavedQualityLevel.Value
+		if level ~= 0 then
+			quality = math.clamp(level / 7, 0.35, 1)
+		end
+	end)
+	emitter.Rate = rate * quality
+end
+
 -- FISICA (ogni frame) -------------------------------------------------------------------------
 
 local TELEPORT_JUMP = 150
@@ -666,10 +732,12 @@ local function physics(dt: number)
 			windSound.Volume = math.clamp((velocity.Magnitude - 30) / 140, 0, 0.6) * (if C.ClientData then C.ClientData.Setting("Sfx", 0.8) else 0.8)
 			windSound.PlaybackSpeed = 0.8 + math.clamp(velocity.Magnitude / 200, 0, 0.8)
 		end
+		updateWindStreaks(root, velocity, true)
 	else
 		if boostEmitter then
 			boostEmitter.Enabled = false
 		end
+		updateWindStreaks(nil, Vector3.zero, false)
 		if windSound then
 			windSound.Volume = 0
 		end

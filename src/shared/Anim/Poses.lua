@@ -359,27 +359,38 @@ function Poses.Human.BattleLoco(t, ctx)
 	return out
 end
 
--- Volo con i Rampini: il corpo si allinea alla direzione del movimento
+-- Volo con i Rampini: il corpo si allinea alla direzione del movimento e reagisce alle forze:
+--   spinta in avanti (gas o corda che tira) = gambe e braccia restano indietro, corpo disteso
+--   frenata = gambe e braccia in avanti per frenare
+--   salita a fine oscillazione = ginocchia raccolte, discesa = gambe che si allungano
+-- ctx: Speed, Pitch, Roll, AccelFwd (accelerazione in avanti, smussata), VY (velocità verticale)
 function Poses.Human.ODMFly(t, ctx)
 	local speed = ctx.Speed or 0
 	local fly = math.clamp(speed / 110, 0, 1)
 	local pitch = (ctx.Pitch or 90) * fly -- 0 = in piedi, 90 = orizzontale, 180 = in picchiata
 	local roll = ctx.Roll or 0
 	local flutter = sin(t * 18) * 3 * fly
+	local push = math.clamp((ctx.AccelFwd or 0) / 140, -1, 1)
+	local stretch = math.max(0, push)
+	local brake = math.max(0, -push)
+	local rise = math.clamp((ctx.VY or 0) / 70, -1, 1)
+	local tuck = math.max(0, rise) * (1 - stretch)
+	local reach = math.max(0, -rise) * (1 - brake) -- in discesa le gambe si allungano verso il basso
+	local sway = sin(t * 2.3) * 2 * fly
 	return {
 		Root = A(-pitch, 0, roll),
-		Waist = A(-6 + flutter * 0.3, 0, 0),
-		Neck = A(math.min(pitch * 0.55, 60), 0, 0),
-		RightShoulder = A(-30 - 20 * fly, 0, 30 + 15 * fly),
-		RightElbow = A(25, 0, 0),
+		Waist = A(-6 + flutter * 0.3 - stretch * 6 + brake * 8, sway, -roll * 0.15),
+		Neck = A(math.min(pitch * 0.55, 60) - stretch * 6 + brake * 4, -sway, 0),
+		RightShoulder = A(-30 - 20 * fly - stretch * 18 + brake * 22, 0, 30 + 15 * fly + stretch * 6),
+		RightElbow = A(25 - stretch * 10 + brake * 15, 0, 0),
 		RightWrist = A(-25, 0, 0),
-		LeftShoulder = A(-30 - 20 * fly, 0, -30 - 15 * fly),
-		LeftElbow = A(25, 0, 0),
+		LeftShoulder = A(-30 - 20 * fly - stretch * 18 + brake * 22, 0, -30 - 15 * fly - stretch * 6),
+		LeftElbow = A(25 - stretch * 10 + brake * 15, 0, 0),
 		LeftWrist = A(-25, 0, 0),
-		RightHip = A(-10 - 12 * fly + flutter, 0, 4),
-		LeftHip = A(-14 - 12 * fly - flutter, 0, -4),
-		RightKnee = A(-30 - 10 * fly, 0, 0),
-		LeftKnee = A(-20 - 10 * fly, 0, 0),
+		RightHip = A(-10 - 12 * fly + flutter - stretch * 14 + tuck * 40 + brake * 25 + reach * 6, 0, 4),
+		LeftHip = A(-14 - 12 * fly - flutter - stretch * 14 + tuck * 30 + brake * 20 - reach * 4, 0, -4),
+		RightKnee = A(-30 - 10 * fly + stretch * 18 - tuck * 45 - brake * 25 + reach * 16, 0, 0),
+		LeftKnee = A(-20 - 10 * fly + stretch * 12 - tuck * 50 - brake * 20 + reach * 8, 0, 0),
 	}
 end
 
@@ -435,13 +446,15 @@ function Poses.Human.Idle(t, ctx)
 	}
 end
 
--- Mantello che svolazza (articolazione "Cloak")
+-- Mantello che svolazza (articolazione "Cloak", sul retro delle spalle).
+-- Angolo NEGATIVO = il mantello si alza all'indietro, lontano dalla schiena: con un angolo positivo
+-- andrebbe in avanti e attraverserebbe il corpo. Più si va veloci, più si solleva e sventola.
 function Poses.Human.Cloak(t, ctx)
 	local speed = ctx.Speed or 0
 	local lift = math.clamp(speed / 120, 0, 1)
-	local flutter = sin(t * (6 + lift * 14)) * (3 + lift * 9)
+	local flutter = sin(t * (6 + lift * 14)) * (3 + lift * 9) + sin(t * (2.3 + lift * 5) + 1.3) * (1 + lift * 3)
 	return {
-		Cloak = A(10 + lift * 55 + flutter, 0, sin(t * 4) * 2 * lift),
+		Cloak = A(-(8 + lift * 55 + flutter), 0, sin(t * 4) * 2 * lift),
 	}
 end
 

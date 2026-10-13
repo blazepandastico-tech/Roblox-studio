@@ -98,13 +98,14 @@ function LightingService.IsNight(): boolean
 end
 
 function LightingService.Setup()
-	Lighting.Brightness = 2.6
+	Lighting.Brightness = 2.75
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 1
 	Lighting.GlobalShadows = true
 	Lighting.ShadowSoftness = 0.18 -- ombre del sole più nette, come alla luce vera
 	Lighting.Ambient = Color3.fromRGB(70, 64, 60)
-	Lighting.OutdoorAmbient = Color3.fromRGB(132, 128, 120)
+	-- luce del cielo nelle ombre: un po' fredda (azzurrina) contro il sole caldo, dà profondità
+	Lighting.OutdoorAmbient = Color3.fromRGB(120, 124, 134)
 	Lighting.ExposureCompensation = 0.1
 	Lighting.GeographicLatitude = 38
 	Lighting.ClockTime = 9.5
@@ -120,12 +121,12 @@ function LightingService.Setup()
 	local sky = ensure("Sky", Lighting)
 	sky.SunAngularSize = 14
 	sky.MoonAngularSize = 11
-	sky.StarCount = 3000
+	sky.StarCount = 5000
 	sky.CelestialBodiesShown = true
 
 	local bloom = ensure("BloomEffect", Lighting)
-	bloom.Intensity = 0.55
-	bloom.Size = 26
+	bloom.Intensity = 0.62
+	bloom.Size = 30
 	bloom.Threshold = 1.25
 
 	local rays = ensure("SunRaysEffect", Lighting)
@@ -134,9 +135,9 @@ function LightingService.Setup()
 
 	local cc = ensure("ColorCorrectionEffect", Lighting)
 	cc.Brightness = 0.02
-	cc.Contrast = 0.08
-	cc.Saturation = 0.08
-	cc.TintColor = Color3.fromRGB(255, 250, 244)
+	cc.Contrast = 0.11
+	cc.Saturation = 0.11
+	cc.TintColor = Color3.fromRGB(255, 248, 240)
 
 	local dof = ensure("DepthOfFieldEffect", Lighting)
 	dof.FarIntensity = 0.12

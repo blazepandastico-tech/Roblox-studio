@@ -118,6 +118,59 @@ local function setupSpinners()
 	end)
 end
 
+-- LUCI DELLA NOTTE ----------------------------------------------------------------------------------
+-- Lampioni, lanterne e torce si accendono al tramonto. Dietro molte finestre delle case si accende una
+-- luce calda, ognuna alla sua ora (chi cena presto, chi va a dormire tardi) e qualcuna già all'alba.
+-- Le fiamme vicine tremolano. Solo grafica: le finestre restano le stesse parti di sempre.
+
+local WINDOW_WARM = {
+	Color3.fromRGB(214, 142, 78),
+	Color3.fromRGB(226, 160, 96),
+	Color3.fromRGB(200, 128, 66),
+	Color3.fromRGB(232, 176, 118),
+}
+local windowDay: { [BasePart]: { Material: Enum.Material, Color: Color3, Reflectance: number } } = setmetatable({}, { __mode = "k" }) :: any
+local windowLit: { [BasePart]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+-- numero fisso tra 0 e 1 per ogni finestra (dalla sua posizione)
+local function hash01(p: Vector3, salt: number): number
+	local v = math.sin(p.X * 12.9898 + p.Y * 37.719 + p.Z * 78.233 + salt * 19.19) * 43758.5453
+	return v - math.floor(v)
+end
+
+function AmbienceController.WindowLit(position: Vector3, clockTime: number): boolean
+	if hash01(position, 1) > 0.62 then
+		return false -- casa vuota o tende tirate
+	end
+	local s = (clockTime - 12) % 24 -- ore passate da mezzogiorno
+	local on = 5.7 + hash01(position, 2) * 1.6 -- tra le 17:42 e le 19:18
+	local off = 10.4 + hash01(position, 3) * 6.5 -- tra le 22:24 e le 4:54
+	if s >= on and s < off then
+		return true
+	end
+	return hash01(position, 4) < 0.25 and s >= 17 and s < 18.5 -- chi si alza presto: 5:00 - 6:30
+end
+
+local function setWindow(glass: BasePart, lit: boolean)
+	if windowLit[glass] == lit then
+		return
+	end
+	if windowDay[glass] == nil then
+		windowDay[glass] = { Material = glass.Material, Color = glass.Color, Reflectance = glass.Reflectance }
+	end
+	windowLit[glass] = lit
+	if lit then
+		glass.Material = Enum.Material.Neon
+		glass.Color = WINDOW_WARM[math.floor(hash01(glass.Position, 5) * #WINDOW_WARM) + 1]
+		glass.Reflectance = 0
+	else
+		local day = windowDay[glass]
+		glass.Material = day.Material
+		glass.Color = day.Color
+		glass.Reflectance = day.Reflectance
+	end
+end
+
 local function updateLamps()
 	local t = Lighting.ClockTime
 	local night = t >= 18 or t < 6.5
@@ -129,6 +182,56 @@ local function updateLamps()
 		if bulb:IsA("BasePart") then
 			bulb.Material = if night then Enum.Material.Neon else Enum.Material.Glass
 		end
+	end
+	for _, glass in CollectionService:GetTagged(Config.Tags.Window) do
+		if glass:IsA("BasePart") then
+			setWindow(glass, AmbienceController.WindowLit(glass.Position, t))
+		end
+	end
+end
+
+-- accende o spegne subito lampioni e finestre (di solito lo fa da sé ogni 2 secondi)
+AmbienceController.RefreshLights = updateLamps
+
+-- fiamme che tremolano (solo quelle vicine alla telecamera, aggiornate ogni fotogramma)
+local flickering: { { Light: PointLight, Base: number, Seed: number } } = {}
+local lastFlickerScan = 0
+
+local function updateFlicker()
+	local now = os.clock()
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	if now - lastFlickerScan > 1.5 then
+		lastFlickerScan = now
+		for _, f in flickering do
+			if f.Light.Parent then
+				f.Light.Brightness = f.Base
+			end
+		end
+		table.clear(flickering)
+		local cam = camera.CFrame.Position
+		for _, bulb in CollectionService:GetTagged(Config.Tags.Lamp) do
+			if #flickering >= 40 then
+				break
+			end
+			if bulb:IsA("BasePart") and bulb:FindFirstChildOfClass("Fire") and (bulb.Position - cam).Magnitude < 220 then
+				local light = bulb:FindFirstChildOfClass("PointLight")
+				if light and light.Enabled then
+					local base = light:GetAttribute("Luminosita")
+					if type(base) ~= "number" then
+						base = light.Brightness
+						light:SetAttribute("Luminosita", base)
+					end
+					table.insert(flickering, { Light = light, Base = base :: number, Seed = hash01(bulb.Position, 6) * 100 })
+				end
+			end
+		end
+	end
+	for _, f in flickering do
+		local n = math.noise(now * 7, f.Seed) * 0.6 + math.noise(now * 17, f.Seed + 3.3) * 0.4
+		f.Light.Brightness = f.Base * (0.86 + n * 0.28)
 	end
 end
 
@@ -303,8 +406,19 @@ function AmbienceController.Start()
 	end)
 	task.spawn(function()
 		while true do
-			updateLamps()
-			task.wait(5)
+			local ok, err = pcall(updateLamps)
+			if not ok then
+				warn("[Luci] " .. tostring(err))
+			end
+			task.wait(2)
+		end
+	end)
+	local flickerWarned = false
+	RunService.RenderStepped:Connect(function()
+		local ok, err = pcall(updateFlicker)
+		if not ok and not flickerWarned then
+			flickerWarned = true
+			warn("[Luci] " .. tostring(err))
 		end
 	end)
 end

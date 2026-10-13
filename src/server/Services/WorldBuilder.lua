@@ -106,6 +106,57 @@ local function wedge(props: { [string]: any }): WedgePart
 	return p
 end
 
+-- DETTAGLI SOLO GRAFICI ---------------------------------------------------------------------
+-- Hanno un generatore casuale tutto loro: il generatore della mappa (rng) fa sempre gli stessi
+-- passi, quindi case, mura, alberi e strade restano esattamente dove sono. Non si toccano, i rampini
+-- e i colpi li attraversano (niente collisioni né query) e quasi tutti non fanno ombra.
+local deco = Random.new(Config.WorldSeed + 7919)
+
+local function decoPart(props: { [string]: any }): Part
+	local p = Instance.new("Part")
+	if props.Shape then
+		p.Shape = props.Shape
+	end
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		if k ~= "Parent" and k ~= "Shape" then
+			(p :: any)[k] = v
+		end
+	end
+	p.Parent = props.Parent or currentGroup
+	yieldMaybe()
+	return p
+end
+
+local function decoWedge(props: { [string]: any }): WedgePart
+	local p = Instance.new("WedgePart")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	for k, v in props do
+		if k ~= "Parent" then
+			(p :: any)[k] = v
+		end
+	end
+	p.Parent = props.Parent or currentGroup
+	yieldMaybe()
+	return p
+end
+
+local function decoPick(list)
+	return list[deco:NextInteger(1, #list)]
+end
+
 local function group(name: string, parent: Instance?): Model
 	local m = Instance.new("Model")
 	m.Name = name
@@ -458,6 +509,26 @@ local function torch(cf: CFrame)
 	CollectionService:AddTag(flame, Config.Tags.Lamp)
 end
 
+-- Torcia su un'asta corta (solo grafica, per i camminamenti delle mura): cf alla base dell'asta
+local function postTorch(cf: CFrame)
+	decoPart({ Name = "AstaTorcia", Size = Vector3.new(0.45, 3.2, 0.45), CFrame = cf * CFrame.new(0, 1.6, 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(60, 40, 26) })
+	decoPart({ Name = "Braciere", Size = Vector3.new(1.1, 0.5, 1.1), CFrame = cf * CFrame.new(0, 3.3, 0), Material = Enum.Material.Metal, Color = IRON })
+	local flame = decoPart({ Name = "Fiamma", Size = Vector3.new(0.8, 0.9, 0.8), CFrame = cf * CFrame.new(0, 3.9, 0), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 160, 70), Transparency = 0.2 })
+	local fire = Instance.new("Fire")
+	fire.Size = 2.6
+	fire.Heat = 7
+	fire.Color = Color3.fromRGB(255, 150, 60)
+	fire.SecondaryColor = Color3.fromRGB(255, 70, 20)
+	fire.Parent = flame
+	local light = Instance.new("PointLight")
+	light.Range = 24
+	light.Brightness = 1.7
+	light.Color = Color3.fromRGB(255, 166, 86)
+	light.Shadows = false
+	light.Parent = flame
+	CollectionService:AddTag(flame, Config.Tags.Lamp)
+end
+
 -- Bandiera su asta (in cima a torri e porte)
 local function flag(base: CFrame, poleH: number, color: Color3)
 	part({ Name = "Asta", Size = Vector3.new(0.5, poleH, 0.5), CFrame = base * CFrame.new(0, poleH / 2, 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(70, 50, 34), CastShadow = false })
@@ -514,6 +585,12 @@ local function wallSegment(center: Vector3, faceTowards: Vector3, length: number
 		part({ Name = "Macchia", Size = Vector3.new(rng:NextNumber(6, 14), mh, 0.2), CFrame = cf * CFrame.new(rng:NextNumber(-length * 0.35, length * 0.35), half - mh / 2 - 2, thickness / 2 + 0.1), Material = Enum.Material.Limestone, Color = tint(stone, 0.86), CastShadow = false, CanCollide = false })
 	end
 
+	-- colature di pioggia sotto il camminamento (solo grafica)
+	for _ = 1, deco:NextInteger(1, 3) do
+		local sh = deco:NextNumber(12, math.min(46, height * 0.4))
+		decoPart({ Name = "Colatura", Size = Vector3.new(deco:NextNumber(1.2, 3.4), sh, 0.12), CFrame = cf * CFrame.new(deco:NextNumber(-length * 0.4, length * 0.4), half - sh / 2 - 1, thickness / 2 + 0.07), Material = Enum.Material.Limestone, Color = tint(stone, deco:NextNumber(0.78, 0.88)) })
+	end
+
 	-- camminamento in cima
 	part({ Name = "Camminamento", Size = Vector3.new(length + 0.2, 2, thickness + 1), CFrame = cf * CFrame.new(0, half + 1, 0), Material = Enum.Material.Slate, Color = WALL_TOP })
 	if ruined then
@@ -534,6 +611,10 @@ local function wallSegment(center: Vector3, faceTowards: Vector3, length: number
 		part({ Name = "Merlo", Size = Vector3.new(length / merlons * 0.55, 5, 3), CFrame = cf * CFrame.new(x, half + 8.5, thickness / 2 - 1.5), Material = Enum.Material.Limestone, Color = stone, CastShadow = false })
 	end
 	part({ Name = "ParapettoInterno", Size = Vector3.new(length + 0.2, 2.6, 1.6), CFrame = cf * CFrame.new(0, half + 3.3, -thickness / 2 + 0.8), Material = Enum.Material.Limestone, Color = tint(stone, 0.95) })
+	-- di notte il camminamento si punteggia di torce (sul parapetto interno, solo grafica)
+	if deco:NextNumber() < 0.45 then
+		postTorch(cf * CFrame.new(deco:NextNumber(-length * 0.3, length * 0.3), half + 4.6, -thickness / 2 + 0.8))
+	end
 	-- binari su cui scorrono i cannoni
 	for _, rz in { -2.5, 2.5 } do
 		part({ Name = "Binario", Size = Vector3.new(length + 0.2, 0.4, 0.6), CFrame = cf * CFrame.new(0, half + 2.2, rz), Material = Enum.Material.Metal, Color = IRON, CastShadow = false, CanCollide = false })
@@ -790,11 +871,16 @@ local function facadeWindow(cf: CFrame, x: number, y: number, side: number, dept
 	if rich then
 		part({ Name = "Cornice", Size = Vector3.new(w + 0.9, h + 0.9, 0.25), CFrame = cf * CFrame.new(x, y, z + side * 0.08), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor, CastShadow = false, CanCollide = false })
 	end
-	part({ Name = "Finestra", Size = Vector3.new(w, h, 0.3), CFrame = cf * CFrame.new(x, y, z + side * 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+	local glass = part({ Name = "Finestra", Size = Vector3.new(w, h, 0.3), CFrame = cf * CFrame.new(x, y, z + side * 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+	CollectionService:AddTag(glass, Config.Tags.Window)
 	if not rich then
 		return
 	end
 	part({ Name = "Davanzale", Size = Vector3.new(w + 1.4, 0.4, 0.9), CFrame = cf * CFrame.new(x, y - h / 2 - 0.4, z + side * 0.45), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor, CastShadow = false, CanCollide = false })
+	-- telaio a croce sul vetro (solo grafica): la finestra si legge come una finestra vera anche da lontano
+	local barZ = z + side * 0.31
+	decoPart({ Name = "Telaio", Size = Vector3.new(0.24, h, 0.1), CFrame = cf * CFrame.new(x, y, barZ), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor })
+	decoPart({ Name = "Telaio", Size = Vector3.new(w, 0.24, 0.1), CFrame = cf * CFrame.new(x, y + h * 0.14, barZ), Material = if valdoria then Enum.Material.Limestone else Enum.Material.Wood, Color = frameColor })
 	if valdoria then
 		-- architrave di pietra sopra la finestra
 		part({ Name = "Architrave", Size = Vector3.new(w + 1.6, 0.8, 0.6), CFrame = cf * CFrame.new(x, y + h / 2 + 0.7, z + side * 0.3), Material = Enum.Material.Limestone, Color = frameColor, CastShadow = false, CanCollide = false })
@@ -809,6 +895,55 @@ local function facadeWindow(cf: CFrame, x: number, y: number, side: number, dept
 	elseif roll < 0.65 then
 		part({ Name = "Fioriera", Size = Vector3.new(w + 0.6, 0.9, 0.9), CFrame = cf * CFrame.new(x, y - h / 2 - 0.1, z + side * 0.8), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 66, 44), CastShadow = false, CanCollide = false })
 		part({ Name = "Fiori", Size = Vector3.new(w + 0.4, 0.8, 0.8), CFrame = cf * CFrame.new(x, y - h / 2 + 0.6, z + side * 0.8), Material = Enum.Material.Grass, Color = pick(FLOWERS), CastShadow = false, CanCollide = false })
+	end
+end
+
+local IVY = { Color3.fromRGB(58, 92, 46), Color3.fromRGB(70, 104, 50), Color3.fromRGB(50, 82, 44), Color3.fromRGB(84, 112, 56) }
+
+-- Lanterna a muro su un braccio di ferro: di notte si accende come i lampioni (tag Lamp)
+local function wallLantern(at: CFrame)
+	decoPart({ Name = "Braccio", Size = Vector3.new(0.22, 0.22, 1.5), CFrame = at * CFrame.new(0, 1.05, 0.45), Material = Enum.Material.Metal, Color = IRON })
+	decoPart({ Name = "CappelloLanterna", Size = Vector3.new(1.15, 0.28, 1.15), CFrame = at * CFrame.new(0, 0.82, 0), Material = Enum.Material.Metal, Color = IRON })
+	local lantern = decoPart({ Name = "Lanterna", Size = Vector3.new(0.8, 1.25, 0.8), CFrame = at, Material = Enum.Material.Glass, Color = Color3.fromRGB(255, 194, 118) })
+	decoPart({ Name = "FondoLanterna", Size = Vector3.new(0.95, 0.18, 0.95), CFrame = at * CFrame.new(0, -0.7, 0), Material = Enum.Material.Metal, Color = IRON })
+	local light = Instance.new("PointLight")
+	light.Range = 16
+	light.Brightness = 1.1
+	light.Color = Color3.fromRGB(255, 180, 104)
+	light.Shadows = false
+	light.Enabled = false
+	light.Parent = lantern
+	CollectionService:AddTag(lantern, Config.Tags.Lamp)
+	return lantern
+end
+
+-- Dettagli solo grafici di una casa (generatore separato: la casa non cambia di un millimetro)
+local function houseDetails(cf: CFrame, width: number, depth: number, height: number, floors: number, valdoria: boolean, ruined: boolean)
+	if ruined then
+		-- fuliggine sopra le finestre e i muri anneriti dal fuoco
+		if deco:NextNumber() < 0.6 then
+			local sh = math.min(height * 0.5, deco:NextNumber(4, 9))
+			decoPart({ Name = "Fuliggine", Size = Vector3.new(deco:NextNumber(3, width * 0.5), sh, 0.12), CFrame = cf * CFrame.new(deco:NextNumber(-width * 0.25, width * 0.25), height - sh / 2 - 0.3, -depth / 2 - 0.08), Material = Enum.Material.Slate, Color = Color3.fromRGB(46, 40, 36) })
+		end
+		return
+	end
+	-- edera che sale su un fianco
+	if deco:NextNumber() < 0.18 and depth >= 9 then
+		local sx = if deco:NextNumber() < 0.5 then -1 else 1
+		local ivyH = height * deco:NextNumber(0.45, 0.85)
+		local ivyW = math.min(depth - 4, deco:NextNumber(3, 6.5))
+		local z0 = deco:NextNumber(-depth / 2 + ivyW / 2 + 1.2, depth / 2 - ivyW / 2 - 1.2)
+		local leaf = decoPick(IVY)
+		decoPart({ Name = "Edera", Size = Vector3.new(0.3, ivyH, ivyW), CFrame = cf * CFrame.new(sx * (width / 2 + 0.2), ivyH / 2, z0), Material = Enum.Material.LeafyGrass, Color = leaf })
+		for _ = 1, 3 do
+			local s = deco:NextNumber(1.4, 2.8)
+			decoPart({ Name = "Edera", Size = Vector3.new(0.42, s, s * 1.25), CFrame = cf * CFrame.new(sx * (width / 2 + 0.26), deco:NextNumber(ivyH * 0.35, ivyH * 0.98), z0 + deco:NextNumber(-ivyW * 0.55, ivyW * 0.55)), Material = Enum.Material.LeafyGrass, Color = tint(leaf, deco:NextNumber(0.85, 1.18)) })
+		end
+	end
+	-- lanterna a muro su uno spigolo della facciata (tra le finestre del piano terra e la fascia)
+	if not valdoria and floors >= 2 and width >= 12 and deco:NextNumber() < 0.24 then
+		local sx = if deco:NextNumber() < 0.5 then -1 else 1
+		wallLantern(cf * CFrame.new(sx * (width / 2 - 1.5), 10.2, -depth / 2 - 1.05))
 	end
 end
 
@@ -1001,8 +1136,15 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			local ridge = Vector3.new(0, height + roofH, 0)
 			local slabCF = CFrame.fromMatrix(ridge + down * (slabLen / 2 - 0.4) + normal * (slabT / 2), Vector3.xAxis, normal)
 			for _, side in { -1, 1 } do
-				local slab = part({ Name = "Tetto", Size = Vector3.new(width + gableOh * 2, slabT, slabLen), CFrame = cf * CFrame.Angles(0, if side > 0 then math.pi else 0, 0) * slabCF, Material = roofMat, Color = roofColor })
+				local slabWorld = cf * CFrame.Angles(0, if side > 0 then math.pi else 0, 0) * slabCF
+				local slab = part({ Name = "Tetto", Size = Vector3.new(width + gableOh * 2, slabT, slabLen), CFrame = slabWorld, Material = roofMat, Color = roofColor })
 				slab.CollisionGroup = Config.CollisionGroups.Buildings
+				if not ruined then
+					-- tavole di bordo sotto le falde, sui due timpani (solo grafica)
+					for _, sx in { -1, 1 } do
+						decoPart({ Name = "TavolaTetto", Size = Vector3.new(0.4, slabT + 0.7, slabLen), CFrame = slabWorld * CFrame.new(sx * (width / 2 + gableOh - 0.1), -0.3, 0), Material = Enum.Material.WoodPlanks, Color = tint(PALETTE.Timber, 0.9) })
+					end
+				end
 			end
 			-- colmo
 			part({ Name = "Colmo", Size = Vector3.new(width + gableOh * 2 + 0.3, 0.9, 1.5), CFrame = cf * CFrame.new(0, height + roofH + slabT * math.cos(theta) + 0.15, 0), Material = roofMat, Color = tint(roofColor, 0.8), CastShadow = false })
@@ -1024,7 +1166,10 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 					local zc = (zf + back) / 2
 					part({ Name = "Abbaino", Size = Vector3.new(dw, dh, dd), CFrame = cf * CFrame.new(dx, bottom + dh / 2, zc), Material = material, Color = wallColor })
 					part({ Name = "Cornice", Size = Vector3.new(3.3, 3.2, 0.25), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.05), Material = Enum.Material.Wood, Color = PALETTE.Timber, CastShadow = false, CanCollide = false })
-					part({ Name = "Finestra", Size = Vector3.new(2.6, 2.6, 0.3), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+					local dormerGlass = part({ Name = "Finestra", Size = Vector3.new(2.6, 2.6, 0.3), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.12), Material = Enum.Material.Glass, Color = Color3.fromRGB(40, 54, 66), Reflectance = 0.15, CastShadow = false })
+					CollectionService:AddTag(dormerGlass, Config.Tags.Window)
+					decoPart({ Name = "Telaio", Size = Vector3.new(0.2, 2.6, 0.1), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.31), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+					decoPart({ Name = "Telaio", Size = Vector3.new(2.6, 0.2, 0.1), CFrame = cf * CFrame.new(dx, bottom + 2.2, zf - 0.31), Material = Enum.Material.Wood, Color = PALETTE.Timber })
 					for _, sx in { -1, 1 } do
 						wedge({ Name = "TettoAbbaino", Size = Vector3.new(dd + 0.8, 1.7, dw / 2 + 0.5), CFrame = cf * CFrame.new(dx + sx * (dw / 2 + 0.5) / 2, bottom + dh + 0.85, zc - 0.4) * CFrame.Angles(0, -sx * math.pi / 2, 0), Material = roofMat, Color = roofColor })
 					end
@@ -1049,6 +1194,7 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 			part({ Name = "TraveBruciata", Size = Vector3.new(1.2, 1.2, depth * rng:NextNumber(0.6, 1.1)), CFrame = cf * CFrame.new(rng:NextNumber(-width / 2, width / 2), height + 0.6, 0) * CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(-0.4, 0.4), 0), Material = Enum.Material.Wood, Color = Color3.fromRGB(30, 24, 20), CastShadow = false })
 		end
 	end
+	houseDetails(cf, width, depth, height, floors, isValdoria, ruined == true)
 end
 
 -- INTERNI: arredamento delle stanze in cui si entra -----------------------------------------------
@@ -1673,6 +1819,65 @@ local function zoneCenter(id: string): Vector3
 	return if zone then zone.Center else Vector3.zero
 end
 
+-- Vita al campo dei cadetti (solo grafica): fuoco da campo con i tronchi per sedersi, casse e barili
+-- vicino al deposito, manichini di paglia per i fendenti e bandierine sullo steccato
+local function campDetails(c: Vector3)
+	-- fuoco da campo
+	local fire = c + Vector3.new(30, 0, 54)
+	for i = 0, 8 do
+		local a = i / 9 * math.pi * 2
+		decoPart({ Name = "Sasso", Size = Vector3.new(1.5, 0.9, 1.1), CFrame = CFrame.new(fire + Vector3.new(math.cos(a) * 2.7, G + 0.35, math.sin(a) * 2.7)) * CFrame.Angles(0, -a, deco:NextNumber(-0.2, 0.2)), Material = Enum.Material.Slate, Color = tint(Color3.fromRGB(116, 110, 104), deco:NextNumber(0.85, 1.1)) })
+	end
+	for i = 0, 2 do
+		decoPart({ Name = "Legna", Shape = Enum.PartType.Cylinder, Size = Vector3.new(3.4, 0.6, 0.6), CFrame = CFrame.new(fire + Vector3.new(0, G + 0.7, 0)) * CFrame.Angles(0, i * math.pi / 3, math.rad(20)), Material = Enum.Material.Wood, Color = Color3.fromRGB(64, 44, 30) })
+	end
+	local embers = decoPart({ Name = "Brace", Size = Vector3.new(1.8, 0.35, 1.8), CFrame = CFrame.new(fire + Vector3.new(0, G + 0.3, 0)), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 118, 40) })
+	local flame = Instance.new("Fire")
+	flame.Size = 4.5
+	flame.Heat = 9
+	flame.Color = Color3.fromRGB(255, 150, 60)
+	flame.SecondaryColor = Color3.fromRGB(255, 70, 20)
+	flame.Parent = embers
+	local glow = Instance.new("PointLight")
+	glow.Range = 30
+	glow.Brightness = 1.6
+	glow.Color = Color3.fromRGB(255, 160, 84)
+	glow.Shadows = false
+	glow.Parent = embers
+	for i = 0, 2 do
+		local a = i / 3 * math.pi * 2 + 0.5
+		local at = fire + Vector3.new(math.cos(a) * 6.5, G + 0.7, math.sin(a) * 6.5)
+		decoPart({ Name = "Panca", Shape = Enum.PartType.Cylinder, Size = Vector3.new(6, 1.4, 1.4), CFrame = CFrame.fromMatrix(at, Vector3.new(-math.sin(a), 0, math.cos(a)), Vector3.yAxis), Material = Enum.Material.Wood, Color = Color3.fromRGB(96, 70, 46) })
+	end
+	-- casse e barili vicino al deposito di rifornimento
+	local depot = c + Vector3.new(12, 0, 32)
+	decoPart({ Name = "Cassa", Size = Vector3.new(3, 3, 3), CFrame = CFrame.new(depot + Vector3.new(5.2, G + 1.5, -1.2)) * CFrame.Angles(0, 0.2, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(150, 110, 72) })
+	decoPart({ Name = "Cassa", Size = Vector3.new(2.4, 2.4, 2.4), CFrame = CFrame.new(depot + Vector3.new(5.4, G + 4.2, -1.1)) * CFrame.Angles(0, -0.3, 0), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(136, 98, 64) })
+	for i = 0, 1 do
+		decoPart({ Name = "Barile", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.6, 2, 2), CFrame = CFrame.new(depot + Vector3.new(5 + i * 2.3, G + 1.3, 2.4)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Wood, Color = Color3.fromRGB(108, 74, 46) })
+		decoPart({ Name = "Cerchio", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.25, 2.1, 2.1), CFrame = CFrame.new(depot + Vector3.new(5 + i * 2.3, G + 2.1, 2.4)) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Metal, Color = IRON })
+	end
+	-- manichini di paglia per provare i fendenti
+	for i = 1, 4 do
+		local a = deco:NextNumber(0, math.pi * 2)
+		local r = deco:NextNumber(88, 100)
+		local pos = c + Vector3.new(math.cos(a) * r, G, math.sin(a) * r)
+		local face = CFrame.lookAt(pos, Vector3.new(c.X, G, c.Z))
+		decoPart({ Name = "PaloManichino", Size = Vector3.new(0.5, 6.5, 0.5), CFrame = face * CFrame.new(0, 3.25, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+		decoPart({ Name = "Manichino", Size = Vector3.new(2.2, 2.8, 1.3), CFrame = face * CFrame.new(0, 4.6, 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(214, 184, 106) })
+		decoPart({ Name = "BracciaManichino", Size = Vector3.new(4.6, 0.45, 0.45), CFrame = face * CFrame.new(0, 5.4, 0), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+		decoPart({ Name = "TestaManichino", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.6, CFrame = face * CFrame.new(0, 6.8, 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(222, 196, 120) })
+		decoPart({ Name = "Taglio", Size = Vector3.new(1.6, 0.18, 0.1), CFrame = face * CFrame.new(0, 4.8, -0.68) * CFrame.Angles(0, 0, deco:NextNumber(-0.6, 0.6)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(150, 120, 60) })
+	end
+	-- bandierine dei cadetti sullo steccato
+	for i = 0, 7, 2 do
+		local a = i / 8 * math.pi * 2
+		local pos = c + Vector3.new(math.cos(a) * 112, G, math.sin(a) * 112)
+		decoPart({ Name = "AstaBandierina", Size = Vector3.new(0.4, 12, 0.4), CFrame = CFrame.new(pos + Vector3.new(0, 6, 0)), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+		decoWedge({ Name = "Bandierina", Size = Vector3.new(0.12, 2.6, 4.4), CFrame = CFrame.lookAt(pos + Vector3.new(0, 10.5, 0), pos + Vector3.new(0, 10.5, 0) + Vector3.new(-math.sin(a), 0, math.cos(a))) * CFrame.new(0, 0, -2.2) * CFrame.Angles(0, 0, math.pi), Material = Enum.Material.Fabric, Color = if i % 4 == 0 then Color3.fromRGB(150, 110, 70) else Color3.fromRGB(190, 160, 90) })
+	end
+end
+
 local function buildTrainingCamp()
 	local c = zoneCenter("CampoAddestramento")
 	currentGroup = group("Campo di Addestramento")
@@ -1692,6 +1897,11 @@ local function buildTrainingCamp()
 		if not isReserved(pos, 8) then
 			local h = rng:NextNumber(45, 80)
 			part({ Name = "PaloAddestramento", Size = Vector3.new(3, h, 3), CFrame = CFrame.new(pos + Vector3.new(0, h / 2, 0)), Material = Enum.Material.Wood, Color = PALETTE.Timber })
+			-- corde avvolte in cima e un bersaglio dipinto: i punti dove agganciare i rampini (solo grafica)
+			for _, y in { h - 3, h - 4.2 } do
+				decoPart({ Name = "Corda", Size = Vector3.new(3.3, 0.5, 3.3), CFrame = CFrame.new(pos + Vector3.new(0, y, 0)) * CFrame.Angles(0, deco:NextNumber(0, math.pi), 0), Material = Enum.Material.Fabric, Color = Color3.fromRGB(176, 150, 104) })
+			end
+			decoPart({ Name = "Bersaglio", Size = Vector3.new(3.12, 1.6, 3.12), CFrame = CFrame.new(pos + Vector3.new(0, h * 0.62, 0)), Material = Enum.Material.Wood, Color = Color3.fromRGB(176, 48, 40) })
 		end
 	end
 	-- baracche
@@ -1709,6 +1919,7 @@ local function buildTrainingCamp()
 	supplyStation(c + Vector3.new(12, 0, 32))
 	lamp(c + Vector3.new(-8, 0, 10))
 	lamp(c + Vector3.new(8, 0, -40))
+	campDetails(c)
 end
 
 local function buildHQ()

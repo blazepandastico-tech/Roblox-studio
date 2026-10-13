@@ -163,6 +163,28 @@ Se vai in un'isola troppo forte per te, il gioco ti avvisa, ma non ti ferma.
 Tutti questi dettagli sono solo grafici (ogni giocatore li vede sul suo dispositivo) e si adattano alla qualità
 grafica. Chi ha un dispositivo lento può spegnerli: **Menu (M) → Impostazioni → Dettagli ambientali**.
 
+### Aggiornamento grafico (il gioco resta identico)
+
+- **La notte**: dietro le finestre delle case si accende una luce calda, ognuna alla sua ora (chi cena presto, chi
+  va a letto tardi, chi si alza all'alba); lanterne a muro sulle case, torce lungo il camminamento delle mura,
+  fiamme che tremolano, ombre blu della luna, più stelle.
+- **Case e mura**: finestre con il telaio a croce, tavole di legno sotto le falde dei timpani, edera che sale sui
+  muri, colature di pioggia sulle mura. Il **Campo di Addestramento** (dove si comincia) ha il fuoco da campo con
+  i tronchi, casse e barili al deposito, manichini di paglia, bandierine sullo steccato, corde e bersagli sui pali.
+- **Aria viva**: foglie che cadono nei boschi, pulviscolo nel sole in città e in campagna, cenere tra le rovine,
+  braci al Fronte (solo vicino alla telecamera, si spengono con *Dettagli ambientali*).
+- **Giganti**: riflesso di luce negli occhi, dita dei piedi, nocche, rotule e clavicole; la polvere esce dal piede
+  che tocca terra; i giganti feriti fumano (vapore della rigenerazione) e smettono quando guariscono.
+- **Animazioni**: il volo con i rampini reagisce alle forze (spinta del gas = corpo disteso, frenata = gambe e
+  braccia avanti, oscillazione = ginocchia raccolte in salita), il mantello si alza dietro la schiena (prima
+  ruotava in avanti e attraversava il corpo), le transizioni tra un'animazione e l'altra partono e finiscono piano,
+  scie delle lame a mezzaluna, scie di vento quando si vola veloci, polvere quando si atterra.
+- **Luce**: ombre leggermente fredde contro il sole caldo, un po' più di contrasto e colore, bagliore più morbido.
+
+Niente di tutto questo cambia il gioco: case, mura, alberi, terreno, punti dove si aggancia il rampino, nuca e
+parti colpibili dei giganti sono identici al millimetro (controllo automatico `tools/check_layout.py`, vedi la
+sezione 9). I dettagli nuovi non si toccano e non bloccano i rampini. Foto prima/dopo in `assets/grafica/`.
+
 ## 4. Giganti, boss e raid
 
 - **Giganti normali** (da 3 a 15 metri, più gli anomali) popolano ogni isola: più ti allontani, più sono forti.
@@ -334,7 +356,16 @@ python3 tools/test_data.py    # coerenza di storia, missioni, isole, raid, negoz
 python3 tools/test_world.py   # costruisce tutta la mappa, forzieri, cavallo, barca e mappa UI con un Roblox finto
                               # e fa tutto l'Addestramento di base (client e server) con un orologio finto
 python3 tools/scene_photo.py cartella [--scena TutorialGiganti]   # foto di una scena animata, dalla telecamera della regia
+python3 tools/check_layout.py [HEAD]   # dopo un ritocco grafico: la mappa e i giganti sono rimasti identici?
+python3 tools/world_photo.py cartella calaneth_case_notte [--sorgenti altra/src]   # foto (anche di notte, "_notte")
+python3 tools/pose_photo.py cartella [--prima altra/src]   # le pose del volo con i rampini (prima e dopo)
 ```
+
+`tools/check_layout.py` costruisce la mappa e una serie di giganti con il codice di un commit (di solito HEAD)
+e con quello attuale e confronta tutto quello che conta per giocare: posizione, misure, collisioni e attributi
+delle parti, terreno, oggetti interattivi, parti colpibili e giunture dei giganti. I dettagli solo grafici
+vengono contati a parte. `tools/test_world.py` fa girare anche la prova della grafica del client
+(`tools/tests/graphics_smoke.luau`: luci della notte, particelle, giganti, mantello e pose del volo).
 
 `tools/test_world.py` controlla ogni proprietà assegnata con l'elenco ufficiale di Roblox
 (`tools/tests/roblox_api.luau`, si rigenera con `python3 tools/gen_roblox_api.py globalTypes.d.luau`).

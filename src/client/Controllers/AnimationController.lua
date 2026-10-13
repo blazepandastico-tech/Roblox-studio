@@ -271,6 +271,11 @@ local function updateRig(rig, dt: number, localRoot: BasePart?)
 			ctx.Pitch = math.clamp(pitch, 10, 100)
 			ctx.Roll = math.clamp(-relative.X * 40, -40, 40)
 		end
+		-- accelerazione nel verso del corpo (per le pose del volo): smussata, così non trema
+		local lastVelocity = rig.LastVelocity or velocity
+		rig.LastVelocity = velocity
+		local accel = root.CFrame:VectorToObjectSpace((velocity - lastVelocity) / math.max(dt, 1 / 240))
+		ctx.AccelFwd = (ctx.AccelFwd or 0) + (math.clamp(-accel.Z, -300, 300) - (ctx.AccelFwd or 0)) * math.min(1, dt * 5)
 		rig.Animator:SetLayerWeight("Fly", if flying and not rig.Hanging then 1 else 0)
 		rig.Animator:SetLayerWeight("Hang", if flying and rig.Hanging then 1 else 0)
 		-- locomozione da battaglia: passo che avanza con la velocità, salto e caduta

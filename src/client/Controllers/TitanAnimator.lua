@@ -265,11 +265,46 @@ local function register(model: Model)
 	titans[model] = state
 	makeNameplate(model, state)
 
+	-- ferite: più il gigante è ferito, più vapore sale dal suo corpo (si sta rigenerando)
+	local woundSteam: ParticleEmitter? = nil
 	local function onHP()
 		local maxHP = model:GetAttribute("MaxHP") or 1
 		local hp = model:GetAttribute("HP") or maxHP
+		local ratio = hp / math.max(1, maxHP)
 		if state.SetHP then
-			state.SetHP(hp / math.max(1, maxHP))
+			state.SetHP(ratio)
+		end
+		if ratio < 0.65 and ratio > 0 and not state.Dead then
+			if not woundSteam then
+				local torso = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso")
+				if torso and torso:IsA("BasePart") then
+					local e = Instance.new("ParticleEmitter")
+					e.Name = "VaporeFerite"
+					e.Texture = "rbxasset://textures/particles/smoke_main.dds"
+					e.Color = ColorSequence.new(Color3.fromRGB(246, 240, 234))
+					e.LightEmission = 0.12
+					e.LightInfluence = 0.8
+					e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.15, 0.72), NumberSequenceKeypoint.new(0.6, 0.8), NumberSequenceKeypoint.new(1, 1) })
+					e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, height * 0.04), NumberSequenceKeypoint.new(1, height * 0.16) })
+					e.Lifetime = NumberRange.new(1.6, 2.8)
+					e.Speed = NumberRange.new(height * 0.02, height * 0.06)
+					e.SpreadAngle = Vector2.new(25, 25)
+					e.Acceleration = Vector3.new(0, height * 0.05, 0)
+					e.Drag = 0.8
+					e.RotSpeed = NumberRange.new(-30, 30)
+					e.Rotation = NumberRange.new(0, 360)
+					e.EmissionDirection = Enum.NormalId.Top
+					e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+					e.Rate = 0
+					e.Parent = torso
+					woundSteam = e
+				end
+			end
+			if woundSteam then
+				woundSteam.Rate = 1 + (0.65 - ratio) / 0.65 * 7
+			end
+		elseif woundSteam then
+			woundSteam.Rate = 0
 		end
 	end
 	model:GetAttributeChangedSignal("HP"):Connect(onHP)
@@ -378,12 +413,21 @@ local function updateTitan(state, dt: number, localRoot: BasePart?)
 		local stride = math.max(2, H * 0.45)
 		local previous = ctx.Phase or 0
 		ctx.Phase = previous + dt * math.max(flat, moveAttr * 4) / stride * math.pi
-		-- passi: polvere e terra che trema
+		-- passi: polvere sotto il piede che tocca terra e terra che trema
 		if ctx.Move > 0.3 and math.floor(previous / math.pi) ~= math.floor(ctx.Phase / math.pi) then
 			local footPos = root.Position - Vector3.new(0, model:GetAttribute("HipHeight") or H * 0.5, 0)
-			if H >= 20 and C.EffectsController then
-				C.EffectsController.Steam(footPos, H * 0.06, 4, 1.2, Color3.fromRGB(170, 150, 120))
-				C.EffectsController.ShakeAt(footPos, math.clamp(H / 160, 0.05, 0.6), H * 5, 0.2)
+			local foot = model:FindFirstChild(if math.floor(ctx.Phase / math.pi) % 2 == 0 then "LeftFoot" else "RightFoot") :: BasePart?
+			if foot and foot.Transparency < 0.9 then
+				footPos = Vector3.new(foot.Position.X, footPos.Y, foot.Position.Z)
+			end
+			local near = localRoot ~= nil and (localRoot.Position - footPos).Magnitude < math.max(260, H * 12)
+			if near and C.EffectsController then
+				if H >= 20 then
+					C.EffectsController.GroundDust(footPos, H * 0.075, Color3.fromRGB(172, 156, 128), math.clamp(math.floor(H / 6), 6, 14))
+					C.EffectsController.ShakeAt(footPos, math.clamp(H / 160, 0.05, 0.6), H * 5, 0.2)
+				elseif H >= 8 then
+					C.EffectsController.GroundDust(footPos, H * 0.06, Color3.fromRGB(172, 156, 128), 4)
+				end
 			end
 			if C.SoundController and localRoot and (localRoot.Position - footPos).Magnitude < H * 8 then
 				C.SoundController.Play("Step", footPos, { Range = H * 8, Volume = math.clamp(H / 40, 0.3, 1.2), Pitch = math.clamp(1.2 - H / 120, 0.25, 1) })

@@ -5,12 +5,16 @@ Costruisce il mondo con il Roblox finto delle prove (WorldBuilder + terreno + gi
 lo esporta (tools/tests/world_dump.luau) e lo disegna con il motore di tools/thumbnails/engine.py.
 Le foto mostrano il mondo vero del gioco: utili per vedere le modifiche prima di aprire Studio.
 
-  python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file]
+  python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file] [--sorgenti cartella_src]
 
 Inquadrature: calaneth_tetti, calaneth_strada, calaneth_case, muro_esterno, vermiglia_alto, campo, aurion,
 bosco, giganti, giganti_vicino, volto, varieta, varieta_volti,
 colosso, colosso_busto, colosso_testa, colosso_scena
-(senza nomi le fa tutte). Serve il programma 'luau' (variabile LUAU o nel PATH).
+(senza nomi le fa tutte). Aggiungendo "_notte" al nome (es. calaneth_tetti_notte) la foto è di notte:
+lampioni e torce accesi e le finestre illuminate come le accende il gioco (AmbienceController).
+La luce del giorno segue le impostazioni del gioco (LightingService e atmosfere delle zone).
+--sorgenti fotografa un'altra copia del codice (per le foto "prima e dopo").
+Serve il programma 'luau' (variabile LUAU o nel PATH).
 """
 import math
 import os
@@ -20,6 +24,7 @@ import sys
 import tempfile
 
 import numpy as np
+from PIL import Image
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "tools", "thumbnails"))
@@ -57,9 +62,10 @@ def long_string(text):
     return "[" + "=" * level + "[\n" + text + "]" + "=" * level + "]"
 
 
-def dump(path):
+def dump(path, src_root=None):
+    src_root = src_root or os.path.join(ROOT, "src")
     sources = []
-    for prefix, folder in (("Shared", os.path.join(ROOT, "src", "shared")), ("Server/Services", os.path.join(ROOT, "src", "server", "Services")), ("Client", os.path.join(ROOT, "src", "client"))):
+    for prefix, folder in (("Shared", os.path.join(src_root, "shared")), ("Server/Services", os.path.join(src_root, "server", "Services")), ("Client", os.path.join(src_root, "client"))):
         for base, _, names in os.walk(folder):
             for n in sorted(names):
                 if n.endswith(".lua"):
@@ -84,7 +90,7 @@ def dump(path):
 
 
 def parse(path):
-    data = {"parts": [], "terrain": [], "colors": {}, "zones": {}, "views": {}, "titans": {}, "places": [], "ground": 8.0, "water": 4.0}
+    data = {"parts": [], "terrain": [], "colors": {}, "zones": {}, "views": {}, "titans": {}, "places": [], "ground": 8.0, "water": 4.0, "lighting": {}, "ambience": {}}
     current = None
     for line in open(path, encoding="utf-8"):
         f = line.rstrip("\n").split("\t")
@@ -94,6 +100,7 @@ def parse(path):
                 "class": f[1], "shape": f[2], "size": np.array(list(map(float, f[3:6]))),
                 "pos": np.array(list(map(float, f[6:9]))), "R": np.array(list(map(float, f[9:18]))).reshape(3, 3),
                 "color": np.array(list(map(float, f[18:21]))), "mat": f[21], "alpha": float(f[22]),
+                "tags": tuple(t for t in (f[23].split(",") if len(f) > 23 else []) if t),
             }
             if current is not None:
                 current["parts"].append(part)
@@ -122,6 +129,14 @@ def parse(path):
             data["places"].append((int(f[1]), np.array(list(map(float, f[2:5]))), float(f[5])))
         elif k == "W":
             data["ground" if f[1] == "GroundY" else "water"] = float(f[2])
+        elif k == "PL":
+            v = list(map(float, f[1:9]))
+            data.setdefault("lights", []).append({"pos": np.array(v[0:3]), "color": np.array(v[3:6]), "range": v[6], "brightness": v[7], "night": f[9] == "1"})
+        elif k == "L":
+            data["lighting"][f[1]] = tuple(map(float, f[2:])) if len(f) > 3 else float(f[2])
+        elif k == "A":
+            v = list(map(float, f[2:]))
+            data["ambience"][f[1]] = {"sat": v[0], "con": v[1], "tint": tuple(v[2:5]), "density": v[5], "haze": v[6], "exposure": v[7]}
     return data
 
 
@@ -240,7 +255,43 @@ def seg_dist_xz(p, a, b):
     return float(np.linalg.norm(p2 - (a2 + d * t))), t
 
 
-def build_scene(data, cam_pos, target, reach, clear_view=False):
+# Luci della notte, come nel gioco (AmbienceController): stesse formule, stessi numeri
+WINDOW_WARM = [(214, 142, 78), (226, 160, 96), (200, 128, 66), (232, 176, 118)]
+NIGHT_CLOCK = 21.5
+
+
+def hash01(p, salt):
+    v = math.sin(p[0] * 12.9898 + p[1] * 37.719 + p[2] * 78.233 + salt * 19.19) * 43758.5453
+    return v - math.floor(v)
+
+
+def window_lit(p, clock):
+    if hash01(p, 1) > 0.62:
+        return False
+    s = (clock - 12) % 24
+    on = 5.7 + hash01(p, 2) * 1.6
+    off = 10.4 + hash01(p, 3) * 6.5
+    if on <= s < off:
+        return True
+    return hash01(p, 4) < 0.25 and 17 <= s < 18.5
+
+
+def time_of_day(part, night):
+    """Di giorno i lampioni sono spenti (vetro); di notte si accendono, e anche molte finestre."""
+    tags = part.get("tags", ())
+    if not tags:
+        return part
+    if "Lampione" in tags:
+        if night:
+            return dict(part, mat="Neon")
+        return dict(part, mat="Glass", color=np.clip(part["color"] * 0.8, 0, 1))
+    if night and "FinestraCasa" in tags and window_lit(part["pos"], NIGHT_CLOCK):
+        warm = WINDOW_WARM[int(hash01(part["pos"], 5) * len(WINDOW_WARM))]
+        return dict(part, mat="Neon", color=np.array(warm) / 255.0)
+    return part
+
+
+def build_scene(data, cam_pos, target, reach, clear_view=False, night=False):
     """clear_view: toglie colline e alberi tra la telecamera e il soggetto (foto in posa dei giganti)."""
     origin = np.array([0.0, data["ground"], 0.0])
 
@@ -307,7 +358,7 @@ def build_scene(data, cam_pos, target, reach, clear_view=False):
             continue
         if in_the_way(p["pos"], float(np.max(p["size"])) / 2) and float(np.max(p["size"])) < 120:
             continue
-        add_part(sc, p, origin)
+        add_part(sc, time_of_day(p, night), origin)
         n_p += 1
     print(f"  terreno: {n_t} pezzi, mondo: {n_p} parti")
     return sc, origin
@@ -332,6 +383,56 @@ DAY = dict(
     cloud_col=(1.0, 0.98, 0.95), cloud_dark=(0.55, 0.58, 0.66), rays=0.15, bloom=0.3, saturation=1.06, exposure=1.0,
     sun_disk=True, vignette=0.3, ground_mat="ground",
 )
+
+
+NIGHT = dict(
+    sun_dir=(0.35, 0.62, 0.55), sun_col=(0.34, 0.42, 0.66), sky_top=(0.015, 0.025, 0.06), sky_hor=(0.07, 0.09, 0.15),
+    sky_amb=(0.13, 0.16, 0.26), ground_amb=(0.04, 0.04, 0.06), fog_density=0.0012, fog_height=45, cloud_cover=0.3,
+    cloud_col=(0.12, 0.14, 0.2), cloud_dark=(0.03, 0.035, 0.05), rays=0.0, bloom=1.0, saturation=1.0, exposure=1.45,
+    sun_disk=True, vignette=0.4, ground_mat="ground",
+)
+
+# i valori di luce su cui è stata tarata la luce DAY delle foto: le foto seguono le differenze
+REF_LIGHT = {"Brightness": 2.6, "OutdoorAmbient": (132 / 255, 128 / 255, 120 / 255), "Bloom": 0.55}
+REF_AMBIENCE = {
+    "Default": {"sat": 0.08, "con": 0.08, "tint": (1.0, 250 / 255, 244 / 255)},
+    "Citta": {"sat": 0.1, "con": 0.1, "tint": (1.0, 246 / 255, 232 / 255)},
+}
+
+
+def zone_of(name):
+    return "Citta" if name.startswith("calaneth") or name.startswith("aurion") else "Default"
+
+
+def day_look(data, zone, **extra):
+    """La luce DAY adattata alle impostazioni del gioco (LightingService, atmosfera della zona).
+    Restituisce la luce e la correzione colore da applicare alla foto (contrasto, tinta)."""
+    look = dict(DAY)
+    lt = data.get("lighting", {})
+    if isinstance(lt.get("Brightness"), float):
+        look["sun_col"] = tuple(np.array(DAY["sun_col"]) * lt["Brightness"] / REF_LIGHT["Brightness"])
+    if isinstance(lt.get("OutdoorAmbient"), tuple):
+        look["sky_amb"] = tuple(np.array(DAY["sky_amb"]) * np.array(lt["OutdoorAmbient"]) / np.array(REF_LIGHT["OutdoorAmbient"]))
+    if isinstance(lt.get("Bloom"), tuple):
+        look["bloom"] = DAY["bloom"] * lt["Bloom"][0] / REF_LIGHT["Bloom"]
+    grade = (0.0, (1.0, 1.0, 1.0))
+    amb = data.get("ambience", {}).get(zone)
+    ref = REF_AMBIENCE.get(zone)
+    if amb and ref:
+        look["saturation"] = DAY["saturation"] + (amb["sat"] - ref["sat"])
+        grade = (amb["con"] - ref["con"], tuple(np.array(amb["tint"]) / np.array(ref["tint"])))
+    look.update(extra)
+    return look, grade
+
+
+def apply_grade(img, grade):
+    contrast, tint = grade
+    if abs(contrast) < 1e-6 and np.allclose(tint, 1.0):
+        return img
+    a = np.asarray(img).astype(np.float64) / 255.0
+    a = (a - 0.5) * (1 + contrast) + 0.5
+    a = a * np.array(tint)
+    return Image.fromarray((np.clip(a, 0, 1) * 255 + 0.5).astype(np.uint8))
 
 
 STUDIO = dict(
@@ -364,10 +465,15 @@ def studio_photo(data, name, out_path, width):
 def photo(data, name, out_path, width):
     if name.startswith("colosso") and name != "colosso_scena":
         return studio_photo(data, name, out_path, width)
-    cam_pos, target = data["views"][name]
+    night = name.endswith("_notte")
+    view = name[: -len("_notte")] if night else name
+    if view not in data["views"] and view == "muro":
+        view = "muro_esterno"
+    cam_pos, target = data["views"][view]
+    name = view
     reach = 4200 if name == "vermiglia_alto" else 2600
     with_titans = name in ("giganti", "giganti_vicino", "volto", "varieta", "varieta_volti")
-    sc, origin = build_scene(data, cam_pos, target, reach, clear_view=with_titans)
+    sc, origin = build_scene(data, cam_pos, target, reach, clear_view=with_titans, night=night)
     if with_titans:
         add_titans(sc, data, origin)
     if name == "colosso_scena":
@@ -377,9 +483,18 @@ def photo(data, name, out_path, width):
     tp = to_engine(target, origin)
     cam = Camera(cp, tp, 55 if name != "vermiglia_alto" else 50, width, H)
     dist = float(np.linalg.norm(tp - cp))
-    look = Look(**dict(DAY, shadow_extent=max(120.0, dist * 2.2), shadow_center=tuple(tp * np.array([1, 0, 1]))))
-    img = render(sc, cam, look, ss=1, shadow_cache={})
-    img.save(out_path)
+    shadows = dict(shadow_extent=max(120.0, dist * 2.2), shadow_center=tuple(tp * np.array([1, 0, 1])))
+    if night:
+        # le luci accese vicino alla telecamera (come le PointLight del gioco, senza ombre)
+        lights = []
+        for light in data.get("lights", []):
+            if np.linalg.norm(light["pos"] - cam_pos) < 900:
+                lights.append((to_engine(light["pos"], origin), tuple(light["color"] * light["brightness"] * 1.3), light["range"] * SCALE))
+        look, grade = dict(NIGHT, point_lights=lights, **shadows), (0.0, (1.0, 1.0, 1.0))
+    else:
+        look, grade = day_look(data, zone_of(name), **shadows)
+    img = render(sc, cam, Look(**look), ss=1, shadow_cache={})
+    apply_grade(img, grade).save(out_path)
     print("foto:", out_path)
 
 
@@ -391,6 +506,7 @@ def main():
     out = args[0]
     width = 1280
     dump_path = None
+    src_root = None
     names = []
     i = 1
     while i < len(args):
@@ -400,6 +516,9 @@ def main():
         elif args[i] == "--dump":
             dump_path = args[i + 1]
             i += 2
+        elif args[i] == "--sorgenti":
+            src_root = os.path.abspath(args[i + 1])
+            i += 2
         else:
             names.append(args[i])
             i += 1
@@ -407,9 +526,9 @@ def main():
     if not dump_path:
         dump_path = os.path.join(out, "mondo.txt")
         print("esporto il mondo...")
-        dump(dump_path)
+        dump(dump_path, src_root)
     elif not os.path.exists(dump_path):
-        dump(dump_path)
+        dump(dump_path, src_root)
     data = parse(dump_path)
     print(f"mondo: {len(data['parts'])} parti, {len(data['terrain'])} pezzi di terreno, {len(data['titans'])} giganti")
     for name in names or list(data["views"]):

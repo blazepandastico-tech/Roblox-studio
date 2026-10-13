@@ -220,6 +220,12 @@ local function sampleClip(clip, t: number): Pose
 	return keys[count].Pose
 end
 
+-- dissolvenza morbida: parte e arriva piano (niente scatti all'inizio e alla fine di una transizione)
+local function smooth(x: number): number
+	x = math.clamp(x, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
 local function scaled(cf: CFrame, scale: number): CFrame
 	if scale == 1 then
 		return cf
@@ -253,7 +259,8 @@ function Animator:Step(dt: number)
 				warn(("[Animazioni] Errore nel layer '%s' di %s: %s"):format(layer.Name, self.Model.Name, tostring(pose)))
 			end
 			if ok and pose then
-				local w = layer.Weight
+				-- le dissolvenze piene (verso 0 o 1) seguono la curva morbida, un peso parziale resta com'è
+				local w = if layer.Target == 0 or layer.Target == 1 then smooth(layer.Weight) else layer.Weight
 				for joint, cf in pose do
 					local value = scaled(cf, scale)
 					if w < 0.999 then
@@ -295,12 +302,12 @@ function Animator:Step(dt: number)
 		local weight = active.Weight
 		local fadeIn = clip.FadeIn or 0.06
 		if fadeIn > 0 and active.Time < fadeIn then
-			weight *= active.Time / fadeIn
+			weight *= smooth(active.Time / fadeIn)
 		end
 		if active.Stopping then
 			active.StopTime += dt
 			local fade = math.max(active.StopFade, 0.0001)
-			weight *= math.clamp(1 - active.StopTime / fade, 0, 1)
+			weight *= smooth(1 - active.StopTime / fade)
 			if active.StopTime >= fade then
 				finished = true
 			end

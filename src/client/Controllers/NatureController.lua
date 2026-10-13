@@ -4,7 +4,9 @@
 	  • macchie di fiori colorati sull'erba attorno al giocatore;
 	  • stormi di uccelli che volano in cerchio di giorno;
 	  • lucciole di notte e farfalle di giorno nei prati;
-	  • fumo che esce dai camini delle case vicine.
+	  • fumo che esce dai camini delle case vicine;
+	  • particelle nell'aria: foglie che cadono nei boschi, pulviscolo nel sole,
+	    cenere tra le rovine e braci al fronte della Grande Marcia.
 	Tutto viene creato solo vicino alla telecamera e si può spegnere in
 	Menu → Impostazioni → "Dettagli ambientali".
 ]]
@@ -12,7 +14,10 @@
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Zones = require(ReplicatedStorage:WaitForChild("Shared").Data.Zones)
 
 local NatureController = {}
 local C
@@ -361,6 +366,126 @@ local function updateMeadow()
 	butterflies.Rate = if on and not isNight() and weather == "Sereno" then 1.2 else 0
 end
 
+-- PARTICELLE NELL'ARIA ------------------------------------------------------------------------------------
+-- Una scatola invisibile segue la telecamera: le particelle nascono lì dentro e restano nel mondo
+-- (il vento le porta). Quali particelle dipende dall'atmosfera del posto, dall'ora e dal meteo.
+
+local airPart: Part? = nil
+local airEmitters: { [string]: ParticleEmitter } = {}
+
+local function airEmitter(name: string, props: { [string]: any }): ParticleEmitter
+	local e = Instance.new("ParticleEmitter")
+	e.Name = name
+	e.Shape = Enum.ParticleEmitterShape.Box
+	e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	e.WindAffectsDrag = true
+	e.Rate = 0
+	for k, v in props do
+		(e :: any)[k] = v
+	end
+	e.Parent = airPart
+	airEmitters[name] = e
+	return e
+end
+
+local function buildAir()
+	airPart = localPart({ Name = "AriaAttorno", Size = Vector3.new(110, 40, 110), Transparency = 1, Parent = workspace.CurrentCamera })
+	-- foglie (quadratini che girano su sé stessi mentre scendono, verdi e secche)
+	-- senza texture le particelle sono quadratini pieni (foglioline e fiocchi di cenere)
+	local leaf = {
+		Texture = "",
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.08, 0.32), NumberSequenceKeypoint.new(0.92, 0.32), NumberSequenceKeypoint.new(1, 0) }),
+		Squash = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(0.5, -0.4), NumberSequenceKeypoint.new(1, 0.5) }),
+		Lifetime = NumberRange.new(7, 11),
+		Speed = NumberRange.new(0.5, 2),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0, -1.4, 0),
+		Drag = 1.1,
+		RotSpeed = NumberRange.new(-200, 200),
+		Rotation = NumberRange.new(0, 360),
+		LightInfluence = 1,
+	}
+	airEmitter("FoglieVerdi", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(86, 120, 54), Color3.fromRGB(120, 142, 62))
+	airEmitter("FoglieSecche", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(176, 128, 52), Color3.fromRGB(138, 84, 40))
+	-- pulviscolo che brilla nel sole
+	airEmitter("Pulviscolo", {
+		Texture = "rbxasset://textures/particles/sparkles_main.dds",
+		Color = ColorSequence.new(Color3.fromRGB(255, 244, 214)),
+		LightEmission = 0.35,
+		LightInfluence = 1,
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.3, 0.12), NumberSequenceKeypoint.new(0.7, 0.12), NumberSequenceKeypoint.new(1, 0) }),
+		Transparency = NumberSequence.new(0.35),
+		Lifetime = NumberRange.new(6, 10),
+		Speed = NumberRange.new(0.1, 0.5),
+		SpreadAngle = Vector2.new(180, 180),
+		Drag = 0.6,
+	})
+	-- cenere grigia che scende lenta (rovine) e braci che salgono (fronte)
+	airEmitter("Cenere", {
+		Texture = "",
+		Color = ColorSequence.new(Color3.fromRGB(150, 146, 142), Color3.fromRGB(96, 92, 90)),
+		LightInfluence = 1,
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.1, 0.16), NumberSequenceKeypoint.new(0.9, 0.16), NumberSequenceKeypoint.new(1, 0) }),
+		Lifetime = NumberRange.new(8, 12),
+		Speed = NumberRange.new(0.3, 1.2),
+		SpreadAngle = Vector2.new(180, 180),
+		Acceleration = Vector3.new(0, -0.7, 0),
+		Drag = 0.9,
+		RotSpeed = NumberRange.new(-90, 90),
+		Rotation = NumberRange.new(0, 360),
+	})
+	airEmitter("Braci", {
+		Texture = "rbxasset://textures/particles/sparkles_main.dds",
+		Color = ColorSequence.new(Color3.fromRGB(255, 190, 90), Color3.fromRGB(255, 90, 30)),
+		LightEmission = 1,
+		LightInfluence = 0,
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.18), NumberSequenceKeypoint.new(1, 0) }),
+		Lifetime = NumberRange.new(3, 6),
+		Speed = NumberRange.new(1, 3),
+		SpreadAngle = Vector2.new(40, 40),
+		Acceleration = Vector3.new(0, 1.6, 0),
+		Drag = 0.5,
+	})
+end
+
+-- la grafica "Automatica" (0) vale come media
+local function qualityMultiplier(): number
+	local ok, level = pcall(function()
+		return UserSettings().GameSettings.SavedQualityLevel.Value
+	end)
+	if not ok or level == 0 then
+		return 0.6
+	end
+	return math.clamp(level / 7, 0.35, 1)
+end
+
+local function updateAir()
+	if not airPart then
+		return
+	end
+	local cam = cameraPosition()
+	local ambience = Zones.AmbienceFor(cam)
+	local weather = if C.SkyController then C.SkyController.Weather() else "Sereno"
+	local wet = weather == "Pioggia" or weather == "Temporale"
+	local night = isNight()
+	local on = enabled() and not underground()
+	local forest = ambience == Zones.Ambience.Foresta or ambience == Zones.Ambience.Nebbia
+	local ash = ambience == Zones.Ambience.Rovine
+	local embers = ambience == Zones.Ambience.Marcia
+	local open = ambience == Zones.Ambience.Default or ambience == Zones.Ambience.Citta or ambience == Zones.Ambience.Castello or ambience == Zones.Ambience.Gola
+	local q = qualityMultiplier()
+	local rates = {
+		FoglieVerdi = if on and forest then (if night then 2 else 5) else 0,
+		FoglieSecche = if on and forest then (if night then 1.5 else 3.5) else 0,
+		Pulviscolo = if on and open and not night and not wet then 9 else 0,
+		Cenere = if on and ash then 22 else 0,
+		Braci = if on and embers then 14 else 0,
+	}
+	for name, e in airEmitters do
+		e.Rate = (rates[name] or 0) * q
+	end
+end
+
 -- FUMO DAI CAMINI -----------------------------------------------------------------------------------------
 
 local smoking: { [BasePart]: ParticleEmitter } = {}
@@ -424,6 +549,16 @@ local function updateChimneys()
 	end
 end
 
+-- aggiorna subito fiori, prati, camini e particelle nell'aria (di solito lo fa da sé ogni secondo)
+function NatureController.Refresh()
+	for _, fn in { refreshActiveFoliage, updateFlowers, updateMeadow, updateChimneys, updateAir } do
+		local ok, err = pcall(fn)
+		if not ok then
+			warn("[Natura] " .. tostring(err))
+		end
+	end
+end
+
 function NatureController.Init(c)
 	C = c
 end
@@ -436,6 +571,7 @@ function NatureController.Start()
 	birdFolder.Name = "UccelliLocali"
 	birdFolder.Parent = workspace
 	buildMeadow()
+	buildAir()
 
 	for _, part in CollectionService:GetTagged(FOLIAGE_TAG) do
 		addFoliage(part)
@@ -456,6 +592,10 @@ function NatureController.Start()
 		if meadowPart then
 			meadowPart.CFrame = CFrame.new(cameraPosition().X, meadowGround + 3, cameraPosition().Z)
 		end
+		if airPart then
+			local cam = cameraPosition()
+			airPart.CFrame = CFrame.new(cam.X, cam.Y + 8, cam.Z)
+		end
 	end)
 
 	local wasEnabled = true
@@ -466,12 +606,7 @@ function NatureController.Start()
 				restoreFoliage()
 			end
 			wasEnabled = on
-			for _, fn in { refreshActiveFoliage, updateFlowers, updateMeadow, updateChimneys } do
-				local ok, err = pcall(fn)
-				if not ok then
-					warn("[Natura] " .. tostring(err))
-				end
-			end
+			NatureController.Refresh()
 			task.wait(1)
 		end
 	end)

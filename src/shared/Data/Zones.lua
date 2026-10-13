@@ -15,8 +15,8 @@ local G = W.GroundY
 
 -- Atmosfere (nebbia, colore, saturazione) applicate dal client entrando in una zona
 Zones.Ambience = {
-	Default = { Density = 0.28, Haze = 1.1, Glare = 0.35, Color = Color3.fromRGB(196, 212, 228), Decay = Color3.fromRGB(110, 118, 132), Tint = Color3.fromRGB(255, 250, 244), Saturation = 0.08, Contrast = 0.08, Exposure = 0.1 },
-	Citta = { Density = 0.22, Haze = 0.8, Glare = 0.4, Color = Color3.fromRGB(214, 214, 220), Decay = Color3.fromRGB(120, 112, 104), Tint = Color3.fromRGB(255, 246, 232), Saturation = 0.1, Contrast = 0.1, Exposure = 0.1 },
+	Default = { Density = 0.28, Haze = 1.1, Glare = 0.35, Color = Color3.fromRGB(196, 212, 228), Decay = Color3.fromRGB(110, 118, 132), Tint = Color3.fromRGB(255, 248, 240), Saturation = 0.11, Contrast = 0.11, Exposure = 0.1 },
+	Citta = { Density = 0.22, Haze = 0.8, Glare = 0.4, Color = Color3.fromRGB(214, 214, 220), Decay = Color3.fromRGB(120, 112, 104), Tint = Color3.fromRGB(255, 245, 230), Saturation = 0.12, Contrast = 0.12, Exposure = 0.1 },
 	Foresta = { Density = 0.44, Haze = 2.2, Glare = 0.1, Color = Color3.fromRGB(160, 196, 150), Decay = Color3.fromRGB(70, 92, 62), Tint = Color3.fromRGB(226, 255, 226), Saturation = 0.12, Contrast = 0.12, Exposure = 0 },
 	Nebbia = { Density = 0.42, Haze = 2.6, Glare = 0.1, Color = Color3.fromRGB(172, 204, 160), Decay = Color3.fromRGB(80, 110, 70), Tint = Color3.fromRGB(236, 255, 230), Saturation = -0.05, Contrast = 0.1, Exposure = 0 },
 	Rovine = { Density = 0.46, Haze = 2.8, Glare = 0.2, Color = Color3.fromRGB(176, 166, 156), Decay = Color3.fromRGB(96, 84, 76), Tint = Color3.fromRGB(255, 236, 222), Saturation = -0.25, Contrast = 0.15, Exposure = 0 },
@@ -27,7 +27,7 @@ Zones.Ambience = {
 	Valdoria = { Density = 0.38, Haze = 2.0, Glare = 0.2, Color = Color3.fromRGB(176, 166, 154), Decay = Color3.fromRGB(100, 92, 84), Tint = Color3.fromRGB(255, 240, 226), Saturation = -0.12, Contrast = 0.12, Exposure = 0 },
 	Marcia = { Density = 0.5, Haze = 3.0, Glare = 0.6, Color = Color3.fromRGB(232, 142, 92), Decay = Color3.fromRGB(150, 60, 40), Tint = Color3.fromRGB(255, 212, 182), Saturation = 0.1, Contrast = 0.2, Exposure = 0 },
 	Arena = { Density = 0.32, Haze = 1.5, Glare = 0.5, Color = Color3.fromRGB(220, 190, 160), Decay = Color3.fromRGB(130, 90, 70), Tint = Color3.fromRGB(255, 236, 214), Saturation = 0.1, Contrast = 0.15, Exposure = 0.05 },
-	Mare = { Density = 0.3, Haze = 1.6, Glare = 0.5, Color = Color3.fromRGB(190, 210, 232), Decay = Color3.fromRGB(100, 120, 150), Tint = Color3.fromRGB(244, 250, 255), Saturation = 0.08, Contrast = 0.08, Exposure = 0.1 },
+	Mare = { Density = 0.3, Haze = 1.6, Glare = 0.5, Color = Color3.fromRGB(190, 210, 232), Decay = Color3.fromRGB(100, 120, 150), Tint = Color3.fromRGB(244, 250, 255), Saturation = 0.13, Contrast = 0.1, Exposure = 0.1 },
 }
 
 Zones.SeasonNames = {

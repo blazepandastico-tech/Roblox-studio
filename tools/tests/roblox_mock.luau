@@ -561,7 +561,15 @@ local function newSignal()
 end
 function SignalMT.Connect(self, fn)
 	table.insert(self.Handlers, fn)
-	return { Disconnect = function() end, Connected = true }
+	local connection = { Connected = true }
+	function connection.Disconnect()
+		local i = table.find(self.Handlers, fn)
+		if i then
+			table.remove(self.Handlers, i)
+		end
+		connection.Connected = false
+	end
+	return connection
 end
 SignalMT.Once = SignalMT.Connect
 function SignalMT.Wait(_self)
@@ -573,7 +581,8 @@ function SignalMT.Wait(_self)
 	return nil
 end
 function SignalMT.Fire(self, ...)
-	for _, fn in self.Handlers do
+	-- copia: un gestore può scollegarsi (o collegarne altri) mentre il segnale scatta
+	for _, fn in table.clone(self.Handlers) do
 		fn(...)
 	end
 end
@@ -905,7 +914,19 @@ function Methods.SetAttribute(self, name, value)
 	if value ~= nil and t ~= "number" and t ~= "string" and t ~= "boolean" and t ~= "Vector3" and t ~= "Color3" and t ~= "CFrame" and t ~= "UDim2" and t ~= "Vector2" and t ~= "NumberRange" then
 		fail(("SetAttribute('%s'): tipo %s non salvabile come attributo"):format(name, t))
 	end
-	rawget(self, "__attrs")[name] = value
+	local attrs = rawget(self, "__attrs")
+	local old = attrs[name]
+	attrs[name] = value
+	-- come in Roblox: i segnali scattano solo se il valore cambia davvero
+	if old ~= value then
+		local signals = rawget(self, "__signals")
+		if signals["@" .. name] then
+			signals["@" .. name]:Fire()
+		end
+		if signals.AttributeChanged then
+			signals.AttributeChanged:Fire(name)
+		end
+	end
 end
 function Methods.GetAttribute(self, name)
 	return rawget(self, "__attrs")[name]
@@ -916,8 +937,10 @@ end
 function Methods.GetPropertyChangedSignal(_self, _name)
 	return newSignal()
 end
-function Methods.GetAttributeChangedSignal(_self, _name)
-	return newSignal()
+function Methods.GetAttributeChangedSignal(self, name)
+	local signals = rawget(self, "__signals")
+	signals["@" .. name] = signals["@" .. name] or newSignal()
+	return signals["@" .. name]
 end
 local function partsOf(self)
 	local list = {}
@@ -1046,6 +1069,18 @@ function Methods.SetMaterialColor(_self, material, color)
 	end
 	MOCK_TERRAIN_COLORS[material.Name] = color
 end
+-- spostamento di tante parti insieme (alberi che ondeggiano, stormi di uccelli)
+function Methods.BulkMoveTo(_self, parts, cframes, _mode)
+	if type(parts) ~= "table" or type(cframes) ~= "table" or #parts ~= #cframes then
+		fail("BulkMoveTo(parti, CFrame, modo): servono due liste della stessa lunghezza")
+	end
+	for i, p in parts do
+		if not isCF(cframes[i]) then
+			fail("BulkMoveTo: il " .. i .. "° valore non è un CFrame")
+		end
+		p.CFrame = cframes[i]
+	end
+end
 -- mondo: un raggio verso il basso trova il terreno a quota 8 (o il fondo delle grotte)
 function Methods.Raycast(self, origin, direction, _params)
 	if not isV3(origin) or not isV3(direction) then
@@ -1145,10 +1180,16 @@ end
 local replicated = service("ReplicatedStorage")
 rawset(replicated, "__special", { Shared = SHARED })
 local collection = service("CollectionService")
+-- segnali delle etichette: scattano quando un'istanza già nel mondo riceve o perde l'etichetta
+local tagAdded: { [string]: any } = {}
+local tagRemoved: { [string]: any } = {}
 rawset(collection, "AddTag", function(_self, inst, tag)
 	tags[tag] = tags[tag] or {}
 	if not table.find(tags[tag], inst) then
 		table.insert(tags[tag], inst)
+		if tagAdded[tag] and inst:IsDescendantOf(workspace) then
+			tagAdded[tag]:Fire(inst)
+		end
 	end
 end)
 rawset(collection, "RemoveTag", function(_self, inst, tag)
@@ -1156,6 +1197,9 @@ rawset(collection, "RemoveTag", function(_self, inst, tag)
 	local i = list and table.find(list, inst)
 	if i then
 		table.remove(list, i)
+		if tagRemoved[tag] and inst:IsDescendantOf(workspace) then
+			tagRemoved[tag]:Fire(inst)
+		end
 	end
 end)
 rawset(collection, "HasTag", function(_self, inst, tag)
@@ -1170,11 +1214,13 @@ rawset(collection, "GetTagged", function(_self, tag)
 	end
 	return out
 end)
-rawset(collection, "GetInstanceAddedSignal", function()
-	return newSignal()
+rawset(collection, "GetInstanceAddedSignal", function(_self, tag)
+	tagAdded[tag] = tagAdded[tag] or newSignal()
+	return tagAdded[tag]
 end)
-rawset(collection, "GetInstanceRemovedSignal", function()
-	return newSignal()
+rawset(collection, "GetInstanceRemovedSignal", function(_self, tag)
+	tagRemoved[tag] = tagRemoved[tag] or newSignal()
+	return tagRemoved[tag]
 end)
 local http = service("HttpService")
 rawset(http, "JSONEncode", function(_self, _v)

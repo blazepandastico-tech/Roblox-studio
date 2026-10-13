@@ -233,6 +233,7 @@ local Config = {
 		Pickup = "Raccoglibile",
 		Spinner = "Rotante",
 		Lamp = "Lampione",
+		Window = "FinestraCasa", -- vetri delle case: di notte alcuni si accendono (AmbienceController)
 		Boat = "Barca",
 		BoatDock = "PuntoBarca",
 		Horse = "Cavallo",

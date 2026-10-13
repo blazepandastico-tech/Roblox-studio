@@ -50,6 +50,7 @@ for base, _, names in os.walk(os.path.join(ROOT, "src")):
             used_classes |= set(re.findall(r'ClassName = "(\w+)"', text))
             used_classes |= set(re.findall(r':IsA\("(\w+)"\)', text))
             used_classes |= set(re.findall(r'FindFirstChildOfClass\("(\w+)"\)', text))
+            used_classes |= set(re.findall(r'\bensure\("(\w+)"', text))
             used_enums |= set(re.findall(r"Enum\.(\w+)\.\w+", text))
 used_classes |= {"Workspace", "Terrain", "Model", "Folder", "Part", "Players", "Player", "Humanoid", "CollectionService",
                  "HttpService", "PhysicsService", "RunService", "ReplicatedStorage", "Lighting", "Camera", "PlayerGui",

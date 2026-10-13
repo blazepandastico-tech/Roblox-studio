@@ -244,9 +244,11 @@ local function buildBlades(folder: Instance, character: Model, bladeDef)
 			trail.Attachment0 = a0
 			trail.Attachment1 = a1
 			trail.Color = ColorSequence.new(bladeDef.TrailColor)
-			trail.LightEmission = 0.6
-			trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.15), NumberSequenceKeypoint.new(1, 1) })
-			trail.Lifetime = 0.18
+			trail.LightEmission = 0.75
+			-- scia a mezzaluna: piena vicino alla lama, si assottiglia e svanisce dietro
+			trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.08), NumberSequenceKeypoint.new(0.55, 0.55), NumberSequenceKeypoint.new(1, 1) })
+			trail.WidthScale = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.3) })
+			trail.Lifetime = 0.22
 			trail.MinLength = 0.05
 			trail.FaceCamera = true
 			trail.Enabled = false

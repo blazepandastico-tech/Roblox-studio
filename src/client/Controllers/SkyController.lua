@@ -259,7 +259,7 @@ local function step(dt: number)
 	local glare = amb.Glare * (1 - grey) + warm * 0.5 * sky
 	local saturation = amb.Saturation + w.Sat * sky + warm * 0.05 * sky
 	local contrast = amb.Contrast + warm * 0.03 * sky
-	local exposure = amb.Exposure + w.Exposure * sky + night * 0.05 * sky
+	local exposure = amb.Exposure + w.Exposure * sky + night * 0.08 * sky
 	local bright = if indoor then 1 else w.Bright
 	local cover, cloudDensity = w.Cover, w.CloudDensity
 	local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
@@ -305,11 +305,12 @@ local function step(dt: number)
 	end
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect")
 	if rays then
-		rays.Intensity = approach(rays.Intensity, (0.05 + warm * 0.12) * (1 - grey) * sky, k)
+		rays.Intensity = approach(rays.Intensity, (0.07 + warm * 0.14) * (1 - grey) * sky, k)
 	end
 	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, exposure, k)
 	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * bright, k)
-	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(Color3.fromRGB(96, 106, 146), night * 0.5 * sky), k)
+	-- di notte le ombre prendono il blu della luna (si vede ancora dove si va)
+	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(Color3.fromRGB(84, 98, 150), night * 0.62 * sky), k)
 
 	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
 	if clouds then

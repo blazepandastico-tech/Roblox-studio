@@ -118,6 +118,29 @@ function EffectsController.Steam(position: Vector3, size: number, count: number?
 	return a
 end
 
+-- Polvere che si allarga raso terra (passi dei giganti, atterraggi): sbuffi bassi che rallentano e restano sospesi
+function EffectsController.GroundDust(position: Vector3, size: number, color: Color3?, count: number?)
+	local a = attachmentAt(position + Vector3.new(0, size * 0.12, 0), 6)
+	local e = emitter(a, {
+		Texture = TEX.Smoke,
+		Color = ColorSequence.new(color or Color3.fromRGB(176, 160, 132)),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(0.35, 0.62), NumberSequenceKeypoint.new(1, 1) }),
+		Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, size * 0.22), NumberSequenceKeypoint.new(1, size * 0.85) }),
+		Lifetime = NumberRange.new(1, 2),
+		Speed = NumberRange.new(size * 1.4, size * 2.6),
+		EmissionDirection = Enum.NormalId.Top,
+		SpreadAngle = Vector2.new(84, 84),
+		Acceleration = Vector3.new(0, -size * 0.5, 0),
+		Drag = 3.2,
+		RotSpeed = NumberRange.new(-25, 25),
+		Rotation = NumberRange.new(0, 360),
+		LightEmission = 0.05,
+		LightInfluence = 0.9,
+	})
+	e:Emit(count or 10)
+	return a
+end
+
 function EffectsController.Sparks(position: Vector3, color: Color3?, count: number?, speed: number?)
 	local a = attachmentAt(position, 2)
 	local e = emitter(a, {

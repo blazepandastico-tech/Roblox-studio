@@ -520,6 +520,8 @@ class Look:
         self.sun_disk = kw.get("sun_disk", True)
         self.lightning = kw.get("lightning", None)  # lista di punti (x,y) in pixel per fulmini
         self.dof = kw.get("dof", None)  # (distanza a fuoco, forza): sfoca lo sfondo come una fotocamera
+        # luci puntiformi senza ombre (lampioni, torce): lista di (posizione, colore*intensità, raggio)
+        self.point_lights = kw.get("point_lights", None)
 
 
 def sky_color(D, look, seed=0):
@@ -632,6 +634,19 @@ def render(scene, cam, look, ss=2, shadows=True, extra_post=None, particle_light
     rim = rim * look.sun_col * np.where(np.isin(mat, [M_TEX, M_SKIN, M_FACE, M_CLOTH, M_COLOR, M_METAL]), 1.0, 0.25)[:, None]
     metal_env = np.where((mat == M_METAL)[:, None], look.sky_amb * 1.5, 0)
     lit = alb * ((ndl * shade)[:, None] * look.sun_col + amb * occ) + spec + rim * alb.mean(-1, keepdims=True) * 1.2 + metal_env * 0.3
+    if look.point_lights:
+        # come le PointLight di Roblox con le ombre spente: calano fino a zero al bordo del raggio
+        for lp, lc, lr in look.point_lights:
+            d = np.asarray(lp) - P
+            dist2 = np.einsum("ij,ij->i", d, d)
+            near = dist2 < lr * lr
+            if not near.any():
+                continue
+            dd = np.sqrt(dist2[near]) + 1e-6
+            Ld = d[near] / dd[:, None]
+            ndl_p = np.clip(np.einsum("ij,ij->i", Nn[near], Ld), 0, 1) * 0.85 + 0.15
+            att = np.clip(1 - dd / lr, 0, 1) ** 2
+            lit[near] += alb[near] * np.asarray(lc) * (ndl_p * att)[:, None]
     # nebbia
     dist = depth[hit]
     fog = fog_amount(cam.pos, P, dist, look)

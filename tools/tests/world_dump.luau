@@ -7,6 +7,7 @@
 	  G  un gigante di prova (le sue parti seguono come righe P)
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Config = require(SHARED.Config)
 local Zones = require(SHARED.Data.Zones)
 local W = require(SHARED.Data.WorldLayout)
@@ -59,7 +60,32 @@ local function emitPart(p)
 	local s = p.Size
 	local c = p.Color or Color3.new(0.64, 0.64, 0.64)
 	local cf = table.concat({ cfFields(p.CFrame) }, "\t")
-	emit("P", p.ClassName, shape, f(s.X), f(s.Y), f(s.Z), cf, f(c.R), f(c.G), f(c.B), if p.Material then p.Material.Name else "Plastic", f(p.Transparency or 0))
+	-- etichette che cambiano l'aspetto di notte (lampioni accesi, finestre illuminate)
+	local tags = {}
+	for _, tag in { "Lampione", "FinestraCasa" } do
+		if CollectionService:HasTag(p, tag) then
+			table.insert(tags, tag)
+		end
+	end
+	emit("P", p.ClassName, shape, f(s.X), f(s.Y), f(s.Z), cf, f(c.R), f(c.G), f(c.B), if p.Material then p.Material.Name else "Plastic", f(p.Transparency or 0), table.concat(tags, ","))
+end
+
+-- luce e colori del gioco (LightingService e atmosfere delle zone): le foto li seguono
+do
+	local okL, LightingService = pcall(require, SERVER.Services.LightingService)
+	if okL and LightingService and pcall(LightingService.Setup) then
+		local Lighting = game:GetService("Lighting")
+		emit("L", "Brightness", f(Lighting.Brightness))
+		local oa = Lighting.OutdoorAmbient
+		emit("L", "OutdoorAmbient", f(oa.R), f(oa.G), f(oa.B))
+		local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+		if bloom then
+			emit("L", "Bloom", f(bloom.Intensity), f(bloom.Size), f(bloom.Threshold))
+		end
+	end
+	for name, amb in Zones.Ambience do
+		emit("A", name, f(amb.Saturation), f(amb.Contrast), f(amb.Tint.R), f(amb.Tint.G), f(amb.Tint.B), f(amb.Density), f(amb.Haze), f(amb.Exposure))
+	end
 end
 
 -- zone e mura (per le inquadrature)
@@ -178,6 +204,15 @@ for _, d in workspace:GetDescendants() do
 	if d:IsA("BasePart") and d.ClassName ~= "Terrain" and d.Transparency < 0.98 then
 		emitPart(d)
 		count += 1
+	end
+end
+
+-- luci puntiformi (lampioni, lanterne, torce, fuochi): "1" se si accendono solo di notte
+for _, d in workspace:GetDescendants() do
+	if d:IsA("PointLight") and d.Parent and d.Parent:IsA("BasePart") then
+		local at = (d.Parent :: BasePart).Position
+		local c = d.Color
+		emit("PL", f(at.X), f(at.Y), f(at.Z), f(c.R), f(c.G), f(c.B), f(d.Range), f(d.Brightness), if CollectionService:HasTag(d.Parent, "Lampione") then "1" else "0")
 	end
 end
 

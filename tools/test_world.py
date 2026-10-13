@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Prova di costruzione del mondo fuori da Roblox Studio.
 Costruisce tutta la mappa (WorldBuilder), i forzieri, un cavallo e una barca con un Roblox finto
-che controlla ogni proprietà con l'elenco ufficiale di Roblox (tools/tests/roblox_api.luau).
+che controlla ogni proprietà con l'elenco ufficiale di Roblox (tools/tests/roblox_api.luau),
+poi prova l'interfaccia e la grafica del client (luci della notte, natura, giganti, pose).
 Uso:  python3 tools/test_world.py   (serve il programma 'luau' nel PATH o nella variabile LUAU)"""
 import os, shutil, subprocess, sys, tempfile
 
@@ -29,6 +30,7 @@ bundle += read(os.path.join(ROOT, "tools", "tests", "roblox_api.luau")) + "\n"
 bundle += read(os.path.join(ROOT, "tools", "tests", "roblox_mock.luau")) + "\n"
 bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "world_smoke.luau")) + "\nend\n"
 bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "client_smoke.luau")) + "\nend\n"
+bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "graphics_smoke.luau")) + "\nend\n"
 
 luau = os.environ.get("LUAU") or shutil.which("luau")
 if not luau:
