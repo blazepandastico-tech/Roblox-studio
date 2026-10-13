@@ -140,7 +140,7 @@ function TitanService.Spawn(spec)
 	local zone = Zones.Get(spec.Zone)
 	local level = spec.Level or def.Level or 1
 	local seed = rng:NextInteger(1, 2 ^ 30)
-	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = seed, Name = name })
+	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = seed, Name = name, Costume = spec.Costume })
 	local root = model.PrimaryPart :: BasePart
 	local hip = model:GetAttribute("HipHeight") :: number
 	local pos = spec.Position or (zone and randomPointIn(zone)) or Vector3.zero

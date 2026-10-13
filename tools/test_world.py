@@ -3,7 +3,8 @@
 Costruisce tutta la mappa (WorldBuilder), i forzieri, un cavallo e una barca con un Roblox finto
 che controlla ogni proprietà con l'elenco ufficiale di Roblox (tools/tests/roblox_api.luau),
 poi prova l'interfaccia e la grafica del client (luci della notte, natura, giganti, pose).
-Uso:  python3 tools/test_world.py   (serve il programma 'luau' nel PATH o nella variabile LUAU)"""
+Uso:  python3 tools/test_world.py [--halloween]   (serve il programma 'luau' nel PATH o nella variabile LUAU)
+Con --halloween la prova si fa con il tema di Halloween (come il file SieriPerduti_Halloween.rbxlx)."""
 import os, shutil, subprocess, sys, tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -28,6 +29,8 @@ for prefix, folder in (("Shared", os.path.join(ROOT, "src", "shared")), ("Server
 bundle = "SOURCES_TABLE = {\n" + "\n".join(sources) + "\n}\n"
 bundle += read(os.path.join(ROOT, "tools", "tests", "roblox_api.luau")) + "\n"
 bundle += read(os.path.join(ROOT, "tools", "tests", "roblox_mock.luau")) + "\n"
+if "--halloween" in sys.argv[1:]:
+    bundle += 'game:GetService("ReplicatedStorage"):SetAttribute("Tema", "Halloween")\n'
 bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "world_smoke.luau")) + "\nend\n"
 bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "client_smoke.luau")) + "\nend\n"
 bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "graphics_smoke.luau")) + "\nend\n"

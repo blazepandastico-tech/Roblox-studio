@@ -27,6 +27,7 @@ local TitanBuilder = require(Shared.Anim.TitanBuilder)
 local ProceduralAnimator = require(Shared.Anim.ProceduralAnimator)
 local Poses = require(Shared.Anim.Poses)
 local ArmReach = require(Shared.Anim.ArmReach)
+local HalloweenShows = require(script.Parent.HalloweenShows)
 
 local AbuseEventController = {}
 local C
@@ -322,8 +323,9 @@ end
 
 
 -- Un gigante costruito sul client, animato (Walk, Animate) e sempre in piedi sul punto "ground"
-local function titan(look: string, height: number, ground: Vector3, facing: CFrame): Model
-	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = rng:NextInteger(1, 1e6), Cinematic = true })
+-- costume: costume di Halloween (vedi Shared/Anim/HalloweenCostumes), facoltativo
+local function titan(look: string, height: number, ground: Vector3, facing: CFrame, costume: string?): Model
+	local model = TitanBuilder.Build({ Height = height, Look = look, Seed = rng:NextInteger(1, 1e6), Cinematic = true, Costume = costume })
 	local hip = (model:GetAttribute("HipHeight") :: number?) or height * 0.45
 	model:PivotTo(CFrame.new(ground + Vector3.new(0, hip, 0)) * facing.Rotation)
 	for _, d in model:GetDescendants() do
@@ -621,20 +623,40 @@ local function tween(instance: Instance, time: number, goals: { [string]: any },
 	return t
 end
 
+-- i premi accesi dall'admin per l'evento in corso (attributo AbusePremi)
+local function activeRewards(): { [string]: boolean }
+	local raw = ReplicatedStorage:GetAttribute("AbusePremi")
+	local out = {}
+	if type(raw) == "string" then
+		for _, id in string.split(raw, ",") do
+			out[id] = true
+		end
+	end
+	return out
+end
+
 local function bonusText(def): string
 	local parts = {}
 	local b = def.Bonus or {}
+	local rewards = if def.Id == ReplicatedStorage:GetAttribute("AbuseEvento") then activeRewards() else {}
+	local double = if rewards.Doppio then 2 else 1
 	if b.XP and b.XP > 0 then
-		table.insert(parts, ("XP x%s"):format(tostring(1 + b.XP)))
+		table.insert(parts, ("XP x%s"):format(tostring(1 + b.XP * double)))
 	end
 	if b.Gold and b.Gold > 0 then
-		table.insert(parts, ("Oro x%s"):format(tostring(1 + b.Gold)))
+		table.insert(parts, ("Oro x%s"):format(tostring(1 + b.Gold * double)))
 	end
 	if b.Damage and b.Damage > 0 then
 		table.insert(parts, ("Danni x%s"):format(tostring(1 + b.Damage)))
 	end
 	if def.InfiniteGas then
 		table.insert(parts, "Gas infinito")
+	end
+	if rewards.Dolcetti then
+		table.insert(parts, "🍬 Dolcetti")
+	end
+	if rewards.Partecipazione then
+		table.insert(parts, "🏆 Premio finale")
 	end
 	return table.concat(parts, "  •  ")
 end
@@ -728,7 +750,8 @@ local function playCard(def, minutes: number, token: number, cinematic: boolean)
 	c.Text.Text = ""
 	c.Text.TextTransparency = 0
 	task.delay(if cinematic then 3.4 else 1.9, function()
-		local full = def.Text
+		local note = ReplicatedStorage:GetAttribute("AbuseAnnuncio")
+		local full = if type(note) == "string" and note ~= "" then def.Text .. "\n📢 " .. note else def.Text
 		local len = utf8.len(full) or #full
 		for i = 1, len do
 			if token ~= showToken then
@@ -1711,6 +1734,55 @@ SHOWS.FulmineTrasformazione = function(after)
 end
 
 
+-- 🎃 le scene, le particelle e gli effetti degli eventi di Halloween (Controllers/HalloweenShows)
+HalloweenShows.Register({
+	Shows = SHOWS,
+	Ambient = AMBIENT,
+	AmbientEvents = AMBIENT_EVENTS,
+	Part = part,
+	Emitter = emitter,
+	Track = track,
+	SetStage = setStage,
+	At = at,
+	Rel = rel,
+	Look = look,
+	Shot = shot,
+	ShotPath = shotPath,
+	MoveAlong = moveAlong,
+	TweenTo = tweenTo,
+	Titan = titan,
+	AnimatorOf = animatorOf,
+	Animate = animate,
+	Walk = walk,
+	Standing = standing,
+	HeadPosition = headPosition,
+	NeckPosition = neckPosition,
+	NeckSteam = neckSteam,
+	GlowLight = glowLight,
+	WallSegment = wallSegment,
+	Flare = flare,
+	Strike = goldenStrike,
+	Steam = steamBurst,
+	RoarAt = roarAt,
+	District = district,
+	Forest = forest,
+	Hills = hills,
+	Followers = followers,
+	Fx = fx,
+	Sound = playSound,
+	Shake = shake,
+	Rng = rng,
+	FarPoint = farPoint,
+	GroundAt = groundAt,
+	Folder = function()
+		return folder
+	end,
+	Token = function()
+		return showToken
+	end,
+	Textures = { Smoke = SMOKE, Sparkle = SPARKLE, Sparks = SPARKS },
+})
+
 local function cleanupShow()
 	table.clear(movers)
 	table.clear(followers)
@@ -1861,6 +1933,9 @@ end
 
 function AbuseEventController.ServerEffect(name: string, p: any)
 	p = p or {}
+	if HalloweenShows.ServerEffect(name, p) then
+		return
+	end
 	if name == "AbuseTremor" then
 		for i = 0, 3 do
 			task.delay(i * 0.5, function()
@@ -1961,6 +2036,21 @@ local function refresh()
 	end
 end
 
+-- il prossimo evento programmato (se manca meno di un'ora): lo striscione fa il conto alla rovescia
+local function upcoming(): (any, number)
+	local id = ReplicatedStorage:GetAttribute("ProssimoEvento")
+	local at = ReplicatedStorage:GetAttribute("ProssimoEventoAlle")
+	local def = AbuseEvents.Get(id)
+	if not def or type(at) ~= "number" then
+		return nil, 0
+	end
+	local left = at - serverNow()
+	if left <= 0 or left > 3600 then
+		return nil, 0
+	end
+	return def, left
+end
+
 local function updateBanner()
 	local b = banner
 	if not b then
@@ -1969,10 +2059,25 @@ local function updateBanner()
 	local def = AbuseEvents.Get(activeId)
 	local cinematic = C.CameraController and C.CameraController.IsCinematic and C.CameraController.IsCinematic()
 	local intro = card and card.Root.Visible
-	b.Frame.Visible = def ~= nil and not cinematic and not intro
+	local festival = ReplicatedStorage:GetAttribute("FestaAttiva") == true
 	if not def then
+		local nextDef, left = upcoming()
+		b.Frame.Visible = nextDef ~= nil and not cinematic and not intro
+		if nextDef then
+			b.Name.Text = ("📅 TRA POCO: %s  %s"):format(nextDef.Icon, nextDef.Name:upper())
+			local note = ReplicatedStorage:GetAttribute("ProssimoEventoTesto")
+			b.Bonus.Text = if type(note) == "string" and note ~= "" then "📢 " .. note else "😈 ADMIN ABUSE  •  " .. nextDef.Short
+			b.Timer.Text = AbuseEvents.FormatTime(left)
+			b.Timer.TextColor3 = if left < 60 then Color3.fromRGB(255, 110, 100) else Color3.new(1, 1, 1)
+			b.Bar.BackgroundColor3 = nextDef.Color
+			b.Bar.Size = UDim2.fromScale(math.clamp(1 - left / 3600, 0, 1), 1)
+			b.Stroke.Color = nextDef.Color
+			b.Stroke.Transparency = 0.3
+			b.Frame.Position = UDim2.new(0.5, 0, 0, math.floor(14 + (62 + (if festival then 38 else 0)) * C.UIController.Scale))
+		end
 		return
 	end
+	b.Frame.Visible = not cinematic and not intro
 	local ends = ReplicatedStorage:GetAttribute("AbuseFine")
 	local duration = ReplicatedStorage:GetAttribute("AbuseDurata")
 	local left = if type(ends) == "number" then ends - serverNow() else 0
@@ -1985,7 +2090,6 @@ local function updateBanner()
 	b.Stroke.Color = def.Color
 	b.Stroke.Transparency = 0.05 + 0.35 * (0.5 + 0.5 * math.sin(os.clock() * 4))
 	-- sotto lo striscione della Grande Inaugurazione, se c'è
-	local festival = ReplicatedStorage:GetAttribute("FestaAttiva") == true
 	b.Frame.Position = UDim2.new(0.5, 0, 0, math.floor(14 + (62 + (if festival then 38 else 0)) * C.UIController.Scale))
 end
 

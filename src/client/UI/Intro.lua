@@ -2,6 +2,8 @@
 	Intro - schermata iniziale
 	Titolo animato con braci che salgono e lampi di trasformazione, telecamera che sorvola
 	il campo di addestramento, riepilogo dei progressi e pulsante GIOCA.
+	Nel file di Halloween la schermata è infestata: luna arancione, il gigante che spunta dal Muro
+	con gli occhi accesi, pipistrelli, zucche, fantasmi, ragnatele e foglie d'autunno che cadono.
 	Finché è aperta, i filmati della storia aspettano (CutsceneController controlla IsShowing).
 ]]
 
@@ -118,17 +120,26 @@ end
 
 -- BRACI E LAMPI -----------------------------------------------------------------------------------
 
+local LEAF_COLORS = { Color3.fromRGB(236, 118, 28), Color3.fromRGB(196, 62, 30), Color3.fromRGB(220, 166, 48), Color3.fromRGB(140, 80, 40), Color3.fromRGB(150, 90, 220) }
+
 local function spawnEmbers(parent: Frame)
 	for _ = 1, 46 do
 		local size = math.random(2, 5)
+		if Theme.Halloween then
+			size = math.random(5, 10)
+		end
 		local frame = New("Frame", {
-			BackgroundColor3 = if math.random() < 0.7 then Color3.fromRGB(255, 150, 60) else Color3.fromRGB(255, 220, 140),
+			BackgroundColor3 = if Theme.Halloween then LEAF_COLORS[math.random(1, #LEAF_COLORS)] elseif math.random() < 0.7 then Color3.fromRGB(255, 150, 60) else Color3.fromRGB(255, 220, 140),
 			BorderSizePixel = 0,
 			Size = UDim2.fromOffset(size, size),
 			BackgroundTransparency = 0.2,
 			Parent = parent,
 		})
-		Theme.Corner(frame, size)
+		if Theme.Halloween then
+			Theme.Corner(frame, 2)
+		else
+			Theme.Corner(frame, size)
+		end
 		table.insert(embers, {
 			Frame = frame,
 			X = math.random(),
@@ -143,6 +154,19 @@ end
 
 local function updateEmbers(dt: number, now: number)
 	for _, ember in embers do
+		if Theme.Halloween then
+			-- foglie d'autunno che cadono girando su sé stesse
+			ember.Y += ember.Speed * dt * 0.8
+			if ember.Y > 1.05 then
+				ember.Y = -0.05
+				ember.X = math.random()
+			end
+			local x = ember.X + math.sin(now * 0.9 + ember.Phase) * ember.Sway * 3
+			ember.Frame.Position = UDim2.fromScale(x, ember.Y)
+			ember.Frame.Rotation = (now * 90 + ember.Phase * 40) % 360
+			ember.Frame.BackgroundTransparency = 0.15
+			continue
+		end
 		ember.Y -= ember.Speed * dt
 		if ember.Y < -0.05 then
 			ember.Y = 1.05
@@ -152,6 +176,168 @@ local function updateEmbers(dt: number, now: number)
 		ember.Frame.Position = UDim2.fromScale(x, ember.Y)
 		-- le braci si spengono salendo
 		ember.Frame.BackgroundTransparency = math.clamp(0.1 + (1 - ember.Y) * 0.8 + math.sin(now * 7 + ember.Phase) * 0.1, 0, 1)
+	end
+end
+
+-- L'IMMAGINE DI HALLOWEEN ------------------------------------------------------------------------
+-- Disegnata con le cornici dell'interfaccia (nessuna immagine da caricare): cielo viola, luna, Muro,
+-- il gigante che spunta con gli occhi accesi e le mani sul bordo, pipistrelli, zucche e fantasmi.
+
+type Bat = { Frame: Frame, Left: Frame, Right: Frame, X: number, Y: number, Speed: number, Phase: number, Size: number }
+local bats: { Bat } = {}
+local spooky: { Eyes: { Frame }, Pumpkins: { TextLabel }, Ghosts: { { Label: TextLabel, X: number, Y: number, Phase: number } }, Moon: Frame?, Titan: Frame? } = { Eyes = {}, Pumpkins = {}, Ghosts = {} }
+
+local NIGHT_PURPLE = Color3.fromRGB(26, 12, 40)
+local SILHOUETTE = Color3.fromRGB(12, 6, 18)
+
+local function circle(parent: Instance, color: Color3, pos: UDim2, size: UDim2, alpha: number?, z: number?): Frame
+	local f = New("Frame", { BackgroundColor3 = color, BackgroundTransparency = alpha or 0, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Position = pos, Size = size, ZIndex = z or 1, Parent = parent })
+	New("UICorner", { CornerRadius = UDim.new(0.5, 0), Parent = f })
+	return f
+end
+
+local function block(parent: Instance, color: Color3, pos: UDim2, size: UDim2, z: number?, anchor: Vector2?): Frame
+	return New("Frame", { BackgroundColor3 = color, BorderSizePixel = 0, AnchorPoint = anchor or Vector2.new(0.5, 1), Position = pos, Size = size, ZIndex = z or 1, Parent = parent })
+end
+
+local function makeBat(parent: Instance, size: number): Bat
+	local holder = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(size * 2.4, size), ZIndex = 3, Parent = parent })
+	circle(holder, SILHOUETTE, UDim2.fromScale(0.5, 0.5), UDim2.fromOffset(size * 0.5, size * 0.62), 0, 4)
+	for _, side in { -1, 1 } do
+		circle(holder, SILHOUETTE, UDim2.new(0.5, side * size * 0.12, 0.5, -size * 0.32), UDim2.fromOffset(size * 0.16, size * 0.24), 0, 4) -- orecchie
+	end
+	local function wing(side: number): Frame
+		local w = New("Frame", { BackgroundColor3 = SILHOUETTE, BorderSizePixel = 0, AnchorPoint = Vector2.new(if side < 0 then 1 else 0, 0.5), Position = UDim2.new(0.5, side * size * 0.15, 0.5, 0), Size = UDim2.fromOffset(size * 0.95, size * 0.34), ZIndex = 4, Parent = holder })
+		New("UICorner", { CornerRadius = UDim.new(0.4, 0), Parent = w })
+		-- le punte dell'ala
+		for i = 1, 2 do
+			local tip = New("Frame", { BackgroundColor3 = SILHOUETTE, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(if side < 0 then i * 0.3 else 1 - i * 0.3, 0.6), Size = UDim2.fromOffset(size * 0.2, size * 0.2), Rotation = 45, ZIndex = 4, Parent = w })
+			tip.BackgroundTransparency = 0
+		end
+		return w
+	end
+	return {
+		Frame = holder,
+		Left = wing(-1),
+		Right = wing(1),
+		X = math.random(),
+		Y = 0.08 + math.random() * 0.45,
+		Speed = 0.025 + math.random() * 0.05,
+		Phase = math.random() * 10,
+		Size = size,
+	}
+end
+
+local function buildHalloweenArt(root: Frame)
+	local art = New("Frame", { Name = "Halloween", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = root })
+	-- cielo viola sopra, che sfuma verso il basso
+	local sky = New("Frame", { BackgroundColor3 = NIGHT_PURPLE, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = art })
+	New("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(Color3.fromRGB(40, 16, 60), Color3.fromRGB(110, 40, 30)),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(0.55, 0.55), NumberSequenceKeypoint.new(1, 0.25) }),
+		Parent = sky,
+	})
+	-- la luna arancione con l'alone e i crateri
+	local moonHolder = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.74, 0.42), Size = UDim2.fromScale(0.5, 0.5), Parent = art })
+	New("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height, Parent = moonHolder })
+	for i, alpha in { 0.86, 0.78, 0.68 } do
+		circle(moonHolder, Color3.fromRGB(255, 150, 60), UDim2.fromScale(0.5, 0.5), UDim2.fromScale(1.5 - i * 0.14, 1.5 - i * 0.14), alpha)
+	end
+	local moon = circle(moonHolder, Color3.fromRGB(255, 196, 110), UDim2.fromScale(0.5, 0.5), UDim2.fromScale(1, 1), 0, 2)
+	New("UIGradient", { Rotation = 35, Color = ColorSequence.new(Color3.fromRGB(255, 236, 170), Color3.fromRGB(240, 120, 40)), Parent = moon })
+	for _, crater in { { 0.32, 0.36, 0.16 }, { 0.62, 0.3, 0.1 }, { 0.55, 0.62, 0.2 }, { 0.3, 0.68, 0.08 } } do
+		circle(moon, Color3.fromRGB(214, 110, 40), UDim2.fromScale(crater[1], crater[2]), UDim2.fromScale(crater[3], crater[3]), 0.55, 2)
+	end
+	spooky.Moon = moonHolder
+	-- il gigante che spunta da dietro il Muro, davanti alla luna: testa, spalle, occhi accesi e mani sul bordo
+	local titan = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.74, 0.84), Size = UDim2.fromScale(0.34, 0.46), ZIndex = 2, Parent = art })
+	spooky.Titan = titan
+	local head = block(titan, SILHOUETTE, UDim2.fromScale(0.5, 0.78), UDim2.fromScale(0.42, 0.52), 2)
+	New("UICorner", { CornerRadius = UDim.new(0.18, 0), Parent = head })
+	block(titan, SILHOUETTE, UDim2.fromScale(0.5, 1), UDim2.fromScale(0.96, 0.32), 2)
+	for _, side in { -1, 1 } do
+		-- orecchie e occhi che brillano (con l'alone)
+		block(titan, SILHOUETTE, UDim2.fromScale(0.5 + side * 0.23, 0.6), UDim2.fromScale(0.06, 0.14), 2)
+		local glowEye = circle(head, Color3.fromRGB(255, 140, 40), UDim2.fromScale(0.5 + side * 0.2, 0.42), UDim2.fromScale(0.26, 0.16), 0.55, 3)
+		local eye = circle(head, Color3.fromRGB(255, 214, 120), UDim2.fromScale(0.5 + side * 0.2, 0.42), UDim2.fromScale(0.13, 0.08), 0, 3)
+		table.insert(spooky.Eyes, glowEye)
+		table.insert(spooky.Eyes, eye)
+	end
+	-- il ghigno: denti chiari
+	for i = -3, 3 do
+		block(head, Color3.fromRGB(220, 200, 170), UDim2.fromScale(0.5 + i * 0.075, 0.74), UDim2.fromScale(0.055, 0.08), 3, Vector2.new(0.5, 0.5))
+	end
+	-- il Muro con i merli
+	local wall = block(art, Color3.fromRGB(20, 12, 26), UDim2.fromScale(0.5, 1), UDim2.fromScale(1, 0.2), 3)
+	New("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(46, 28, 56), Color3.fromRGB(10, 6, 14)), Parent = wall })
+	for i = 0, 24 do
+		block(art, Color3.fromRGB(34, 20, 44), UDim2.fromScale(i / 24, 0.805), UDim2.fromScale(0.024, 0.035), 3)
+	end
+	-- le mani del gigante aggrappate al bordo del Muro
+	for _, side in { -1, 1 } do
+		local hand = block(art, SILHOUETTE, UDim2.fromScale(0.74 + side * 0.16, 0.84), UDim2.fromScale(0.07, 0.06), 4)
+		New("UICorner", { CornerRadius = UDim.new(0.3, 0), Parent = hand })
+		for f = 0, 3 do
+			block(art, SILHOUETTE, UDim2.fromScale(0.74 + side * 0.16 + (f - 1.5) * 0.016, 0.86), UDim2.fromScale(0.012, 0.045), 4, Vector2.new(0.5, 0))
+		end
+	end
+	-- zucche accese negli angoli in basso e fantasmi che fluttuano
+	for _, at in { { 0.07, 0.9, 120 }, { 0.17, 0.94, 80 }, { 0.93, 0.92, 100 } } do
+		local glow = circle(art, Color3.fromRGB(255, 140, 40), UDim2.fromScale(at[1], at[2]), UDim2.fromOffset(at[3] * 1.6, at[3] * 1.6), 0.7, 4)
+		local label = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(at[1], at[2]), Size = UDim2.fromOffset(at[3], at[3]), Text = "🎃", TextScaled = true, Font = Theme.Fonts.Bold, ZIndex = 5, Parent = art })
+		table.insert(spooky.Pumpkins, label)
+		label:SetAttribute("Glow", true)
+		glow.Name = "AloneZucca"
+		label:SetAttribute("Base", at[3])
+		table.insert(spooky.Eyes, glow)
+	end
+	for i, at in { { 0.12, 0.42 }, { 0.3, 0.2 }, { 0.92, 0.18 } } do
+		local ghost = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(at[1], at[2]), Size = UDim2.fromOffset(64, 64), Text = "👻", TextScaled = true, TextTransparency = 0.3, Font = Theme.Fonts.Bold, ZIndex = 5, Parent = art })
+		table.insert(spooky.Ghosts, { Label = ghost, X = at[1], Y = at[2], Phase = i * 1.7 })
+	end
+	-- ragnatele negli angoli in alto
+	Theme.Cobweb(art, 190)
+	local right = Theme.Cobweb(art, 190)
+	right.AnchorPoint = Vector2.new(1, 0)
+	right.Position = UDim2.fromScale(1, 0)
+	right.Rotation = 90
+	-- pipistrelli
+	for _ = 1, 14 do
+		local bat = makeBat(art, math.random(14, 30))
+		table.insert(bats, bat)
+	end
+	return art
+end
+
+local function updateHalloweenArt(dt: number, now: number)
+	for _, bat in bats do
+		bat.X += bat.Speed * dt
+		if bat.X > 1.08 then
+			bat.X = -0.08
+			bat.Y = 0.08 + math.random() * 0.45
+		end
+		local y = bat.Y + math.sin(now * 1.6 + bat.Phase) * 0.03
+		bat.Frame.Position = UDim2.fromScale(bat.X, y)
+		local flap = math.sin(now * 16 + bat.Phase) * 32
+		bat.Left.Rotation = flap
+		bat.Right.Rotation = -flap
+	end
+	-- occhi del gigante e zucche che tremolano come candele
+	local flicker = 0.5 + 0.5 * math.noise(now * 3, 1.7)
+	for _, f in spooky.Eyes do
+		if f.Name == "AloneZucca" then
+			f.BackgroundTransparency = 0.62 + flicker * 0.18
+		end
+	end
+	for _, g in spooky.Ghosts do
+		g.Label.Position = UDim2.fromScale(g.X + math.sin(now * 0.5 + g.Phase) * 0.02, g.Y + math.sin(now * 1.1 + g.Phase) * 0.025)
+		g.Label.TextTransparency = 0.25 + 0.35 * (0.5 + 0.5 * math.sin(now * 0.8 + g.Phase))
+	end
+	-- il gigante sale piano da dietro il Muro e ogni tanto torna giù
+	if spooky.Titan then
+		local rise = 0.5 + 0.5 * math.sin(now * 0.25)
+		spooky.Titan.Position = UDim2.fromScale(0.74, 0.84 + (1 - rise) * 0.08)
 	end
 end
 
@@ -238,9 +424,12 @@ local function build()
 		}),
 		Parent = vignette,
 	})
+	if Theme.Halloween then
+		buildHalloweenArt(root)
+	end
 	local emberLayer = New("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = root })
 	spawnEmbers(emberLayer)
-	ui.Flash = New("Frame", { BackgroundColor3 = Color3.fromRGB(255, 236, 200), BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = root })
+	ui.Flash = New("Frame", { BackgroundColor3 = if Theme.Halloween then Color3.fromRGB(170, 120, 255) else Color3.fromRGB(255, 236, 200), BackgroundTransparency = 1, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = root })
 
 	local content = New("Frame", { BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = root })
 	ui.Content = content
@@ -261,7 +450,7 @@ local function build()
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Font = Theme.Fonts.Title,
 		TextSize = 92,
-		TextColor3 = Color3.fromRGB(255, 120, 50),
+		TextColor3 = if Theme.Halloween then Color3.fromRGB(140, 255, 90) else Color3.fromRGB(255, 120, 50),
 		TextTransparency = 0.75,
 		TextStrokeTransparency = 1,
 		Parent = column,
@@ -280,7 +469,12 @@ local function build()
 		TextTransparency = 1,
 		Parent = column,
 	})
-	Theme.Gradient(ui.Title, Color3.fromRGB(255, 240, 200), Color3.fromRGB(210, 150, 70), 90)
+	if Theme.Halloween then
+		ui.Title.TextStrokeColor3 = Color3.fromRGB(30, 8, 40)
+		Theme.Gradient(ui.Title, Color3.fromRGB(255, 200, 90), Color3.fromRGB(230, 90, 20), 90)
+	else
+		Theme.Gradient(ui.Title, Color3.fromRGB(255, 240, 200), Color3.fromRGB(210, 150, 70), 90)
+	end
 	ui.TitleScale = New("UIScale", { Scale = 1.25, Parent = ui.Title })
 	ui.Line = New("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -310,7 +504,7 @@ local function build()
 		TextTransparency = 1,
 		Parent = column,
 	})
-	ui.Tagline = Theme.Label("Cinque isole. Otto poteri. Un solo mondo da salvare.", {
+	ui.Tagline = Theme.Label(if Theme.Halloween then "🎃  EDIZIONE DI HALLOWEEN  •  Le Mura sono infestate: i giganti hanno fame di dolcetti  🦇" else "Cinque isole. Otto poteri. Un solo mondo da salvare.", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 228),
 		Size = UDim2.new(1, 0, 0, 26),
@@ -329,7 +523,7 @@ local function build()
 		Font = Theme.Fonts.Title,
 		TextSize = 40,
 		TextColor3 = Colors.GoldBright,
-		BackgroundColor3 = Color3.fromRGB(70, 40, 26),
+		BackgroundColor3 = if Theme.Halloween then Color3.fromRGB(70, 26, 90) else Color3.fromRGB(70, 40, 26),
 		Visible = false,
 		Parent = column,
 	}, function()
@@ -410,12 +604,15 @@ local function step(dt: number)
 	end
 	local now = os.clock()
 	updateEmbers(dt, now)
+	if Theme.Halloween then
+		updateHalloweenArt(dt, now)
+	end
 	if characterReady() then
 		updateCamera(dt, now)
 	end
 	if canPlay() then
 		reveal()
-		ui.Status.Text = "Premi GIOCA per entrare nelle Mura"
+		ui.Status.Text = if Theme.Halloween then "Premi GIOCA... se hai il coraggio di entrare nelle Mura 🎃" else "Premi GIOCA per entrare nelle Mura"
 		if not starting then
 			-- il pulsante "esplode" fuori e poi pulsa piano
 			local pop = math.clamp((now - revealClock) / 0.45, 0, 1)
@@ -482,6 +679,7 @@ function Intro.Begin()
 	fade:Destroy()
 	ui.Root:Destroy()
 	table.clear(embers)
+	table.clear(bats)
 end
 
 function Intro.IsShowing(): boolean

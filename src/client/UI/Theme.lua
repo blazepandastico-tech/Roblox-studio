@@ -1,9 +1,14 @@
 --[[
 	Theme - stile grafico dell'interfaccia (colori, font e funzioni per creare elementi)
 	Toni da avventura militare: cuoio, ottone, pergamena e verde del Corpo dei Falchi.
+	Nel file di Halloween (Shared/Data/Tema) i menu diventano infestati: viola notte, arancione zucca,
+	verde pozione, titoli con un carattere spettrale e ragnatele negli angoli dei pannelli.
 ]]
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+
+local Tema = require(ReplicatedStorage:WaitForChild("Shared").Data.Tema)
 
 local Theme = {}
 
@@ -37,6 +42,32 @@ Theme.Fonts = {
 	Bold = Enum.Font.GothamBold,
 	Number = Enum.Font.Oswald,
 }
+
+Theme.Halloween = Tema.IsHalloween()
+if Theme.Halloween then
+	-- stesse chiavi: tutti i menu che usano Theme.Colors cambiano da soli
+	for key, value in {
+		Background = Color3.fromRGB(16, 10, 22),
+		Panel = Color3.fromRGB(30, 18, 40),
+		PanelLight = Color3.fromRGB(56, 32, 68),
+		Border = Color3.fromRGB(226, 112, 32),
+		Gold = Color3.fromRGB(246, 140, 44),
+		GoldBright = Color3.fromRGB(255, 196, 92),
+		Text = Color3.fromRGB(244, 234, 250),
+		TextDim = Color3.fromRGB(182, 164, 196),
+		Green = Color3.fromRGB(84, 140, 52),
+		GreenBright = Color3.fromRGB(150, 232, 90),
+		Red = Color3.fromRGB(176, 36, 56),
+		RedBright = Color3.fromRGB(255, 86, 96),
+		Blue = Color3.fromRGB(120, 86, 220),
+		Gas = Color3.fromRGB(196, 156, 255),
+		Energy = Color3.fromRGB(255, 150, 40),
+		XP = Color3.fromRGB(176, 124, 255),
+	} :: { [string]: Color3 } do
+		Theme.Colors[key] = value
+	end
+	Theme.Fonts.Title = Enum.Font.Creepster
+end
 
 function Theme.New(className: string, props: { [string]: any }?, children: { Instance }?): any
 	local instance = Instance.new(className)
@@ -111,11 +142,53 @@ function Theme.Panel(props: { [string]: any }?): Frame
 	end
 	Theme.Corner(frame, 10)
 	Theme.Stroke(frame, Theme.Colors.Border, 1.5, 0.25)
-	Theme.Gradient(frame, Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 180, 170), 90)
+	if Theme.Halloween then
+		Theme.Gradient(frame, Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 126, 170), 90)
+		-- nei pannelli grandi, una ragnatela nell'angolo in alto a sinistra
+		local size = frame.Size
+		if size.X.Offset >= 300 or size.X.Scale >= 0.3 then
+			Theme.Cobweb(frame, 46)
+		end
+	else
+		Theme.Gradient(frame, Color3.fromRGB(255, 255, 255), Color3.fromRGB(190, 180, 170), 90)
+	end
 	if props and props.Parent then
 		frame.Parent = props.Parent
 	end
 	return frame
+end
+
+-- Ragnatela disegnata con linee sottili nell'angolo in alto a sinistra di un elemento (Halloween)
+function Theme.Cobweb(parent: GuiObject, size: number, color: Color3?): Frame
+	local web = New("Frame", { Name = "Ragnatela", BackgroundTransparency = 1, Size = UDim2.fromOffset(size, size), ZIndex = parent.ZIndex, Parent = parent })
+	local c = color or Color3.fromRGB(236, 230, 246)
+	local function line(x1: number, y1: number, x2: number, y2: number, alpha: number)
+		local dx, dy = x2 - x1, y2 - y1
+		local len = math.sqrt(dx * dx + dy * dy)
+		New("Frame", {
+			BackgroundColor3 = c,
+			BackgroundTransparency = alpha,
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset((x1 + x2) / 2, (y1 + y2) / 2),
+			Size = UDim2.fromOffset(len, 1),
+			Rotation = math.deg(math.atan2(dy, dx)),
+			ZIndex = parent.ZIndex,
+			Parent = web,
+		})
+	end
+	local angles = { 2, 30, 58, 88 }
+	for _, a in angles do
+		local r = math.rad(a)
+		line(0, 0, math.cos(r) * size, math.sin(r) * size, 0.45)
+	end
+	for _, k in { 0.42, 0.78 } do
+		for i = 1, #angles - 1 do
+			local a, b = math.rad(angles[i]), math.rad(angles[i + 1])
+			line(math.cos(a) * size * k, math.sin(a) * size * k, math.cos(b) * size * k, math.sin(b) * size * k, 0.55)
+		end
+	end
+	return web
 end
 
 function Theme.Label(text: string, props: { [string]: any }?): TextLabel

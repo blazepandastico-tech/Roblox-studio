@@ -5,15 +5,16 @@ Costruisce il mondo con il Roblox finto delle prove (WorldBuilder + terreno + gi
 lo esporta (tools/tests/world_dump.luau) e lo disegna con il motore di tools/thumbnails/engine.py.
 Le foto mostrano il mondo vero del gioco: utili per vedere le modifiche prima di aprire Studio.
 
-  python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file] [--sorgenti cartella_src]
+  python3 tools/world_photo.py <cartella uscita> [inquadratura ...] [--larghezza 1280] [--dump file] [--sorgenti cartella_src] [--halloween]
 
 Inquadrature: calaneth_tetti, calaneth_strada, calaneth_case, muro_esterno, vermiglia_alto, campo, aurion,
 bosco, giganti, giganti_vicino, volto, varieta, varieta_volti,
-colosso, colosso_busto, colosso_testa, colosso_scena
+colosso, colosso_busto, colosso_testa, colosso_scena, (con --halloween anche) halloween_giganti, halloween_zucca
 (senza nomi le fa tutte). Aggiungendo "_notte" al nome (es. calaneth_tetti_notte) la foto è di notte:
 lampioni e torce accesi e le finestre illuminate come le accende il gioco (AmbienceController).
 La luce del giorno segue le impostazioni del gioco (LightingService e atmosfere delle zone).
 --sorgenti fotografa un'altra copia del codice (per le foto "prima e dopo").
+--halloween fotografa il file di Halloween (tema "Halloween": colori, zucche, cielo viola e arancione).
 Serve il programma 'luau' (variabile LUAU o nel PATH).
 """
 import math
@@ -62,7 +63,7 @@ def long_string(text):
     return "[" + "=" * level + "[\n" + text + "]" + "=" * level + "]"
 
 
-def dump(path, src_root=None):
+def dump(path, src_root=None, tema=None):
     src_root = src_root or os.path.join(ROOT, "src")
     sources = []
     for prefix, folder in (("Shared", os.path.join(src_root, "shared")), ("Server/Services", os.path.join(src_root, "server", "Services")), ("Client", os.path.join(src_root, "client"))):
@@ -74,6 +75,8 @@ def dump(path, src_root=None):
     bundle = "SOURCES_TABLE = {\n" + "\n".join(sources) + "\n}\n"
     for name in ("roblox_api.luau", "roblox_mock.luau"):
         bundle += open(os.path.join(ROOT, "tools", "tests", name), encoding="utf-8").read() + "\n"
+    if tema:
+        bundle += 'game:GetService("ReplicatedStorage"):SetAttribute("Tema", "%s")\n' % tema
     bundle += "do\n" + open(os.path.join(ROOT, "tools", "tests", "world_dump.luau"), encoding="utf-8").read() + "\nend\n"
     luau = os.environ.get("LUAU") or shutil.which("luau")
     if not luau:
@@ -257,7 +260,10 @@ def seg_dist_xz(p, a, b):
 
 # Luci della notte, come nel gioco (AmbienceController): stesse formule, stessi numeri
 WINDOW_WARM = [(214, 142, 78), (226, 160, 96), (200, 128, 66), (232, 176, 118)]
+# finestre infestate del file di Halloween (come AmbienceController): arancio, viola e verde
+WINDOW_HAUNTED = [(232, 128, 44), (214, 110, 36), (240, 150, 60), (226, 120, 40), (150, 90, 220), (130, 220, 90)]
 NIGHT_CLOCK = 21.5
+HALLOWEEN = {"on": False}
 
 
 def hash01(p, salt):
@@ -286,8 +292,14 @@ def time_of_day(part, night):
             return dict(part, mat="Neon")
         return dict(part, mat="Glass", color=np.clip(part["color"] * 0.8, 0, 1))
     if night and "FinestraCasa" in tags and window_lit(part["pos"], NIGHT_CLOCK):
-        warm = WINDOW_WARM[int(hash01(part["pos"], 5) * len(WINDOW_WARM))]
+        palette = WINDOW_HAUNTED if HALLOWEEN["on"] else WINDOW_WARM
+        warm = palette[int(hash01(part["pos"], 5) * len(palette))]
         return dict(part, mat="Neon", color=np.array(warm) / 255.0)
+    if "ZuccaAccesa" in tags:
+        # intaglio delle zucche: di notte brilla la candela, di giorno è un buco scuro
+        if night:
+            return dict(part, mat="Neon", color=np.array((255, 196, 92)) / 255.0)
+        return part
     return part
 
 
@@ -364,7 +376,9 @@ def build_scene(data, cam_pos, target, reach, clear_view=False, night=False):
     return sc, origin
 
 
-def add_titans(sc, data, origin, only=None):
+def add_titans(sc, data, origin, only=None, plain=None):
+    if plain is None:
+        plain = only is not None
     for idx, pos, yaw in data["places"]:
         titan = data["titans"].get(idx)
         if not titan or (only is not None and idx not in only) or (only is None and idx >= 30):
@@ -374,7 +388,7 @@ def add_titans(sc, data, origin, only=None):
         c, s = math.cos(a), math.sin(a)
         R0 = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
         for p in titan["parts"]:
-            add_part(sc, p, origin, titan=True, offset=pos, R0=R0, plain=only is not None)
+            add_part(sc, p, origin, titan=True, offset=pos, R0=R0, plain=plain)
 
 
 DAY = dict(
@@ -390,6 +404,20 @@ NIGHT = dict(
     sky_amb=(0.13, 0.16, 0.26), ground_amb=(0.04, 0.04, 0.06), fog_density=0.0012, fog_height=45, cloud_cover=0.3,
     cloud_col=(0.12, 0.14, 0.2), cloud_dark=(0.03, 0.035, 0.05), rays=0.0, bloom=1.0, saturation=1.0, exposure=1.45,
     sun_disk=True, vignette=0.4, ground_mat="ground",
+)
+
+# la luce del file di Halloween (SkyController: pomeriggio d'autunno arancio e viola, notte viola)
+HALLOWEEN_DAY = dict(
+    sun_dir=(0.5, 0.42, 0.62), sun_col=(2.3, 1.62, 1.12), sky_top=(0.2, 0.14, 0.34), sky_hor=(0.9, 0.54, 0.34),
+    sky_amb=(0.3, 0.26, 0.42), ground_amb=(0.16, 0.12, 0.14), fog_density=0.0024, fog_height=55, cloud_cover=0.5,
+    cloud_col=(0.95, 0.66, 0.56), cloud_dark=(0.36, 0.26, 0.42), rays=0.22, bloom=0.42, saturation=1.04, exposure=1.0,
+    sun_disk=True, vignette=0.42, ground_mat="ground",
+)
+HALLOWEEN_NIGHT = dict(
+    sun_dir=(0.35, 0.62, 0.55), sun_col=(0.42, 0.36, 0.7), sky_top=(0.03, 0.012, 0.06), sky_hor=(0.15, 0.07, 0.17),
+    sky_amb=(0.17, 0.12, 0.28), ground_amb=(0.05, 0.03, 0.06), fog_density=0.0018, fog_height=55, cloud_cover=0.35,
+    cloud_col=(0.16, 0.1, 0.22), cloud_dark=(0.04, 0.025, 0.06), rays=0.0, bloom=1.15, saturation=1.02, exposure=1.55,
+    sun_disk=True, vignette=0.48, ground_mat="ground",
 )
 
 # i valori di luce su cui è stata tarata la luce DAY delle foto: le foto seguono le differenze
@@ -472,9 +500,11 @@ def photo(data, name, out_path, width):
     cam_pos, target = data["views"][view]
     name = view
     reach = 4200 if name == "vermiglia_alto" else 2600
-    with_titans = name in ("giganti", "giganti_vicino", "volto", "varieta", "varieta_volti")
+    with_titans = name in ("giganti", "giganti_vicino", "volto", "varieta", "varieta_volti", "halloween_giganti", "halloween_zucca")
     sc, origin = build_scene(data, cam_pos, target, reach, clear_view=with_titans, night=night)
-    if with_titans:
+    if name.startswith("halloween_"):
+        add_titans(sc, data, origin, only=set(range(41, 48)), plain=False)
+    elif with_titans:
         add_titans(sc, data, origin)
     if name == "colosso_scena":
         add_titans(sc, data, origin, only={31})
@@ -490,7 +520,9 @@ def photo(data, name, out_path, width):
         for light in data.get("lights", []):
             if np.linalg.norm(light["pos"] - cam_pos) < 900:
                 lights.append((to_engine(light["pos"], origin), tuple(light["color"] * light["brightness"] * 1.3), light["range"] * SCALE))
-        look, grade = dict(NIGHT, point_lights=lights, **shadows), (0.0, (1.0, 1.0, 1.0))
+        look, grade = dict(HALLOWEEN_NIGHT if HALLOWEEN["on"] else NIGHT, point_lights=lights, **shadows), (0.0, (1.0, 1.0, 1.0))
+    elif HALLOWEEN["on"]:
+        look, grade = dict(HALLOWEEN_DAY, **shadows), (0.06, (1.0, 0.97, 1.02))
     else:
         look, grade = day_look(data, zone_of(name), **shadows)
     img = render(sc, cam, Look(**look), ss=1, shadow_cache={})
@@ -519,6 +551,9 @@ def main():
         elif args[i] == "--sorgenti":
             src_root = os.path.abspath(args[i + 1])
             i += 2
+        elif args[i] == "--halloween":
+            HALLOWEEN["on"] = True
+            i += 1
         else:
             names.append(args[i])
             i += 1
@@ -526,9 +561,9 @@ def main():
     if not dump_path:
         dump_path = os.path.join(out, "mondo.txt")
         print("esporto il mondo...")
-        dump(dump_path, src_root)
+        dump(dump_path, src_root, "Halloween" if HALLOWEEN["on"] else None)
     elif not os.path.exists(dump_path):
-        dump(dump_path, src_root)
+        dump(dump_path, src_root, "Halloween" if HALLOWEEN["on"] else None)
     data = parse(dump_path)
     print(f"mondo: {len(data['parts'])} parti, {len(data['terrain'])} pezzi di terreno, {len(data['titans'])} giganti")
     for name in names or list(data["views"]):

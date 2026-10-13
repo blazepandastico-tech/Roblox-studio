@@ -26,6 +26,7 @@ local ORDER = {
 	{ Controllers, "AmbienceController" },
 	{ Controllers, "SkyController" },
 	{ Controllers, "NatureController" },
+	{ Controllers, "HalloweenController" },
 	{ Controllers, "CitizenController" },
 	{ Controllers, "CutsceneController" },
 	{ Controllers, "BoatController" },

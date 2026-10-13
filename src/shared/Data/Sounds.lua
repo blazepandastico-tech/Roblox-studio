@@ -25,6 +25,9 @@ local Sounds = {
 	Steam = { Id = "rbxasset://sounds/Rocket whoosh 01.wav", Volume = 0.6, Pitch = 0.4 },
 	Thunder = { Id = "rbxasset://sounds/Rocket shot.wav", Volume = 1, Pitch = 0.3 },
 	Roar = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 1, Pitch = 0.25 },
+	-- Halloween: il sospiro dei fantasmi e lo "scherzetto" delle zucche
+	Spettro = { Id = "rbxasset://sounds/Rocket whoosh 01.wav", Volume = 0.35, Pitch = 0.32 },
+	Scherzetto = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 0.6, Pitch = 1.6 },
 }
 
 --[[

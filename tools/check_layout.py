@@ -2,6 +2,7 @@
 """Controllo "il gioco resta uguale" per i ritocchi solo grafici.
 
   python3 tools/check_layout.py [riferimento git]   (predefinito: HEAD)
+  python3 tools/check_layout.py --halloween         (gioco normale contro file di Halloween)
 
 Costruisce la mappa (WorldBuilder) e una serie di giganti due volte con il Roblox finto delle prove:
 con il codice del riferimento git e con quello attuale (tools/tests/layout_dump.luau). Poi confronta
@@ -38,7 +39,7 @@ def long_string(text):
     return "[" + "=" * level + "[\n" + text + "]" + "=" * level + "]"
 
 
-def bundle_for(src_root):
+def bundle_for(src_root, tema=None):
     sources = []
     for prefix, folder in (("Shared", os.path.join(src_root, "shared")), ("Server/Services", os.path.join(src_root, "server", "Services")), ("Client", os.path.join(src_root, "client"))):
         for base, _, names in os.walk(folder):
@@ -49,16 +50,18 @@ def bundle_for(src_root):
     bundle = "SOURCES_TABLE = {\n" + "\n".join(sources) + "\n}\n"
     for name in ("roblox_api.luau", "roblox_mock.luau"):
         bundle += read(os.path.join(ROOT, "tools", "tests", name)) + "\n"
+    if tema:
+        bundle += 'game:GetService("ReplicatedStorage"):SetAttribute("Tema", "%s")\n' % tema
     bundle += "do\n" + read(os.path.join(ROOT, "tools", "tests", "layout_dump.luau")) + "\nend\n"
     return bundle
 
 
-def run(src_root, label):
+def run(src_root, label, tema=None):
     luau = os.environ.get("LUAU") or shutil.which("luau")
     if not luau:
         sys.exit("Interprete 'luau' non trovato")
     with tempfile.NamedTemporaryFile("w", suffix=".luau", delete=False, encoding="utf-8") as f:
-        f.write(bundle_for(src_root))
+        f.write(bundle_for(src_root, tema))
         tmp = f.name
     proc = subprocess.run([luau, tmp], capture_output=True, text=True, timeout=1800)
     os.unlink(tmp)
@@ -142,13 +145,22 @@ def diff(name, old, new, show=6):
 
 
 def main():
-    ref = sys.argv[1] if len(sys.argv) > 1 else "HEAD"
-    with tempfile.TemporaryDirectory() as tmp:
-        old_src = extract(ref, tmp)
-        print("costruisco il gioco di %s..." % ref)
-        old = parse(run(old_src, ref))
-    print("costruisco il gioco attuale...")
-    new = parse(run(os.path.join(ROOT, "src"), "attuale"))
+    args = sys.argv[1:]
+    if "--halloween" in args:
+        # stesso codice, due temi: il file di Halloween deve avere la stessa mappa di gioco
+        ref = "normale"
+        print("costruisco il gioco normale...")
+        old = parse(run(os.path.join(ROOT, "src"), ref))
+        print("costruisco il gioco di Halloween...")
+        new = parse(run(os.path.join(ROOT, "src"), "Halloween", "Halloween"))
+    else:
+        ref = args[0] if args else "HEAD"
+        with tempfile.TemporaryDirectory() as tmp:
+            old_src = extract(ref, tmp)
+            print("costruisco il gioco di %s..." % ref)
+            old = parse(run(old_src, ref))
+        print("costruisco il gioco attuale...")
+        new = parse(run(os.path.join(ROOT, "src"), "attuale"))
     for label, data in ((ref, old), ("attuale", new)):
         if data["errors"]:
             print("righe non riconosciute (%s): %d" % (label, len(data["errors"])))

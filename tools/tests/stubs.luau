@@ -174,3 +174,24 @@ require = function(target: any)
 end
 
 SHARED = ROOT
+
+-- "game" minimo: i moduli condivisi leggono gli attributi di ReplicatedStorage (per esempio il tema)
+local services: { [string]: any } = {}
+local attributes: { [string]: any } = {}
+services.ReplicatedStorage = {
+	GetAttribute = function(_self, name: string)
+		return attributes[name]
+	end,
+	SetAttribute = function(_self, name: string, value: any)
+		attributes[name] = value
+	end,
+	WaitForChild = function(_self, name: string)
+		return if name == "Shared" then ROOT else nil
+	end,
+}
+game = {
+	GetService = function(_self, name: string)
+		services[name] = services[name] or {}
+		return services[name]
+	end,
+}

@@ -18,6 +18,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Zones = require(ReplicatedStorage:WaitForChild("Shared").Data.Zones)
+local Tema = require(ReplicatedStorage:WaitForChild("Shared").Data.Tema)
+
+-- nel file di Halloween: foglie d'autunno ovunque, fiori arancio e viola, fuochi fatui al posto
+-- delle lucciole e niente uccelli (ci pensano i pipistrelli di HalloweenController)
+local HALLOWEEN = Tema.IsHalloween()
 
 local NatureController = {}
 local C
@@ -149,10 +154,15 @@ end
 
 -- FIORI ------------------------------------------------------------------------------------------------
 
-local FLOWER_COLORS = {
-	Color3.fromRGB(236, 72, 84), Color3.fromRGB(250, 214, 70), Color3.fromRGB(170, 110, 220),
-	Color3.fromRGB(245, 245, 250), Color3.fromRGB(255, 150, 60), Color3.fromRGB(110, 160, 250),
-}
+local FLOWER_COLORS = if HALLOWEEN
+	then {
+		Color3.fromRGB(236, 118, 28), Color3.fromRGB(122, 50, 162), Color3.fromRGB(40, 28, 44),
+		Color3.fromRGB(226, 236, 255), Color3.fromRGB(196, 40, 40), Color3.fromRGB(150, 220, 80),
+	}
+	else {
+		Color3.fromRGB(236, 72, 84), Color3.fromRGB(250, 214, 70), Color3.fromRGB(170, 110, 220),
+		Color3.fromRGB(245, 245, 250), Color3.fromRGB(255, 150, 60), Color3.fromRGB(110, 160, 250),
+	}
 local CELL = 40
 local RADIUS = 120
 local flowerFolder: Folder
@@ -272,7 +282,7 @@ end
 
 local function updateFlocks(t: number, dt: number)
 	local cam = cameraPosition()
-	local want = enabled() and not isNight() and not underground() and (C.SkyController == nil or C.SkyController.Weather() ~= "Temporale")
+	local want = not HALLOWEEN and enabled() and not isNight() and not underground() and (C.SkyController == nil or C.SkyController.Weather() ~= "Temporale")
 	if not want then
 		if #flocks > 0 then
 			clearFlocks()
@@ -322,7 +332,7 @@ local function buildMeadow()
 	fireflies = Instance.new("ParticleEmitter")
 	fireflies.Name = "Lucciole"
 	fireflies.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	fireflies.Color = ColorSequence.new(Color3.fromRGB(214, 255, 120))
+	fireflies.Color = if HALLOWEEN then ColorSequence.new(Color3.fromRGB(150, 255, 110), Color3.fromRGB(255, 160, 60)) else ColorSequence.new(Color3.fromRGB(214, 255, 120))
 	fireflies.LightEmission = 1
 	fireflies.LightInfluence = 0
 	fireflies.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.2, 0.35), NumberSequenceKeypoint.new(0.8, 0.35), NumberSequenceKeypoint.new(1, 0) })
@@ -405,8 +415,13 @@ local function buildAir()
 		Rotation = NumberRange.new(0, 360),
 		LightInfluence = 1,
 	}
-	airEmitter("FoglieVerdi", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(86, 120, 54), Color3.fromRGB(120, 142, 62))
-	airEmitter("FoglieSecche", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(176, 128, 52), Color3.fromRGB(138, 84, 40))
+	if HALLOWEEN then
+		airEmitter("FoglieVerdi", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(214, 96, 26), Color3.fromRGB(176, 46, 30))
+		airEmitter("FoglieSecche", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(222, 166, 48), Color3.fromRGB(130, 76, 38))
+	else
+		airEmitter("FoglieVerdi", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(86, 120, 54), Color3.fromRGB(120, 142, 62))
+		airEmitter("FoglieSecche", table.clone(leaf)).Color = ColorSequence.new(Color3.fromRGB(176, 128, 52), Color3.fromRGB(138, 84, 40))
+	end
 	-- pulviscolo che brilla nel sole
 	airEmitter("Pulviscolo", {
 		Texture = "rbxasset://textures/particles/sparkles_main.dds",
@@ -474,9 +489,11 @@ local function updateAir()
 	local embers = ambience == Zones.Ambience.Marcia
 	local open = ambience == Zones.Ambience.Default or ambience == Zones.Ambience.Citta or ambience == Zones.Ambience.Castello or ambience == Zones.Ambience.Gola
 	local q = qualityMultiplier()
+	-- a Halloween è autunno dappertutto: foglie anche nei prati e in città
+	local leaves = forest or (HALLOWEEN and open)
 	local rates = {
-		FoglieVerdi = if on and forest then (if night then 2 else 5) else 0,
-		FoglieSecche = if on and forest then (if night then 1.5 else 3.5) else 0,
+		FoglieVerdi = if on and leaves then (if night then 2 else 5) * (if HALLOWEEN and not forest then 0.6 else 1) else 0,
+		FoglieSecche = if on and leaves then (if night then 1.5 else 3.5) * (if HALLOWEEN then 1.3 else 1) else 0,
 		Pulviscolo = if on and open and not night and not wet then 9 else 0,
 		Cenere = if on and ash then 22 else 0,
 		Braci = if on and embers then 14 else 0,

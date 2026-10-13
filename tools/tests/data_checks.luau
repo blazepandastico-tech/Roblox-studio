@@ -813,7 +813,29 @@ do
 	check(#AbuseEvents.List >= 5, "servono almeno 5 eventi a tempo")
 	local skyKeys = { "Color", "Decay", "Tint", "CloudColor" }
 	local skyNumbers = { "Density", "Haze", "Glare", "Exposure", "Saturation", "Contrast", "Bright", "Cover", "Rain" }
-	for _, def in AbuseEvents.List do
+	-- gli eventi di Halloween: solo nel file di Halloween, ma i dati si controllano sempre
+	local halloweenEvents = 0
+	for _, def in AbuseEvents.All do
+		if def.Theme == "Halloween" then
+			halloweenEvents += 1
+			check(not table.find(AbuseEvents.List, def) or AbuseEvents.Available(def), "Evento %s: di Halloween ma nella lista del file normale", def.Id)
+		end
+	end
+	check(halloweenEvents >= 5, "servono almeno 5 eventi di Halloween (ce ne sono %d)", halloweenEvents)
+	for _, r in AbuseEvents.Rewards do
+		check(type(r.Id) == "string" and type(r.Icon) == "string" and type(r.Name) == "string" and type(r.Text) == "string", "premio dell'evento senza testi")
+	end
+	local clean = AbuseEvents.CleanRewards({ Dolcetti = true, Strano = true, Doppio = "si" })
+	check(clean.Dolcetti == true and clean.Doppio == false and clean.Strano == nil, "CleanRewards non pulisce i premi")
+	for _, id in Items.HalloweenCollection do
+		local item = Items.Get(id)
+		check(item ~= nil and item.Halloween == true and item.Category == "Accessorio", "Collezione di Halloween: oggetto %s mancante o sbagliato", id)
+	end
+	for _, bossId in { "ReZucca", "GiganteFantasma" } do
+		local boss = Titans.Bosses[bossId]
+		check(boss ~= nil and boss.Event == true and boss.ScaleLevel == true, "boss di Halloween %s mancante", bossId)
+	end
+	for _, def in AbuseEvents.All do
 		local where = "Evento " .. tostring(def.Id)
 		check(AbuseEvents.Get(def.Id) == def, "%s: non trovato per Id", where)
 		check(type(def.Icon) == "string" and type(def.Name) == "string" and type(def.Text) == "string" and type(def.Short) == "string" and type(def.Episode) == "string", "%s: testi mancanti", where)

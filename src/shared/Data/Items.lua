@@ -690,6 +690,61 @@ add({
 	Description = "Il mantello dorato dei membri VIP dell'Arcipelago. +5% oro ed esperienza.",
 })
 
+-- Collezione di Halloween: premi degli eventi dell'Admin Abuse di Halloween (non si comprano)
+add({
+	Id = "CappelloStrega",
+	Name = "Cappello della Strega",
+	Category = "Accessorio",
+	Rarity = "Epico",
+	LevelReq = 1,
+	XPBonus = 0.05,
+	Visual = "CappelloStrega",
+	Halloween = true,
+	Description = "Premio dell'Admin Abuse di Halloween: un cappello a punta viola con la fibbia d'oro. +5% esperienza.",
+})
+
+add({
+	Id = "MascheraZucca",
+	Name = "Maschera di Zucca",
+	Category = "Accessorio",
+	Rarity = "Epico",
+	LevelReq = 1,
+	GoldBonus = 0.05,
+	Visual = "MascheraZucca",
+	Halloween = true,
+	Description = "Premio dell'Admin Abuse di Halloween: una zucca intagliata con gli occhi che brillano. +5% oro.",
+})
+
+add({
+	Id = "LanternaZucca",
+	Name = "Lanterna di Zucca",
+	Category = "Accessorio",
+	Rarity = "Raro",
+	LevelReq = 1,
+	AllDamage = 0.03,
+	Visual = "LanternaZucca",
+	Halloween = true,
+	Description = "Premio dell'Admin Abuse di Halloween: una zucchetta accesa appesa alla cintura. +3% a tutti i danni.",
+})
+
+add({
+	Id = "MantelloSpettrale",
+	Name = "Mantello Spettrale",
+	Category = "Accessorio",
+	Rarity = "Leggendario",
+	LevelReq = 1,
+	XPBonus = 0.05,
+	GoldBonus = 0.05,
+	Visual = "Mantello",
+	CloakColor = Color3.fromRGB(38, 20, 54),
+	CloakTrim = Color3.fromRGB(236, 118, 28),
+	Halloween = true,
+	Description = "Il premio più raro dell'Admin Abuse di Halloween: un mantello viola notte con il bordo color zucca. +5% oro ed esperienza.",
+})
+
+-- l'ordine in cui si vincono i premi della Collezione di Halloween
+Items.HalloweenCollection = { "LanternaZucca", "CappelloStrega", "MascheraZucca", "MantelloSpettrale" }
+
 -- CONSUMABILI -------------------------------------------------------------------------
 
 add({

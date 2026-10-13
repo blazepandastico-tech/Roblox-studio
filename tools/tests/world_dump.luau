@@ -62,7 +62,7 @@ local function emitPart(p)
 	local cf = table.concat({ cfFields(p.CFrame) }, "\t")
 	-- etichette che cambiano l'aspetto di notte (lampioni accesi, finestre illuminate)
 	local tags = {}
-	for _, tag in { "Lampione", "FinestraCasa" } do
+	for _, tag in { "Lampione", "FinestraCasa", "ZuccaAccesa" } do
 		if CollectionService:HasTag(p, tag) then
 			table.insert(tags, tag)
 		end
@@ -152,6 +152,20 @@ for i = 1, VARIETY do
 end
 view("varieta", varietySlot(4.5) + outward * 118 + Vector3.new(0, G + 14, 0), varietySlot(4.5) + Vector3.new(0, G + 11, 0))
 view("varieta_volti", varietySlot(1.5) + outward * 30 + Vector3.new(0, G + 18, 0), varietySlot(1.5) + Vector3.new(0, G + 16.5, 0))
+-- terza fila (solo nel file di Halloween): i costumi dei giganti, il Re Zucca e il Gigante Fantasma
+local HALLOWEEN_ROW = { { "Puro", "Zucca", 22 }, { "Puro", "Strega", 22 }, { "Puro", "Zombie", 22 }, { "Puro", "Corna", 22 }, { "Puro", "Scheletro", 22 }, { "Zucca", nil, 46 }, { "Spettro", nil, 40 } }
+local halloweenRow = varietyRow + outward * 120
+local function halloweenSlot(i: number): Vector3
+	return halloweenRow + right * ((i - (#HALLOWEEN_ROW + 1) / 2) * 30)
+end
+if game:GetService("ReplicatedStorage"):GetAttribute("Tema") == "Halloween" then
+	for i = 1, #HALLOWEEN_ROW do
+		local q = halloweenSlot(i)
+		emit("TP", tostring(40 + i), f(q.X), f(G), f(q.Z), f(math.atan2(outward.X, outward.Z)))
+	end
+	view("halloween_giganti", halloweenSlot(4) + outward * 150 + Vector3.new(0, G + 26, 0), halloweenSlot(4) + Vector3.new(0, G + 18, 0))
+	view("halloween_zucca", halloweenSlot(6) + outward * 52 + right * 10 + Vector3.new(0, G + 44, 0), halloweenSlot(6) + Vector3.new(0, G + 38, 0))
+end
 -- le case di Calaneth viste dall'alto delle mura interne del distretto
 view("calaneth_case", calaneth - outward * 35 + right * 55 + Vector3.new(0, G + 46, 0), calaneth + outward * 25 - right * 30 + Vector3.new(0, G + 8, 0))
 -- un boschetto in campagna (il primo albero a 650-800 studs dal centro di Vermiglia, lontano dalle mura)
@@ -278,6 +292,23 @@ for i = 1, VARIETY do
 		LOG("ASPETTO\t" .. tostring(model:GetAttribute("Aspetto")))
 	else
 		emit("GX", "Puro", tostring(model))
+	end
+end
+
+if game:GetService("ReplicatedStorage"):GetAttribute("Tema") == "Halloween" then
+	for i, entry in HALLOWEEN_ROW do
+		local okT, model = pcall(TitanBuilder.Build, { Height = entry[3], Look = entry[1], Seed = 7000 + i * 31, Name = entry[1], Costume = entry[2] })
+		if okT and model then
+			emit("G", entry[1], f(entry[3]), tostring(40 + i))
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") and d.Transparency < 0.98 then
+					emitPart(d)
+				end
+			end
+			emit("GE", entry[1])
+		else
+			emit("GX", entry[1], tostring(model))
+		end
 	end
 end
 

@@ -1091,7 +1091,7 @@ handlers.ColossusArrival = function(p)
 end
 
 -- eventi a tempo dell'Admin Abuse (le animazioni sono in AbuseEventController)
-for _, name in { "AbuseTremor", "AbuseScream", "AbuseFlare", "AbuseLightning" } do
+for _, name in { "AbuseTremor", "AbuseScream", "AbuseFlare", "AbuseLightning", "AbusePumpkinBurst", "AbuseGhost", "AbuseRise", "AbuseCandyDrop", "AbuseTrick", "AbuseBats", "AbuseCandy" } do
 	handlers[name] = function(p)
 		if C.AbuseEventController then
 			C.AbuseEventController.ServerEffect(name, p)

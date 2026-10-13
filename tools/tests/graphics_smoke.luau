@@ -211,6 +211,99 @@ local pushX = push.RightShoulder:ToEulerAnglesXYZ()
 local brakeX = brake.RightShoulder:ToEulerAnglesXYZ()
 check(brakeX > pushX + math.rad(20), "in frenata le braccia non vanno in avanti")
 
+-- 🎃 HALLOWEEN (solo con il tema di Halloween): zucche accese di notte, pipistrelli, fantasmi e costumi
+local halloweenText = ""
+local Tema = require(SHARED.Data.Tema)
+if Tema.IsHalloween() then
+	local okH, HC = pcall(require, (CLIENT :: any).Controllers.HalloweenController)
+	check(okH, "caricamento HalloweenController: " .. tostring(HC))
+	if okH then
+		withLoops(function()
+			HC.Init(C)
+			HC.Start()
+		end)
+		local carved = CollectionService:GetTagged(Tema.Tags.Carved)
+		check(#carved > 200, ("zucche intagliate con la candela: solo %d pezzi"):format(#carved))
+		Lighting.ClockTime = 21.5
+		HC.RefreshPumpkins()
+		local lit = 0
+		for _, p in carved do
+			if p.Material == Enum.Material.Neon then
+				lit += 1
+			end
+		end
+		check(lit == #carved, ("di notte si accendono %d intagli su %d"):format(lit, #carved))
+		Lighting.ClockTime = 12
+		HC.RefreshPumpkins()
+		local dayLit = 0
+		for _, p in carved do
+			if p.Material == Enum.Material.Neon then
+				dayLit += 1
+			end
+		end
+		check(dayLit == 0, "di giorno le zucche restano accese")
+		Lighting.ClockTime = 22
+		camera.CFrame = CFrame.new(here + Vector3.new(0, 12, 30), here)
+		for i = 1, 30 do
+			HC.Step(i * 0.1, 0.1)
+		end
+		local local_ = workspace:FindFirstChild("HalloweenLocale")
+		local bats, ghosts = 0, 0
+		if local_ then
+			for _, d in local_:GetDescendants() do
+				if d.Name == "Pipistrello" then
+					bats += 1
+				elseif d.Name == "Fantasma" then
+					ghosts += 1
+				end
+			end
+		end
+		check(bats >= 10, ("di notte volano solo %d pipistrelli"):format(bats))
+		check(ghosts >= 1, "di notte non compare nessun fantasma")
+		halloweenText = ("; Halloween: %d intagli accesi di notte, %d pipistrelli, %d fantasmi"):format(lit, bats, ghosts)
+	end
+	-- costumi dei giganti: gli occhi della zucca stanno davanti agli occhi veri
+	local king = TitanBuilder.Build({ Height = 46, Look = "Zucca", Seed = 3, Name = "ReZucca" })
+	check(king:GetAttribute("Costume") == "ReZucca", "il Re Zucca non ha il suo costume")
+	local headPart = king:FindFirstChild("Head") :: BasePart
+	local eye = king:FindFirstChild("RightEye") :: BasePart
+	local carvedEyes = {}
+	for _, d in king:GetDescendants() do
+		if d:IsA("BasePart") and d.Name == "OcchioZucca" then
+			table.insert(carvedEyes, headPart.CFrame:PointToObjectSpace(d.Position))
+		end
+	end
+	check(#carvedEyes == 4, ("intagli degli occhi della zucca: %d invece di 4"):format(#carvedEyes))
+	if eye then
+		local e = headPart.CFrame:PointToObjectSpace(eye.Position)
+		local nearest = math.huge
+		for _, c in carvedEyes do
+			nearest = math.min(nearest, math.abs(c.X - e.X) + math.abs(c.Y - e.Y))
+		end
+		check(nearest < headPart.Size.X * 0.2, "gli occhi intagliati non stanno davanti agli occhi veri del Re Zucca")
+		check(eye.CanQuery and eye.Transparency >= 1, "l'occhio da colpire del Re Zucca è cambiato")
+	end
+	for _, d in king:GetDescendants() do
+		if d:IsA("BasePart") and (d.Name == "Zucca" or d.Name == "OcchioZucca" or d.Name == "Mantello") then
+			check(not d.CanQuery and not d.CanCollide, "un pezzo del costume ferma i colpi: " .. d.Name)
+		end
+	end
+	local costumes = {}
+	for seed = 1, 40 do
+		local m = TitanBuilder.Build({ Height = 20, Look = "Puro", Seed = seed, Name = "Puro" })
+		local c = m:GetAttribute("Costume")
+		if c then
+			costumes[c] = (costumes[c] or 0) + 1
+		end
+	end
+	for _, kind in { "Zucca", "Strega", "Zombie", "Corna", "Scheletro" } do
+		check((costumes[kind] or 0) > 0, "nessun gigante con il costume " .. kind)
+	end
+	local ghost = TitanBuilder.Build({ Height = 40, Look = "Spettro", Seed = 9, Name = "Spettro" })
+	local torsoPart = ghost:FindFirstChild("Torso") :: BasePart
+	check(torsoPart ~= nil and torsoPart.Transparency > 0.2 and torsoPart:FindFirstChild("Ectoplasma") ~= nil, "il Gigante Fantasma non è trasparente o non ha l'ectoplasma")
+end
+
 for i = warningsBefore + 1, #WARNINGS do
 	table.insert(ERRORS, "Avviso (grafica): " .. WARNINGS[i])
 end
@@ -220,4 +313,4 @@ if #ERRORS > 0 then
 	end
 	error(("prova della grafica fallita: %d errori"):format(#ERRORS))
 end
-LOG(("Prova della grafica OK: di notte %d finestre accese su %d e %d luci, a mezzogiorno spente; foglie nel bosco, vapore dalle ferite, %d sbuffi di polvere, mantello all'indietro"):format(nightLit, windows, lampsOn, dust))
+LOG(("Prova della grafica OK: di notte %d finestre accese su %d e %d luci, a mezzogiorno spente; foglie nel bosco, vapore dalle ferite, %d sbuffi di polvere, mantello all'indietro%s"):format(nightLit, windows, lampsOn, dust, halloweenText))

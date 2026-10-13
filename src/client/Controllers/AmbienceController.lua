@@ -21,6 +21,7 @@ local Config = require(Shared.Config)
 local Util = require(Shared.Lib.Util)
 local Zones = require(Shared.Data.Zones)
 local Sounds = require(Shared.Data.Sounds)
+local Tema = require(Shared.Data.Tema)
 
 local AmbienceController = {}
 local C
@@ -129,6 +130,17 @@ local WINDOW_WARM = {
 	Color3.fromRGB(200, 128, 66),
 	Color3.fromRGB(232, 176, 118),
 }
+-- file di Halloween: finestre arancioni come zucche, e qualcuna viola o verde (case infestate)
+if Tema.IsHalloween() then
+	WINDOW_WARM = {
+		Color3.fromRGB(232, 128, 44),
+		Color3.fromRGB(214, 110, 36),
+		Color3.fromRGB(240, 150, 60),
+		Color3.fromRGB(226, 120, 40),
+		Color3.fromRGB(150, 90, 220),
+		Color3.fromRGB(130, 220, 90),
+	}
+end
 local windowDay: { [BasePart]: { Material: Enum.Material, Color: Color3, Reflectance: number } } = setmetatable({}, { __mode = "k" }) :: any
 local windowLit: { [BasePart]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 
@@ -216,7 +228,7 @@ local function updateFlicker()
 			if #flickering >= 40 then
 				break
 			end
-			if bulb:IsA("BasePart") and bulb:FindFirstChildOfClass("Fire") and (bulb.Position - cam).Magnitude < 220 then
+			if bulb:IsA("BasePart") and (bulb:FindFirstChildOfClass("Fire") or bulb:GetAttribute("Tremola") == true) and (bulb.Position - cam).Magnitude < 220 then
 				local light = bulb:FindFirstChildOfClass("PointLight")
 				if light and light.Enabled then
 					local base = light:GetAttribute("Luminosita")

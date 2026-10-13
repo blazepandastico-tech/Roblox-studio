@@ -27,6 +27,7 @@ local Signal = require(Shared.Lib.Signal)
 local W = require(Shared.Data.WorldLayout)
 local Zones = require(Shared.Data.Zones)
 local NPCs = require(Shared.Data.NPCs)
+local HalloweenWorld = require(script.Parent.HalloweenWorld)
 
 local WorldBuilder = {}
 WorldBuilder.Ready = false
@@ -34,6 +35,8 @@ WorldBuilder.ReadySignal = Signal.new()
 
 local G = W.GroundY
 local rng = Random.new(Config.WorldSeed)
+-- file di Halloween (Shared/Data/Tema): stesse parti di gioco, colori e decorazioni infestate
+local halloween = false
 local partCount = 0
 local mapFolder: Folder
 local currentGroup: Instance
@@ -218,6 +221,9 @@ local function buildTerrain()
 		terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(214, 196, 150))
 		terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(92, 74, 56))
 	end)
+	if halloween then
+		HalloweenWorld.Terrain(terrain)
+	end
 
 	-- Oceano che collega tutte le isole (a blocchi, per non bloccare il server)
 	local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
@@ -747,6 +753,9 @@ local function buildGate(center: Vector3, outward: Vector3, height: number, thic
 			part({ Name = "Macerie", Size = Vector3.new(s, s * 0.7, s), CFrame = cf * CFrame.new(rng:NextNumber(-width, width), s * 0.3, rng:NextNumber(-thickness * 2, thickness * 2)) * CFrame.Angles(rng:NextNumber(-0.6, 0.6), rng:NextNumber(0, 6), rng:NextNumber(-0.6, 0.6)), Material = Enum.Material.Limestone, Color = tint(stone, 0.75) })
 		end
 	end
+	if halloween and intact then
+		HalloweenWorld.Gate(center, outward, width, thickness)
+	end
 end
 
 local function buildRingWall(wall, districts)
@@ -1195,6 +1204,9 @@ local function buildHouse(cf: CFrame, width: number, depth: number, floors: numb
 		end
 	end
 	houseDetails(cf, width, depth, height, floors, isValdoria, ruined == true)
+	if halloween then
+		HalloweenWorld.House(cf, width, depth, height, floors, isValdoria, ruined == true, doorX, plinthH)
+	end
 end
 
 -- INTERNI: arredamento delle stanze in cui si entra -----------------------------------------------
@@ -1546,6 +1558,9 @@ local function lamp(pos: Vector3, color: Color3?)
 	light.Shadows = false
 	light.Parent = bulb
 	CollectionService:AddTag(bulb, Config.Tags.Lamp)
+	if halloween then
+		HalloweenWorld.Lamp(pos)
+	end
 	return base
 end
 
@@ -1810,6 +1825,9 @@ local function giantTree(pos: Vector3)
 		local sat = part({ Name = "Chioma", Shape = Enum.PartType.Ball, Size = Vector3.one * crown * rng:NextNumber(0.5, 0.65), CFrame = CFrame.new(top + Vector3.new(math.cos(a) * crown * 0.42, (j - 2) * crown * 0.16, math.sin(a) * crown * 0.42)), Material = Enum.Material.LeafyGrass, Color = if j == 3 then pick(LEAF_SUN) else pick(LEAF_SHADE), CastShadow = false })
 		swayInfo(sat, crownPivot, phase)
 	end
+	if halloween then
+		HalloweenWorld.GiantTree(pos, h, d)
+	end
 end
 
 -- LUOGHI SPECIALI ------------------------------------------------------------------------
@@ -1920,6 +1938,9 @@ local function buildTrainingCamp()
 	lamp(c + Vector3.new(-8, 0, 10))
 	lamp(c + Vector3.new(8, 0, -40))
 	campDetails(c)
+	if halloween then
+		HalloweenWorld.Camp(c)
+	end
 end
 
 local function buildHQ()
@@ -2839,6 +2860,10 @@ function WorldBuilder.Build()
 	mapFolder = Instance.new("Folder")
 	mapFolder.Name = Config.Folders.Map
 	mapFolder.Parent = workspace
+	halloween = HalloweenWorld.Active()
+	if halloween then
+		HalloweenWorld.Begin({ Map = mapFolder, G = G, OpenLand = openLand, GroundAt = groundAt })
+	end
 
 	step("Basi delle isole", buildIslandBases)
 	step("Terreno", buildTerrain)
@@ -2929,6 +2954,9 @@ function WorldBuilder.Build()
 	step("Fronte della Grande Marcia", buildRumbleFront)
 	step("Alberi", scatterTrees)
 	step("Confini", buildBoundaries)
+	if halloween then
+		step("Halloween", HalloweenWorld.Finish)
+	end
 
 	-- alberi che ondeggiano e camini che fumano (li anima il client)
 	for _, d in mapFolder:GetDescendants() do

@@ -256,7 +256,8 @@ check(not Abuse.Launch("EventoCheNonEsiste", 5), "un evento inesistente non deve
 check(AbuseEvents.ClampMinutes(500) == AbuseEvents.MaxMinutes and AbuseEvents.ClampMinutes(0) == AbuseEvents.MinMinutes, "minuti dell'evento non limitati")
 for _, def in AbuseEvents.List do
 	local before = #spawned
-	local okL, resL = pcall(Abuse.Launch, def.Id, 2)
+	-- senza premi in più (i premi hanno una prova tutta loro qui sotto)
+	local okL, resL = pcall(Abuse.Launch, def.Id, 2, { Rewards = {} })
 	check(okL and resL == true, def.Id .. ": l'evento non parte (" .. tostring(resL) .. ")")
 	check(replicated:GetAttribute("AbuseEvento") == def.Id, def.Id .. ": attributo AbuseEvento non pubblicato")
 	check(type(replicated:GetAttribute("AbuseFine")) == "number", def.Id .. ": manca la fine dell'evento")
@@ -277,7 +278,13 @@ for _, def in AbuseEvents.List do
 		check(okS, def.Id .. ": Step: " .. tostring(errS))
 	end
 	local made = #spawned - before
-	check(made > 0 or invasions > 0 or freezes > 0, def.Id .. ": l'evento non ha fatto succedere niente")
+	-- Dolcetto o Scherzetto fa cadere zucche piene di dolci (non solo giganti)
+	local ctxNow = Abuse.DebugContext()
+	local candies = if ctxNow then #ctxNow.Candy else 0
+	check(made > 0 or candies > 0 or invasions > 0 or freezes > 0, def.Id .. ": l'evento non ha fatto succedere niente")
+	if def.CandyPumpkins then
+		check(candies > 0, def.Id .. ": nessuna zucca dei dolcetti")
+	end
 	if def.Id == "Spedizione" then
 		local anomaly = nil
 		for i = before + 1, #spawned do
@@ -318,6 +325,151 @@ end
 check(invasions > 0 and allies > 0 and freezes > 0, "invasione, alleati o fulmini degli eventi non attivati")
 Abuse.Launch("CadutaMuro", 5)
 check(Abuse.Stop("Admin") and replicated:GetAttribute("AbuseEvento") == nil, "Termina evento non funziona")
+
+-- 🎃 gli eventi di Halloween ci sono solo nel file di Halloween
+local Tema = require(SHARED.Data.Tema)
+local ItemsData = require(SHARED.Data.Items)
+do
+	local okH = Abuse.Launch("NotteZucche", 2, { Rewards = {} })
+	check(okH == Tema.IsHalloween(), "gli eventi di Halloween devono partire solo nel file di Halloween")
+	Abuse.Stop("Admin")
+end
+
+-- 🎁 PREMI DELL'EVENTO: bonus doppi, dolcetti per ogni gigante, premio finale con la classifica
+do
+	local def = AbuseEvents.Get("CadutaMuro")
+	local okL, msg = Abuse.Launch("CadutaMuro", 5, { Rewards = { Dolcetti = true, Partecipazione = true, Doppio = true }, Text = "Tutti alle mura!", By = "Prova" })
+	check(okL, "evento con i premi non partito: " .. tostring(msg))
+	check(player:GetAttribute("BonusXPAbuse") == def.Bonus.XP * 2, "i bonus doppi non raddoppiano l'esperienza")
+	check(replicated:GetAttribute("AbusePremi") == "Dolcetti,Partecipazione,Doppio", "premi dell'evento non pubblicati: " .. tostring(replicated:GetAttribute("AbusePremi")))
+	check(string.find(tostring(replicated:GetAttribute("AbuseAnnuncio")), "Tutti alle mura", 1, true) ~= nil, "annuncio dell'admin non pubblicato")
+	local goldCalls = 0
+	local addGold = S.PlayerService.AddGold
+	S.PlayerService.AddGold = function(_, n)
+		goldCalls += 1
+		return n
+	end
+	local fake = { AbuseEvent = "CadutaMuro", Level = 80, Kind = "Pure", State = "Dead", Model = Instance.new("Model") }
+	for _ = 1, 4 do
+		S.TitanService.Killed:Fire(fake, player, { player })
+	end
+	check(goldCalls == 4, ("i dolcetti non danno l'oro (%d su 4)"):format(goldCalls))
+	local candies = goldCalls
+	local gemsBefore = profile.Gems
+	local titles = {}
+	local announceTo = S.EventService.AnnounceTo
+	S.EventService.AnnounceTo = function(_, title, subtitle)
+		table.insert(titles, title .. " " .. tostring(subtitle))
+	end
+	local inventory = S.InventoryService
+	local given = {}
+	S.InventoryService = {
+		Give = function(_, id)
+			table.insert(given, id)
+		end,
+		Has = function()
+			return false
+		end,
+	}
+	Abuse.Stop("Admin")
+	check(profile.Gems >= gemsBefore + 5 + 4 + 20, ("il premio finale non dà le gemme giuste (+%d)"):format(profile.Gems - gemsBefore))
+	check(#titles == 1 and string.find(titles[1], "MIGLIOR CACCIATORE", 1, true) ~= nil, "manca l'annuncio del miglior cacciatore")
+	if Tema.IsHalloween() then
+		check(given[1] == ItemsData.HalloweenCollection[1], "premio della Collezione di Halloween non dato: " .. tostring(given[1]))
+	else
+		check(#given == 0, "fuori dal file di Halloween non si vincono oggetti di Halloween")
+	end
+	S.InventoryService = inventory
+	S.EventService.AnnounceTo = announceTo
+	S.PlayerService.AddGold = addGold
+	LOG(("Premi dell'evento: bonus doppi, %d dolcetti, premio finale +%d 💎%s"):format(candies, profile.Gems - gemsBefore, if given[1] then " e " .. given[1] else ""))
+end
+
+-- 🍬 Dolcetto o Scherzetto: le zucche cadono vicino ai giocatori e si raccolgono passandoci vicino
+if Tema.IsHalloween() then
+	local okD = Abuse.Launch("DolcettoScherzetto", 5, { Rewards = {} })
+	check(okD, "Dolcetto o Scherzetto non parte")
+	Abuse.FastForward(20)
+	pcall(Abuse.Step)
+	local ctx = Abuse.DebugContext()
+	check(ctx ~= nil and #ctx.Candy >= 1, "nessuna zucca dei dolcetti vicino al giocatore")
+	if ctx and ctx.Candy[1] then
+		local candy = ctx.Candy[1]
+		candy.ReadyAt = 0
+		root.CFrame = CFrame.new(candy.Position + Vector3.new(0, 3, 0))
+		local n = #ctx.Candy
+		local okC, errC = pcall(Abuse.CandyStep)
+		check(okC, "raccolta della zucca: " .. tostring(errC))
+		check(#ctx.Candy == n - 1, "la zucca dei dolcetti non si raccoglie")
+	end
+	Abuse.Stop("Admin")
+	root.CFrame = CFrame.new(plains.Center + Vector3.new(0, 4, 0))
+	LOG("Dolcetto o Scherzetto: zucca caduta vicino al giocatore e raccolta")
+end
+
+-- 📅 PROGRAMMAZIONE: evento per un giorno e un'ora, avvisi prima dell'inizio, partenza da solo
+do
+	-- un DataStore finto in memoria (come quello vero: UpdateAsync riceve il valore salvato)
+	local memory = {}
+	rawset(game:GetService("DataStoreService"), "GetDataStore", function()
+		return {
+			GetAsync = function(_, key)
+				return memory[key]
+			end,
+			UpdateAsync = function(_, key, fn)
+				local value = fn(memory[key])
+				if value ~= nil then
+					memory[key] = value
+				end
+				return memory[key]
+			end,
+		}
+	end)
+	local Sched = require(SERVER.Services.AbuseScheduleService)
+	Sched.Init(S)
+	S.AbuseScheduleService = Sched
+	local clock = os.time()
+	Sched.Clock = function()
+		return clock
+	end
+	local titles = {}
+	local announce = S.EventService.Announce
+	S.EventService.Announce = function(title)
+		table.insert(titles, title)
+	end
+	local at = clock + 3600
+	local ok1, m1 = Sched.Schedule(player, "CadutaMuro", 10, at, "Ci vediamo alle mura!", { Dolcetti = true })
+	check(ok1, "programmazione non riuscita: " .. tostring(m1))
+	check(not (Sched.Schedule(player, "CaricaBastione", 10, at + 300, "", nil)), "accettati due eventi che si sovrappongono")
+	check(not (Sched.Schedule(player, "CaricaBastione", 10, clock - 10, "", nil)), "accettato un evento nel passato")
+	check(not (Sched.Schedule(player, "EventoCheNonEsiste", 10, at + 7200, "", nil)), "accettato un evento inesistente")
+	check(replicated:GetAttribute("ProssimoEvento") == "CadutaMuro" and replicated:GetAttribute("ProssimoEventoAlle") == at, "prossimo evento non pubblicato per i client")
+	check(type(replicated:GetAttribute("ProgrammaEventi")) == "string" and string.find(replicated:GetAttribute("ProgrammaEventi"), "CadutaMuro", 1, true) ~= nil, "programma degli eventi non pubblicato")
+	clock = at - 600 + 2
+	Sched.Step()
+	check(titles[#titles] ~= nil and string.find(titles[#titles], "Tra 10 minuti", 1, true) ~= nil, "manca l'avviso dei 10 minuti")
+	local count = #titles
+	Sched.Step()
+	check(#titles == count, "l'avviso dei 10 minuti si ripete")
+	clock = at + 2
+	Sched.Step()
+	check(replicated:GetAttribute("AbuseEvento") == "CadutaMuro", "l'evento programmato non parte all'ora giusta")
+	check(replicated:GetAttribute("AbusePremi") == "Dolcetti", "premi dell'evento programmato sbagliati: " .. tostring(replicated:GetAttribute("AbusePremi")))
+	check(string.find(tostring(replicated:GetAttribute("AbuseAnnuncio")), "Ci vediamo alle mura", 1, true) ~= nil, "annuncio dell'evento programmato mancante")
+	Abuse.Stop("Admin")
+	Sched.Step()
+	check(replicated:GetAttribute("AbuseEvento") == nil, "l'evento programmato riparte da solo dopo essere stato fermato")
+	local list = Sched.List()
+	check(#list == 1, ("nel programma ci sono %d eventi invece di 1"):format(#list))
+	check(type(memory.Programma) == "table" and #memory.Programma == 1, "il programma non è stato salvato nel DataStore")
+	if list[1] then
+		local okC = Sched.Cancel(player, list[1].Uid)
+		check(okC and #Sched.List() == 0, "annullamento dell'evento programmato non riuscito")
+	end
+	S.EventService.Announce = announce
+	Sched.Clock = os.time
+	LOG("Programmazione: evento programmato, avviso dei 10 minuti, partenza all'ora giusta con premi e annuncio, annullamento")
+end
 table.clear(MOCK_PLAYERS)
 
 -- ADDESTRAMENTO DI BASE (server): dopo il prologo la storia aspetta il tutorial, il premio arriva

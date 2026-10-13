@@ -407,9 +407,68 @@ if C.AdminPanel then
 				end
 			end
 		end
-		check(events == #AbuseEvents.List, ("sezione Animazioni: %d eventi invece di %d"):format(events, #AbuseEvents.List))
-		check(durations == #AbuseEvents.Durations + 1, ("sezione Animazioni: %d pulsanti della durata"):format(durations))
+		-- ogni evento compare due volte: tra le animazioni (parte subito) e nel programma
+		check(events == #AbuseEvents.List * 2, ("sezione Animazioni: %d pulsanti degli eventi invece di %d"):format(events, #AbuseEvents.List * 2))
+		check(durations == #AbuseEvents.Durations + 2, ("sezione Animazioni: %d pulsanti della durata"):format(durations))
 		LOG(("Pannello admin: sezione 😈 Admin Abuse con %d pulsanti, %d eventi animati e %d durate"):format(buttons + events + durations, events, durations))
+		-- 🎁 premi, ▶ evento subito e 📅 programma: i pulsanti mandano al server quello che si è scelto
+		local Net = require(SHARED.Lib.Net)
+		local remote = Net.Event("AdminAction")
+		local sent = {}
+		rawset(remote, "FireServer", function(_self, action, _target, value)
+			table.insert(sent, { Action = action, Value = value })
+		end)
+		local function find(prefix: string): TextButton?
+			for _, d in (gui :: Instance):GetDescendants() do
+				if d:IsA("TextButton") and d.Text:sub(1, #prefix) == prefix then
+					return d
+				end
+			end
+			return nil
+		end
+		local candy = find("🍬 Dolcetti:")
+		check(candy ~= nil, "manca il pulsante dei dolcetti")
+		local wasOn = candy ~= nil and candy.Text:find("SÌ", 1, true) ~= nil
+		if candy then
+			candy.Activated:Fire()
+		end
+		local candy2 = find("🍬 Dolcetti:")
+		check(candy2 ~= nil and (candy2.Text:find("SÌ", 1, true) ~= nil) ~= wasOn, "il pulsante dei dolcetti non cambia")
+		local ten = find("⏱️ 10 min")
+		if ten then
+			ten.Activated:Fire()
+		end
+		local first = AbuseEvents.List[1]
+		local launch = find(first.Icon .. " " .. first.Name .. "\n")
+		check(launch ~= nil, "manca il pulsante per far partire " .. first.Name)
+		if launch then
+			launch.Activated:Fire()
+		end
+		local last = sent[#sent]
+		check(last ~= nil and last.Action == "AbuseEvent" and last.Value.Id == first.Id and last.Value.Minutes == 10 and type(last.Value.Rewards) == "table" and last.Value.Rewards.Dolcetti == not wasOn, "l'evento subito non manda tipo, durata e premi")
+		local plusHour = find("+1 h")
+		if plusHour then
+			plusHour.Activated:Fire()
+		end
+		local program = find("📅 PROGRAMMA QUESTO EVENTO")
+		check(program ~= nil, "manca il pulsante per programmare l'evento")
+		if program then
+			program.Activated:Fire()
+		end
+		last = sent[#sent]
+		check(last ~= nil and last.Action == "AbuseSchedule" and type(last.Value.At) == "number" and last.Value.At > os.time() + 3600, "il programma non manda data e ora")
+		-- la lista degli eventi programmati con il pulsante per annullare
+		game:GetService("ReplicatedStorage"):SetAttribute("ProgrammaEventi", '[{"Uid":"prova-1","Event":"' .. first.Id .. '","Minutes":15,"At":' .. tostring(os.time() + 7200) .. ',"Text":"Ci vediamo!","By":"Prova"}]')
+		RunService.Heartbeat:Fire(0.1)
+		local cancel = find("❌ Annulla")
+		check(cancel ~= nil, "manca il pulsante per annullare un evento programmato")
+		if cancel then
+			cancel.Activated:Fire()
+		end
+		last = sent[#sent]
+		check(last ~= nil and last.Action == "AbuseUnschedule" and last.Value == "prova-1", "l'annullamento non manda l'evento giusto")
+		game:GetService("ReplicatedStorage"):SetAttribute("ProgrammaEventi", nil)
+		LOG(("Pannello admin: premi, evento subito, programma e annullamento mandati al server (%d azioni)"):format(#sent))
 	end
 end
 

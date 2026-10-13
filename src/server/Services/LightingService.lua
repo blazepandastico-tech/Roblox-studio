@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Tema = require(Shared.Data.Tema)
 
 local LightingService = {}
 local S
@@ -123,6 +124,12 @@ function LightingService.Setup()
 	sky.MoonAngularSize = 11
 	sky.StarCount = 5000
 	sky.CelestialBodiesShown = true
+	if Tema.IsHalloween() then
+		-- la luna di Halloween: enorme sopra le Mura, e più stelle
+		sky.MoonAngularSize = 26
+		sky.SunAngularSize = 18
+		sky.StarCount = 7000
+	end
 
 	local bloom = ensure("BloomEffect", Lighting)
 	bloom.Intensity = 0.62
@@ -182,7 +189,13 @@ function LightingService.Start()
 		if night ~= wasNight then
 			wasNight = night
 			if S.EventService then
-				if night then
+				if Tema.IsHalloween() then
+					if night then
+						S.EventService.Announce("🎃 Cala la notte di Halloween", "Le zucche si accendono, i fantasmi escono dalle tombe e i giganti rallentano...", "Notte")
+					else
+						S.EventService.Announce("🦇 Sorge un'alba spettrale", "I giganti tornano attivi, con le loro maschere. Preparate i rampini!", "Giorno")
+					end
+				elseif night then
 					S.EventService.Announce("Cala la notte", "I giganti rallentano... ma alcuni anomali non dormono mai.", "Notte")
 				else
 					S.EventService.Announce("Sorge il sole", "I giganti tornano attivi. Preparate i rampini!", "Giorno")

@@ -14,6 +14,8 @@
 
 local MeshTitan = require(script.Parent.MeshTitan)
 local ColossoAnatomico = require(script.Parent.ColossoAnatomico)
+local HalloweenCostumes = require(script.Parent.HalloweenCostumes)
+local Tema = require(script.Parent.Parent.Data.Tema)
 
 local warnedColosso = false
 
@@ -47,7 +49,7 @@ end
 
 local function newPart(model: Instance, name: string, size: Vector3, color: Color3, cf: CFrame, opts)
 	opts = opts or {}
-	local part = Instance.new("Part")
+	local part: BasePart = if opts.Shape == "Wedge" then Instance.new("WedgePart") else Instance.new("Part")
 	part.Name = name
 	part.Size = Vector3.new(math.max(size.X, 0.05), math.max(size.Y, 0.05), math.max(size.Z, 0.05))
 	part.Color = color
@@ -64,9 +66,9 @@ local function newPart(model: Instance, name: string, size: Vector3, color: Colo
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
 	if opts.Shape == "Ball" then
-		part.Shape = Enum.PartType.Ball
+		(part :: Part).Shape = Enum.PartType.Ball
 	elseif opts.Shape == "Cylinder" then
-		part.Shape = Enum.PartType.Cylinder
+		(part :: Part).Shape = Enum.PartType.Cylinder
 	elseif opts.Shape == "Sphere" then
 		local mesh = Instance.new("SpecialMesh")
 		mesh.MeshType = Enum.MeshType.Sphere
@@ -402,6 +404,30 @@ local function makeProfile(look: string, rng: Random)
 	elseif look == "Cristallo" then
 		p.Crystal = true
 		p.EyeGlow = Color3.fromRGB(140, 230, 255)
+	elseif look == "Zucca" then
+		-- il Re Zucca dell'Admin Abuse di Halloween: lungo e magro, pelle di liana, artigli
+		p.Skin = Color3.fromRGB(86, 104, 66)
+		p.Hair = Color3.fromRGB(40, 50, 30)
+		p.HairStyle = "Calvo"
+		p.LegMul, p.ArmMul, p.TorsoMul, p.HeadMul, p.WidthMul, p.ThickMul = 1.1, 1.25, 1.0, 1.1, 0.95, 0.85
+		p.Belly = 0
+		p.Claws = true
+		p.Lips = false
+		p.MouthWidth = 0.7
+		p.Grin = true
+		p.EyeGlow = Color3.fromRGB(255, 184, 70)
+	elseif look == "Spettro" then
+		-- il Gigante Fantasma di Halloween: pallido, trasparente, la bocca spalancata in un urlo
+		p.Skin = Color3.fromRGB(196, 214, 230)
+		p.Hair = Color3.fromRGB(226, 236, 248)
+		p.HairStyle = "Lungo"
+		p.LegMul, p.ArmMul, p.TorsoMul, p.HeadMul, p.WidthMul, p.ThickMul = 1.08, 1.15, 1.05, 1.05, 0.9, 0.8
+		p.Belly = 0
+		p.Lips = false
+		p.Gape = 7
+		p.Sockets = true
+		p.MouthWidth = 0.6
+		p.EyeGlow = Color3.fromRGB(150, 230, 255)
 	elseif look == "Dorato" then
 		-- il Colosso d'Oro dell'evento Grande Inaugurazione
 		p.Skin = Color3.fromRGB(226, 176, 64)
@@ -488,6 +514,12 @@ local function buildDummy(height: number, name: string?): Model
 	w3.Parent = nape
 	decor(model, torso, "ArmL", Vector3.new(h * 0.3, h * 0.05, h * 0.05), darkWood, CFrame.new(-h * 0.3, h * 0.1, 0), { Shape = "Block", Material = Enum.Material.Wood })
 	decor(model, torso, "ArmR", Vector3.new(h * 0.3, h * 0.05, h * 0.05), darkWood, CFrame.new(h * 0.3, h * 0.1, 0), { Shape = "Block", Material = Enum.Material.Wood })
+	if Tema.IsHalloween() then
+		-- nel file di Halloween la sagoma ha la testa di zucca (solo aspetto)
+		HalloweenCostumes.Dummy(function(parent, partName, size, color, offset, opts)
+			return decor(model, parent, partName, size, color, offset, opts)
+		end, head, h)
+	end
 	model.PrimaryPart = root
 	model:SetAttribute("Height", h)
 	model:SetAttribute("HipHeight", h * 0.3)
@@ -1160,6 +1192,45 @@ function TitanBuilder.Build(params): Model
 			for _, side in { -1, 1 } do
 				decor(model, torso, "Petto" .. side, Vector3.new(torsoW * 0.36, torsoH * 0.03, torsoD * 0.03), darker(skin, 0.9), CFrame.new(side * torsoW * 0.2, torsoH * 0.13, frontZ - torsoD * 0.01) * CFrame.Angles(0, 0, rad(-side * 6)))
 			end
+		end
+	end
+
+	-- HALLOWEEN (solo aspetto): maschere di zucca, cappelli da strega, zombie... (Shared/Anim/HalloweenCostumes)
+	-- params.Costume = "" toglie il costume; il Re Zucca e il Gigante Fantasma hanno sempre il loro
+	local costume: string? = params.Costume
+	if costume == nil then
+		if look == "Zucca" then
+			costume = "ReZucca"
+		elseif look == "Spettro" then
+			costume = "Spettro"
+		elseif Tema.IsHalloween() then
+			costume = HalloweenCostumes.For(look, seed)
+		end
+	end
+	if costume and costume ~= "" then
+		local ok, err = pcall(HalloweenCostumes.Apply, costume, {
+			Model = model,
+			Decor = function(parent, partName, size, color, offset, opts)
+				return decor(model, parent, partName, size, color, offset, opts)
+			end,
+			Head = head,
+			Jaw = jaw,
+			Torso = torso,
+			Hips = hips,
+			H = H,
+			HeadW = headW,
+			HeadH = headH,
+			HeadD = headD,
+			FaceZ = faceZ,
+			EyeY = eyeY,
+			TorsoW = torsoW,
+			TorsoH = torsoH,
+			TorsoD = torsoD,
+			Skin = skin,
+			Rng = Random.new(seed * 2207 + 5),
+		})
+		if not ok then
+			warn("[Giganti] Costume di Halloween: " .. tostring(err))
 		end
 	end
 

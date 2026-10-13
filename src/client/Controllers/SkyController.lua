@@ -7,6 +7,8 @@
 	    Sereno, Nuvoloso, Pioggia (gocce, cielo grigio) e Temporale (pioggia forte, fulmini e tuoni).
 	Sottoterra il meteo e il cielo non si vedono.
 	Durante gli eventi dell'Admin Abuse il cielo prende i colori dell'evento (SetEventSky).
+	Nel file di Halloween sopra a tutto c'è il cielo di Halloween: pomeriggi d'autunno arancioni con
+	la foschia viola, notti viola con la luna grande e le ombre color lavanda.
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -16,6 +18,9 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Zones = require(Shared.Data.Zones)
+local Tema = require(Shared.Data.Tema)
+
+local HALLOWEEN = Tema.IsHalloween()
 
 local SkyController = {}
 local C
@@ -265,6 +270,21 @@ local function step(dt: number)
 	local cloudColor = (w.CloudColor or Color3.new(1, 1, 1)):Lerp(Color3.fromRGB(255, 190, 150), warm * 0.6 * (1 - grey)):Lerp(Color3.fromRGB(40, 46, 66), night * 0.85)
 	local eventRain = 0
 
+	-- il cielo di Halloween (sempre, sopra alla zona e al meteo; più forte di notte)
+	if HALLOWEEN and sky > 0 then
+		local hk = 0.5 + 0.3 * night
+		color = color:Lerp(Color3.fromRGB(190, 120, 150):Lerp(Color3.fromRGB(70, 40, 110), night), hk)
+		decay = decay:Lerp(Color3.fromRGB(176, 76, 46):Lerp(Color3.fromRGB(42, 16, 60), night), hk)
+		tint = tint:Lerp(Color3.fromRGB(255, 228, 214):Lerp(Color3.fromRGB(220, 200, 255), night), hk * 0.75)
+		density += 0.05
+		haze += 0.7
+		saturation -= 0.03
+		contrast += 0.05
+		exposure -= 0.02
+		cover = math.max(cover, 0.5)
+		cloudColor = cloudColor:Lerp(Color3.fromRGB(200, 130, 140):Lerp(Color3.fromRGB(46, 26, 66), night), 0.6)
+	end
+
 	-- il cielo dell'evento dell'Admin Abuse (arriva e se ne va in un paio di secondi)
 	eventBlend = approach(eventBlend, eventTarget, math.min(1, dt * 0.7))
 	local ev = eventSky
@@ -310,7 +330,8 @@ local function step(dt: number)
 	Lighting.ExposureCompensation = approach(Lighting.ExposureCompensation, exposure, k)
 	Lighting.Brightness = approach(Lighting.Brightness, base.Brightness * bright, k)
 	-- di notte le ombre prendono il blu della luna (si vede ancora dove si va)
-	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(Color3.fromRGB(84, 98, 150), night * 0.62 * sky), k)
+	local moonShadow = if HALLOWEEN then Color3.fromRGB(104, 80, 156) else Color3.fromRGB(84, 98, 150)
+	Lighting.OutdoorAmbient = Lighting.OutdoorAmbient:Lerp(base.OutdoorAmbient:Lerp(moonShadow, night * 0.62 * sky), k)
 
 	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds")
 	if clouds then

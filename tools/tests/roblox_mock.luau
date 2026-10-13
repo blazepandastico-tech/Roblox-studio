@@ -1223,11 +1223,157 @@ rawset(collection, "GetInstanceRemovedSignal", function(_self, tag)
 	return tagRemoved[tag]
 end)
 local http = service("HttpService")
-rawset(http, "JSONEncode", function(_self, _v)
-	return "[]"
+-- JSON vero (piccolo): tabelle, liste, testi, numeri e vero/falso, come HttpService di Roblox
+local function jsonEncode(v: any): string
+	local t = type(v)
+	if v == nil then
+		return "null"
+	elseif t == "boolean" then
+		return tostring(v)
+	elseif t == "number" then
+		if v ~= v or v == math.huge or v == -math.huge then
+			return "null"
+		end
+		return if v == math.floor(v) and math.abs(v) < 1e15 then string.format("%d", v) else string.format("%.14g", v)
+	elseif t == "string" then
+		local escaped = v:gsub('[%c"\\]', function(c)
+			if c == '"' then
+				return '\\"'
+			elseif c == "\\" then
+				return "\\\\"
+			elseif c == "\n" then
+				return "\\n"
+			end
+			return string.format("\\u%04x", string.byte(c))
+		end)
+		return '"' .. escaped .. '"'
+	elseif t == "table" then
+		if #v > 0 or next(v) == nil then
+			local parts = {}
+			for _, item in ipairs(v) do
+				table.insert(parts, jsonEncode(item))
+			end
+			return "[" .. table.concat(parts, ",") .. "]"
+		end
+		local keys = {}
+		for k in v do
+			table.insert(keys, tostring(k))
+		end
+		table.sort(keys)
+		local parts = {}
+		for _, k in keys do
+			table.insert(parts, jsonEncode(k) .. ":" .. jsonEncode(v[k] == nil and v[tonumber(k)] or v[k]))
+		end
+		return "{" .. table.concat(parts, ",") .. "}"
+	end
+	error("JSONEncode: tipo non valido " .. t)
+end
+local function jsonDecode(text: string): any
+	local i = 1
+	local function skip()
+		i = string.find(text, "[^ \t\r\n]", i) or #text + 1
+	end
+	local value
+	local function str(): string
+		local out = {}
+		i += 1
+		while true do
+			local c = string.sub(text, i, i)
+			if c == "" then
+				error("JSONDecode: testo non chiuso")
+			elseif c == '"' then
+				i += 1
+				return table.concat(out)
+			elseif c == "\\" then
+				local e = string.sub(text, i + 1, i + 1)
+				if e == "n" then
+					table.insert(out, "\n")
+				elseif e == "u" then
+					table.insert(out, utf8.char(tonumber(string.sub(text, i + 2, i + 5), 16) or 63))
+					i += 4
+				else
+					table.insert(out, e)
+				end
+				i += 2
+			else
+				table.insert(out, c)
+				i += 1
+			end
+		end
+	end
+	function value(): any
+		skip()
+		local c = string.sub(text, i, i)
+		if c == "{" then
+			local out = {}
+			i += 1
+			skip()
+			if string.sub(text, i, i) == "}" then
+				i += 1
+				return out
+			end
+			while true do
+				skip()
+				local k = str()
+				skip()
+				i += 1 -- :
+				out[k] = value()
+				skip()
+				local sep = string.sub(text, i, i)
+				i += 1
+				if sep == "}" then
+					return out
+				end
+			end
+		elseif c == "[" then
+			local out = {}
+			i += 1
+			skip()
+			if string.sub(text, i, i) == "]" then
+				i += 1
+				return out
+			end
+			while true do
+				table.insert(out, value())
+				skip()
+				local sep = string.sub(text, i, i)
+				i += 1
+				if sep == "]" then
+					return out
+				end
+			end
+		elseif c == '"' then
+			return str()
+		elseif string.sub(text, i, i + 3) == "true" then
+			i += 4
+			return true
+		elseif string.sub(text, i, i + 4) == "false" then
+			i += 5
+			return false
+		elseif string.sub(text, i, i + 3) == "null" then
+			i += 4
+			return nil
+		end
+		local num = string.match(text, "^-?[%d%.eE%+%-]+", i)
+		if not num then
+			error("JSONDecode: carattere inatteso " .. c)
+		end
+		i += #num
+		return tonumber(num)
+	end
+	return value()
+end
+rawset(http, "JSONEncode", function(_self, v)
+	return jsonEncode(v)
 end)
-rawset(http, "JSONDecode", function(_self, _v)
-	return {}
+rawset(http, "JSONDecode", function(_self, v)
+	return jsonDecode(v)
+end)
+local guidCount = 0
+rawset(http, "GenerateGUID", function(_self, braces)
+	guidCount += 1
+	local id = string.format("00000000-0000-4000-8000-%012d", guidCount)
+	return if braces == false then id else "{" .. id .. "}"
 end)
 local physics = service("PhysicsService")
 rawset(physics, "RegisterCollisionGroup", function() end)

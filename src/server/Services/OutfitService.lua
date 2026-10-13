@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Items = require(Shared.Data.Items)
+local Tema = require(Shared.Data.Tema)
 
 local OutfitService = {}
 
@@ -407,6 +408,46 @@ local function buildAccessory(folder: Instance, character: Model, def)
 		end
 	elseif visual == "Mantello" then
 		buildCloak(folder, character, def.CloakColor or Color3.fromRGB(120, 30, 30), def.CloakTrim, def.Emblem)
+	elseif visual == "CappelloStrega" and head then
+		local hs = head.Size
+		attach(folder, head, "TesaStrega", Vector3.new(0.08, hs.X * 1.9, hs.X * 1.9), Color3.fromRGB(40, 22, 54), CFrame.new(0, hs.Y * 0.52, 0) * CFrame.Angles(0, 0, math.rad(90)), { Shape = Enum.PartType.Cylinder, Material = Enum.Material.Fabric })
+		local cf = CFrame.new(0, hs.Y * 0.52, 0)
+		for i, d in { 1.0, 0.72, 0.46, 0.24 } do
+			cf = cf * CFrame.Angles(math.rad(if i > 1 then 7 else 0), 0, 0) * CFrame.new(0, 0.26, 0)
+			attach(folder, head, "CappelloStrega", Vector3.new(0.55, hs.X * d, hs.X * d), Color3.fromRGB(46, 26, 62), cf * CFrame.Angles(0, 0, math.rad(90)), { Shape = Enum.PartType.Cylinder, Material = Enum.Material.Fabric })
+			cf = cf * CFrame.new(0, 0.26, 0)
+		end
+		attach(folder, head, "NastroStrega", Vector3.new(0.16, hs.X * 1.04, hs.X * 1.04), Color3.fromRGB(116, 52, 160), CFrame.new(0, hs.Y * 0.6, 0) * CFrame.Angles(0, 0, math.rad(90)), { Shape = Enum.PartType.Cylinder, Material = Enum.Material.Fabric })
+		attach(folder, head, "FibbiaStrega", Vector3.new(0.24, 0.16, 0.05), Color3.fromRGB(236, 196, 80), CFrame.new(0, hs.Y * 0.6, -hs.X * 0.53), { Material = Enum.Material.Metal })
+	elseif visual == "MascheraZucca" and head then
+		local hs = head.Size
+		local pumpkin = attach(folder, head, "MascheraZucca", hs * Vector3.new(1.32, 1.18, 1.3), Color3.fromRGB(236, 118, 28), CFrame.new(0, 0.02, 0))
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = pumpkin
+		attach(folder, head, "GamboZucca", Vector3.new(0.18, 0.32, 0.18), Color3.fromRGB(70, 96, 40), CFrame.new(0, hs.Y * 0.7, 0) * CFrame.Angles(0.2, 0, -0.2), { Material = Enum.Material.Wood })
+		local glow = Color3.fromRGB(255, 196, 92)
+		for _, side in { -1, 1 } do
+			attach(folder, head, "OcchioZucca", Vector3.new(0.26, 0.22, 0.05), glow, CFrame.new(side * hs.X * 0.22, hs.Y * 0.1, -hs.Z * 0.64) * CFrame.Angles(0, 0, math.rad(45)), { Material = Enum.Material.Neon })
+		end
+		attach(folder, head, "BoccaZucca", Vector3.new(hs.X * 0.6, 0.14, 0.05), glow, CFrame.new(0, -hs.Y * 0.22, -hs.Z * 0.62), { Material = Enum.Material.Neon })
+	elseif visual == "LanternaZucca" then
+		local lower = getPart(character, "LowerTorso")
+		if lower then
+			local s = lower.Size
+			attach(folder, lower, "CatenellaZucca", Vector3.new(0.06, 0.5, 0.06), Color3.fromRGB(60, 56, 60), CFrame.new(-s.X * 0.5 - 0.12, -0.1, -s.Z * 0.3), { Material = Enum.Material.Metal })
+			local p = attach(folder, lower, "LanternaZucca", Vector3.new(0.62, 0.52, 0.6), Color3.fromRGB(236, 118, 28), CFrame.new(-s.X * 0.5 - 0.14, -0.55, -s.Z * 0.3))
+			local mesh = Instance.new("SpecialMesh")
+			mesh.MeshType = Enum.MeshType.Sphere
+			mesh.Parent = p
+			attach(folder, lower, "LuceZucca", Vector3.new(0.3, 0.14, 0.05), Color3.fromRGB(255, 196, 92), CFrame.new(-s.X * 0.5 - 0.14, -0.55, -s.Z * 0.3 - 0.3), { Material = Enum.Material.Neon })
+			local light = Instance.new("PointLight")
+			light.Color = Color3.fromRGB(255, 150, 60)
+			light.Range = 9
+			light.Brightness = 1.2
+			light.Shadows = false
+			light.Parent = p
+		end
 	elseif visual == "Chiave" then
 		local upper = getPart(character, "UpperTorso")
 		if upper then
@@ -471,6 +512,74 @@ local function buildUniform(folder: Instance, character: Model, styleName: strin
 	return style
 end
 
+-- HALLOWEEN (solo aspetto, file di Halloween) -----------------------------------------------------
+-- Bombole del gas color zucca, foderi neri con i ganci arancioni, il filo arancione sulle lame e la
+-- scia arancio-viola; i PNG portano un cappello da strega, le corna o una zucchetta accesa.
+local HALLOWEEN_PROPS = { "Strega", "Corna", "Lanterna", "Strega", "Nessuno" }
+
+local function halloweenHat(folder: Instance, character: Model)
+	local head = getPart(character, "Head")
+	if not head then
+		return
+	end
+	buildAccessory(folder, character, { Visual = "CappelloStrega" })
+end
+
+local function halloweenHorns(folder: Instance, character: Model)
+	local head = getPart(character, "Head")
+	if not head then
+		return
+	end
+	for _, side in { -1, 1 } do
+		local horn = attach(folder, head, "Corno", Vector3.new(0.18, 0.42, 0.18), Color3.fromRGB(160, 26, 32), CFrame.new(side * head.Size.X * 0.3, head.Size.Y * 0.58, 0) * CFrame.Angles(0, 0, math.rad(-side * 22)))
+		attach(folder, horn, "PuntaCorno", Vector3.new(0.1, 0.26, 0.1), Color3.fromRGB(60, 10, 14), CFrame.new(side * 0.04, 0.3, 0) * CFrame.Angles(0, 0, math.rad(-side * 18)))
+	end
+end
+
+function OutfitService.HalloweenTouch(folder: Instance, character: Model, spec)
+	for _, d in folder:GetDescendants() do
+		if d:IsA("BasePart") then
+			local name = d.Name
+			if string.sub(name, 1, 7) == "Bombola" then
+				d.Color = Color3.fromRGB(236, 118, 28)
+				d.Reflectance = 0.12
+			elseif name == "Motore" or name == "FoderoSinistro" or name == "FoderoDestro" then
+				d.Color = Color3.fromRGB(34, 28, 40)
+			elseif name == "Gancio" then
+				d.Color = Color3.fromRGB(236, 118, 28)
+			elseif name == "Lama" and d.Parent then
+				local trail = d:FindFirstChildOfClass("Trail")
+				if trail then
+					local base = d:GetAttribute("TrailColor")
+					local c = if typeof(base) == "Color3" then base else Color3.new(1, 1, 1)
+					trail.Color = ColorSequence.new({
+						ColorSequenceKeypoint.new(0, c:Lerp(Color3.fromRGB(255, 170, 70), 0.45)),
+						ColorSequenceKeypoint.new(0.55, Color3.fromRGB(236, 110, 30)),
+						ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 50, 170)),
+					})
+				end
+				-- il filo della lama brilla d'arancione
+				attach(folder, d, "FiloZucca", Vector3.new(0.03, 0.06, d.Size.Z * 0.96), Color3.fromRGB(255, 150, 50), CFrame.new(0, -d.Size.Y * 0.5, 0), { Material = Enum.Material.Neon })
+			end
+		end
+	end
+	-- i PNG (con l'uniforme) hanno un piccolo costume, sempre lo stesso per lo stesso personaggio
+	if spec.Uniform then
+		local h = 0
+		for _, code in utf8.codes(character.Name) do
+			h = (h * 31 + code) % 997
+		end
+		local prop = HALLOWEEN_PROPS[h % #HALLOWEEN_PROPS + 1]
+		if prop == "Strega" and not (spec.Look and (spec.Look.Hat or spec.Look.Hood)) then
+			halloweenHat(folder, character)
+		elseif prop == "Corna" then
+			halloweenHorns(folder, character)
+		elseif prop == "Lanterna" then
+			buildAccessory(folder, character, { Visual = "LanternaZucca" })
+		end
+	end
+end
+
 -- API ---------------------------------------------------------------------------------------
 
 function OutfitService.Clear(character: Model)
@@ -526,6 +635,9 @@ function OutfitService.Apply(character: Model, spec)
 	end
 	if spec.Look then
 		buildLookExtras(folder, character, spec.Look)
+	end
+	if Tema.IsHalloween() then
+		OutfitService.HalloweenTouch(folder, character, spec)
 	end
 	return folder
 end

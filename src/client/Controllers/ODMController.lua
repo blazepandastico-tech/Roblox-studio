@@ -20,6 +20,7 @@ local Config = require(Shared.Config)
 local Net = require(Shared.Lib.Net)
 local Util = require(Shared.Lib.Util)
 local ODMPhysics = require(Shared.Modules.ODMPhysicsModule)
+local Tema = require(Shared.Data.Tema)
 
 local ODMController = {}
 local C
@@ -534,7 +535,7 @@ local function ensureBoostEmitter(): ParticleEmitter?
 	att.Parent = lower
 	local e = Instance.new("ParticleEmitter")
 	e.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	e.Color = ColorSequence.new(Color3.fromRGB(250, 250, 250))
+	e.Color = if Tema.IsHalloween() then ColorSequence.new(Color3.fromRGB(255, 220, 180), Color3.fromRGB(170, 110, 230)) else ColorSequence.new(Color3.fromRGB(250, 250, 250))
 	e.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
 	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 3.5) })
 	e.Lifetime = NumberRange.new(0.4, 0.7)

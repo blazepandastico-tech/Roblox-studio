@@ -13,6 +13,10 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Tema = require(Shared.Data.Tema)
+
+-- nel file di Halloween i cittadini girano in costume: zucca, strega, fantasma, vampiro
+local HALLOWEEN = Tema.IsHalloween()
 
 local CitizenController = {}
 local C
@@ -109,6 +113,55 @@ local function buildCitizen(): (Model, { BasePart }, { CFrame }, { [number]: { P
 	end
 	add(newPart({ Name = "Testa", Shape = Enum.PartType.Ball, Size = Vector3.new(1.25, 1.25, 1.25), Color = skin }), CFrame.new(0, 5.2, 0))
 	local style = rng:NextInteger(1, 4)
+	if HALLOWEEN then
+		local costume = rng:NextNumber()
+		if costume < 0.6 then
+			style = 4 -- niente capelli né cappello sotto al costume
+		end
+		local candle = Color3.fromRGB(255, 196, 92)
+		if costume < 0.24 then
+			-- testa di zucca intagliata
+			parts[#parts].Color = Color3.fromRGB(236, 118, 28)
+			parts[#parts].Size = Vector3.new(1.55, 1.35, 1.5)
+			add(newPart({ Name = "Gambo", Size = Vector3.new(0.18, 0.36, 0.18), Color = Color3.fromRGB(70, 96, 40), Material = Enum.Material.Wood }), CFrame.new(0, 6.0, 0) * CFrame.Angles(0.2, 0, -0.2))
+			for _, side in { -1, 1 } do
+				add(newPart({ Name = "OcchioZucca", Size = Vector3.new(0.24, 0.24, 0.05), Color = candle, Material = Enum.Material.Neon, CastShadow = false }), CFrame.new(side * 0.28, 5.36, -0.72) * CFrame.Angles(0, 0, math.rad(45)))
+			end
+			add(newPart({ Name = "BoccaZucca", Size = Vector3.new(0.7, 0.12, 0.05), Color = candle, Material = Enum.Material.Neon, CastShadow = false }), CFrame.new(0, 4.96, -0.68))
+		elseif costume < 0.44 then
+			-- strega: cappello a punta e vestito viola
+			for i = 1, #parts - 1 do
+				if parts[i].Name == "Busto" or parts[i].Name == "Gonna" or parts[i].Name == "Braccio" then
+					parts[i].Color = Color3.fromRGB(70, 34, 96)
+				end
+			end
+			add(newPart({ Name = "TesaStrega", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 2.3, 2.3), Color = Color3.fromRGB(34, 22, 44), Material = Enum.Material.Fabric }), CFrame.new(0, 5.72, 0) * CFrame.Angles(0, 0, math.rad(90)))
+			for i, d in { 1.15, 0.8, 0.46 } do
+				add(newPart({ Name = "CappelloStrega", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, d, d), Color = Color3.fromRGB(40, 26, 52), Material = Enum.Material.Fabric }), CFrame.new(0, 5.72 + i * 0.42, (i - 1) * 0.08) * CFrame.Angles(math.rad(-6 * i), 0, math.rad(90)))
+			end
+			add(newPart({ Name = "NastroStrega", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.16, 1.2, 1.2), Color = Color3.fromRGB(150, 70, 200), Material = Enum.Material.Fabric }), CFrame.new(0, 5.98, 0) * CFrame.Angles(0, 0, math.rad(90)))
+		elseif costume < 0.58 then
+			-- fantasma: un lenzuolo bianco con due buchi per gli occhi
+			for _, p in parts do
+				p.Color = Color3.fromRGB(240, 242, 248)
+				p.Material = Enum.Material.Fabric
+			end
+			add(newPart({ Name = "Lenzuolo", Size = Vector3.new(2.3, 3.9, 1.4), Color = Color3.fromRGB(240, 242, 248), Material = Enum.Material.Fabric }), CFrame.new(0, 3.3, 0))
+			for _, side in { -1, 1 } do
+				add(newPart({ Name = "Buco", Size = Vector3.new(0.22, 0.32, 0.05), Color = Color3.fromRGB(20, 18, 26), CastShadow = false }), CFrame.new(side * 0.25, 5.3, -0.63))
+			end
+		elseif costume < 0.68 then
+			-- vampiro: mantello nero foderato di rosso e colletto alto
+			parts[#parts].Color = Color3.fromRGB(226, 220, 214)
+			add(newPart({ Name = "Mantello", Size = Vector3.new(2.3, 3.6, 0.14), Color = Color3.fromRGB(20, 14, 20), Material = Enum.Material.Fabric }), CFrame.new(0, 3.2, 0.62) * CFrame.Angles(math.rad(-5), 0, 0))
+			add(newPart({ Name = "Fodera", Size = Vector3.new(2.1, 3.3, 0.1), Color = Color3.fromRGB(150, 20, 30), Material = Enum.Material.Fabric }), CFrame.new(0, 3.25, 0.52) * CFrame.Angles(math.rad(-5), 0, 0))
+			add(newPart({ Name = "Colletto", Size = Vector3.new(2.2, 0.9, 0.12), Color = Color3.fromRGB(20, 14, 20), Material = Enum.Material.Fabric }), CFrame.new(0, 4.85, 0.5) * CFrame.Angles(math.rad(-25), 0, 0))
+		elseif costume < 0.84 then
+			-- un cestino di zucca pieno di dolcetti
+			add(newPart({ Name = "CestoZucca", Shape = Enum.PartType.Ball, Size = Vector3.new(1.1, 0.95, 1.1), Color = Color3.fromRGB(236, 118, 28) }), CFrame.new(-1.3, 2.4, -0.35), { Pivot = Vector3.new(-1.25, 4.5, 0), Swing = 1 })
+			add(newPart({ Name = "Dolcetti", Shape = Enum.PartType.Ball, Size = Vector3.new(0.8, 0.4, 0.8), Color = Color3.fromRGB(230, 60, 120), CastShadow = false }), CFrame.new(-1.3, 2.85, -0.35), { Pivot = Vector3.new(-1.25, 4.5, 0), Swing = 1 })
+		end
+	end
 	if style == 1 then
 		add(newPart({ Name = "Capelli", Shape = Enum.PartType.Ball, Size = Vector3.new(1.32, 1.1, 1.32), Color = pick(HAIR), Material = Enum.Material.Fabric }), CFrame.new(0, 5.42, 0.08))
 	elseif style == 2 then

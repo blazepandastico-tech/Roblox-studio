@@ -6,6 +6,7 @@
 	Tutte le azioni vengono controllate dal server (AdminService).
 ]]
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -360,6 +361,115 @@ end
 local render: () -> () -- definita più sotto (ridisegna la categoria aperta)
 local abuseMinutes = AbuseEvents.DefaultMinutes
 local abuseStatus: TextLabel? = nil
+local abuseRewards = AbuseEvents.DefaultRewards()
+local abuseText = "" -- annuncio dell'admin (facoltativo), per gli eventi subito e programmati
+local scheduleEvent = (AbuseEvents.List[1] and AbuseEvents.List[1].Id) or ""
+local scheduleAt = 0 -- secondi Unix dell'inizio scelto (0 = ancora da scegliere)
+local scheduleLabel: TextLabel? = nil
+
+-- ORA LOCALE DELL'ADMIN (il server lavora con i secondi Unix, uguali in tutto il mondo)
+local GIORNI = { "dom", "lun", "mar", "mer", "gio", "ven", "sab" }
+
+local function localParts(unix: number): { Year: number, Month: number, Day: number, Hour: number, Minute: number }
+	local ok, t = pcall(function()
+		return DateTime.fromUnixTimestamp(unix):ToLocalTime()
+	end)
+	if ok and type(t) == "table" then
+		return t :: any
+	end
+	local d = os.date("*t", unix) :: any
+	return { Year = d.year, Month = d.month, Day = d.day, Hour = d.hour, Minute = d.min }
+end
+
+local function fromLocal(year: number, month: number, day: number, hour: number, minute: number): number?
+	local ok, dt = pcall(function()
+		return DateTime.fromLocalTime(year, month, day, hour, minute, 0, 0)
+	end)
+	if ok and dt then
+		return (dt :: DateTime).UnixTimestamp
+	end
+	local ok2, t = pcall(os.time, { year = year, month = month, day = day, hour = hour, min = minute, sec = 0 })
+	return if ok2 then t else nil
+end
+
+local function weekday(unix: number): string
+	local ok, w = pcall(function()
+		return (os.date("*t", unix) :: any).wday
+	end)
+	return if ok and type(w) == "number" then GIORNI[w] or "" else ""
+end
+
+local function whenText(unix: number): string
+	local p = localParts(unix)
+	return ("%s %02d/%02d alle %02d:%02d"):format(weekday(unix), p.Day, p.Month, p.Hour, p.Minute)
+end
+
+local function untilText(unix: number): string
+	local left = math.max(0, unix - os.time())
+	local d, h, m = left // 86400, (left % 86400) // 3600, (left % 3600) // 60
+	if d > 0 then
+		return ("tra %d g %d h"):format(d, h)
+	elseif h > 0 then
+		return ("tra %d h %d min"):format(h, m)
+	end
+	return ("tra %d min"):format(math.max(1, m))
+end
+
+-- di base: la prossima ora piena, almeno tra 30 minuti
+local function defaultScheduleAt(): number
+	local t = os.time() + 1800
+	return t - t % 3600 + 3600
+end
+
+-- "31/10 21:30", "31/10/2026 21:30" oppure solo "21:30" (oggi, o domani se è già passata)
+local function parseWhen(text: string): number?
+	local d, mo, y, h, mi = string.match(text, "^%s*(%d+)/(%d+)/(%d+)%s+(%d+)[:%.](%d+)%s*$")
+	if not d then
+		d, mo, h, mi = string.match(text, "^%s*(%d+)/(%d+)%s+(%d+)[:%.](%d+)%s*$")
+	end
+	local today = localParts(os.time())
+	if not d then
+		h, mi = string.match(text, "^%s*(%d+)[:%.](%d+)%s*$")
+		if not h then
+			return nil
+		end
+		local at = fromLocal(today.Year, today.Month, today.Day, tonumber(h) :: number, tonumber(mi) :: number)
+		if at and at < os.time() then
+			at += 86400
+		end
+		return at
+	end
+	local year = tonumber(y) or today.Year
+	if year < 100 then
+		year += 2000
+	end
+	local month, day, hour, minute = tonumber(mo) :: number, tonumber(d) :: number, tonumber(h) :: number, tonumber(mi) :: number
+	if month < 1 or month > 12 or day < 1 or day > 31 or hour > 23 or minute > 59 then
+		return nil
+	end
+	local at = fromLocal(year, month, day, hour, minute)
+	-- senza anno: se la data è già passata quest'anno, è quella dell'anno prossimo
+	if at and not y and at < os.time() - 3600 then
+		at = fromLocal(year + 1, month, day, hour, minute)
+	end
+	return at
+end
+
+local function scheduleText(): string
+	local def = AbuseEvents.Get(scheduleEvent)
+	return ("📅 %s %s  •  %s (%s)  •  %d minut%s"):format(def and def.Icon or "", def and def.Name or "?", whenText(scheduleAt), untilText(scheduleAt), abuseMinutes, if abuseMinutes == 1 then "o" else "i")
+end
+
+local function scheduledList(): { any }
+	local raw = ReplicatedStorage:GetAttribute("ProgrammaEventi")
+	if type(raw) ~= "string" or raw == "" then
+		return {}
+	end
+	local ok, data = pcall(function()
+		return HttpService:JSONDecode(raw)
+	end)
+	return if ok and type(data) == "table" then data else {}
+end
 
 local function abuseStatusText(): string
 	local def = AbuseEvents.Get(ReplicatedStorage:GetAttribute("AbuseEvento"))
@@ -372,14 +482,63 @@ local function abuseStatusText(): string
 	return ("%s   •   IN CORSO: %s %s (mancano %s)"):format(chosen, def.Icon, def.Name, AbuseEvents.FormatTime(left))
 end
 
+local function eventButton(parent: Instance, def, onClick: () -> ())
+	local b = button(parent, ("%s %s\n%s"):format(def.Icon, def.Name, def.Short), def.Color:Lerp(Color3.new(0, 0, 0), 0.6), onClick)
+	local stroke = b:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = def.Color
+		stroke.Transparency = 0.1
+	end
+	return b
+end
+
 local function showAbuse()
+	if scheduleAt == 0 then
+		scheduleAt = defaultScheduleAt()
+	end
 	section("😈 Admin Abuse", "Le animazioni dell'evento partono quando vuoi tu: annuncia l'Admin Abuse e scatenati!")
 	local r = row(220, 44)
 	button(r, "😈 Annuncia ADMIN ABUSE", RED, function()
 		send("Abuse", "announce")
 	end)
-	-- 🎬 ANIMAZIONI: eventi a tempo della prima stagione
-	section("🎬 Animazioni", "1) Scegli quanto dura l'evento (o scrivi i minuti nel VALORE in alto e premi ✏️).  2) Clicca un evento: parte subito un'animazione per tutti i giocatori, poi l'evento dura il tempo scelto.")
+	-- 🎁 PREMI E 📢 ANNUNCIO (valgono per l'evento che fai partire subito e per quelli programmati)
+	section("🎁 Premi dell'evento", "Accendi i premi in più per i giocatori. Valgono per il prossimo evento che fai partire o che programmi.")
+	r = row(256, 50)
+	for _, reward in AbuseEvents.Rewards do
+		local on = abuseRewards[reward.Id] == true
+		local b = button(r, ("%s %s: %s"):format(reward.Icon, reward.Name, if on then "SÌ" else "NO"), if on then Colors.Green else nil, function()
+			abuseRewards[reward.Id] = not abuseRewards[reward.Id]
+			render()
+		end)
+		b.TextSize = 13
+	end
+	for _, reward in AbuseEvents.Rewards do
+		Theme.Label(("%s %s: %s"):format(reward.Icon, reward.Name, reward.Text), { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = nextOrder(), Font = Theme.Fonts.UI, TextSize = 12, TextColor3 = Colors.TextDim, Parent = content })
+	end
+	section("📢 Annuncio", "Facoltativo: lo vedono tutti nel titolo dell'evento e alla fine dell'animazione (e negli avvisi degli eventi programmati). Passa dal filtro di Roblox.")
+	local box = New("TextBox", {
+		Size = UDim2.new(1, -10, 0, 38),
+		LayoutOrder = nextOrder(),
+		BackgroundColor3 = Colors.Background,
+		TextColor3 = Colors.Text,
+		PlaceholderText = "Es.: Stasera alle 21 tutti alle Pianure Meridionali! 🎃",
+		PlaceholderColor3 = Colors.TextDim,
+		Font = Theme.Fonts.Bold,
+		TextSize = 14,
+		ClearTextOnFocus = false,
+		Text = abuseText,
+		Parent = content,
+	})
+	Theme.Corner(box, 8)
+	Theme.Stroke(box, Colors.Border, 1, 0.3)
+	box.FocusLost:Connect(function()
+		abuseText = string.sub(box.Text, 1, AbuseEvents.Schedule.MaxText)
+	end)
+	box:GetPropertyChangedSignal("Text"):Connect(function()
+		abuseText = string.sub(box.Text, 1, AbuseEvents.Schedule.MaxText)
+	end)
+	-- 🎬 ANIMAZIONI: gli eventi a tempo
+	section("🎬 Animazioni", "1) Scegli quanto dura l'evento (o scrivi i minuti nel VALORE in alto e premi ✏️).  2) Clicca un evento: parte SUBITO un'animazione per tutti i giocatori, poi l'evento dura il tempo scelto.")
 	r = row(90, 36)
 	for _, minutes in AbuseEvents.Durations do
 		button(r, ("⏱️ %d min"):format(minutes), if minutes == abuseMinutes then Colors.Green else nil, function()
@@ -395,15 +554,19 @@ local function showAbuse()
 			C.Notifications.Toast(("Scrivi i minuti (da %d a %d) nel VALORE in alto"):format(AbuseEvents.MinMinutes, AbuseEvents.MaxMinutes), "Errore", 3)
 		end
 	end)
-	r = row(256, 64)
+	local halloweenEvents, seasonEvents = {}, {}
 	for _, def in AbuseEvents.List do
-		local b = button(r, ("%s %s\n%s"):format(def.Icon, def.Name, def.Short), def.Color:Lerp(Color3.new(0, 0, 0), 0.6), function()
-			send("AbuseEvent", { Id = def.Id, Minutes = abuseMinutes })
-		end)
-		local stroke = b:FindFirstChildOfClass("UIStroke")
-		if stroke then
-			stroke.Color = def.Color
-			stroke.Transparency = 0.1
+		table.insert(if def.Theme == "Halloween" then halloweenEvents else seasonEvents, def)
+	end
+	for _, group in { { "🎃 Eventi di Halloween", halloweenEvents }, { "🗡️ Eventi della prima stagione", seasonEvents } } do
+		if #group[2] > 0 then
+			Theme.Label(group[1], { Size = UDim2.new(1, -10, 0, 20), LayoutOrder = nextOrder(), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.Gold, Parent = content })
+			r = row(256, 64)
+			for _, def in group[2] do
+				eventButton(r, def, function()
+					send("AbuseEvent", { Id = def.Id, Minutes = abuseMinutes, Rewards = abuseRewards, Text = abuseText })
+				end)
+			end
 		end
 	end
 	abuseStatus = Theme.Label(abuseStatusText(), { Size = UDim2.new(1, -10, 0, 22), LayoutOrder = nextOrder(), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.GoldBright, Parent = content })
@@ -411,6 +574,74 @@ local function showAbuse()
 	button(r, "⏹️ Termina l'evento in corso", RED, function()
 		send("AbuseStop")
 	end)
+
+	-- 📅 PROGRAMMA PER DOPO: evento, giorno, ora, durata, premi e annuncio
+	section("📅 Programma un evento", "Scegli l'evento, poi giorno e ora (la tua ora). All'ora giusta parte da solo in TUTTI i server, con l'annuncio e i premi scelti sopra; prima arrivano gli avvisi (30, 10, 5 e 1 minuto prima). Si può scrivere anche la data nel VALORE in alto (es. 31/10 21:30) e premere ✏️.")
+	r = row(160, 40)
+	for _, def in AbuseEvents.List do
+		local b = button(r, ("%s %s"):format(def.Icon, def.Name), if def.Id == scheduleEvent then Colors.Green else def.Color:Lerp(Color3.new(0, 0, 0), 0.65), function()
+			scheduleEvent = def.Id
+			render()
+		end)
+		b.TextSize = 11
+	end
+	scheduleLabel = Theme.Label(scheduleText(), { Size = UDim2.new(1, -10, 0, 24), LayoutOrder = nextOrder(), Font = Theme.Fonts.Bold, TextSize = 15, TextColor3 = Colors.GoldBright, Parent = content })
+	r = row(96, 34)
+	local function shift(seconds: number)
+		scheduleAt = math.max(os.time() + 60, scheduleAt + seconds)
+		render()
+	end
+	for _, step in { { "Oggi", 0 }, { "Domani", 1 } } do
+		button(r, "📆 " .. step[1], nil, function()
+			local now = localParts(os.time())
+			local chosen = localParts(scheduleAt)
+			local at = fromLocal(now.Year, now.Month, now.Day, chosen.Hour, chosen.Minute)
+			if at then
+				scheduleAt = at + step[2] * 86400
+				render()
+			end
+		end)
+	end
+	for _, step in { { "-1 g", -86400 }, { "+1 g", 86400 }, { "-1 h", -3600 }, { "+1 h", 3600 }, { "-10 min", -600 }, { "+10 min", 600 }, { "-1 min", -60 }, { "+1 min", 60 } } do
+		button(r, step[1], nil, function()
+			shift(step[2])
+		end)
+	end
+	button(r, "✏️ VALORE", BLUE, function()
+		local at = parseWhen(typedValue())
+		if at then
+			scheduleAt = at
+			render()
+		elseif C.Notifications then
+			C.Notifications.Toast("Scrivi la data nel VALORE in alto: 31/10 21:30 (oppure solo 21:30)", "Errore", 4)
+		end
+	end)
+	r = row(300, 46)
+	button(r, "📅 PROGRAMMA QUESTO EVENTO", GREEN, function()
+		send("AbuseSchedule", { Id = scheduleEvent, Minutes = abuseMinutes, At = scheduleAt, Text = abuseText, Rewards = abuseRewards })
+	end)
+	local list = scheduledList()
+	if #list == 0 then
+		Theme.Label("Nessun evento programmato.", { Size = UDim2.new(1, -10, 0, 20), LayoutOrder = nextOrder(), Font = Theme.Fonts.UI, TextSize = 13, TextColor3 = Colors.TextDim, Parent = content })
+	else
+		Theme.Label(("Eventi programmati (%d):"):format(#list), { Size = UDim2.new(1, -10, 0, 20), LayoutOrder = nextOrder(), Font = Theme.Fonts.Bold, TextSize = 14, TextColor3 = Colors.Gold, Parent = content })
+		for _, e in list do
+			local def = AbuseEvents.Get(e.Event)
+			local line = New("Frame", { BackgroundColor3 = Colors.Background, BackgroundTransparency = 0.2, Size = UDim2.new(1, -10, 0, 48), LayoutOrder = nextOrder(), Parent = content })
+			Theme.Corner(line, 8)
+			local started = type(e.At) == "number" and e.At <= os.time()
+			local rewards = AbuseEvents.RewardsText(e.Rewards)
+			Theme.Label(("%s %s  •  %s (%s)  •  %d min%s\n%s"):format(
+				def and def.Icon or "", def and def.Name or tostring(e.Event),
+				whenText(e.At), if started then "IN CORSO" else untilText(e.At), e.Minutes or 0,
+				if rewards ~= "" then "  •  " .. rewards else "",
+				if type(e.Text) == "string" and e.Text ~= "" then ("📢 \"%s\" — %s"):format(e.Text, tostring(e.By)) else ("da %s"):format(tostring(e.By))
+			), { Position = UDim2.fromOffset(10, 3), Size = UDim2.new(1, -150, 1, -6), Font = Theme.Fonts.UI, TextSize = 12, Parent = line })
+			Theme.Button("❌ Annulla", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(120, 32), TextSize = 13, BackgroundColor3 = RED, Parent = line }, function()
+				send("AbuseUnschedule", e.Uid)
+			end)
+		end
+	end
 	section("👑 Colosso d'Oro", "Cade dal cielo come una meteora d'oro. Con l'evento acceso, chi aiuta a sconfiggerlo riceve gemme e oro (e completa la sfida).")
 	r = row(220, 44)
 	button(r, "👑 Colosso d'Oro qui", PURPLE, function()
@@ -610,9 +841,12 @@ function AdminPanel.Start()
 		local label = abuseStatus
 		if label and label.Parent and C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
 			label.Text = abuseStatusText()
+			if scheduleLabel and scheduleLabel.Parent then
+				scheduleLabel.Text = scheduleText()
+			end
 		end
 	end)
-	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto", "AbuseEvento" } do
+	for _, attribute in { "FestaAttiva", "FestaSpettacoliAuto", "AbuseEvento", "ProgrammaEventi" } do
 		ReplicatedStorage:GetAttributeChangedSignal(attribute):Connect(function()
 			if C.UIController.IsOpen("Admin") and currentCategory == "Admin Abuse" then
 				render()

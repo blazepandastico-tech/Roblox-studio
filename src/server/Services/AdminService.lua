@@ -589,16 +589,41 @@ ACTIONS.Abuse = function(admin, target, value)
 	return nil
 end
 
--- 🎬 Animazioni: eventi a tempo della prima stagione (tipo e minuti scelti dall'admin)
-ACTIONS.AbuseEvent = function(_, _, value)
+-- 🎬 Animazioni: eventi a tempo (tipo, minuti, premi e annuncio scelti dall'admin)
+ACTIONS.AbuseEvent = function(admin, _, value)
 	if not S.AbuseService then
 		return "Eventi non disponibili"
 	end
 	if type(value) ~= "table" then
 		return "Scegli un evento"
 	end
-	local ok, message = S.AbuseService.Launch(value.Id, value.Minutes)
+	local ok, message
+	if S.AbuseScheduleService then
+		ok, message = S.AbuseScheduleService.LaunchNow(admin, value.Id, value.Minutes, value.Text, value.Rewards)
+	else
+		ok, message = S.AbuseService.Launch(value.Id, value.Minutes, { Rewards = value.Rewards })
+	end
 	return if ok then "🎬 Evento avviato: " .. message else message
+end
+
+-- 📅 Programma: un evento per un giorno e un'ora (con l'annuncio e gli avvisi prima dell'inizio)
+ACTIONS.AbuseSchedule = function(admin, _, value)
+	if not S.AbuseScheduleService then
+		return "Programmazione non disponibile"
+	end
+	if type(value) ~= "table" then
+		return "Scegli evento, data e ora"
+	end
+	local _, message = S.AbuseScheduleService.Schedule(admin, value.Id, value.Minutes, value.At, value.Text, value.Rewards)
+	return message
+end
+
+ACTIONS.AbuseUnschedule = function(admin, _, value)
+	if not S.AbuseScheduleService then
+		return "Programmazione non disponibile"
+	end
+	local _, message = S.AbuseScheduleService.Cancel(admin, value)
+	return message
 end
 
 ACTIONS.AbuseStop = function()
