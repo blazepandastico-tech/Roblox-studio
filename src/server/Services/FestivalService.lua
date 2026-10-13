@@ -20,6 +20,8 @@ local Zones = require(Shared.Data.Zones)
 local W = require(Shared.Data.WorldLayout)
 local Titans = require(Shared.Data.Titans)
 local Festival = require(Shared.Data.Festival)
+local Tema = require(Shared.Data.Tema)
+local HalloweenWorld = require(script.Parent.HalloweenWorld)
 
 local FestivalService = {}
 local S
@@ -515,6 +517,10 @@ local function buildDecorations()
 				warn("[Festa] Addobbi di " .. zoneId .. ": " .. tostring(err))
 			end
 		end
+	end
+	if Tema.IsHalloween() then
+		-- nel file di Halloween anche gli addobbi della festa sono arancio, viola e nero
+		pcall(HalloweenWorld.Repaint, folder)
 	end
 	folder.Parent = workspace
 end

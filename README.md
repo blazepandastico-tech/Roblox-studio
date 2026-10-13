@@ -27,6 +27,21 @@ poi salva il luogo: all'avvio il server non rigenera una mappa che esiste già.
 **Per sviluppatori (Rojo):** il codice è in `src/` ed è un progetto [Rojo 7](https://rojo.space).
 `rojo serve` + plugin Rojo in Studio per sincronizzare, oppure `rojo build default.project.json -o SieriPerduti.rbxlx`.
 
+## 1b. 🎃 L'aggiornamento di Halloween (file a parte)
+
+`SieriPerduti_Halloween.rbxlx` è lo stesso gioco con **tutto infestato**: case, giardini, alberi e terreno
+d'autunno, zucche intagliate che si accendono di notte, lapidi, ragnatele, spaventapasseri, pipistrelli e
+fantasmi, cielo viola e luna arancione, giganti in costume (zucca, strega, zombie, corna, scheletro),
+equipaggiamento color zucca, cittadini travestiti e **menu nuovi** (schermata iniziale con il gigante che spunta
+dal Muro). Nell'**Admin Abuse** ci sono **5 eventi di Halloween** con le loro animazioni (La Notte delle Zucche,
+Il Gigante Fantasma, Il Risveglio dei Caduti, Dolcetto o Scherzetto, La Luna di Sangue), **premi e bonus** che
+scegli tu (dolcetti, premio finale, bonus doppi) e la **programmazione** per giorno e ora con un **annuncio** a
+tutti i server. La mappa e i valori di gioco sono identici al file normale e i progressi dei giocatori sono gli stessi.
+
+Guida completa (eventi, premi, programmazione, come pubblicarlo): [`docs/HALLOWEEN.md`](docs/HALLOWEEN.md).
+Foto (disegnate da un motore simulato, non screenshot di Studio): [`assets/halloween/`](assets/halloween).
+Si costruisce con `rojo build halloween.project.json -o SieriPerduti_Halloween.rbxlx`.
+
 ## 2. Comandi
 
 | PC | Azione |
@@ -322,6 +337,11 @@ Visibile solo agli amministratori: **Roblox Studio**, il **proprietario del gioc
   La Spedizione oltre le Mura, Il Fulmine della Trasformazione): parte un'animazione con la regia per tutti
   (telecamera puntata sull'evento, giocatori bloccati e intoccabili per circa 16 secondi) e poi l'evento
   con bonus, giganti e boss fino allo scadere del tempo (dettagli in `docs/EVENTO_INAUGURAZIONE.md`).
+  Nel file di Halloween ci sono anche i **5 eventi di Halloween**.
+  **🎁 Premi dell'evento**: dolcetti per ogni gigante abbattuto, premio finale (gemme e oro, i 3 migliori
+  cacciatori annunciati) e bonus doppi. **📢 Annuncio**: un messaggio per tutti nel titolo dell'evento.
+  **📅 Programma un evento**: scegli evento, giorno e ora (anche scrivendo `31/10 21:30` nel valore): parte da
+  solo in tutti i server, con gli avvisi 30, 10, 5 e 1 minuto prima (dettagli in `docs/HALLOWEEN.md`).
 
 In alto scegli il **bersaglio** (tu o un altro giocatore) e scrivi un **valore** per i pulsanti che lo usano.
 
@@ -359,6 +379,8 @@ python3 tools/scene_photo.py cartella [--scena TutorialGiganti]   # foto di una 
 python3 tools/check_layout.py [HEAD]   # dopo un ritocco grafico: la mappa e i giganti sono rimasti identici?
 python3 tools/world_photo.py cartella calaneth_case_notte [--sorgenti altra/src]   # foto (anche di notte, "_notte")
 python3 tools/pose_photo.py cartella [--prima altra/src]   # le pose del volo con i rampini (prima e dopo)
+python3 tools/ui_photo.py cartella [titolo admin evento ...] [--halloween] [--sfondo foto.png]   # foto dei menu
+python3 tools/test_world.py --halloween    # le stesse prove con il tema di Halloween (anche check_layout e world_photo)
 ```
 
 `tools/check_layout.py` costruisce la mappa e una serie di giganti con il codice di un commit (di solito HEAD)

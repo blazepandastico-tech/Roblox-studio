@@ -608,7 +608,7 @@ local function buildUI()
 	Theme.Corner(b, 12)
 	local stroke = New("UIStroke", { Thickness = 2, Color = Color3.new(1, 1, 1), Transparency = 0.1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = b })
 	local name = New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -110, 0, 22), Text = "", TextXAlignment = Enum.TextXAlignment.Left, TextSize = 16, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), Parent = b })
-	local bonus = New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 25), Size = UDim2.new(1, -110, 0, 16), Text = "", TextXAlignment = Enum.TextXAlignment.Left, TextSize = 12, Font = Theme.Fonts.UI, TextColor3 = Color3.fromRGB(230, 220, 200), Parent = b })
+	local bonus = New("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 25), Size = UDim2.new(1, -110, 0, 16), Text = "", TextXAlignment = Enum.TextXAlignment.Left, TextSize = 12, Font = Theme.Fonts.UI, TextColor3 = Color3.fromRGB(230, 220, 200), TextTruncate = Enum.TextTruncate.AtEnd, Parent = b })
 	local timer = New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 6), Size = UDim2.fromOffset(96, 30), Text = "", TextXAlignment = Enum.TextXAlignment.Right, TextSize = 24, Font = Theme.Fonts.Bold, TextColor3 = Color3.new(1, 1, 1), Parent = b })
 	local barBack = New("Frame", { BackgroundColor3 = Color3.fromRGB(60, 50, 46), BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 10, 1, -5), Size = UDim2.new(1, -20, 0, 4), Parent = b })
 	Theme.Corner(barBack, 2)
@@ -2051,6 +2051,16 @@ local function upcoming(): (any, number)
 	return def, left
 end
 
+-- lo striscione si allarga quando il testo è lungo (premi accesi, annuncio dell'admin)
+local function fitBanner(b)
+	local nameLen = utf8.len(b.Name.Text) or #b.Name.Text
+	local bonusLen = utf8.len(b.Bonus.Text) or #b.Bonus.Text
+	local width = math.floor(math.clamp(math.max(nameLen * 10.5, bonusLen * 6.6) + 130, 500, 820))
+	if b.Frame.Size.X.Offset ~= width then
+		b.Frame.Size = UDim2.fromOffset(width, 50)
+	end
+end
+
 local function updateBanner()
 	local b = banner
 	if not b then
@@ -2073,6 +2083,7 @@ local function updateBanner()
 			b.Bar.Size = UDim2.fromScale(math.clamp(1 - left / 3600, 0, 1), 1)
 			b.Stroke.Color = nextDef.Color
 			b.Stroke.Transparency = 0.3
+			fitBanner(b)
 			b.Frame.Position = UDim2.new(0.5, 0, 0, math.floor(14 + (62 + (if festival then 38 else 0)) * C.UIController.Scale))
 		end
 		return
@@ -2083,6 +2094,7 @@ local function updateBanner()
 	local left = if type(ends) == "number" then ends - serverNow() else 0
 	b.Name.Text = ("%s  %s"):format(def.Icon, def.Name:upper())
 	b.Bonus.Text = "😈 ADMIN ABUSE  •  " .. bonusText(def)
+	fitBanner(b)
 	b.Timer.Text = AbuseEvents.FormatTime(left)
 	b.Timer.TextColor3 = if left < 30 then Color3.fromRGB(255, 110, 100) else Color3.new(1, 1, 1)
 	b.Bar.BackgroundColor3 = def.Color

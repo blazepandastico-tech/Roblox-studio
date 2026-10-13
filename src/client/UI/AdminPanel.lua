@@ -521,7 +521,7 @@ local function showAbuse()
 		LayoutOrder = nextOrder(),
 		BackgroundColor3 = Colors.Background,
 		TextColor3 = Colors.Text,
-		PlaceholderText = "Es.: Stasera alle 21 tutti alle Pianure Meridionali! 🎃",
+		PlaceholderText = "Es.: Stasera alle 21 tutti alle Pianure Meridionali! " .. (if Theme.Halloween then "🎃" else "⚔️"),
 		PlaceholderColor3 = Colors.TextDim,
 		Font = Theme.Fonts.Bold,
 		TextSize = 14,

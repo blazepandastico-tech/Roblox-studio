@@ -489,7 +489,7 @@ function HalloweenWorld.Terrain(terrain: Terrain)
 	pcall(function()
 		terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(118, 108, 58))
 		terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(104, 78, 44))
-		terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(82, 66, 52))
+		terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(100, 82, 62))
 		terrain:SetMaterialColor(Enum.Material.Cobblestone, Color3.fromRGB(112, 106, 114))
 		terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(98, 92, 98))
 		terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(176, 156, 120))
@@ -524,9 +524,9 @@ function HalloweenWorld.House(cf: CFrame, width: number, depth: number, height: 
 	end
 	-- zucche intagliate ai lati della porta (quella più vicina ha la candela accesa)
 	local roll = rng:NextNumber()
-	if roll < 0.46 then
+	if roll < 0.55 then
 		local side = if rng:NextNumber() < 0.5 then -1 else 1
-		local s = rng:NextNumber(1.7, 2.3)
+		local s = rng:NextNumber(2.1, 2.9)
 		pumpkin(cf * CFrame.new(doorX + side * 4.1, 0, front - 1.5) * CFrame.Angles(0, rng:NextNumber(-0.4, 0.4), 0), s, true, true)
 		if rng:NextNumber() < 0.45 then
 			pumpkin(cf * CFrame.new(doorX + side * 5.6, 0, front - 2.3) * CFrame.Angles(0, rng:NextNumber(-0.6, 0.6), 0), s * 0.7, rng:NextNumber() < 0.5, false)
@@ -668,7 +668,7 @@ end
 -- Ogni parte prende il colore di Halloween secondo il nome e il materiale. Il colore dipende dalla
 -- posizione (Tema.Hash): stessa casa = stesso colore su server, client e foto.
 
-local PLASTER = { Color3.fromRGB(176, 164, 172), Color3.fromRGB(158, 164, 148), Color3.fromRGB(198, 186, 162), Color3.fromRGB(140, 128, 148), Color3.fromRGB(174, 142, 114), Color3.fromRGB(150, 144, 150) }
+local PLASTER = { Color3.fromRGB(150, 128, 150), Color3.fromRGB(128, 138, 116), Color3.fromRGB(178, 160, 128), Color3.fromRGB(118, 104, 132), Color3.fromRGB(164, 118, 92), Color3.fromRGB(112, 106, 114), Color3.fromRGB(96, 116, 108) }
 local BRICK = { Color3.fromRGB(104, 48, 50), Color3.fromRGB(88, 42, 54), Color3.fromRGB(118, 62, 52) }
 local ROOF = { Color3.fromRGB(50, 38, 60), Color3.fromRGB(40, 46, 46), Color3.fromRGB(72, 36, 58), Color3.fromRGB(56, 56, 66), Color3.fromRGB(46, 40, 44), Color3.fromRGB(126, 60, 30) }
 local SHUTTER = { Color3.fromRGB(212, 100, 30), Color3.fromRGB(92, 44, 124), Color3.fromRGB(30, 26, 32), Color3.fromRGB(84, 122, 52) }
@@ -722,7 +722,7 @@ local function repaintPart(p: BasePart)
 			p.Color = fromList(BRICK, p, 1):Lerp(c, 0.25)
 		else
 			local base = fromList(PLASTER, p, 1)
-			p.Color = tint(base:Lerp(c, 0.25), if name == "Umidita" then 0.78 else 0.92)
+			p.Color = tint(base:Lerp(c, 0.15), if name == "Umidita" then 0.74 else 0.86)
 		end
 	elseif name == "Tetto" or name == "Colmo" or name == "TettoAbbaino" or name == "TettoTorre" or name == "TettoPaglia" or name == "TettoCapanna" or name == "TettoFaro" or name == "Pinnacolo" then
 		local roof = fromList(ROOF, p, 2)

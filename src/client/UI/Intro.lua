@@ -187,7 +187,6 @@ type Bat = { Frame: Frame, Left: Frame, Right: Frame, X: number, Y: number, Spee
 local bats: { Bat } = {}
 local spooky: { Eyes: { Frame }, Pumpkins: { TextLabel }, Ghosts: { { Label: TextLabel, X: number, Y: number, Phase: number } }, Moon: Frame?, Titan: Frame? } = { Eyes = {}, Pumpkins = {}, Ghosts = {} }
 
-local NIGHT_PURPLE = Color3.fromRGB(26, 12, 40)
 local SILHOUETTE = Color3.fromRGB(12, 6, 18)
 
 local function circle(parent: Instance, color: Color3, pos: UDim2, size: UDim2, alpha: number?, z: number?): Frame
@@ -230,8 +229,8 @@ end
 
 local function buildHalloweenArt(root: Frame)
 	local art = New("Frame", { Name = "Halloween", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = root })
-	-- cielo viola sopra, che sfuma verso il basso
-	local sky = New("Frame", { BackgroundColor3 = NIGHT_PURPLE, BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = art })
+	-- cielo viola sopra, che sfuma verso il basso (fondo bianco: UIGradient moltiplica il colore)
+	local sky = New("Frame", { BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), Parent = art })
 	New("UIGradient", {
 		Rotation = 90,
 		Color = ColorSequence.new(Color3.fromRGB(40, 16, 60), Color3.fromRGB(110, 40, 30)),
@@ -239,7 +238,7 @@ local function buildHalloweenArt(root: Frame)
 		Parent = sky,
 	})
 	-- la luna arancione con l'alone e i crateri
-	local moonHolder = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.74, 0.42), Size = UDim2.fromScale(0.5, 0.5), Parent = art })
+	local moonHolder = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.8, 0.4), Size = UDim2.fromScale(0.5, 0.5), Parent = art })
 	New("UIAspectRatioConstraint", { AspectRatio = 1, DominantAxis = Enum.DominantAxis.Height, Parent = moonHolder })
 	for i, alpha in { 0.86, 0.78, 0.68 } do
 		circle(moonHolder, Color3.fromRGB(255, 150, 60), UDim2.fromScale(0.5, 0.5), UDim2.fromScale(1.5 - i * 0.14, 1.5 - i * 0.14), alpha)
@@ -251,11 +250,12 @@ local function buildHalloweenArt(root: Frame)
 	end
 	spooky.Moon = moonHolder
 	-- il gigante che spunta da dietro il Muro, davanti alla luna: testa, spalle, occhi accesi e mani sul bordo
-	local titan = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.74, 0.84), Size = UDim2.fromScale(0.34, 0.46), ZIndex = 2, Parent = art })
+	local titan = New("Frame", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.8, 0.9), Size = UDim2.fromScale(0.34, 0.46), ZIndex = 2, Parent = art })
 	spooky.Titan = titan
 	local head = block(titan, SILHOUETTE, UDim2.fromScale(0.5, 0.78), UDim2.fromScale(0.42, 0.52), 2)
 	New("UICorner", { CornerRadius = UDim.new(0.18, 0), Parent = head })
-	block(titan, SILHOUETTE, UDim2.fromScale(0.5, 1), UDim2.fromScale(0.96, 0.32), 2)
+	local shoulders = block(titan, SILHOUETTE, UDim2.fromScale(0.5, 1), UDim2.fromScale(0.9, 0.3), 2)
+	New("UICorner", { CornerRadius = UDim.new(0.35, 0), Parent = shoulders })
 	for _, side in { -1, 1 } do
 		-- orecchie e occhi che brillano (con l'alone)
 		block(titan, SILHOUETTE, UDim2.fromScale(0.5 + side * 0.23, 0.6), UDim2.fromScale(0.06, 0.14), 2)
@@ -269,17 +269,17 @@ local function buildHalloweenArt(root: Frame)
 		block(head, Color3.fromRGB(220, 200, 170), UDim2.fromScale(0.5 + i * 0.075, 0.74), UDim2.fromScale(0.055, 0.08), 3, Vector2.new(0.5, 0.5))
 	end
 	-- il Muro con i merli
-	local wall = block(art, Color3.fromRGB(20, 12, 26), UDim2.fromScale(0.5, 1), UDim2.fromScale(1, 0.2), 3)
+	local wall = block(art, Color3.new(1, 1, 1), UDim2.fromScale(0.5, 1), UDim2.fromScale(1, 0.2), 3)
 	New("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(46, 28, 56), Color3.fromRGB(10, 6, 14)), Parent = wall })
 	for i = 0, 24 do
 		block(art, Color3.fromRGB(34, 20, 44), UDim2.fromScale(i / 24, 0.805), UDim2.fromScale(0.024, 0.035), 3)
 	end
 	-- le mani del gigante aggrappate al bordo del Muro
 	for _, side in { -1, 1 } do
-		local hand = block(art, SILHOUETTE, UDim2.fromScale(0.74 + side * 0.16, 0.84), UDim2.fromScale(0.07, 0.06), 4)
+		local hand = block(art, SILHOUETTE, UDim2.fromScale(0.8 + side * 0.16, 0.84), UDim2.fromScale(0.07, 0.06), 4)
 		New("UICorner", { CornerRadius = UDim.new(0.3, 0), Parent = hand })
 		for f = 0, 3 do
-			block(art, SILHOUETTE, UDim2.fromScale(0.74 + side * 0.16 + (f - 1.5) * 0.016, 0.86), UDim2.fromScale(0.012, 0.045), 4, Vector2.new(0.5, 0))
+			block(art, SILHOUETTE, UDim2.fromScale(0.8 + side * 0.16 + (f - 1.5) * 0.016, 0.86), UDim2.fromScale(0.012, 0.045), 4, Vector2.new(0.5, 0))
 		end
 	end
 	-- zucche accese negli angoli in basso e fantasmi che fluttuano
@@ -337,7 +337,7 @@ local function updateHalloweenArt(dt: number, now: number)
 	-- il gigante sale piano da dietro il Muro e ogni tanto torna giù
 	if spooky.Titan then
 		local rise = 0.5 + 0.5 * math.sin(now * 0.25)
-		spooky.Titan.Position = UDim2.fromScale(0.74, 0.84 + (1 - rise) * 0.08)
+		spooky.Titan.Position = UDim2.fromScale(0.8, 0.9 + (1 - rise) * 0.08)
 	end
 end
 
@@ -512,6 +512,7 @@ local function build()
 		Font = Theme.Fonts.Body,
 		TextSize = 18,
 		TextColor3 = Colors.TextDim,
+		TextStrokeTransparency = if Theme.Halloween then 0.35 else 1, -- leggibile anche davanti alla luna
 		TextTransparency = 1,
 		Parent = column,
 	})
