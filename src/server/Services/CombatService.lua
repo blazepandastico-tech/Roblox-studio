@@ -494,7 +494,7 @@ local function onAwaken(player: Player)
 	state.AwakenReadyAt = now + awakening.Cooldown
 	player:SetAttribute("AwakenedUntil", workspace:GetServerTimeNow() + awakening.Duration)
 	S.EventService.Effect("Awaken", { Character = player.Character, Duration = awakening.Duration }, root.Position, 600)
-	S.EventService.Notify(player, "RISVEGLIO ACKERMAN!", "Raro", 3)
+	S.EventService.Notify(player, "RISVEGLIO VALKAR!", "Raro", 3)
 end
 
 -- INOLTRO ANIMAZIONI -------------------------------------------------------------------------------
@@ -539,7 +539,8 @@ local function onAnimRelay(player: Player, clip: any, speed: any)
 	if not withinBudget(player, 20) then
 		return
 	end
-	relayToNearby(Net.Unreliable("AnimRelay"), player, 500, clip, if type(speed) == "number" then math.clamp(speed, 0.2, 3) else 1)
+	-- velocità sempre valida (un NaN romperebbe le animazioni di chi guarda)
+	relayToNearby(Net.Unreliable("AnimRelay"), player, 500, clip, if type(speed) == "number" and speed == speed then math.clamp(speed, 0.2, 3) else 1)
 end
 
 function CombatService.Init(services)

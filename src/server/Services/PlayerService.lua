@@ -653,7 +653,7 @@ local function allocate(player: Player, statName: any, amount: any)
 	local n
 	if amount == "max" then
 		n = profile.StatPoints
-	elseif type(amount) == "number" then
+	elseif type(amount) == "number" and amount == amount then
 		n = math.floor(amount)
 	else
 		return

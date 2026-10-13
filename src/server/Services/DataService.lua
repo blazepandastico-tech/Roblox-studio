@@ -24,6 +24,8 @@ DataService.Loaded = Signal.new()
 local profiles: { [Player]: any } = {}
 local noSave: { [Player]: boolean } = {}
 local dirty: { [Player]: boolean } = {}
+-- giocatori che stanno uscendo: un salvataggio automatico in ritardo non deve ribloccare i dati
+local leaving: { [Player]: boolean } = {}
 
 local store: DataStore? = nil
 local SESSION_TIMEOUT = 900
@@ -194,6 +196,10 @@ local function saveToStore(player: Player, release: boolean): boolean
 		local ok, err = pcall(function()
 			(store :: DataStore):UpdateAsync(key, function(old)
 				written = false
+				if not release and (leaving[player] or profiles[player] == nil) then
+					-- il giocatore è uscito mentre questo salvataggio aspettava: ci pensa quello d'uscita
+					return nil
+				end
 				if type(old) == "table" and type(old.Lock) == "table" and old.Lock.Job ~= game.JobId then
 					-- un altro server ha preso il controllo: non sovrascrivere
 					if os.time() - (old.Lock.Time or 0) < SESSION_TIMEOUT then
@@ -217,6 +223,12 @@ end
 local function onPlayerAdded(player: Player)
 	local profile, err = loadFromStore(player)
 	if not player.Parent then
+		-- è uscito mentre i dati si caricavano: togliamo subito il blocco di sessione
+		if profile and not err then
+			profiles[player] = profile
+			saveToStore(player, true)
+			profiles[player] = nil
+		end
 		return
 	end
 	if not profile then
@@ -247,10 +259,12 @@ local function onPlayerRemoving(player: Player)
 		profile.PlayTime += math.floor(os.clock() - profile._Joined)
 		profile._Joined = os.clock()
 	end
+	leaving[player] = true
 	saveToStore(player, true)
 	profiles[player] = nil
 	noSave[player] = nil
 	dirty[player] = nil
+	leaving[player] = nil
 end
 
 -- API ---------------------------------------------------------------------------------

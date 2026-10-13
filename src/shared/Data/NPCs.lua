@@ -246,7 +246,7 @@ local NPCList = {
 	{ Id = "ArmaioloDietz", Zone = "PortoRevelia", Offset = Vector3.new(16, 0, 12), Facing = 220, Role = "Shop", Shop = "ArmeriaRevelia",
 		Name = "Dietz", Title = "Armaiolo Valdoriano",
 		Look = { Skin = Color3.fromRGB(200, 150, 115), Hair = Color3.fromRGB(70, 60, 50), HairStyle = "Corto", Uniform = "Valdoria", Beard = true },
-		Greeting = { "Armi marleyane, le migliori del mondo. Non chiedo per chi combatti." } },
+		Greeting = { "Armi valdoriane, le migliori del mondo. Non chiedo per chi combatti." } },
 	{ Id = "EmporioRevelia", Zone = "PortoRevelia", Offset = Vector3.new(-16, 0, 12), Facing = 140, Role = "Shop", Shop = "Emporio",
 		Name = "Anya", Title = "Venditrice",
 		Look = { Skin = Color3.fromRGB(226, 186, 160), Hair = Color3.fromRGB(40, 30, 25), HairStyle = "Lungo", Uniform = "Civile" },
