@@ -2,6 +2,11 @@
 
 Baseplate con menu laterale animato e finestra **Store!** (progetto [Rojo](https://rojo.space)).
 
+## Metterlo nel TUO place aperto in Studio (consigliato)
+1. Apri `Install.lua` (su GitHub clicca *Raw* → seleziona tutto → copia).
+2. In Studio: **View → Command Bar**, incolla e premi **Invio**.
+3. In StarterGui compaiono `ShopMenu` e `ShopStore`, e gli script nei posti giusti. Rilanciarlo sostituisce le versioni precedenti.
+
 ## Aprire direttamente in Studio (senza Rojo)
 Scarica **`Shop.rbxlx`** dalla root del repo e aprilo con Roblox Studio: dentro ci sono baseplate, script e, in **StarterGui**, `ShopMenu` e `ShopStore` gia' visibili e modificabili. Dopo aver cambiato file in `src/` rigenera con `python3 tools/gen_ui.py && python3 tools/build_rbxlx.py`.
 
