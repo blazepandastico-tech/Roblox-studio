@@ -1,0 +1,1024 @@
+{
+  "ClassName": "ScreenGui",
+  "Name": "ShopStore",
+  "Properties": {
+    "ResetOnSpawn": false,
+    "IgnoreGuiInset": true,
+    "DisplayOrder": 10,
+    "ZIndexBehavior": "Sibling",
+    "Enabled": false
+  },
+  "Children": [
+    {
+      "ClassName": "TextButton",
+      "Name": "Overlay",
+      "Properties": {
+        "Text": "",
+        "AutoButtonColor": false,
+        "BackgroundColor3": [
+          0,
+          0,
+          0
+        ],
+        "BackgroundTransparency": 0.5,
+        "Size": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "ClassName": "Frame",
+      "Name": "Fit",
+      "Properties": {
+        "BackgroundTransparency": 1,
+        "AnchorPoint": [
+          0.5,
+          0.5
+        ],
+        "Position": [
+          [
+            0.5,
+            0
+          ],
+          [
+            0.5,
+            0
+          ]
+        ],
+        "Size": [
+          [
+            0,
+            640
+          ],
+          [
+            0,
+            430
+          ]
+        ]
+      },
+      "Children": [
+        {
+          "ClassName": "UIScale",
+          "Name": "FitScale",
+          "Properties": {
+            "Scale": 1
+          }
+        },
+        {
+          "ClassName": "Frame",
+          "Name": "Window",
+          "Properties": {
+            "BackgroundColor3": [
+              0.1961,
+              0.5882,
+              0.9412
+            ],
+            "AnchorPoint": [
+              0.5,
+              0.5
+            ],
+            "Position": [
+              [
+                0.5,
+                0
+              ],
+              [
+                0.5,
+                0
+              ]
+            ],
+            "Size": [
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                0
+              ]
+            ],
+            "Active": true
+          },
+          "Children": [
+            {
+              "ClassName": "UICorner",
+              "Name": "Corner",
+              "Properties": {
+                "CornerRadius": [
+                  0,
+                  22
+                ]
+              }
+            },
+            {
+              "ClassName": "UIStroke",
+              "Name": "Stroke",
+              "Properties": {
+                "Color": [
+                  0.0627,
+                  0.1725,
+                  0.4314
+                ],
+                "Thickness": 5,
+                "ApplyStrokeMode": "Border"
+              }
+            },
+            {
+              "ClassName": "UIScale",
+              "Name": "OpenScale",
+              "Properties": {
+                "Scale": 1
+              }
+            },
+            {
+              "ClassName": "Frame",
+              "Name": "Panel",
+              "Properties": {
+                "BackgroundColor3": [
+                  0.9882,
+                  0.9647,
+                  0.8863
+                ],
+                "Position": [
+                  [
+                    0,
+                    8
+                  ],
+                  [
+                    0,
+                    58
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    624
+                  ],
+                  [
+                    0,
+                    364
+                  ]
+                ],
+                "ClipsDescendants": true
+              },
+              "Children": [
+                {
+                  "ClassName": "UICorner",
+                  "Name": "Corner",
+                  "Properties": {
+                    "CornerRadius": [
+                      0,
+                      16
+                    ]
+                  }
+                },
+                {
+                  "ClassName": "UIStroke",
+                  "Name": "Stroke",
+                  "Properties": {
+                    "Color": [
+                      0.0627,
+                      0.1725,
+                      0.4314
+                    ],
+                    "Thickness": 3,
+                    "ApplyStrokeMode": "Border"
+                  }
+                },
+                {
+                  "ClassName": "Frame",
+                  "Name": "Cards",
+                  "Properties": {
+                    "BackgroundTransparency": 1,
+                    "Size": [
+                      [
+                        1,
+                        0
+                      ],
+                      [
+                        1,
+                        0
+                      ]
+                    ],
+                    "ZIndex": 2
+                  }
+                }
+              ]
+            },
+            {
+              "ClassName": "TextLabel",
+              "Name": "Title",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "Font": "FredokaOne",
+                "Text": "Store!",
+                "TextColor3": [
+                  1,
+                  1,
+                  1
+                ],
+                "TextSize": 44,
+                "TextScaled": false,
+                "TextXAlignment": "Left",
+                "Position": [
+                  [
+                    0,
+                    100
+                  ],
+                  [
+                    0,
+                    4
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    170
+                  ],
+                  [
+                    0,
+                    50
+                  ]
+                ],
+                "ZIndex": 5
+              },
+              "Children": [
+                {
+                  "ClassName": "UIStroke",
+                  "Name": "Stroke",
+                  "Properties": {
+                    "Color": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "Thickness": 4,
+                    "ApplyStrokeMode": "Contextual"
+                  }
+                }
+              ]
+            },
+            {
+              "ClassName": "TextLabel",
+              "Name": "BasketIcon",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "Font": "FredokaOne",
+                "Text": "🧺",
+                "TextColor3": [
+                  1,
+                  1,
+                  1
+                ],
+                "TextSize": 78,
+                "TextScaled": false,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    44
+                  ],
+                  [
+                    0,
+                    24
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    92
+                  ],
+                  [
+                    0,
+                    92
+                  ]
+                ],
+                "ZIndex": 6
+              },
+              "Children": [
+                {
+                  "ClassName": "UIStroke",
+                  "Name": "Stroke",
+                  "Properties": {
+                    "Color": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "Thickness": 0,
+                    "ApplyStrokeMode": "Contextual"
+                  }
+                }
+              ]
+            },
+            {
+              "ClassName": "ImageLabel",
+              "Name": "BasketImage",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "Image": "",
+                "ScaleType": "Fit",
+                "Visible": false,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    44
+                  ],
+                  [
+                    0,
+                    24
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    92
+                  ],
+                  [
+                    0,
+                    92
+                  ]
+                ],
+                "ZIndex": 6
+              }
+            },
+            {
+              "ClassName": "Frame",
+              "Name": "Tab_Luck",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    295
+                  ],
+                  [
+                    0,
+                    30
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    48
+                  ],
+                  [
+                    0,
+                    48
+                  ]
+                ],
+                "ZIndex": 5
+              },
+              "Children": [
+                {
+                  "ClassName": "UIScale",
+                  "Name": "UIScale",
+                  "Properties": {
+                    "Scale": 1
+                  }
+                },
+                {
+                  "ClassName": "TextButton",
+                  "Name": "Body",
+                  "Properties": {
+                    "Text": "",
+                    "AutoButtonColor": false,
+                    "BackgroundColor3": [
+                      0.1608,
+                      0.502,
+                      1.0
+                    ],
+                    "Size": [
+                      [
+                        1,
+                        0
+                      ],
+                      [
+                        1,
+                        0
+                      ]
+                    ],
+                    "ZIndex": 5
+                  },
+                  "Children": [
+                    {
+                      "ClassName": "UICorner",
+                      "Name": "Corner",
+                      "Properties": {
+                        "CornerRadius": [
+                          0,
+                          12
+                        ]
+                      }
+                    },
+                    {
+                      "ClassName": "UIStroke",
+                      "Name": "Stroke",
+                      "Properties": {
+                        "Color": [
+                          0.0643,
+                          0.2008,
+                          0.4
+                        ],
+                        "Thickness": 4,
+                        "ApplyStrokeMode": "Border"
+                      }
+                    },
+                    {
+                      "ClassName": "TextLabel",
+                      "Name": "Icon",
+                      "Properties": {
+                        "BackgroundTransparency": 1,
+                        "Font": "FredokaOne",
+                        "Text": "❄️",
+                        "TextColor3": [
+                          1,
+                          1,
+                          1
+                        ],
+                        "TextSize": 30,
+                        "TextScaled": false,
+                        "Size": [
+                          [
+                            1,
+                            0
+                          ],
+                          [
+                            1,
+                            0
+                          ]
+                        ],
+                        "ZIndex": 6
+                      },
+                      "Children": [
+                        {
+                          "ClassName": "UIStroke",
+                          "Name": "Stroke",
+                          "Properties": {
+                            "Color": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "Thickness": 0,
+                            "ApplyStrokeMode": "Contextual"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "ClassName": "Frame",
+              "Name": "Tab_Power",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    353
+                  ],
+                  [
+                    0,
+                    30
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    48
+                  ],
+                  [
+                    0,
+                    48
+                  ]
+                ],
+                "ZIndex": 5
+              },
+              "Children": [
+                {
+                  "ClassName": "UIScale",
+                  "Name": "UIScale",
+                  "Properties": {
+                    "Scale": 1
+                  }
+                },
+                {
+                  "ClassName": "TextButton",
+                  "Name": "Body",
+                  "Properties": {
+                    "Text": "",
+                    "AutoButtonColor": false,
+                    "BackgroundColor3": [
+                      1.0,
+                      0.7686,
+                      0.1176
+                    ],
+                    "Size": [
+                      [
+                        1,
+                        0
+                      ],
+                      [
+                        1,
+                        0
+                      ]
+                    ],
+                    "ZIndex": 5
+                  },
+                  "Children": [
+                    {
+                      "ClassName": "UICorner",
+                      "Name": "Corner",
+                      "Properties": {
+                        "CornerRadius": [
+                          0,
+                          12
+                        ]
+                      }
+                    },
+                    {
+                      "ClassName": "UIStroke",
+                      "Name": "Stroke",
+                      "Properties": {
+                        "Color": [
+                          0.4,
+                          0.3074,
+                          0.047
+                        ],
+                        "Thickness": 4,
+                        "ApplyStrokeMode": "Border"
+                      }
+                    },
+                    {
+                      "ClassName": "TextLabel",
+                      "Name": "Icon",
+                      "Properties": {
+                        "BackgroundTransparency": 1,
+                        "Font": "FredokaOne",
+                        "Text": "💪",
+                        "TextColor3": [
+                          1,
+                          1,
+                          1
+                        ],
+                        "TextSize": 30,
+                        "TextScaled": false,
+                        "Size": [
+                          [
+                            1,
+                            0
+                          ],
+                          [
+                            1,
+                            0
+                          ]
+                        ],
+                        "ZIndex": 6
+                      },
+                      "Children": [
+                        {
+                          "ClassName": "UIStroke",
+                          "Name": "Stroke",
+                          "Properties": {
+                            "Color": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "Thickness": 0,
+                            "ApplyStrokeMode": "Contextual"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "ClassName": "Frame",
+              "Name": "Tab_Trophies",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    411
+                  ],
+                  [
+                    0,
+                    30
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    48
+                  ],
+                  [
+                    0,
+                    48
+                  ]
+                ],
+                "ZIndex": 5
+              },
+              "Children": [
+                {
+                  "ClassName": "UIScale",
+                  "Name": "UIScale",
+                  "Properties": {
+                    "Scale": 1
+                  }
+                },
+                {
+                  "ClassName": "TextButton",
+                  "Name": "Body",
+                  "Properties": {
+                    "Text": "",
+                    "AutoButtonColor": false,
+                    "BackgroundColor3": [
+                      1.0,
+                      0.6667,
+                      0.1176
+                    ],
+                    "Size": [
+                      [
+                        1,
+                        0
+                      ],
+                      [
+                        1,
+                        0
+                      ]
+                    ],
+                    "ZIndex": 5
+                  },
+                  "Children": [
+                    {
+                      "ClassName": "UICorner",
+                      "Name": "Corner",
+                      "Properties": {
+                        "CornerRadius": [
+                          0,
+                          12
+                        ]
+                      }
+                    },
+                    {
+                      "ClassName": "UIStroke",
+                      "Name": "Stroke",
+                      "Properties": {
+                        "Color": [
+                          0.4,
+                          0.2667,
+                          0.047
+                        ],
+                        "Thickness": 4,
+                        "ApplyStrokeMode": "Border"
+                      }
+                    },
+                    {
+                      "ClassName": "TextLabel",
+                      "Name": "Icon",
+                      "Properties": {
+                        "BackgroundTransparency": 1,
+                        "Font": "FredokaOne",
+                        "Text": "🏆",
+                        "TextColor3": [
+                          1,
+                          1,
+                          1
+                        ],
+                        "TextSize": 30,
+                        "TextScaled": false,
+                        "Size": [
+                          [
+                            1,
+                            0
+                          ],
+                          [
+                            1,
+                            0
+                          ]
+                        ],
+                        "ZIndex": 6
+                      },
+                      "Children": [
+                        {
+                          "ClassName": "UIStroke",
+                          "Name": "Stroke",
+                          "Properties": {
+                            "Color": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "Thickness": 0,
+                            "ApplyStrokeMode": "Contextual"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "ClassName": "Frame",
+              "Name": "Tab_Pets",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    469
+                  ],
+                  [
+                    0,
+                    30
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    48
+                  ],
+                  [
+                    0,
+                    48
+                  ]
+                ],
+                "ZIndex": 5
+              },
+              "Children": [
+                {
+                  "ClassName": "UIScale",
+                  "Name": "UIScale",
+                  "Properties": {
+                    "Scale": 1
+                  }
+                },
+                {
+                  "ClassName": "TextButton",
+                  "Name": "Body",
+                  "Properties": {
+                    "Text": "",
+                    "AutoButtonColor": false,
+                    "BackgroundColor3": [
+                      0.1569,
+                      0.7843,
+                      0.3529
+                    ],
+                    "Size": [
+                      [
+                        1,
+                        0
+                      ],
+                      [
+                        1,
+                        0
+                      ]
+                    ],
+                    "ZIndex": 5
+                  },
+                  "Children": [
+                    {
+                      "ClassName": "UICorner",
+                      "Name": "Corner",
+                      "Properties": {
+                        "CornerRadius": [
+                          0,
+                          12
+                        ]
+                      }
+                    },
+                    {
+                      "ClassName": "UIStroke",
+                      "Name": "Stroke",
+                      "Properties": {
+                        "Color": [
+                          0.0628,
+                          0.3137,
+                          0.1412
+                        ],
+                        "Thickness": 4,
+                        "ApplyStrokeMode": "Border"
+                      }
+                    },
+                    {
+                      "ClassName": "TextLabel",
+                      "Name": "Icon",
+                      "Properties": {
+                        "BackgroundTransparency": 1,
+                        "Font": "FredokaOne",
+                        "Text": "🔴",
+                        "TextColor3": [
+                          1,
+                          1,
+                          1
+                        ],
+                        "TextSize": 30,
+                        "TextScaled": false,
+                        "Size": [
+                          [
+                            1,
+                            0
+                          ],
+                          [
+                            1,
+                            0
+                          ]
+                        ],
+                        "ZIndex": 6
+                      },
+                      "Children": [
+                        {
+                          "ClassName": "UIStroke",
+                          "Name": "Stroke",
+                          "Properties": {
+                            "Color": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "Thickness": 0,
+                            "ApplyStrokeMode": "Contextual"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "ClassName": "Frame",
+              "Name": "Close",
+              "Properties": {
+                "BackgroundTransparency": 1,
+                "AnchorPoint": [
+                  0.5,
+                  0.5
+                ],
+                "Position": [
+                  [
+                    0,
+                    636
+                  ],
+                  [
+                    0,
+                    26
+                  ]
+                ],
+                "Size": [
+                  [
+                    0,
+                    50
+                  ],
+                  [
+                    0,
+                    50
+                  ]
+                ],
+                "ZIndex": 8
+              },
+              "Children": [
+                {
+                  "ClassName": "UIScale",
+                  "Name": "UIScale",
+                  "Properties": {
+                    "Scale": 1
+                  }
+                },
+                {
+                  "ClassName": "TextButton",
+                  "Name": "Body",
+                  "Properties": {
+                    "Text": "",
+                    "AutoButtonColor": false,
+                    "BackgroundColor3": [
+                      0.9216,
+                      0.1569,
+                      0.1569
+                    ],
+                    "Size": [
+                      [
+                        1,
+                        0
+                      ],
+                      [
+                        1,
+                        0
+                      ]
+                    ],
+                    "ZIndex": 8
+                  },
+                  "Children": [
+                    {
+                      "ClassName": "UICorner",
+                      "Name": "Corner",
+                      "Properties": {
+                        "CornerRadius": [
+                          0,
+                          12
+                        ]
+                      }
+                    },
+                    {
+                      "ClassName": "UIStroke",
+                      "Name": "Stroke",
+                      "Properties": {
+                        "Color": [
+                          0.4314,
+                          0.0392,
+                          0.0392
+                        ],
+                        "Thickness": 4,
+                        "ApplyStrokeMode": "Border"
+                      }
+                    },
+                    {
+                      "ClassName": "TextLabel",
+                      "Name": "X",
+                      "Properties": {
+                        "BackgroundTransparency": 1,
+                        "Font": "FredokaOne",
+                        "Text": "✖",
+                        "TextColor3": [
+                          1,
+                          1,
+                          1
+                        ],
+                        "TextSize": 30,
+                        "TextScaled": false,
+                        "Size": [
+                          [
+                            1,
+                            0
+                          ],
+                          [
+                            1,
+                            0
+                          ]
+                        ],
+                        "ZIndex": 9
+                      },
+                      "Children": [
+                        {
+                          "ClassName": "UIStroke",
+                          "Name": "Stroke",
+                          "Properties": {
+                            "Color": [
+                              0,
+                              0,
+                              0
+                            ],
+                            "Thickness": 2,
+                            "ApplyStrokeMode": "Contextual"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

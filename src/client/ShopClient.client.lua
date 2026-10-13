@@ -1,5 +1,5 @@
 -- UI dello shop: menu laterale + finestra Store + animale che segue il cursore.
--- Tutto e' costruito da codice, quindi non serve disegnare nulla in Studio.
+-- Bottoni e finestra sono oggetti reali in StarterGui (ShopMenu / ShopStore); qui li animiamo.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -249,19 +249,11 @@ local function sparkle(parent, position, text, size)
 end
 
 ----------------------------------------------------------------------
--- Menu laterale (2 colonne x 3 righe)
+-- Menu laterale: gli oggetti sono in StarterGui > ShopMenu (vedi tools/gen_ui.py)
 ----------------------------------------------------------------------
-local menuGui = makeScreenGui("ShopMenu", 1)
-local CELL, GAP = 96, 10
-
-local menuRoot = create("Frame", {
-	Name = "Menu",
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, 14, 0.5, 0),
-	Size = UDim2.fromOffset(CELL * 2 + GAP, CELL * 3 + GAP * 2),
-}, menuGui)
-local menuScale = create("UIScale", {}, menuRoot)
+local menuGui = playerGui:WaitForChild("ShopMenu")
+local menuRoot = menuGui:WaitForChild("Menu")
+local menuScale = menuRoot:WaitForChild("UIScale")
 
 local function updateMenuScale()
 	local vp = camera.ViewportSize
@@ -276,91 +268,49 @@ local toggleStore
 local giftRemaining = Config.GiftSeconds
 
 local menuDefs = {
-	{ Name = "Sentieri", Icon = "🐾", Color = Color3.fromRGB(176, 56, 214) },
-	{ Name = "Rinascita", Icon = "🔄", Color = Color3.fromRGB(34, 160, 185) },
-	{ Name = "Giornaliero", Icon = "📅", Color = Color3.fromRGB(232, 232, 236), Badge = true },
-	{ Name = "Gift", Icon = "🎁", Color = Color3.fromRGB(255, 150, 40), Gift = true },
-	{ Name = "Musica", Icon = "🎵", Color = Color3.fromRGB(255, 214, 40) },
-	{ Name = "Shop", Icon = "🧺", Color = Color3.fromRGB(60, 205, 80), Shop = true },
+	{ Name = "Sentieri" },
+	{ Name = "Rinascita" },
+	{ Name = "Giornaliero", Badge = true },
+	{ Name = "Gift", Gift = true },
+	{ Name = "Musica" },
+	{ Name = "Shop", Shop = true },
 }
 
 local function formatTime(seconds)
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
 
-local function makeMenuButton(def, index)
-	local col = (index - 1) % 2
-	local row = (index - 1) // 2
-	local center = UDim2.fromOffset(col * (CELL + GAP) + CELL / 2, row * (CELL + GAP) + CELL / 2)
+-- Sceglie tra emoji e immagine (se in Studio o in Config hai messo un asset id)
+local function pickIcon(textIcon, imageIcon, configImage)
+	if configImage and configImage ~= "" then
+		imageIcon.Image = configImage
+	end
+	local useImage = imageIcon.Image ~= ""
+	imageIcon.Visible = useImage
+	textIcon.Visible = not useImage
+	return useImage and imageIcon or textIcon
+end
 
-	local holder = create("Frame", {
-		Name = def.Name,
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = center,
-		Size = UDim2.fromOffset(CELL, CELL),
-	}, menuRoot)
-	local scale = create("UIScale", { Scale = 0 }, holder)
+local function bindMenuButton(def, index)
+	local holder = menuRoot:WaitForChild(def.Name)
+	local scale = holder:WaitForChild("UIScale")
+	local body = holder:WaitForChild("Body")
+	local bodyStroke = body:FindFirstChildOfClass("UIStroke")
+	local baseStrokeColor = bodyStroke.Color
+	local nameLabel = body:WaitForChild("NameLabel")
+	local icon = pickIcon(body:WaitForChild("Icon"), body:WaitForChild("IconImage"), def.Shop and Config.ShopIconImage)
+	local badge = holder:FindFirstChild("Badge")
+	local badgeScale = badge and badge:FindFirstChildOfClass("UIScale")
 
-	local body = create("TextButton", {
-		Name = "Body",
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundColor3 = def.Color,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(1, 1),
-	}, holder)
-	round(body, 16)
-	local bodyStroke = stroke(body, shade(def.Color, 0.45), 4)
-	gradient(body, def.Color:Lerp(WHITE, 0.3), shade(def.Color, 0.88))
-
-	-- riflesso
-	local gloss = create("Frame", {
-		BackgroundColor3 = WHITE,
-		BackgroundTransparency = 0.8,
-		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(6, 5),
-		Size = UDim2.new(1, -12, 0.3, 0),
-	}, body)
-	round(gloss, 10)
-
-	local icon
-	if def.Shop and Config.ShopIconImage ~= "" then
-		icon = create("ImageLabel", {
-			BackgroundTransparency = 1,
-			Image = Config.ShopIconImage,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.4),
-			Size = UDim2.fromOffset(62, 62),
-			ScaleType = Enum.ScaleType.Fit,
-		}, body)
-	else
-		icon = label(body, {
-			Text = def.Icon,
-			TextSize = 50,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.4),
-			Size = UDim2.fromOffset(64, 64),
-		})
+	if not body:FindFirstChildOfClass("UIGradient") then
+		gradient(body, body.BackgroundColor3:Lerp(WHITE, 0.3), shade(body.BackgroundColor3, 0.88))
 	end
 
-	local text = def.Name
-	if def.Gift then
-		text = formatTime(giftRemaining)
-	elseif def.Name == "Giornaliero" then
-		text = "Giornaliero"
-	end
-	local nameLabel = label(body, {
-		Text = text,
-		TextScaled = true,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, 2),
-		Size = UDim2.new(1, 0, 0, 26),
-		ZIndex = 3,
-	})
-	create("UITextSizeConstraint", { MaxTextSize = 24 }, nameLabel)
-	textStroke(nameLabel, 3)
+	-- entrata
+	scale.Scale = 0
+	task.delay(0.1 * index, function()
+		tween(scale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+	end)
 
 	-- Hover / click
 	local ready = false
@@ -404,34 +354,12 @@ local function makeMenuButton(def, index)
 				confetti(holder.AbsolutePosition + holder.AbsoluteSize / 2, 25)
 				toast("🎁 Regalo ritirato!", Color3.fromRGB(255, 150, 40))
 			else
-				toast("⏳ Il regalo arriva tra " .. formatTime(giftRemaining), Color3.fromRGB(70, 70, 110))
+				toast("⏳ Il regalo arriva tra " .. formatTime(math.ceil(giftRemaining)), Color3.fromRGB(70, 70, 110))
 			end
 		else
 			toast("✨ " .. def.Name .. " - presto disponibile!", Color3.fromRGB(70, 70, 110))
 		end
 	end)
-
-	-- Badge rosso "!"
-	local badgeScale
-	if def.Badge then
-		local badge = create("Frame", {
-			BackgroundColor3 = Color3.fromRGB(235, 40, 40),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(1, -2, 0, 4),
-			Size = UDim2.fromOffset(30, 30),
-			ZIndex = 6,
-		}, holder)
-		round(badge, 9)
-		stroke(badge, Color3.fromRGB(120, 10, 10), 3)
-		gradient(badge, Color3.fromRGB(255, 110, 110), Color3.fromRGB(215, 25, 25))
-		label(badge, {
-			Text = "!",
-			TextSize = 26,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = 7,
-		})
-		badgeScale = create("UIScale", {}, badge)
-	end
 
 	-- Animazioni idle
 	local phase = index * 1.3
@@ -448,7 +376,7 @@ local function makeMenuButton(def, index)
 		end
 		if def.Shop then
 			local pulse = (math.sin(t * 4) + 1) / 2
-			bodyStroke.Color = shade(def.Color, 0.45):Lerp(WHITE, pulse * 0.85)
+			bodyStroke.Color = baseStrokeColor:Lerp(WHITE, pulse * 0.85)
 			local cycle = t % 4
 			if cycle < 0.7 and not hovering then
 				holder.Rotation = math.sin(cycle * 38) * 9 * (1 - cycle / 0.7)
@@ -470,17 +398,10 @@ local function makeMenuButton(def, index)
 		end
 		return true
 	end)
-
-	-- Entrata
-	task.delay(0.1 * index, function()
-		tween(scale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
-	end)
-
-	return holder
 end
 
 for i, def in ipairs(menuDefs) do
-	makeMenuButton(def, i)
+	bindMenuButton(def, i)
 end
 
 -- Conto alla rovescia del regalo
@@ -492,13 +413,12 @@ addAnimator(function(dt)
 end)
 
 ----------------------------------------------------------------------
--- Finestra Store
+-- Finestra Store: oggetti in StarterGui > ShopStore
 ----------------------------------------------------------------------
 local WIN_W, WIN_H = 640, 430
-local HEADER = 58
 local PANEL_W, PANEL_H = 624, 364
 
-local storeGui = makeScreenGui("ShopStore", 10)
+local storeGui = playerGui:WaitForChild("ShopStore")
 storeGui.Enabled = false
 
 local blur = Instance.new("BlurEffect")
@@ -506,23 +426,9 @@ blur.Name = "ShopBlur"
 blur.Size = 0
 blur.Parent = Lighting
 
-local overlay = create("TextButton", {
-	Name = "Overlay",
-	Text = "",
-	AutoButtonColor = false,
-	BackgroundColor3 = BLACK,
-	BackgroundTransparency = 1,
-	Size = UDim2.fromScale(1, 1),
-}, storeGui)
-
-local fit = create("Frame", {
-	Name = "Fit",
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromOffset(WIN_W, WIN_H),
-}, storeGui)
-local fitScale = create("UIScale", {}, fit)
+local overlay = storeGui:WaitForChild("Overlay")
+local fit = storeGui:WaitForChild("Fit")
+local fitScale = fit:WaitForChild("FitScale")
 
 local function updateFit()
 	local vp = camera.ViewportSize
@@ -531,31 +437,16 @@ end
 updateFit()
 camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateFit)
 
-local window = create("Frame", {
-	Name = "Window",
-	BackgroundColor3 = Color3.fromRGB(50, 150, 240),
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromScale(1, 1),
-	Active = true, -- blocca i click verso l'overlay
-}, fit)
-round(window, 22)
-stroke(window, Color3.fromRGB(16, 44, 110), 5)
+local window = fit:WaitForChild("Window")
+local openScale = window:WaitForChild("OpenScale")
+openScale.Scale = 0
 gradient(window, Color3.fromRGB(95, 190, 255), Color3.fromRGB(40, 120, 220))
-local openScale = create("UIScale", { Scale = 0 }, window)
 
--- Pannello interno con soldi che fluttuano
-local panel = create("Frame", {
-	Name = "Panel",
-	BackgroundColor3 = Color3.fromRGB(252, 246, 226),
-	Position = UDim2.fromOffset(8, HEADER),
-	Size = UDim2.fromOffset(PANEL_W, PANEL_H),
-	ClipsDescendants = true,
-}, window)
-round(panel, 16)
-stroke(panel, Color3.fromRGB(16, 44, 110), 3)
+local panel = window:WaitForChild("Panel")
 gradient(panel, Color3.fromRGB(255, 252, 238), Color3.fromRGB(255, 232, 160))
+local cardsFolder = panel:WaitForChild("Cards")
 
+-- Soldi che fluttuano nello sfondo
 local moneyBits = {}
 for i = 1, 18 do
 	local l = label(panel, {
@@ -597,73 +488,26 @@ addAnimator(function(dt)
 	return true
 end)
 
-local cardsFolder = create("Frame", {
-	Name = "Cards",
-	BackgroundTransparency = 1,
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 2,
-}, panel)
-
--- Titolo
-local title = label(window, {
-	Name = "Title",
-	Text = "Store!",
-	TextSize = 44,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	Position = UDim2.fromOffset(100, 4),
-	Size = UDim2.fromOffset(170, 50),
-	ZIndex = 5,
-})
-textStroke(title, 4)
-
--- Icona cestino (sporge dall'angolo)
-local basket
-if Config.ShopIconImage ~= "" then
-	basket = create("ImageLabel", {
-		BackgroundTransparency = 1,
-		Image = Config.ShopIconImage,
-		ScaleType = Enum.ScaleType.Fit,
-	}, window)
-else
-	basket = label(window, { Text = "🧺", TextSize = 78 })
-end
-basket.Name = "BasketIcon"
-basket.AnchorPoint = Vector2.new(0.5, 0.5)
-basket.Position = UDim2.fromOffset(44, 24)
-basket.Size = UDim2.fromOffset(92, 92)
-basket.ZIndex = 6
+-- Icona cestino (emoji oppure immagine)
+local basket = pickIcon(window:WaitForChild("BasketIcon"), window:WaitForChild("BasketImage"), Config.ShopIconImage)
 
 -- Tab
 local tabButtons = {}
 local currentTab = 1
 local showTab -- definita dopo
 
-local function makeTab(def, index)
-	local holder = create("Frame", {
-		Name = def.Id,
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(295 + (index - 1) * 58, 30),
-		Size = UDim2.fromOffset(48, 48),
-		ZIndex = 5,
-	}, window)
-	local pop = create("UIScale", { Scale = 0 }, holder)
-	local body = create("TextButton", {
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundColor3 = def.Color,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 5,
-	}, holder)
-	round(body, 12)
-	local st = stroke(body, shade(def.Color, 0.4), 4)
-	gradient(body, def.Color:Lerp(WHITE, 0.35), shade(def.Color, 0.9))
-	local icon = label(body, {
-		Text = def.Icon,
-		TextSize = 30,
-		Size = UDim2.fromScale(1, 1),
-		ZIndex = 6,
-	})
+local function bindTab(def, index)
+	local holder = window:WaitForChild("Tab_" .. def.Id)
+	local pop = holder:WaitForChild("UIScale")
+	local body = holder:WaitForChild("Body")
+	local st = body:FindFirstChildOfClass("UIStroke")
+	local icon = body:WaitForChild("Icon")
+	local dark = st.Color
+	local basePos = holder.Position
+
+	if not body:FindFirstChildOfClass("UIGradient") then
+		gradient(body, body.BackgroundColor3:Lerp(WHITE, 0.35), shade(body.BackgroundColor3, 0.9))
+	end
 
 	body.MouseEnter:Connect(function()
 		tween(holder, 0.12, { Rotation = -10 })
@@ -683,49 +527,29 @@ local function makeTab(def, index)
 		return true
 	end)
 
-	tabButtons[index] = { holder = holder, pop = pop, stroke = st, def = def }
+	tabButtons[index] = { holder = holder, pop = pop, stroke = st, dark = dark, basePos = basePos }
 end
 
 for i, def in ipairs(Config.Tabs) do
-	makeTab(def, i)
+	bindTab(def, i)
 end
 
 local function selectTabVisual(index)
 	for i, tab in ipairs(tabButtons) do
 		local selected = i == index
 		tween(tab.pop, 0.3, { Scale = selected and 1.18 or 1 }, Enum.EasingStyle.Back)
-		tween(tab.holder, 0.25, { Position = UDim2.fromOffset(295 + (i - 1) * 58, selected and 34 or 30) }, Enum.EasingStyle.Back)
-		tab.stroke.Color = selected and WHITE or shade(tab.def.Color, 0.4)
+		tween(tab.holder, 0.25, {
+			Position = tab.basePos + UDim2.fromOffset(0, selected and 4 or 0),
+		}, Enum.EasingStyle.Back)
+		tab.stroke.Color = selected and WHITE or tab.dark
 	end
 end
 
 -- Pulsante chiudi
-local closeHolder = create("Frame", {
-	Name = "Close",
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromOffset(WIN_W - 4, 26),
-	Size = UDim2.fromOffset(50, 50),
-	ZIndex = 8,
-}, window)
-local closeScale = create("UIScale", { Scale = 0 }, closeHolder)
-local closeBody = create("TextButton", {
-	Text = "",
-	AutoButtonColor = false,
-	BackgroundColor3 = Color3.fromRGB(235, 40, 40),
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 8,
-}, closeHolder)
-round(closeBody, 12)
-stroke(closeBody, Color3.fromRGB(110, 10, 10), 4)
+local closeHolder = window:WaitForChild("Close")
+local closeScale = closeHolder:WaitForChild("UIScale")
+local closeBody = closeHolder:WaitForChild("Body")
 gradient(closeBody, Color3.fromRGB(255, 100, 100), Color3.fromRGB(210, 25, 25))
-local closeX = label(closeBody, {
-	Text = "✖",
-	TextSize = 30,
-	Size = UDim2.fromScale(1, 1),
-	ZIndex = 9,
-})
-textStroke(closeX, 2)
 
 closeBody.MouseEnter:Connect(function()
 	tween(closeScale, 0.2, { Scale = 1.15 }, Enum.EasingStyle.Back)
