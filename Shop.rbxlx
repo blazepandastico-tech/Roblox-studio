@@ -1,0 +1,1229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4"><Item class="Workspace" referent="RBXEA0AF61D2C4F49AEB1E11E80A726B586"><Properties><string name="Name">Workspace</string></Properties><Item class="Part" referent="RBXF347CFC773E445C1943B74F594949C3E"><Properties><string name="Name">Baseplate</string><CoordinateFrame name="CFrame"><X>0</X><Y>-10</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>512</X><Y>20</Y><Z>512</Z></Vector3><bool name="Anchored">true</bool><Color3uint8 name="Color3uint8">6512482</Color3uint8></Properties></Item><Item class="SpawnLocation" referent="RBX3A75E064371E4DBFAAABF8482EC26FA6"><Properties><string name="Name">SpawnLocation</string><CoordinateFrame name="CFrame"><X>0</X><Y>0.5</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame><Vector3 name="size"><X>12</X><Y>1</Y><Z>12</Z></Vector3><bool name="Anchored">true</bool><Color3uint8 name="Color3uint8">10724005</Color3uint8></Properties></Item></Item><Item class="Lighting" referent="RBX5BD2A78F0AF04680980EF6D300DD4E2F"><Properties><string name="Name">Lighting</string></Properties></Item><Item class="ReplicatedStorage" referent="RBX44F70FD300A448E1857E6B601574F6D8"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="Folder" referent="RBX7E68F4BF62A74173A84029B9555ABD68"><Properties><string name="Name">Shared</string></Properties><Item class="ModuleScript" referent="RBXB0D6453CAEA94464B68D3A2B33582550"><Properties><string name="Name">ShopConfig</string><ProtectedString name="Source"><![CDATA[-- Configurazione dello shop: modifica QUI tab, oggetti, prezzi e colori.
+local Config = {}
+
+-- true = gli acquisti sono SIMULATI (nessun Robux speso) cosi puoi provare tutto.
+-- Quando metti ProductId veri, quelli useranno MarketplaceService.
+Config.TestMode = true
+
+-- Incolla qui l'asset id dell'icona del cestino (es. "rbxassetid://123456789").
+-- Se vuoto viene usata un'emoji al suo posto.
+Config.ShopIconImage = ""
+
+-- Secondi del timer del regalo nel menu (2:46 = 166)
+Config.GiftSeconds = 166
+
+-- Tab in alto (la prima e quella che si apre per default)
+Config.Tabs = {
+	{ Id = "Luck", Icon = "❄️", Color = Color3.fromRGB(41, 128, 255) },
+	{ Id = "Power", Icon = "💪", Color = Color3.fromRGB(255, 196, 30) },
+	{ Id = "Trophies", Icon = "🏆", Color = Color3.fromRGB(255, 170, 30) },
+	{ Id = "Pets", Icon = "🔴", Color = Color3.fromRGB(40, 200, 90) },
+}
+
+local GREEN = Color3.fromRGB(58, 214, 40)
+local PURPLE = Color3.fromRGB(150, 50, 230)
+local YELLOW = Color3.fromRGB(255, 196, 20)
+local BLUE = Color3.fromRGB(140, 200, 245)
+local RED = Color3.fromRGB(255, 70, 70)
+local ORANGE = Color3.fromRGB(255, 140, 30)
+local PINK = Color3.fromRGB(255, 100, 190)
+local TEAL = Color3.fromRGB(30, 190, 200)
+
+-- Ogni tab ha 5 oggetti: i primi 3 stanno nella riga sopra, gli altri 2 (larghi) sotto.
+-- Reward = { Attribute = "Nome", Add = numero } viene sommato come attributo del Player.
+-- ProductId = 0 -> acquisto finto (TestMode). Metti l'ID del Developer Product per quello vero.
+Config.Items = {
+	-- LUCK
+	{ Id = "Lucky", Tab = "Luck", Name = "Lucky", Desc = "Permanently gain better luck!", Price = 199, Color = GREEN, ProductId = 0, Reward = { Attribute = "Luck", Add = 1 } },
+	{ Id = "UltraLucky", Tab = "Luck", Name = "ULTRA Lucky", Desc = "Permanently gain outrageous luck!", Price = 199, Color = PURPLE, Tag = "HOT!", ProductId = 0, Reward = { Attribute = "Luck", Add = 5 } },
+	{ Id = "SuperLucky", Tab = "Luck", Name = "Super Lucky", Desc = "Permanently gain even better luck!", Price = 199, Color = YELLOW, ProductId = 0, Reward = { Attribute = "Luck", Add = 3 } },
+	{ Id = "DoubleCash", Tab = "Luck", Name = "2x Cash", Desc = "Double all your coins, forever!", Icon = "💰", Price = 199, Color = BLUE, ProductId = 0, Reward = { Attribute = "CashMultiplier", Add = 1 } },
+	{ Id = "VIP", Tab = "Luck", Name = "VIP", Desc = "Golden name, chat tag & perks!", Icon = "👑", Price = 199, Color = BLUE, Tag = "BEST", ProductId = 0, Reward = { Attribute = "VIP", Add = 1 } },
+
+	-- POWER
+	{ Id = "Strong", Tab = "Power", Name = "Strong", Desc = "Permanently gain more power!", Price = 99, Color = RED, ProductId = 0, Reward = { Attribute = "Power", Add = 1 } },
+	{ Id = "MegaStrong", Tab = "Power", Name = "MEGA Strong", Desc = "Permanently gain huge power!", Price = 249, Color = ORANGE, Tag = "-20%", ProductId = 0, Reward = { Attribute = "Power", Add = 5 } },
+	{ Id = "Speed", Tab = "Power", Name = "Speed Boost", Desc = "Run faster, forever!", Price = 149, Color = TEAL, ProductId = 0, Reward = { Attribute = "Speed", Add = 1 } },
+	{ Id = "AutoTrain", Tab = "Power", Name = "Auto Train", Desc = "Train even while you rest!", Icon = "⚙️", Price = 399, Color = BLUE, ProductId = 0, Reward = { Attribute = "AutoTrain", Add = 1 } },
+	{ Id = "GiantFists", Tab = "Power", Name = "Giant Fists", Desc = "Hit twice as hard!", Icon = "🥊", Price = 299, Color = BLUE, ProductId = 0, Reward = { Attribute = "Fists", Add = 1 } },
+
+	-- TROPHIES
+	{ Id = "Bronze", Tab = "Trophies", Name = "Bronze Cup", Desc = "A shiny start for champions!", Price = 49, Color = ORANGE, ProductId = 0, Reward = { Attribute = "Trophies", Add = 1 } },
+	{ Id = "Silver", Tab = "Trophies", Name = "Silver Cup", Desc = "Show off your skills!", Price = 99, Color = Color3.fromRGB(170, 190, 215), ProductId = 0, Reward = { Attribute = "Trophies", Add = 2 } },
+	{ Id = "Gold", Tab = "Trophies", Name = "Gold Cup", Desc = "Only for true legends!", Price = 199, Color = YELLOW, Tag = "NEW", ProductId = 0, Reward = { Attribute = "Trophies", Add = 5 } },
+	{ Id = "Crown", Tab = "Trophies", Name = "Royal Crown", Desc = "Wear it with pride!", Icon = "👑", Price = 499, Color = BLUE, ProductId = 0, Reward = { Attribute = "Trophies", Add = 10 } },
+	{ Id = "Medal", Tab = "Trophies", Name = "Hero Medal", Desc = "The ultimate flex!", Icon = "🎖️", Price = 349, Color = BLUE, ProductId = 0, Reward = { Attribute = "Trophies", Add = 7 } },
+
+	-- PETS
+	{ Id = "EggCommon", Tab = "Pets", Name = "Cute Egg", Desc = "Hatch a friendly pet!", Price = 79, Color = GREEN, ProductId = 0, Reward = { Attribute = "Eggs", Add = 1 } },
+	{ Id = "EggEpic", Tab = "Pets", Name = "Epic Egg", Desc = "Higher chance for epic pets!", Price = 199, Color = PURPLE, ProductId = 0, Reward = { Attribute = "Eggs", Add = 3 } },
+	{ Id = "EggLegend", Tab = "Pets", Name = "Legend Egg", Desc = "Legendary pets inside!", Price = 399, Color = PINK, Tag = "HOT!", ProductId = 0, Reward = { Attribute = "Eggs", Add = 5 } },
+	{ Id = "PetSlot", Tab = "Pets", Name = "+1 Pet Slot", Desc = "Carry one more friend!", Icon = "🐾", Price = 149, Color = BLUE, ProductId = 0, Reward = { Attribute = "PetSlots", Add = 1 } },
+	{ Id = "PetLuck", Tab = "Pets", Name = "Pet Luck", Desc = "Better hatch odds, forever!", Icon = "🍀", Price = 299, Color = BLUE, ProductId = 0, Reward = { Attribute = "PetLuck", Add = 1 } },
+}
+
+return Config
+]]></ProtectedString></Properties></Item></Item></Item><Item class="ServerScriptService" referent="RBXC22DCBEAFB5F494887EF3299F8CCC1E1"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Script" referent="RBXC04B29C2EC2F4DDF9BC760B80F2D761A"><Properties><string name="Name">ShopServer</string><ProtectedString name="Source"><![CDATA[-- Lato server dello shop: valida gli acquisti e assegna le ricompense.
+-- NOTA: le ricompense sono attributi del Player (es. player:GetAttribute("Luck")).
+-- Per salvarle tra una sessione e l'altra aggiungi un DataStore.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ShopConfig"))
+
+local remotes = Instance.new("Folder")
+remotes.Name = "ShopRemotes"
+
+local purchaseRemote = Instance.new("RemoteEvent")
+purchaseRemote.Name = "Purchase"
+purchaseRemote.Parent = remotes
+
+local purchasedRemote = Instance.new("RemoteEvent")
+purchasedRemote.Name = "Purchased"
+purchasedRemote.Parent = remotes
+
+remotes.Parent = ReplicatedStorage
+
+local itemsById = {}
+local itemsByProduct = {}
+for _, item in ipairs(Config.Items) do
+	itemsById[item.Id] = item
+	if item.ProductId and item.ProductId ~= 0 then
+		itemsByProduct[item.ProductId] = item
+	end
+end
+
+local function grant(player, item)
+	local reward = item.Reward
+	if reward then
+		local current = player:GetAttribute(reward.Attribute) or 0
+		player:SetAttribute(reward.Attribute, current + reward.Add)
+	end
+	purchasedRemote:FireClient(player, item.Id)
+end
+
+-- Acquisti simulati (solo con Config.TestMode = true)
+local lastPurchase = {}
+purchaseRemote.OnServerEvent:Connect(function(player, itemId)
+	if not Config.TestMode or typeof(itemId) ~= "string" then
+		return
+	end
+	local now = os.clock()
+	if lastPurchase[player] and now - lastPurchase[player] < 0.4 then
+		return
+	end
+	lastPurchase[player] = now
+
+	local item = itemsById[itemId]
+	if item then
+		grant(player, item)
+	end
+end)
+
+-- Acquisti veri con Developer Product
+MarketplaceService.ProcessReceipt = function(receiptInfo)
+	local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
+	if not player then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	local item = itemsByProduct[receiptInfo.ProductId]
+	if not item then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	grant(player, item)
+	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	lastPurchase[player] = nil
+end)
+]]></ProtectedString></Properties></Item></Item><Item class="StarterGui" referent="RBX81F1371A77284BE4A844764E945FA4CA"><Properties><string name="Name">StarterGui</string></Properties><Item class="ScreenGui" referent="RBX3E43D585F3914AE5A396875B4FDC8F68"><Properties><string name="Name">ShopMenu</string><bool name="ResetOnSpawn">false</bool><bool name="IgnoreGuiInset">true</bool><int name="DisplayOrder">1</int><token name="ZIndexBehavior">1</token></Properties><Item class="Frame" referent="RBX3F9A6B64A7A845BA9C726C20E8FAE94F"><Properties><string name="Name">Menu</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>14</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>202</XO><YS>0</YS><YO>308</YO></UDim2></Properties><Item class="UIScale" referent="RBX0ED7C043E5D14D9B94ED9AA4E23BCEB4"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="Frame" referent="RBXB25C0C00B450488AAA9A88CD0D370404"><Properties><string name="Name">Sentieri</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>48.0</XO><YS>0</YS><YO>48.0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>96</XO><YS>0</YS><YO>96</YO></UDim2></Properties><Item class="UIScale" referent="RBX48101A7C2C5445F18AB2254CC728D8D7"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX086BC6954D8548F1A31DC1034C0D34EC"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.6902</R><G>0.2196</G><B>0.8392</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBXAA378AC76A194A12AE5EFA3ECDC79573"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX2D00D6DBF0B746A29A10E077102B641A"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.3106</R><G>0.0988</G><B>0.3776</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBX5A52A15533E043DE9A2EE46CC16E2F32"><Properties><string name="Name">Gloss</string><Color3 name="BackgroundColor3"><R>1</R><G>1</G><B>1</B></Color3><float name="BackgroundTransparency">0.8</float><int name="BorderSizePixel">0</int><UDim2 name="Position"><XS>0</XS><XO>6</XO><YS>0</YS><YO>5</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>-12</XO><YS>0.3</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX3154435287634D73AD0C9FC1143F2A59"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>10</O></UDim></Properties></Item></Item><Item class="TextLabel" referent="RBXB3391396E6B04D3C88DFF6602B71340F"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🐾</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">50</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>64</XO><YS>0</YS><YO>64</YO></UDim2></Properties><Item class="UIStroke" referent="RBX1039EA2C5A0B4C3FA5922AB6B114EF4D"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBX7076F181C4AC49EF9400AE7B1352E70C"><Properties><string name="Name">IconImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>62</XO><YS>0</YS><YO>62</YO></UDim2></Properties></Item><Item class="TextLabel" referent="RBX4BCC3F9CA40340D2A22C649BED0DEEFC"><Properties><string name="Name">NameLabel</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">Sentieri</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">24</int><bool name="TextScaled">true</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>1</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>1</YS><YO>2</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>0</YS><YO>26</YO></UDim2><int name="ZIndex">3</int></Properties><Item class="UIStroke" referent="RBX4A8DC2EBD70247458C62E7FC9D3F86AD"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">0</token></Properties></Item><Item class="UITextSizeConstraint" referent="RBX8C1334709016471494FB870BC3FD5C97"><Properties><string name="Name">SizeLimit</string><int name="MaxTextSize">24</int></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBXC2521E0D77B34A359E8E49CD09C760B9"><Properties><string name="Name">Rinascita</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>154.0</XO><YS>0</YS><YO>48.0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>96</XO><YS>0</YS><YO>96</YO></UDim2></Properties><Item class="UIScale" referent="RBX24B9102F3118410DAE0E9594800E44BF"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX4E9DFB7831EE4185ADC9D03306F27B20"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.1333</R><G>0.6275</G><B>0.7255</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX7CC8C883D2384679B16510B81B4A4657"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBXD82B62F95C194977A414C68AEEFB36CF"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.06</R><G>0.2824</G><B>0.3265</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBX17C6B56E37F446809EBFD28717785855"><Properties><string name="Name">Gloss</string><Color3 name="BackgroundColor3"><R>1</R><G>1</G><B>1</B></Color3><float name="BackgroundTransparency">0.8</float><int name="BorderSizePixel">0</int><UDim2 name="Position"><XS>0</XS><XO>6</XO><YS>0</YS><YO>5</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>-12</XO><YS>0.3</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX7A4D3C3006DA412BB0667F1C9C61230B"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>10</O></UDim></Properties></Item></Item><Item class="TextLabel" referent="RBXA5202547AF784270BB026288F263C6D1"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🔄</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">50</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>64</XO><YS>0</YS><YO>64</YO></UDim2></Properties><Item class="UIStroke" referent="RBX874F233FB5E74FCF9B8042716158614E"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBXAA6CEE45AF2546ECB9A96F594FC43433"><Properties><string name="Name">IconImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>62</XO><YS>0</YS><YO>62</YO></UDim2></Properties></Item><Item class="TextLabel" referent="RBXBFAF04EB334B40A6A535F5D16EBA6538"><Properties><string name="Name">NameLabel</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">Rinascita</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">24</int><bool name="TextScaled">true</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>1</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>1</YS><YO>2</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>0</YS><YO>26</YO></UDim2><int name="ZIndex">3</int></Properties><Item class="UIStroke" referent="RBX4CD2873B657B4B239F6DD1BD6368592D"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">0</token></Properties></Item><Item class="UITextSizeConstraint" referent="RBXEA67459DD36A4354A934720743B358DD"><Properties><string name="Name">SizeLimit</string><int name="MaxTextSize">24</int></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBXFDDF74983938497CA22A8AAC33007308"><Properties><string name="Name">Giornaliero</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>48.0</XO><YS>0</YS><YO>154.0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>96</XO><YS>0</YS><YO>96</YO></UDim2></Properties><Item class="UIScale" referent="RBX84E92DF9E13E4087841DC234207F9EAB"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX52EAD5273CC14AD2996FB07318D26A13"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.9098</R><G>0.9098</G><B>0.9255</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX4B9E76B465F94DFCA1377BDA4F6183D2"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX7716F43D2DF541ED80CE3574787B4348"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.4094</R><G>0.4094</G><B>0.4165</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBXC5570CD7DD77417684CE13E3A8F10733"><Properties><string name="Name">Gloss</string><Color3 name="BackgroundColor3"><R>1</R><G>1</G><B>1</B></Color3><float name="BackgroundTransparency">0.8</float><int name="BorderSizePixel">0</int><UDim2 name="Position"><XS>0</XS><XO>6</XO><YS>0</YS><YO>5</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>-12</XO><YS>0.3</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX5CC2EA03BFE94345BD26DDE5653F440A"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>10</O></UDim></Properties></Item></Item><Item class="TextLabel" referent="RBXB53BD485D4754A74885EC7FC4CF58D98"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">📅</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">50</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>64</XO><YS>0</YS><YO>64</YO></UDim2></Properties><Item class="UIStroke" referent="RBX4CEA088C174E46899AB09C90B82892AB"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBX64423DFEB46C4D27B49AC6BCCB14524A"><Properties><string name="Name">IconImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>62</XO><YS>0</YS><YO>62</YO></UDim2></Properties></Item><Item class="TextLabel" referent="RBX070DE8B3B38E4496BA4775650A798B65"><Properties><string name="Name">NameLabel</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">Giornaliero</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">24</int><bool name="TextScaled">true</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>1</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>1</YS><YO>2</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>0</YS><YO>26</YO></UDim2><int name="ZIndex">3</int></Properties><Item class="UIStroke" referent="RBX3D5264E5E56142FE85BDF022A89C3D61"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">0</token></Properties></Item><Item class="UITextSizeConstraint" referent="RBX0C6A90F0B5BA48CFAAEC5BF607F1FF46"><Properties><string name="Name">SizeLimit</string><int name="MaxTextSize">24</int></Properties></Item></Item></Item><Item class="Frame" referent="RBX2F807D38976A4DA698B89CF91700CC59"><Properties><string name="Name">Badge</string><Color3 name="BackgroundColor3"><R>0.9216</R><G>0.1569</G><B>0.1569</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>1</XS><XO>-2</XO><YS>0</YS><YO>4</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>30</XO><YS>0</YS><YO>30</YO></UDim2><int name="ZIndex">6</int></Properties><Item class="UICorner" referent="RBX5313A6235B754C8AAF2215DCD71A859C"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>9</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX112BE17C690F4F5C92F2CDE571AA7BF9"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.4706</R><G>0.0392</G><B>0.0392</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="UIScale" referent="RBX19B3B96C0EB046FB8D012CDCB0F7E7F4"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextLabel" referent="RBXDF625FC5D91F4538A5F9D8210C731142"><Properties><string name="Name">Mark</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">!</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">26</int><bool name="TextScaled">false</bool><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">7</int></Properties><Item class="UIStroke" referent="RBX2606EE00973447F685ED1E8E570DCDDF"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBX06E2A222E5DC453FBC253C212FCF73F8"><Properties><string name="Name">Gift</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>154.0</XO><YS>0</YS><YO>154.0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>96</XO><YS>0</YS><YO>96</YO></UDim2></Properties><Item class="UIScale" referent="RBX54C6E7551A5647E3A62D704489A21AE0"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBXE05DF39DB606463493B3A5D64C500FB2"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>1.0</R><G>0.5882</G><B>0.1569</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX517495CF05D145C1B996E5E0E324FC3C"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX46CF0961F9B145979C82F9C5E0772DEF"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.45</R><G>0.2647</G><B>0.0706</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBX80B1FB423F0945A1B0F7E1A55B26DFA9"><Properties><string name="Name">Gloss</string><Color3 name="BackgroundColor3"><R>1</R><G>1</G><B>1</B></Color3><float name="BackgroundTransparency">0.8</float><int name="BorderSizePixel">0</int><UDim2 name="Position"><XS>0</XS><XO>6</XO><YS>0</YS><YO>5</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>-12</XO><YS>0.3</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBXF5A8031E388C41AEBA9BA2E46FADA775"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>10</O></UDim></Properties></Item></Item><Item class="TextLabel" referent="RBX0691D03A3DC04753B6F052C289072256"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🎁</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">50</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>64</XO><YS>0</YS><YO>64</YO></UDim2></Properties><Item class="UIStroke" referent="RBX571C3466A91044F785E14B025AD637DA"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBX375956812CC8494FB4F6CEA7FCCF5939"><Properties><string name="Name">IconImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>62</XO><YS>0</YS><YO>62</YO></UDim2></Properties></Item><Item class="TextLabel" referent="RBXC068158756EA4275A79E3427B4C76C02"><Properties><string name="Name">NameLabel</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">2:46</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">24</int><bool name="TextScaled">true</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>1</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>1</YS><YO>2</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>0</YS><YO>26</YO></UDim2><int name="ZIndex">3</int></Properties><Item class="UIStroke" referent="RBX2AB102EC7E2841BC8B6CE8ED2E768B6A"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">0</token></Properties></Item><Item class="UITextSizeConstraint" referent="RBX5E354389DB2B40ACB7F171030A70F2CA"><Properties><string name="Name">SizeLimit</string><int name="MaxTextSize">24</int></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBX59A8E71E58B8499698408AAFA3332BF5"><Properties><string name="Name">Musica</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>48.0</XO><YS>0</YS><YO>260.0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>96</XO><YS>0</YS><YO>96</YO></UDim2></Properties><Item class="UIScale" referent="RBXB3FEDF9429DD45648DDBCBCC20BDB1BA"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBXF1BDCF4160CF4433925490C9E3E92216"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>1.0</R><G>0.8392</G><B>0.1569</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX93B6AB67702D419A8994C7FA0AE4E34B"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBXD5FA1AB2F1B14DBF96B1F1752DD1D0AF"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.45</R><G>0.3776</G><B>0.0706</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBX39A37113C18C47C784772D286B7145DE"><Properties><string name="Name">Gloss</string><Color3 name="BackgroundColor3"><R>1</R><G>1</G><B>1</B></Color3><float name="BackgroundTransparency">0.8</float><int name="BorderSizePixel">0</int><UDim2 name="Position"><XS>0</XS><XO>6</XO><YS>0</YS><YO>5</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>-12</XO><YS>0.3</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBX0CB3875ECB0A4553BF110E1C19CB165F"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>10</O></UDim></Properties></Item></Item><Item class="TextLabel" referent="RBX558FD4CC3FA94445A89F4E6B237E8B46"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🎵</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">50</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>64</XO><YS>0</YS><YO>64</YO></UDim2></Properties><Item class="UIStroke" referent="RBXBE365BCC5E6947769A7F37C04A437143"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBXD68D5C13D86346579FECEB9DD5ACFFEE"><Properties><string name="Name">IconImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>62</XO><YS>0</YS><YO>62</YO></UDim2></Properties></Item><Item class="TextLabel" referent="RBXD7DD736B322444EB93D202B973C85FC1"><Properties><string name="Name">NameLabel</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">Musica</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">24</int><bool name="TextScaled">true</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>1</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>1</YS><YO>2</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>0</YS><YO>26</YO></UDim2><int name="ZIndex">3</int></Properties><Item class="UIStroke" referent="RBX184EFA41DF194EC0BBC4FE068C6FC0AE"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">0</token></Properties></Item><Item class="UITextSizeConstraint" referent="RBXB085464710644A728D1818B83F7D551C"><Properties><string name="Name">SizeLimit</string><int name="MaxTextSize">24</int></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBX9DDA9BA7CD23462AA1BE7B32F28EA5B3"><Properties><string name="Name">Shop</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>154.0</XO><YS>0</YS><YO>260.0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>96</XO><YS>0</YS><YO>96</YO></UDim2></Properties><Item class="UIScale" referent="RBX1FE2D97F1B464E1183CE0387545BF1C9"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX8C500EC9B2974436ADA2BF34B8AB964B"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.2353</R><G>0.8039</G><B>0.3137</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBXD3EB04A7BB6C43CD99C2DFD4304B2E7F"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX9AC40AC47D574EC7A7567D4A7B42A383"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.1059</R><G>0.3618</G><B>0.1412</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBX73CB46CD64E342B48C17593803E1649E"><Properties><string name="Name">Gloss</string><Color3 name="BackgroundColor3"><R>1</R><G>1</G><B>1</B></Color3><float name="BackgroundTransparency">0.8</float><int name="BorderSizePixel">0</int><UDim2 name="Position"><XS>0</XS><XO>6</XO><YS>0</YS><YO>5</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>-12</XO><YS>0.3</YS><YO>0</YO></UDim2></Properties><Item class="UICorner" referent="RBXEF2BA2BF7D4B4FA89679FEB07A4C02CA"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>10</O></UDim></Properties></Item></Item><Item class="TextLabel" referent="RBX8F67B8E9D7A4474BB316E5DE4B284B4C"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🧺</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">50</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>64</XO><YS>0</YS><YO>64</YO></UDim2></Properties><Item class="UIStroke" referent="RBX156FE360D62647F99C4B16809777AE9E"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBXC4D0AA6B3DE5440D8A48A740624D06E4"><Properties><string name="Name">IconImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.4</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>62</XO><YS>0</YS><YO>62</YO></UDim2></Properties></Item><Item class="TextLabel" referent="RBXF73900BEC35844BBBFA9497FAC84F882"><Properties><string name="Name">NameLabel</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">Shop</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">24</int><bool name="TextScaled">true</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>1</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>1</YS><YO>2</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>0</YS><YO>26</YO></UDim2><int name="ZIndex">3</int></Properties><Item class="UIStroke" referent="RBX55BB6D67685B488BB220B509E598BBE3"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">0</token></Properties></Item><Item class="UITextSizeConstraint" referent="RBXC47AB540FE14498B911D17C6193EAE14"><Properties><string name="Name">SizeLimit</string><int name="MaxTextSize">24</int></Properties></Item></Item></Item></Item></Item></Item><Item class="ScreenGui" referent="RBX0277191AF49E44C183E433FBF0CAFCDD"><Properties><string name="Name">ShopStore</string><bool name="ResetOnSpawn">false</bool><bool name="IgnoreGuiInset">true</bool><int name="DisplayOrder">10</int><token name="ZIndexBehavior">1</token><bool name="Enabled">true</bool></Properties><Item class="TextButton" referent="RBX475FC4D3143B455FAE4D196D33958C15"><Properties><string name="Name">Overlay</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0</R><G>0</G><B>0</B></Color3><float name="BackgroundTransparency">0.5</float><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2></Properties></Item><Item class="Frame" referent="RBXD38455BFEE9D48EBA5967923426EFB0B"><Properties><string name="Name">Fit</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>640</XO><YS>0</YS><YO>430</YO></UDim2></Properties><Item class="UIScale" referent="RBXAE729E7927DB4C25AEBFBB6DC2250508"><Properties><string name="Name">FitScale</string><float name="Scale">1</float></Properties></Item><Item class="Frame" referent="RBX3CD5A4B3BB9F40538FBD0C991DE29AB6"><Properties><string name="Name">Window</string><Color3 name="BackgroundColor3"><R>0.1961</R><G>0.5882</G><B>0.9412</B></Color3><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0.5</XS><XO>0</XO><YS>0.5</YS><YO>0</YO></UDim2><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><bool name="Active">true</bool></Properties><Item class="UICorner" referent="RBX44A598F68DE441BBB535565A251BA209"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>22</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX9822A9E868414AA79F18A6D0CC9E1BEC"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.0627</R><G>0.1725</G><B>0.4314</B></Color3><float name="Thickness">5</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="UIScale" referent="RBX5897F14C9F0A4B54A66FEE77298DBA79"><Properties><string name="Name">OpenScale</string><float name="Scale">1</float></Properties></Item><Item class="Frame" referent="RBX33CD228EFFED4CD5A9CE25AEE8E1A68C"><Properties><string name="Name">Panel</string><Color3 name="BackgroundColor3"><R>0.9882</R><G>0.9647</G><B>0.8863</B></Color3><UDim2 name="Position"><XS>0</XS><XO>8</XO><YS>0</YS><YO>58</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>624</XO><YS>0</YS><YO>364</YO></UDim2><bool name="ClipsDescendants">true</bool></Properties><Item class="UICorner" referent="RBX93EE41431CC1444AB6FBF0CB74BDD508"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>16</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX8F3AB53FFB9948A5BA118413F2470896"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.0627</R><G>0.1725</G><B>0.4314</B></Color3><float name="Thickness">3</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="Frame" referent="RBXE348ED0087ED484AB1BE111A23DBA909"><Properties><string name="Name">Cards</string><float name="BackgroundTransparency">1</float><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">2</int></Properties></Item></Item><Item class="TextLabel" referent="RBX4E5FF7E43CB24D7DBED8D503F0491FCC"><Properties><string name="Name">Title</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">Store!</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">44</int><bool name="TextScaled">false</bool><token name="TextXAlignment">0</token><UDim2 name="Position"><XS>0</XS><XO>100</XO><YS>0</YS><YO>4</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>170</XO><YS>0</YS><YO>50</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UIStroke" referent="RBXC5A08B944A9145FAB07CC241AA89B7FF"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="TextLabel" referent="RBX46AB2BEED8E343E088ACE5728BBE8A7D"><Properties><string name="Name">BasketIcon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🧺</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">78</int><bool name="TextScaled">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>44</XO><YS>0</YS><YO>24</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>92</XO><YS>0</YS><YO>92</YO></UDim2><int name="ZIndex">6</int></Properties><Item class="UIStroke" referent="RBX069FCBAFC0A9440E8AA31ACECCA33B3D"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item><Item class="ImageLabel" referent="RBXBE204B38061A4EAC8F4F5F0DA4041094"><Properties><string name="Name">BasketImage</string><float name="BackgroundTransparency">1</float><string name="Image"></string><token name="ScaleType">3</token><bool name="Visible">false</bool><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>44</XO><YS>0</YS><YO>24</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>92</XO><YS>0</YS><YO>92</YO></UDim2><int name="ZIndex">6</int></Properties></Item><Item class="Frame" referent="RBXD74D21B4305D4C438025A8D318A7CB33"><Properties><string name="Name">Tab_Luck</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>295</XO><YS>0</YS><YO>30</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>48</XO><YS>0</YS><YO>48</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UIScale" referent="RBX269D6BF4ABD64DC39C90C4B26A7E60A1"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX6B8E7F80426A4F24A7CE97C24981BE65"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.1608</R><G>0.502</G><B>1.0</B></Color3><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UICorner" referent="RBX10A11F98F680496B96FE19982B69B30C"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>12</O></UDim></Properties></Item><Item class="UIStroke" referent="RBXBCCB29F6A00B4DA5908A8C0935A39EA7"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.0643</R><G>0.2008</G><B>0.4</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="TextLabel" referent="RBX41FF2AD9F63540299245D598C1285F5B"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">❄️</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">30</int><bool name="TextScaled">false</bool><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">6</int></Properties><Item class="UIStroke" referent="RBXE51FAF17D3964726BC147791C85B7C67"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBX6212E6119E40483A9184917EC4F61626"><Properties><string name="Name">Tab_Power</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>353</XO><YS>0</YS><YO>30</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>48</XO><YS>0</YS><YO>48</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UIScale" referent="RBX8B9E5EF37A4047069FB459F968A1C92E"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX7DE47FC4EED34F45B3E1AC0916FAB9BE"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>1.0</R><G>0.7686</G><B>0.1176</B></Color3><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UICorner" referent="RBX091E596694634F668AEF882965B1BB50"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>12</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX696707B030114E42B1800DA9BE41541A"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.4</R><G>0.3074</G><B>0.047</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="TextLabel" referent="RBX650131FF79F34400B043DEAF5617EF47"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">💪</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">30</int><bool name="TextScaled">false</bool><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">6</int></Properties><Item class="UIStroke" referent="RBX4A682E1B8E6B454585C475665753627B"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBXD436E60CBCA84431B62F7A76A6C1665E"><Properties><string name="Name">Tab_Trophies</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>411</XO><YS>0</YS><YO>30</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>48</XO><YS>0</YS><YO>48</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UIScale" referent="RBX0452628D0A864B7A8F6331CF9FCF511F"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX494271B5F80649FFADD82449BFAAD390"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>1.0</R><G>0.6667</G><B>0.1176</B></Color3><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UICorner" referent="RBXAB17B11AB481462D8D299A842B0035BD"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>12</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX14227CCEB2A94D86BE0504B0D401DE61"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.4</R><G>0.2667</G><B>0.047</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="TextLabel" referent="RBX7500E39468584D4C9D28171D8F5BF1F5"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🏆</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">30</int><bool name="TextScaled">false</bool><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">6</int></Properties><Item class="UIStroke" referent="RBX7EF147457F1843F9930B75D47259546A"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBXBB41323CA79B4F379670516FFA866BA6"><Properties><string name="Name">Tab_Pets</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>469</XO><YS>0</YS><YO>30</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>48</XO><YS>0</YS><YO>48</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UIScale" referent="RBXE3226C9091934F008AB817A7DFA5A1E0"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX530A9D54D70E49A189901F56C45DFB59"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.1569</R><G>0.7843</G><B>0.3529</B></Color3><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">5</int></Properties><Item class="UICorner" referent="RBX83914BA20A324D219578B374412CA9D3"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>12</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX82B7D1FD3C2A4DAFB52D1E654ED76880"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.0628</R><G>0.3137</G><B>0.1412</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="TextLabel" referent="RBXD1233608E8D542B287365274CDECAB98"><Properties><string name="Name">Icon</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">🔴</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">30</int><bool name="TextScaled">false</bool><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">6</int></Properties><Item class="UIStroke" referent="RBX6C11031864BA49EABBAE21BE9C5660BE"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">0</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item></Item></Item><Item class="Frame" referent="RBX80F5D2D5D5F549C796EF28CF345AE876"><Properties><string name="Name">Close</string><float name="BackgroundTransparency">1</float><Vector2 name="AnchorPoint"><X>0.5</X><Y>0.5</Y></Vector2><UDim2 name="Position"><XS>0</XS><XO>636</XO><YS>0</YS><YO>26</YO></UDim2><UDim2 name="Size"><XS>0</XS><XO>50</XO><YS>0</YS><YO>50</YO></UDim2><int name="ZIndex">8</int></Properties><Item class="UIScale" referent="RBXEC3E2289282F4F9DAFC15BA42E8CC20B"><Properties><string name="Name">UIScale</string><float name="Scale">1</float></Properties></Item><Item class="TextButton" referent="RBX7CE96880648B4C33841D4C86E70A638B"><Properties><string name="Name">Body</string><string name="Text"></string><bool name="AutoButtonColor">false</bool><Color3 name="BackgroundColor3"><R>0.9216</R><G>0.1569</G><B>0.1569</B></Color3><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">8</int></Properties><Item class="UICorner" referent="RBXB749DEB830AF4A879D8F70F4952ED65F"><Properties><string name="Name">Corner</string><UDim name="CornerRadius"><S>0</S><O>12</O></UDim></Properties></Item><Item class="UIStroke" referent="RBX3A19014E520D4C229FD700235FEFC0CA"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0.4314</R><G>0.0392</G><B>0.0392</B></Color3><float name="Thickness">4</float><token name="ApplyStrokeMode">1</token></Properties></Item><Item class="TextLabel" referent="RBXB27BA2B036A14DD29512A3C133276BCD"><Properties><string name="Name">X</string><float name="BackgroundTransparency">1</float><Font name="FontFace"><Family><url>rbxasset://fonts/families/FredokaOne.json</url></Family><Weight>400</Weight><Style>Normal</Style></Font><string name="Text">✖</string><Color3 name="TextColor3"><R>1</R><G>1</G><B>1</B></Color3><int name="TextSize">30</int><bool name="TextScaled">false</bool><UDim2 name="Size"><XS>1</XS><XO>0</XO><YS>1</YS><YO>0</YO></UDim2><int name="ZIndex">9</int></Properties><Item class="UIStroke" referent="RBX3251FCCA5996466EADC9C90DD5BD12C0"><Properties><string name="Name">Stroke</string><Color3 name="Color"><R>0</R><G>0</G><B>0</B></Color3><float name="Thickness">2</float><token name="ApplyStrokeMode">0</token></Properties></Item></Item></Item></Item></Item></Item></Item></Item><Item class="StarterPlayer" referent="RBX092D3D7396D0400DBF0069FC905FC736"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX44A0D9EA3F45411E8297C849AEAE557C"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="LocalScript" referent="RBX9F81A9CD403E4F3B806B26EB8AE22516"><Properties><string name="Name">ShopClient</string><ProtectedString name="Source"><![CDATA[-- UI dello shop: menu laterale + finestra Store + animale che segue il cursore.
+-- Bottoni e finestra sono oggetti reali in StarterGui (ShopMenu / ShopStore); qui li animiamo.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ShopConfig"))
+local remotes = ReplicatedStorage:WaitForChild("ShopRemotes")
+local purchaseRemote = remotes:WaitForChild("Purchase")
+local purchasedRemote = remotes:WaitForChild("Purchased")
+
+local FONT = Enum.Font.FredokaOne
+local WHITE = Color3.new(1, 1, 1)
+local BLACK = Color3.new(0, 0, 0)
+
+----------------------------------------------------------------------
+-- Helper
+----------------------------------------------------------------------
+local function create(class, props, parent)
+	local inst = Instance.new(class)
+	for k, v in pairs(props) do
+		inst[k] = v
+	end
+	inst.Parent = parent
+	return inst
+end
+
+local function round(inst, radius)
+	return create("UICorner", { CornerRadius = UDim.new(0, radius) }, inst)
+end
+
+local function stroke(inst, color, thickness)
+	return create("UIStroke", {
+		Color = color,
+		Thickness = thickness,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, inst)
+end
+
+local function textStroke(label, thickness)
+	return create("UIStroke", {
+		Color = BLACK,
+		Thickness = thickness or 2,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+	}, label)
+end
+
+local function gradient(inst, c1, c2, rotation)
+	return create("UIGradient", {
+		Color = ColorSequence.new(c1, c2),
+		Rotation = rotation or 90,
+	}, inst)
+end
+
+local function shade(color, factor)
+	return Color3.new(
+		math.clamp(color.R * factor, 0, 1),
+		math.clamp(color.G * factor, 0, 1),
+		math.clamp(color.B * factor, 0, 1)
+	)
+end
+
+local function tween(inst, time, props, style, direction)
+	local t = TweenService:Create(
+		inst,
+		TweenInfo.new(time, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out),
+		props
+	)
+	t:Play()
+	return t
+end
+
+local function label(parent, props)
+	local l = create("TextLabel", {
+		BackgroundTransparency = 1,
+		Font = FONT,
+		TextColor3 = WHITE,
+	}, parent)
+	for k, v in pairs(props) do
+		l[k] = v
+	end
+	return l
+end
+
+local function makeScreenGui(name, order)
+	return create("ScreenGui", {
+		Name = name,
+		ResetOnSpawn = false,
+		IgnoreGuiInset = true,
+		DisplayOrder = order,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	}, playerGui)
+end
+
+-- Piccolo sistema di animatori: ogni funzione gira ogni frame e ritorna false per fermarsi.
+local animators = {}
+local function addAnimator(fn)
+	table.insert(animators, fn)
+end
+
+RunService.RenderStepped:Connect(function(dt)
+	local t = os.clock()
+	for i = #animators, 1, -1 do
+		if animators[i](dt, t) == false then
+			table.remove(animators, i)
+		end
+	end
+end)
+
+local function alive(inst)
+	return inst:IsDescendantOf(playerGui)
+end
+
+-- Icona Robux disegnata con i frame (esagono scuro con anello)
+local function robuxIcon(parent, size)
+	local holder = create("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 8, 0.5, 0),
+		Size = UDim2.fromOffset(size, size),
+	}, parent)
+	local outer = create("Frame", {
+		BackgroundColor3 = Color3.fromRGB(35, 35, 40),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.78, 0.78),
+		Rotation = 45,
+	}, holder)
+	round(outer, 6)
+	local ring = create("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.5, 0.5),
+	}, outer)
+	round(ring, 4)
+	stroke(ring, Color3.fromRGB(210, 210, 215), 2)
+	return holder
+end
+
+----------------------------------------------------------------------
+-- Toast (messaggi in basso)
+----------------------------------------------------------------------
+local toastGui = makeScreenGui("ShopToast", 30)
+local toastLabel = label(toastGui, {
+	Name = "Toast",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Position = UDim2.new(0.5, 0, 1, 80),
+	Size = UDim2.fromOffset(320, 46),
+	BackgroundTransparency = 0,
+	BackgroundColor3 = Color3.fromRGB(30, 30, 45),
+	TextSize = 24,
+	Text = "",
+})
+round(toastLabel, 14)
+stroke(toastLabel, WHITE, 3)
+textStroke(toastLabel, 2)
+local toastId = 0
+
+local function toast(text, color)
+	toastId += 1
+	local myId = toastId
+	toastLabel.Text = text
+	toastLabel.BackgroundColor3 = color or Color3.fromRGB(30, 30, 45)
+	toastLabel.Position = UDim2.new(0.5, 0, 1, 80)
+	tween(toastLabel, 0.45, { Position = UDim2.new(0.5, 0, 1, -40) }, Enum.EasingStyle.Back)
+	task.delay(2.2, function()
+		if myId == toastId then
+			tween(toastLabel, 0.3, { Position = UDim2.new(0.5, 0, 1, 80) }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+		end
+	end)
+end
+
+----------------------------------------------------------------------
+-- Coriandoli
+----------------------------------------------------------------------
+local fxGui = makeScreenGui("ShopFX", 40)
+local CONFETTI_COLORS = {
+	Color3.fromRGB(255, 80, 80),
+	Color3.fromRGB(255, 200, 40),
+	Color3.fromRGB(80, 220, 90),
+	Color3.fromRGB(70, 160, 255),
+	Color3.fromRGB(200, 90, 255),
+	Color3.fromRGB(255, 120, 200),
+}
+
+local function confetti(origin, count)
+	for _ = 1, count do
+		local piece = create("Frame", {
+			BackgroundColor3 = CONFETTI_COLORS[math.random(1, #CONFETTI_COLORS)],
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(math.random(8, 14), math.random(6, 10)),
+			Position = UDim2.fromOffset(origin.X, origin.Y),
+			Rotation = math.random(0, 360),
+		}, fxGui)
+		local angle = math.random() * math.pi * 2
+		local speed = math.random(200, 650)
+		local vx, vy = math.cos(angle) * speed, math.sin(angle) * speed - 280
+		local px, py = origin.X, origin.Y
+		local born = os.clock()
+		local spin = math.random(-500, 500)
+		addAnimator(function(dt, t)
+			local age = t - born
+			if age > 1.9 or not alive(piece) then
+				piece:Destroy()
+				return false
+			end
+			vy += 950 * dt
+			vx *= 1 - math.min(dt * 1.3, 1)
+			px += vx * dt
+			py += vy * dt
+			piece.Position = UDim2.fromOffset(px, py)
+			piece.Rotation += spin * dt
+			piece.BackgroundTransparency = math.clamp((age - 1.2) / 0.7, 0, 1)
+			return true
+		end)
+	end
+end
+
+local function sparkle(parent, position, text, size)
+	local s = label(parent, {
+		Text = text or "✨",
+		TextSize = size or 22,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = position,
+		Size = UDim2.fromOffset(30, 30),
+		Rotation = math.random(-30, 30),
+		ZIndex = 20,
+	})
+	tween(s, 0.9, {
+		Position = position - UDim2.fromOffset(math.random(-10, 10), math.random(25, 45)),
+		TextTransparency = 1,
+		Rotation = s.Rotation + math.random(-60, 60),
+	})
+	task.delay(0.95, function()
+		s:Destroy()
+	end)
+	return s
+end
+
+----------------------------------------------------------------------
+-- Menu laterale: gli oggetti sono in StarterGui > ShopMenu (vedi tools/gen_ui.py)
+----------------------------------------------------------------------
+local menuGui = playerGui:WaitForChild("ShopMenu")
+local menuRoot = menuGui:WaitForChild("Menu")
+local menuScale = menuRoot:WaitForChild("UIScale")
+
+local function updateMenuScale()
+	local vp = camera.ViewportSize
+	menuScale.Scale = math.clamp(vp.Y / 800, 0.55, 1)
+end
+updateMenuScale()
+camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateMenuScale)
+
+local openStore -- definita piu sotto
+local toggleStore
+
+local giftRemaining = Config.GiftSeconds
+
+local menuDefs = {
+	{ Name = "Sentieri" },
+	{ Name = "Rinascita" },
+	{ Name = "Giornaliero", Badge = true },
+	{ Name = "Gift", Gift = true },
+	{ Name = "Musica" },
+	{ Name = "Shop", Shop = true },
+}
+
+local function formatTime(seconds)
+	return string.format("%d:%02d", seconds // 60, seconds % 60)
+end
+
+-- Sceglie tra emoji e immagine (se in Studio o in Config hai messo un asset id)
+local function pickIcon(textIcon, imageIcon, configImage)
+	if configImage and configImage ~= "" then
+		imageIcon.Image = configImage
+	end
+	local useImage = imageIcon.Image ~= ""
+	imageIcon.Visible = useImage
+	textIcon.Visible = not useImage
+	return useImage and imageIcon or textIcon
+end
+
+local function bindMenuButton(def, index)
+	local holder = menuRoot:WaitForChild(def.Name)
+	local scale = holder:WaitForChild("UIScale")
+	local body = holder:WaitForChild("Body")
+	local bodyStroke = body:FindFirstChildOfClass("UIStroke")
+	local baseStrokeColor = bodyStroke.Color
+	local nameLabel = body:WaitForChild("NameLabel")
+	local icon = pickIcon(body:WaitForChild("Icon"), body:WaitForChild("IconImage"), def.Shop and Config.ShopIconImage)
+	local badge = holder:FindFirstChild("Badge")
+	local badgeScale = badge and badge:FindFirstChildOfClass("UIScale")
+
+	if not body:FindFirstChildOfClass("UIGradient") then
+		gradient(body, body.BackgroundColor3:Lerp(WHITE, 0.3), shade(body.BackgroundColor3, 0.88))
+	end
+
+	-- entrata
+	scale.Scale = 0
+	task.delay(0.1 * index, function()
+		tween(scale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+	end)
+
+	-- Hover / click
+	local ready = false
+	local hovering = false
+	task.delay(0.1 * index + 0.7, function()
+		ready = true
+	end)
+
+	body.MouseEnter:Connect(function()
+		if not ready then
+			return
+		end
+		hovering = true
+		tween(scale, 0.25, { Scale = 1.12 }, Enum.EasingStyle.Back)
+		tween(holder, 0.12, { Rotation = -6 })
+		task.delay(0.12, function()
+			tween(holder, 0.35, { Rotation = 0 }, Enum.EasingStyle.Elastic)
+		end)
+	end)
+	body.MouseLeave:Connect(function()
+		hovering = false
+		if ready then
+			tween(scale, 0.2, { Scale = 1 })
+		end
+	end)
+	body.MouseButton1Down:Connect(function()
+		if ready then
+			tween(scale, 0.08, { Scale = 0.9 })
+		end
+	end)
+	body.Activated:Connect(function()
+		if not ready then
+			return
+		end
+		tween(scale, 0.35, { Scale = hovering and 1.12 or 1 }, Enum.EasingStyle.Elastic)
+		if def.Shop then
+			toggleStore()
+		elseif def.Gift then
+			if giftRemaining <= 0 then
+				giftRemaining = Config.GiftSeconds
+				confetti(holder.AbsolutePosition + holder.AbsoluteSize / 2, 25)
+				toast("🎁 Regalo ritirato!", Color3.fromRGB(255, 150, 40))
+			else
+				toast("⏳ Il regalo arriva tra " .. formatTime(math.ceil(giftRemaining)), Color3.fromRGB(70, 70, 110))
+			end
+		else
+			toast("✨ " .. def.Name .. " - presto disponibile!", Color3.fromRGB(70, 70, 110))
+		end
+	end)
+
+	-- Animazioni idle
+	local phase = index * 1.3
+	local wasShaking = false
+	local sparkleTimer = 0
+	addAnimator(function(dt, t)
+		if not alive(holder) then
+			return false
+		end
+		body.Rotation = math.sin(t * 2 + phase) * 2.2
+		icon.Position = UDim2.new(0.5, 0, 0.4, math.sin(t * 3 + phase) * 3)
+		if badgeScale then
+			badgeScale.Scale = 1 + math.abs(math.sin(t * 4)) * 0.22
+		end
+		if def.Shop then
+			local pulse = (math.sin(t * 4) + 1) / 2
+			bodyStroke.Color = baseStrokeColor:Lerp(WHITE, pulse * 0.85)
+			local cycle = t % 4
+			if cycle < 0.7 and not hovering then
+				holder.Rotation = math.sin(cycle * 38) * 9 * (1 - cycle / 0.7)
+				wasShaking = true
+			elseif wasShaking then
+				holder.Rotation = 0
+				wasShaking = false
+			end
+			sparkleTimer += dt
+			if sparkleTimer > 0.45 then
+				sparkleTimer = 0
+				local pos = UDim2.new(math.random(), 0, math.random() * 0.8, 0)
+				sparkle(holder, pos, math.random() < 0.5 and "✨" or "⭐", math.random(16, 26))
+			end
+		end
+		if def.Gift then
+			local sec = math.max(0, math.ceil(giftRemaining))
+			nameLabel.Text = sec > 0 and formatTime(sec) or "Ritira!"
+		end
+		return true
+	end)
+end
+
+for i, def in ipairs(menuDefs) do
+	bindMenuButton(def, i)
+end
+
+-- Conto alla rovescia del regalo
+addAnimator(function(dt)
+	if giftRemaining > 0 then
+		giftRemaining = math.max(0, giftRemaining - dt)
+	end
+	return true
+end)
+
+----------------------------------------------------------------------
+-- Finestra Store: oggetti in StarterGui > ShopStore
+----------------------------------------------------------------------
+local WIN_W, WIN_H = 640, 430
+local PANEL_W, PANEL_H = 624, 364
+
+local storeGui = playerGui:WaitForChild("ShopStore")
+storeGui.Enabled = false
+
+local blur = Instance.new("BlurEffect")
+blur.Name = "ShopBlur"
+blur.Size = 0
+blur.Parent = Lighting
+
+local overlay = storeGui:WaitForChild("Overlay")
+local fit = storeGui:WaitForChild("Fit")
+local fitScale = fit:WaitForChild("FitScale")
+
+local function updateFit()
+	local vp = camera.ViewportSize
+	fitScale.Scale = math.min(1, vp.X / (WIN_W + 70), vp.Y / (WIN_H + 70))
+end
+updateFit()
+camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateFit)
+
+local window = fit:WaitForChild("Window")
+local openScale = window:WaitForChild("OpenScale")
+openScale.Scale = 0
+gradient(window, Color3.fromRGB(95, 190, 255), Color3.fromRGB(40, 120, 220))
+
+local panel = window:WaitForChild("Panel")
+gradient(panel, Color3.fromRGB(255, 252, 238), Color3.fromRGB(255, 232, 160))
+local cardsFolder = panel:WaitForChild("Cards")
+
+-- Soldi che fluttuano nello sfondo
+local moneyBits = {}
+for i = 1, 18 do
+	local l = label(panel, {
+		Text = "💵",
+		TextSize = math.random(26, 40),
+		TextTransparency = 0.55,
+		Size = UDim2.fromOffset(44, 44),
+		ZIndex = 1,
+	})
+	moneyBits[i] = {
+		label = l,
+		x = math.random() * PANEL_W,
+		y = math.random() * PANEL_H,
+		speed = math.random(14, 32),
+		rot = math.random(0, 360),
+		spin = math.random(-25, 25),
+	}
+end
+addAnimator(function(dt)
+	if not alive(panel) then
+		return false
+	end
+	if not storeGui.Enabled then
+		return true
+	end
+	for _, bit in ipairs(moneyBits) do
+		bit.x += bit.speed * dt
+		bit.y += bit.speed * 0.7 * dt
+		bit.rot += bit.spin * dt
+		if bit.x > PANEL_W + 30 then
+			bit.x = -30
+		end
+		if bit.y > PANEL_H + 30 then
+			bit.y = -30
+		end
+		bit.label.Position = UDim2.fromOffset(bit.x - 22, bit.y - 22)
+		bit.label.Rotation = bit.rot
+	end
+	return true
+end)
+
+-- Icona cestino (emoji oppure immagine)
+local basket = pickIcon(window:WaitForChild("BasketIcon"), window:WaitForChild("BasketImage"), Config.ShopIconImage)
+
+-- Tab
+local tabButtons = {}
+local currentTab = 1
+local showTab -- definita dopo
+
+local function bindTab(def, index)
+	local holder = window:WaitForChild("Tab_" .. def.Id)
+	local pop = holder:WaitForChild("UIScale")
+	local body = holder:WaitForChild("Body")
+	local st = body:FindFirstChildOfClass("UIStroke")
+	local icon = body:WaitForChild("Icon")
+	local dark = st.Color
+	local basePos = holder.Position
+
+	if not body:FindFirstChildOfClass("UIGradient") then
+		gradient(body, body.BackgroundColor3:Lerp(WHITE, 0.35), shade(body.BackgroundColor3, 0.9))
+	end
+
+	body.MouseEnter:Connect(function()
+		tween(holder, 0.12, { Rotation = -10 })
+		task.delay(0.12, function()
+			tween(holder, 0.35, { Rotation = 0 }, Enum.EasingStyle.Elastic)
+		end)
+	end)
+	body.Activated:Connect(function()
+		showTab(index)
+	end)
+
+	addAnimator(function(_, t)
+		if not alive(holder) then
+			return false
+		end
+		icon.Rotation = math.sin(t * 3 + index) * 6
+		return true
+	end)
+
+	tabButtons[index] = { holder = holder, pop = pop, stroke = st, dark = dark, basePos = basePos }
+end
+
+for i, def in ipairs(Config.Tabs) do
+	bindTab(def, i)
+end
+
+local function selectTabVisual(index)
+	for i, tab in ipairs(tabButtons) do
+		local selected = i == index
+		tween(tab.pop, 0.3, { Scale = selected and 1.18 or 1 }, Enum.EasingStyle.Back)
+		tween(tab.holder, 0.25, {
+			Position = tab.basePos + UDim2.fromOffset(0, selected and 4 or 0),
+		}, Enum.EasingStyle.Back)
+		tab.stroke.Color = selected and WHITE or tab.dark
+	end
+end
+
+-- Pulsante chiudi
+local closeHolder = window:WaitForChild("Close")
+local closeScale = closeHolder:WaitForChild("UIScale")
+local closeBody = closeHolder:WaitForChild("Body")
+gradient(closeBody, Color3.fromRGB(255, 100, 100), Color3.fromRGB(210, 25, 25))
+
+closeBody.MouseEnter:Connect(function()
+	tween(closeScale, 0.2, { Scale = 1.15 }, Enum.EasingStyle.Back)
+	tween(closeHolder, 0.25, { Rotation = 90 }, Enum.EasingStyle.Back)
+end)
+closeBody.MouseLeave:Connect(function()
+	tween(closeScale, 0.2, { Scale = 1 })
+	tween(closeHolder, 0.25, { Rotation = 0 })
+end)
+
+-- Celebrazione acquisto / carte
+local cardMap = {}
+
+local function requestPurchase(item)
+	if item.ProductId and item.ProductId ~= 0 then
+		MarketplaceService:PromptProductPurchase(player, item.ProductId)
+	elseif Config.TestMode then
+		purchaseRemote:FireServer(item.Id)
+	else
+		toast("Non disponibile", Color3.fromRGB(150, 40, 40))
+	end
+end
+
+local itemsById = {}
+local pages = {}
+for _, tab in ipairs(Config.Tabs) do
+	pages[tab.Id] = {}
+end
+for _, item in ipairs(Config.Items) do
+	itemsById[item.Id] = item
+	table.insert(pages[item.Tab], item)
+end
+
+local PAD, SLOT_GAP = 10, 8
+local topW = (PANEL_W - PAD * 2 - SLOT_GAP * 2) / 3
+local rowH = (PANEL_H - PAD * 2 - SLOT_GAP) / 2
+local botW = (PANEL_W - PAD * 2 - SLOT_GAP) / 2
+
+local function slotRect(index)
+	if index <= 3 then
+		return PAD + (index - 1) * (topW + SLOT_GAP), PAD, topW, rowH
+	end
+	return PAD + (index - 4) * (botW + SLOT_GAP), PAD + rowH + SLOT_GAP, botW, rowH
+end
+
+local function buildCard(item, index, delay)
+	local x, y, w, h = slotRect(index)
+	local wide = index > 3
+	local baseY = y + h / 2
+
+	local holder = create("Frame", {
+		Name = item.Id,
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(x + w / 2, baseY),
+		Size = UDim2.fromOffset(w, h),
+	}, cardsFolder)
+	local scale = create("UIScale", { Scale = 0 }, holder)
+	cardMap[item.Id] = holder
+
+	local body = create("TextButton", {
+		Name = "Body",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = item.Color,
+		Size = UDim2.fromScale(1, 1),
+		ClipsDescendants = true,
+	}, holder)
+	round(body, 16)
+	stroke(body, shade(item.Color, 0.5), 3.5)
+	gradient(body, item.Color:Lerp(WHITE, 0.3), shade(item.Color, 0.85))
+
+	-- raggi che ruotano
+	local diag = math.sqrt(w * w + h * h)
+	local rays = create("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(diag, diag),
+	}, body)
+	for i = 0, 7 do
+		create("Frame", {
+			BackgroundColor3 = WHITE,
+			BackgroundTransparency = 0.86,
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(0, 24, 1, 0),
+			Rotation = i * 22.5,
+		}, rays)
+	end
+
+	-- scritte
+	local name = label(body, {
+		Text = item.Name,
+		TextScaled = true,
+		Position = UDim2.fromOffset(8, 8),
+		Size = UDim2.new(1, -16, 0, wide and 32 or 34),
+		ZIndex = 3,
+	})
+	create("UITextSizeConstraint", { MaxTextSize = 30 }, name)
+	textStroke(name, 3)
+
+	local desc = label(body, {
+		Text = item.Desc,
+		TextSize = 15,
+		TextWrapped = true,
+		Font = Enum.Font.FredokaOne,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, wide and 44 or 46),
+		Size = UDim2.new(1, -28, 0, wide and 36 or 60),
+		ZIndex = 3,
+	})
+	textStroke(desc, 2)
+
+	local bigIcon
+	if item.Icon then
+		bigIcon = label(body, {
+			Text = item.Icon,
+			TextSize = 58,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.16, 0, 0.7, 0),
+			Size = UDim2.fromOffset(70, 70),
+			ZIndex = 3,
+		})
+	end
+
+	-- prezzo
+	local green = Color3.fromRGB(45, 200, 70)
+	local price = create("Frame", {
+		Name = "Price",
+		BackgroundColor3 = green,
+		AnchorPoint = wide and Vector2.new(1, 1) or Vector2.new(0.5, 1),
+		Position = wide and UDim2.new(1, -12, 1, -10) or UDim2.new(0.5, 0, 1, -10),
+		Size = wide and UDim2.fromOffset(130, 40) or UDim2.new(0.66, 0, 0, 40),
+		ZIndex = 4,
+	}, body)
+	round(price, 10)
+	stroke(price, Color3.fromRGB(20, 100, 35), 3)
+	gradient(price, Color3.fromRGB(110, 240, 120), green)
+	local priceScale = create("UIScale", {}, price)
+	robuxIcon(price, 26).ZIndex = 5
+	local priceText = label(price, {
+		Text = tostring(item.Price),
+		TextSize = 26,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(40, 0),
+		Size = UDim2.new(1, -44, 1, 0),
+		ZIndex = 5,
+	})
+	textStroke(priceText, 2.5)
+
+	-- scia di luce
+	local shine = create("Frame", {
+		BackgroundColor3 = WHITE,
+		BackgroundTransparency = 0.7,
+		BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(38, h * 1.8),
+		Rotation = 22,
+		ZIndex = 8,
+		Visible = false,
+	}, body)
+
+	-- etichetta (HOT!, NEW...)
+	local tagScale
+	if item.Tag then
+		local tag = create("Frame", {
+			BackgroundColor3 = Color3.fromRGB(235, 40, 40),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, -10, 0, 8),
+			Size = UDim2.fromOffset(62, 26),
+			Rotation = 14,
+			ZIndex = 12,
+		}, holder)
+		round(tag, 8)
+		stroke(tag, Color3.fromRGB(110, 10, 10), 2.5)
+		local tagLabel = label(tag, {
+			Text = item.Tag,
+			TextSize = 18,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 13,
+		})
+		textStroke(tagLabel, 2)
+		tagScale = create("UIScale", {}, tag)
+	end
+
+	-- interazione
+	local ready = false
+	local hovering = false
+	task.delay(delay + 0.55, function()
+		ready = true
+	end)
+
+	body.MouseEnter:Connect(function()
+		if not ready then
+			return
+		end
+		hovering = true
+		tween(scale, 0.25, { Scale = 1.07 }, Enum.EasingStyle.Back)
+		tween(holder, 0.1, { Rotation = (math.random() < 0.5 and -1 or 1) * 2.5 })
+		task.delay(0.1, function()
+			tween(holder, 0.35, { Rotation = 0 }, Enum.EasingStyle.Elastic)
+		end)
+	end)
+	body.MouseLeave:Connect(function()
+		hovering = false
+		if ready then
+			tween(scale, 0.2, { Scale = 1 })
+		end
+	end)
+	body.MouseButton1Down:Connect(function()
+		if ready then
+			tween(scale, 0.08, { Scale = 0.93 })
+		end
+	end)
+	body.Activated:Connect(function()
+		if not ready then
+			return
+		end
+		tween(scale, 0.4, { Scale = hovering and 1.07 or 1 }, Enum.EasingStyle.Elastic)
+		requestPurchase(item)
+	end)
+
+	-- animazioni idle
+	addAnimator(function(_, t)
+		if not alive(holder) then
+			return false
+		end
+		holder.Position = UDim2.fromOffset(x + w / 2, baseY + math.sin(t * 1.8 + index) * 2.5)
+		rays.Rotation = t * 10 + index * 20
+		priceScale.Scale = 1 + math.sin(t * 4 + index) * 0.045
+		if bigIcon then
+			bigIcon.Rotation = math.sin(t * 2.5 + index) * 10
+			bigIcon.Position = UDim2.new(0.16, 0, 0.7, math.sin(t * 3 + index) * 4)
+		end
+		if tagScale then
+			tagScale.Scale = 1 + math.abs(math.sin(t * 3 + index)) * 0.15
+		end
+		local cycle = (t + index * 0.6) % 3.4
+		if cycle < 1 then
+			shine.Visible = true
+			shine.Position = UDim2.fromOffset(-60 + cycle * (w + 120), h / 2)
+		else
+			shine.Visible = false
+		end
+		return true
+	end)
+
+	-- entrata
+	task.delay(delay, function()
+		if alive(holder) then
+			tween(scale, 0.55, { Scale = 1 }, Enum.EasingStyle.Back)
+		end
+	end)
+end
+
+showTab = function(index)
+	currentTab = index
+	selectTabVisual(index)
+	for _, child in ipairs(cardsFolder:GetChildren()) do
+		child:Destroy()
+	end
+	cardMap = {}
+	local items = pages[Config.Tabs[index].Id]
+	for i, item in ipairs(items) do
+		if i <= 5 then
+			buildCard(item, i, 0.05 + i * 0.07)
+		end
+	end
+end
+
+-- Quando il server conferma l'acquisto
+purchasedRemote.OnClientEvent:Connect(function(itemId)
+	local item = itemsById[itemId]
+	if not item then
+		return
+	end
+	local card = cardMap[itemId]
+	local origin
+	if card and alive(card) then
+		origin = card.AbsolutePosition + card.AbsoluteSize / 2
+	else
+		origin = camera.ViewportSize / 2
+	end
+	confetti(origin, 45)
+	toast("✅ Hai preso: " .. item.Name .. "!", Color3.fromRGB(40, 150, 60))
+end)
+
+----------------------------------------------------------------------
+-- Animale che segue il cursore
+----------------------------------------------------------------------
+local petGui = makeScreenGui("ShopPet", 50)
+local PET_SIZE = 60
+local ORANGE = Color3.fromRGB(255, 168, 40)
+
+local pet = create("Frame", {
+	Name = "Pet",
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Size = UDim2.fromOffset(PET_SIZE, PET_SIZE),
+	Visible = false,
+}, petGui)
+local petScale = create("UIScale", { Scale = 0 }, pet)
+
+-- orecchie
+for _, sx in ipairs({ 0.2, 0.8 }) do
+	local ear = create("Frame", {
+		BackgroundColor3 = ORANGE,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(sx, 0.08),
+		Size = UDim2.fromOffset(18, 18),
+		Rotation = sx < 0.5 and -25 or 25,
+	}, pet)
+	round(ear, 7)
+	stroke(ear, Color3.fromRGB(150, 80, 10), 3)
+end
+
+local petBody = create("Frame", {
+	BackgroundColor3 = ORANGE,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.52),
+	Size = UDim2.fromScale(1, 0.92),
+}, pet)
+round(petBody, 30)
+stroke(petBody, Color3.fromRGB(150, 80, 10), 3.5)
+gradient(petBody, Color3.fromRGB(255, 205, 90), Color3.fromRGB(255, 150, 30))
+
+local eyes = {}
+for _, ex in ipairs({ 0.3, 0.7 }) do
+	local eye = create("Frame", {
+		BackgroundColor3 = WHITE,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(ex, 0.4),
+		Size = UDim2.fromOffset(17, 17),
+		ZIndex = 2,
+	}, petBody)
+	round(eye, 9)
+	local pupil = create("Frame", {
+		BackgroundColor3 = BLACK,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(9, 9),
+		ZIndex = 3,
+	}, eye)
+	round(pupil, 5)
+	local glint = create("Frame", {
+		BackgroundColor3 = WHITE,
+		Position = UDim2.fromOffset(1, 1),
+		Size = UDim2.fromOffset(3, 3),
+		ZIndex = 4,
+	}, pupil)
+	round(glint, 2)
+	table.insert(eyes, { eye = eye, pupil = pupil })
+end
+
+for _, cx in ipairs({ 0.14, 0.86 }) do
+	local blush = create("Frame", {
+		BackgroundColor3 = Color3.fromRGB(255, 110, 130),
+		BackgroundTransparency = 0.35,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(cx, 0.68),
+		Size = UDim2.fromOffset(11, 7),
+		ZIndex = 2,
+	}, petBody)
+	round(blush, 4)
+end
+
+local mouth = create("Frame", {
+	BackgroundColor3 = Color3.fromRGB(150, 40, 30),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.7),
+	Size = UDim2.fromOffset(12, 7),
+	ZIndex = 2,
+}, petBody)
+round(mouth, 5)
+
+local petPos = Vector2.new(0, 0)
+local lastTrail = 0
+local petBobSeed = 0
+
+addAnimator(function(dt, t)
+	if not pet.Visible then
+		return true
+	end
+	local mouse = UserInputService:GetMouseLocation()
+	local target = mouse + Vector2.new(40, 32)
+	local prev = petPos
+	petPos = petPos:Lerp(target, 1 - math.exp(-8 * dt))
+	local vel = (petPos - prev) / math.max(dt, 1 / 240)
+
+	pet.Position = UDim2.fromOffset(petPos.X, petPos.Y + math.sin(t * 7 + petBobSeed) * 3)
+	pet.Rotation = math.clamp(vel.X * 0.03, -25, 25)
+	local stretch = math.clamp(vel.Magnitude / 1600, 0, 0.25)
+	pet.Size = UDim2.fromOffset(PET_SIZE * (1 - stretch * 0.4), PET_SIZE * (1 + stretch * 0.5))
+
+	-- occhi che guardano il cursore + battito di ciglia
+	local dir = mouse - petPos
+	local unit = dir.Magnitude > 1 and dir.Unit or Vector2.zero
+	local blink = (t % 3.3) < 0.12
+	for _, e in ipairs(eyes) do
+		e.pupil.Position = UDim2.new(0.5, unit.X * 3, 0.5, unit.Y * 3)
+		e.eye.Size = blink and UDim2.fromOffset(17, 4) or UDim2.fromOffset(17, 17)
+	end
+	mouth.Size = vel.Magnitude > 400 and UDim2.fromOffset(14, 11) or UDim2.fromOffset(12, 7)
+
+	-- scia di stelline quando corre
+	if vel.Magnitude > 260 and t - lastTrail > 0.05 then
+		lastTrail = t
+		sparkle(petGui, UDim2.fromOffset(petPos.X, petPos.Y + 10), "✦", math.random(14, 22)).TextColor3 =
+			Color3.fromRGB(255, 220, 80)
+	end
+	return true
+end)
+
+local function showPet()
+	local mouse = UserInputService:GetMouseLocation()
+	petPos = Vector2.new(mouse.X, -80) -- cade dall'alto
+	pet.Visible = true
+	petScale.Scale = 0
+	tween(petScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+end
+
+local function hidePet()
+	local t = tween(petScale, 0.25, { Scale = 0 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+	t.Completed:Connect(function()
+		if petScale.Scale <= 0.05 then
+			pet.Visible = false
+		end
+	end)
+end
+
+----------------------------------------------------------------------
+-- Apri / chiudi
+----------------------------------------------------------------------
+local isOpen = false
+local busy = false
+local basketFree = false
+
+openStore = function()
+	if isOpen or busy then
+		return
+	end
+	busy = true
+	isOpen = true
+
+	storeGui.Enabled = true
+	overlay.BackgroundTransparency = 1
+	tween(overlay, 0.3, { BackgroundTransparency = 0.5 })
+	tween(blur, 0.35, { Size = 16 })
+
+	openScale.Scale = 0
+	window.Rotation = -12
+	tween(openScale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+	tween(window, 0.6, { Rotation = 0 }, Enum.EasingStyle.Back)
+
+	-- cestino che rimbalza dentro
+	basketFree = false
+	basket.Rotation = -25
+	tween(basket, 0.9, { Rotation = 0 }, Enum.EasingStyle.Elastic)
+	task.delay(1, function()
+		basketFree = true
+	end)
+
+	-- tab e bottone chiudi entrano a cascata
+	for i, tab in ipairs(tabButtons) do
+		tab.pop.Scale = 0
+		task.delay(0.2 + i * 0.07, function()
+			tween(tab.pop, 0.45, { Scale = i == currentTab and 1.18 or 1 }, Enum.EasingStyle.Back)
+		end)
+	end
+	closeScale.Scale = 0
+	task.delay(0.45, function()
+		tween(closeScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+	end)
+
+	showTab(currentTab)
+	showPet()
+
+	task.delay(0.6, function()
+		busy = false
+	end)
+end
+
+local function closeStore()
+	if not isOpen or busy then
+		return
+	end
+	busy = true
+	isOpen = false
+
+	tween(overlay, 0.3, { BackgroundTransparency = 1 })
+	tween(blur, 0.3, { Size = 0 })
+	tween(openScale, 0.3, { Scale = 0 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+	tween(window, 0.3, { Rotation = 10 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+	hidePet()
+
+	task.delay(0.32, function()
+		storeGui.Enabled = false
+		busy = false
+	end)
+end
+
+toggleStore = function()
+	if isOpen then
+		closeStore()
+	else
+		openStore()
+	end
+end
+
+closeBody.Activated:Connect(closeStore)
+overlay.Activated:Connect(closeStore)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.B then
+		toggleStore()
+	end
+end)
+
+-- Cestino che dondola mentre il negozio e' aperto
+addAnimator(function(_, t)
+	if not alive(basket) then
+		return false
+	end
+	if isOpen and basketFree then
+		basket.Rotation = math.sin(t * 2.2) * 6
+		basket.Position = UDim2.fromOffset(44, 24 + math.sin(t * 3) * 3)
+	end
+	return true
+end)
+]]></ProtectedString></Properties></Item></Item></Item></roblox>

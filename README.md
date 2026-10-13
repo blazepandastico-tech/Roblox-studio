@@ -2,7 +2,10 @@
 
 Baseplate con menu laterale animato e finestra **Store!** (progetto [Rojo](https://rojo.space)).
 
-## Come provarlo
+## Aprire direttamente in Studio (senza Rojo)
+Scarica **`Shop.rbxlx`** dalla root del repo e aprilo con Roblox Studio: dentro ci sono baseplate, script e, in **StarterGui**, `ShopMenu` e `ShopStore` gia' visibili e modificabili. Dopo aver cambiato file in `src/` rigenera con `python3 tools/gen_ui.py && python3 tools/build_rbxlx.py`.
+
+## Come provarlo (con Rojo)
 1. Installa Rojo, poi nella cartella del repo: `rojo serve` e connettiti da Studio (oppure `rojo build -o Shop.rbxlx`).
 2. Premi Play. A sinistra trovi il menu (Sentieri, Rinascita, Giornaliero, Regalo, Musica, **Shop**).
 3. Clicca **Shop** (o premi **B**) per aprire lo Store.
