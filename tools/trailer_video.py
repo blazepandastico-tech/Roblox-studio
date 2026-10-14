@@ -54,7 +54,7 @@ KEYS = {
         "case_notte": dict(view="calaneth_case", night=True, fwd=-15, up=6, fov=66),
         "aurion": dict(view="aurion", fwd=-20, fov=64),
         "campo": dict(view="campo", fwd=-25, up=10, fov=64),
-        "colosso": dict(view="colosso_scena", up=-30, tup=10, fov=66, titans="colosso"),
+        "colosso": dict(view="colosso_scena", right=12, up=6, tup=-6, fov=54, titans="colosso"),
         "varieta": dict(view="varieta_volti", fwd=-10, fov=62, titans="fila"),
     },
     "halloween": {
@@ -661,7 +661,10 @@ def move(a, b, curve=ease):
         k = curve(t)
         out = {}
         for key in set(a) | set(b):
-            va, vb = a.get(key, b.get(key, 0.0)), b.get(key, a.get(key, 0.0))
+            # quello che manca da una parte vale 0 (fov e follow: come l'altra parte / 1)
+            default = {"fov": None, "follow": 1.0}.get(key, 0.0)
+            va = a.get(key, b[key] if default is None else default)
+            vb = b.get(key, a[key] if default is None else default)
             out[key] = va + (vb - va) * k
         return out
     return m
@@ -691,11 +694,11 @@ def shots_lancio():
         Shot("mura", 3.5, key="mura", cam=move({"fov": 52}, {"fwd": 16, "up": 3, "fov": 48}), fx=[("pioggia", {"n": 700})],
              flashes=[(0.25, 0.9, (0.75, 0.82, 1.0)), (1.6, 0.5, (0.75, 0.82, 1.0))], fade_in=0.15,
              title=("Poi tornarono i GIGANTI.", "GothamBlack", RED)),
-        Shot("giganti", 3.5, key="giganti", cam=move({"fov": 52, "up": 0}, {"fwd": 30, "up": 5, "tup": 4, "fov": 50}), fx=[("vapore", {"n": 10})], shake=0.6,
+        Shot("giganti", 3.5, key="giganti", cam=move({"fov": 52, "up": 0}, {"fwd": 12, "up": 3, "tup": 3, "fov": 50}), fx=[("vapore", {"n": 10})], shake=0.6,
              caption=("Sono enormi... e hanno fame.", "GothamBlack", None)),
         Shot("volto", 2.0, key="volto", cam=move({"fov": 50, "roll": 0.0}, {"fwd": 2.5, "fov": 44, "roll": -0.04}), fx=[("vapore", {"n": 8})], flashes=[(1.85, 0.6, (1, 1, 1))]),
         Shot("tetti", 4.0, key="aurion", cam=move({"fov": 56}, {"fwd": 8, "up": -1, "fov": 52}),
-             fx=[("cadetto", {"percorso": [(26, 20, -2), (32, 8, -5), (38, -4, -6), (46, -16, -4), (56, -28, -1)], "aggancio": (68, -24, 8), "da": 0.2, "a": 3.7, "alto": 1.9})],
+             fx=[("cadetto", {"percorso": [(17, 15, -2), (22, 6, -4), (27, -3, -5), (33, -12, -4), (41, -22, -2)], "aggancio": (52, -20, 9), "da": 0.2, "a": 3.7, "alto": 2.6})],
              caption=("Vola tra i tetti con i rampini", "GothamBlack", GOLD)),
         Shot("nuca", 3.0, key="nuca", cam=move({"fov": 56}, {"fwd": 5, "fov": 46}, ease_out), blur=2, shake=0.4,
              fx=[("vapore", {"n": 12}), ("cadetto", {"percorso": [(1, -5, -5), (5, -3, -3), (9, -1, -2), (12.4, 0, -1.8)], "da": 0.1, "a": 2.0, "vista": "schiena", "alto": 1.9})],
@@ -708,9 +711,9 @@ def shots_lancio():
              caption=("Giorno, notte, pioggia e temporali", "GothamBlack", None)),
         Shot("campo", 2.5, key="campo", cam=move({"fov": 56}, {"up": 6, "fwd": 6, "fov": 54}),
              caption=("Storia in 4 stagioni, missioni e raid", "GothamBlack", None)),
-        Shot("colosso", 3.5, key="colosso", cam=move({"fov": 58, "tup": -12}, {"fwd": 6, "tup": 2, "fov": 52}), fx=[("vapore", {"n": 14})], shake=0.8,
+        Shot("colosso", 3.5, key="colosso", cam=move({"fov": 48, "tup": -5}, {"fwd": 6, "tup": 1, "fov": 44}), fx=[("vapore", {"n": 14})], shake=0.8,
              flashes=[(0.1, 0.8, (1.0, 0.9, 0.8))], title=("I GIGANTI PIÙ GRANDI TI ASPETTANO", "GothamBlack", RED)),
-        Shot("varieta", 1.5, key="varieta", cam=move({"fov": 52}, {"fwd": 3, "fov": 48}), fx=[("vapore", {"n": 8})],
+        Shot("varieta", 1.5, key="varieta", cam=move({"fov": 52}, {"fwd": 1.8, "fov": 48}), fx=[("vapore", {"n": 8})],
              caption=("Ogni gigante è diverso", "GothamBlack", None)),
         Shot("finale", 5.5, key="giganti", cam=move({"fov": 50, "fwd": -6}, {"fwd": 6, "fov": 50}), dark=0.6, fade_out=0.6,
              logo="lancio", fx=[("vapore", {"n": 8})]),
@@ -728,9 +731,9 @@ def shots_halloween():
              caption=("Case e giardini infestati", "GothamBlack", ORANGE)),
         Shot("strada", 2.5, key="strada", cam=move({"fov": 56}, {"fwd": 5, "up": 0.3, "fov": 54}), fx=[("foglie", {"n": 140})],
              caption=("Zucche, lapidi, ragnatele e candele", "GothamBlack", None)),
-        Shot("giganti", 3.5, key="giganti", cam=move({"fov": 52, "right": -8}, {"right": 8, "fwd": 6, "fov": 50, "follow": 0.7}), fx=[("nebbia", {"colore": (0.7, 0.55, 0.6)}), ("foglie", {"n": 80})],
+        Shot("giganti", 3.5, key="giganti", cam=move({"fov": 52, "right": -4}, {"right": 4, "fwd": 3, "fov": 50, "follow": 0.7}), fx=[("nebbia", {"colore": (0.7, 0.55, 0.6)}), ("foglie", {"n": 80})],
              title=("I GIGANTI SI TRAVESTONO!", "Creepster", ORANGE)),
-        Shot("zucca", 3.0, key="zucca", cam=move({"fov": 52}, {"fwd": 5, "up": 1, "fov": 46}), shake=0.4, flashes=[(0.15, 0.6, (1.0, 0.6, 0.2))],
+        Shot("zucca", 3.0, key="zucca", cam=move({"fov": 52}, {"fwd": 3, "up": 0.6, "fov": 46}), shake=0.4, flashes=[(0.15, 0.6, (1.0, 0.6, 0.2))],
              caption=("Arrivano il Re Zucca e il Gigante Fantasma", "GothamBlack", ORANGE)),
         Shot("ev1", 1.3, image="evento_NotteZucche", zoom=(1.0, 1.06), flashes=[(0.0, 0.7, (1.0, 0.7, 0.3))], title=("5 NUOVI EVENTI ADMIN ABUSE", "Creepster", ORANGE)),
         Shot("ev2", 1.3, image="evento_GiganteFantasma", zoom=(1.02, 1.08), flashes=[(0.0, 0.6, (0.8, 0.9, 1.0))], title=("5 NUOVI EVENTI ADMIN ABUSE", "Creepster", ORANGE)),
