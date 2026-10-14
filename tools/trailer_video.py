@@ -48,10 +48,9 @@ KEYS = {
         "mura": dict(view="muro_esterno", night=True, fwd=-60, up=-20, tup=8, fov=64),
         "giganti": dict(view="giganti", fwd=200, up=-28, tup=25, fov=62, titans="fila"),
         "volto": dict(view="volto", fwd=-6, up=-2, fov=60, titans="fila"),
-        "tetti": dict(view="calaneth_case", fwd=20, up=30, tup=10, fov=68),
         "nuca": dict(nape=5, fov=66, titans="fila"),
         "isola": dict(view="vermiglia_alto", fwd=150, up=40, fov=60),
-        "strada": dict(view="calaneth_strada", fwd=-10, up=4, fov=66),
+        "strada": dict(view="calaneth_strada", fwd=-10, up=24, tup=-6, fov=64),
         "case_notte": dict(view="calaneth_case", night=True, fwd=-15, up=6, fov=66),
         "aurion": dict(view="aurion", fwd=-20, fov=64),
         "campo": dict(view="campo", fwd=-25, up=10, fov=64),
@@ -61,7 +60,7 @@ KEYS = {
     "halloween": {
         "mura": dict(view="muro_esterno", night=True, fwd=-40, up=-24, tup=6, fov=64),
         "case_notte": dict(view="calaneth_case", night=True, fwd=-15, up=6, fov=66),
-        "strada": dict(view="calaneth_strada", fwd=-10, up=4, fov=66),
+        "strada": dict(view="calaneth_strada", fwd=-10, up=24, tup=-6, fov=64),
         "giganti": dict(view="halloween_giganti", fwd=-20, up=-6, fov=66, titans="halloween"),
         "zucca": dict(view="halloween_zucca", fwd=-12, up=-6, fov=60, titans="halloween"),
         "campo_notte": dict(view="campo", night=True, fwd=-25, up=10, fov=64),
@@ -670,13 +669,14 @@ def move(a, b, curve=ease):
 
 class Shot:
     def __init__(self, name, dur, key=None, image=None, cam=None, fx=(), caption=None, title=None, flashes=(), shake=0.0,
-                 fade_in=0.0, fade_out=0.0, blur=1, zoom=(1.0, 1.0), focus=(0.5, 0.5), grade=None, dark=0.0, logo=None):
+                 fade_in=0.0, fade_out=0.0, blur=1, zoom=(1.0, 1.0), focus=(0.5, 0.5), grade=None, dark=0.0, logo=None, slash=None):
         self.name, self.dur, self.key, self.image = name, dur, key, image
         self.cam = cam or (lambda t: {})
         self.fx, self.caption, self.title = list(fx), caption, title
         self.flashes, self.shake = list(flashes), shake
         self.fade_in, self.fade_out, self.blur = fade_in, fade_out, blur
         self.zoom, self.focus, self.grade, self.dark, self.logo = zoom, focus, grade, dark, logo
+        self.slash = slash
 
 
 GOLD = (255, 214, 120)
@@ -694,22 +694,20 @@ def shots_lancio():
         Shot("giganti", 3.5, key="giganti", cam=move({"fov": 52, "up": 0}, {"fwd": 30, "up": 5, "tup": 4, "fov": 50}), fx=[("vapore", {"n": 10})], shake=0.6,
              caption=("Sono enormi... e hanno fame.", "GothamBlack", None)),
         Shot("volto", 2.0, key="volto", cam=move({"fov": 50, "roll": 0.0}, {"fwd": 2.5, "fov": 44, "roll": -0.04}), fx=[("vapore", {"n": 8})], flashes=[(1.85, 0.6, (1, 1, 1))]),
-        Shot("tetti", 4.0, key="tetti", cam=move({"fov": 60}, {"fwd": 26, "up": -8, "tup": -6, "fov": 56}, ease_out), blur=2,
-             fx=[("cadetto", {"percorso": [(18, 26, -4), (30, 10, -10), (44, -6, -16), (60, -24, -20), (80, -40, -18)], "aggancio": (90, -30, -14), "da": 0.2, "a": 3.6, "alto": 1.9})],
+        Shot("tetti", 4.0, key="aurion", cam=move({"fov": 56}, {"fwd": 8, "up": -1, "fov": 52}),
+             fx=[("cadetto", {"percorso": [(26, 20, -2), (32, 8, -5), (38, -4, -6), (46, -16, -4), (56, -28, -1)], "aggancio": (68, -24, 8), "da": 0.2, "a": 3.7, "alto": 1.9})],
              caption=("Vola tra i tetti con i rampini", "GothamBlack", GOLD)),
         Shot("nuca", 3.0, key="nuca", cam=move({"fov": 56}, {"fwd": 5, "fov": 46}, ease_out), blur=2, shake=0.4,
-             fx=[("vapore", {"n": 12}), ("cadetto", {"percorso": [(2, -4, -6), (6, -2, -2), (10, -0.5, 1), (13, 0, 2)], "da": 0.1, "a": 2.0, "vista": "schiena", "alto": 1.9})],
-             flashes=[(2.0, 1.0, (1, 1, 1))], title=("COLPISCI LA NUCA!", "GothamBlack", GOLD)),
+             fx=[("vapore", {"n": 12}), ("cadetto", {"percorso": [(1, -5, -5), (5, -3, -3), (9, -1, -2), (12.4, 0, -1.8)], "da": 0.1, "a": 2.0, "vista": "schiena", "alto": 1.9})],
+             flashes=[(2.0, 0.55, (1, 1, 1))], slash=2.0, title=("COLPISCI LA NUCA!", "GothamBlack", GOLD)),
         Shot("isola", 3.5, key="isola", cam=move({"fov": 52}, {"fwd": 40, "right": 50, "up": -10, "fov": 50, "follow": 0.2}),
              caption=("5 isole. Un arcipelago tutto da esplorare.", "GothamBlack", None)),
         Shot("strada", 2.5, key="strada", cam=move({"fov": 56}, {"fwd": 5, "up": 0.3, "fov": 54}),
              caption=("Città vive: mercati, cavalli e barche", "GothamBlack", None)),
         Shot("case_notte", 2.5, key="case_notte", cam=move({"fov": 56, "right": -3}, {"right": 4, "fov": 54, "follow": 0.6}), fx=[("lucciole", {"n": 70})],
              caption=("Giorno, notte, pioggia e temporali", "GothamBlack", None)),
-        Shot("aurion", 2.0, key="aurion", cam=move({"fov": 56}, {"fwd": 8, "fov": 54}),
-             caption=("Una storia originale in 4 stagioni", "GothamBlack", None)),
-        Shot("campo", 2.0, key="campo", cam=move({"fov": 56}, {"up": 6, "fwd": 6, "fov": 54}),
-             caption=("Missioni, raid a ondate e boss", "GothamBlack", None)),
+        Shot("campo", 2.5, key="campo", cam=move({"fov": 56}, {"up": 6, "fwd": 6, "fov": 54}),
+             caption=("Storia in 4 stagioni, missioni e raid", "GothamBlack", None)),
         Shot("colosso", 3.5, key="colosso", cam=move({"fov": 58, "tup": -12}, {"fwd": 6, "tup": 2, "fov": 52}), fx=[("vapore", {"n": 14})], shake=0.8,
              flashes=[(0.1, 0.8, (1.0, 0.9, 0.8))], title=("I GIGANTI PIÙ GRANDI TI ASPETTANO", "GothamBlack", RED)),
         Shot("varieta", 1.5, key="varieta", cam=move({"fov": 52}, {"fwd": 3, "fov": 48}), fx=[("vapore", {"n": 8})],
@@ -1002,6 +1000,8 @@ def render_frame(args):
         if k > 0:
             blurred = np.asarray(Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(6 * k))).astype(np.float64) / 255
             img = blurred * (1 - k * 0.75)
+    if shot.slash is not None and 0 <= T - shot.slash < 0.35:
+        img = slash_fx(img, (T - shot.slash) / 0.35)
     for ft, strength, col in shot.flashes:
         if T >= ft:
             img = img + np.asarray(col) * strength * math.exp(-(T - ft) * 7.0)
@@ -1017,6 +1017,19 @@ def render_frame(args):
     vert = vertical(img)
     texts(img, vert, shot, T, theme)
     return (np.clip(img, 0, 1) * 255).astype(np.uint8).tobytes(), (np.clip(vert, 0, 1) * 255).astype(np.uint8).tobytes()
+
+
+def slash_fx(img, k):
+    """Il colpo di lama: due archi bianchi che attraversano lo schermo e svaniscono."""
+    layer = Image.new("L", (OUT_W, OUT_H), 0)
+    d = ImageDraw.Draw(layer)
+    reach = min(1.0, k * 2.5)
+    for off, width in ((0, 26), (70, 12)):
+        box = [-OUT_W * 0.3, OUT_H * 0.15 + off, OUT_W * 1.3, OUT_H * 1.9 + off]
+        d.arc(box, 200, 200 + 140 * reach, fill=255, width=width)
+    layer = layer.filter(ImageFilter.GaussianBlur(4))
+    a = np.asarray(layer).astype(np.float64)[..., None] / 255.0 * (1 - k) ** 0.7
+    return img * (1 - a) + np.array([1.0, 1.0, 0.98]) * a
 
 
 def vertical(img):
