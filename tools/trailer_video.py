@@ -1009,8 +1009,10 @@ def render_frame(args):
         img = img * (T / shot.fade_in)
     if shot.fade_out and T > shot.dur - shot.fade_out:
         img = img * max(0.0, (shot.dur - T) / shot.fade_out)
-    rng = np.random.default_rng(i)
-    img = img + rng.normal(0, 0.012, (OUT_H, OUT_W, 1))
+    # grana leggera sempre uguale (una grana diversa a ogni fotogramma non si comprime: file enormi)
+    if "grana" not in STATE:
+        STATE["grana"] = np.random.default_rng(5).normal(0, 0.006, (OUT_H, OUT_W, 1))
+    img = img + STATE["grana"]
     img = np.clip(img, 0, 1)
     vert = vertical(img)
     texts(img, vert, shot, T, theme)
@@ -1094,7 +1096,7 @@ def cmd_edit(theme, folder, music, out_path, vert_path, fonts_dir, workers=4, on
         cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (w, h), "-r", str(FPS), "-i", "-"]
         if music and only is None:
             cmd += ["-i", music, "-c:a", "aac", "-b:a", "192k", "-shortest"]
-        cmd += ["-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path]
+        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "23", "-maxrate", "6M", "-bufsize", "12M", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path]
         return subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
     ph = ffmpeg(out_path, OUT_W, OUT_H)
