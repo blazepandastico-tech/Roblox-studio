@@ -60,7 +60,7 @@ KEYS = {
         "mura": dict(view="muro_esterno", night=True, fwd=-40, up=-24, tup=6, fov=64),
         "case_notte": dict(view="calaneth_case", night=True, fwd=-15, up=6, fov=66),
         "strada": dict(view="calaneth_strada", fwd=-10, up=24, tup=-6, fov=64),
-        "giganti": dict(view="halloween_giganti", fwd=-20, up=-6, fov=66, titans="halloween"),
+        "giganti": dict(view="halloween_giganti", fwd=75, up=-12, tup=4, fov=64, titans="halloween"),
         "zucca": dict(view="halloween_zucca", fwd=-12, up=-6, fov=60, titans="halloween"),
         "campo_notte": dict(view="campo", night=True, fwd=-25, up=10, fov=64),
         "isola": dict(view="vermiglia_alto", fwd=150, up=40, fov=60),
