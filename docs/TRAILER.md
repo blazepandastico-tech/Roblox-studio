@@ -4,10 +4,10 @@ I video sono in `assets/trailer/`. La musica è stata composta apposta per i tra
 
 | File | Formato | Dove usarlo |
 |---|---|---|
-| `SieriPerduti_Lancio.mp4` | 1920×1080, 42 s | YouTube, Discord, pagina del gioco e del gruppo Roblox |
-| `SieriPerduti_Lancio_Verticale.mp4` | 1080×1920, 42 s | TikTok, YouTube Shorts, Instagram Reels |
-| `SieriPerduti_Halloween.mp4` | 1920×1080, 40 s | annuncio dell'aggiornamento di Halloween |
-| `SieriPerduti_Halloween_Verticale.mp4` | 1080×1920, 40 s | TikTok, Shorts, Reels per Halloween |
+| `SieriPerduti_Lancio.mp4` | 1920×1080, 38 s | YouTube, Discord, pagina del gioco e del gruppo Roblox |
+| `SieriPerduti_Lancio_Verticale.mp4` | 1080×1920, 38 s | TikTok, YouTube Shorts, Instagram Reels |
+| `SieriPerduti_Halloween.mp4` | 1920×1080, 38 s | annuncio dell'aggiornamento di Halloween |
+| `SieriPerduti_Halloween_Verticale.mp4` | 1080×1920, 38 s | TikTok, Shorts, Reels per Halloween |
 
 Il vecchio trailer (`SieriPerduti_Trailer.mp4`, fatto con scene generiche prima della grafica nuova) è
 ancora nella stessa cartella.
@@ -23,10 +23,10 @@ chiave del mondo con la prospettiva giusta. Vapore, pioggia, foglie, pipistrelli
 2. Le Mura di notte sotto la pioggia, i lampi: "Poi tornarono i GIGANTI."
 3. La fila dei giganti fuori dal cancello, con il vapore: "Sono enormi... e hanno fame."
 4. Il volto di un gigante da vicino.
-5. Il cadetto che vola tra i tetti di Calaneth con i rampini e la scia di gas.
+5. Il cadetto che vola tra i tetti di Aurion con i rampini e la scia di gas.
 6. Il cadetto che si lancia sulla nuca di un gigante: "COLPISCI LA NUCA!"
 7. L'isola di Vermiglia dall'alto: "5 isole. Un arcipelago tutto da esplorare."
-8. Il mercato di Calaneth, la città di notte con le lucciole, Aurion, il campo d'addestramento.
+8. Calaneth di notte con le finestre accese e le lucciole, poi il campo d'addestramento.
 9. Il colosso che spunta dalle Mura: "I GIGANTI PIÙ GRANDI TI ASPETTANO".
 10. Giganti tutti diversi, poi il logo, "GIOCA ORA GRATIS SU ROBLOX" e il codice regalo `SIERIPERDUTI`.
 
@@ -43,14 +43,13 @@ Gioca GRATIS su Roblox: cerca "Sieri Perduti" 🎁 Codice: SIERIPERDUTI
 
 1. "Questa notte le Mura sono infestate..." con i pipistrelli e un lampo viola.
 2. Le Mura di notte, nebbia e pipistrelli: "🎃 AGGIORNAMENTO DI HALLOWEEN".
-3. Case e giardini infestati, con fantasmi e fuochi fatui.
-4. La strada del mercato con le foglie d'autunno: zucche, lapidi, ragnatele e candele.
-5. I giganti in costume (zucca, strega, zombie, corna, scheletro): "I GIGANTI SI TRAVESTONO!"
-6. Il Re Zucca e il Gigante Fantasma da vicino.
-7. I titoli dei 5 nuovi eventi Admin Abuse, uno dopo l'altro.
-8. Il pannello Admin Abuse: premi (dolcetti, premio finale, bonus doppi) e programmazione per giorno e ora.
-9. Il campo di notte con pipistrelli e fuochi fatui, poi l'arcipelago in festa.
-10. La nuova schermata iniziale di Halloween e "🎃 ORA SU ROBLOX 🎃".
+3. Case e giardini infestati, con fantasmi, pipistrelli e fuochi fatui.
+4. I giganti in costume (zucca, strega, zombie, corna, scheletro): "I GIGANTI SI TRAVESTONO!"
+5. Il Re Zucca e il Gigante Fantasma da vicino.
+6. I titoli dei 5 nuovi eventi Admin Abuse, uno dopo l'altro.
+7. Il pannello Admin Abuse: premi (dolcetti, premio finale, bonus doppi) e programmazione per giorno e ora.
+8. Il campo di notte con pipistrelli e fuochi fatui, poi l'arcipelago in festa.
+9. La nuova schermata iniziale di Halloween e "🎃 ORA SU ROBLOX 🎃".
 
 Testo da mettere sotto il video:
 

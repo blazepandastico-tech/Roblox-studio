@@ -50,7 +50,6 @@ KEYS = {
         "volto": dict(view="volto", fwd=-6, up=-2, fov=60, titans="fila"),
         "nuca": dict(nape=5, fov=66, titans="fila"),
         "isola": dict(view="vermiglia_alto", fwd=150, up=40, fov=60),
-        "strada": dict(view="calaneth_strada", fwd=-10, up=24, tup=-6, fov=64),
         "case_notte": dict(view="calaneth_case", night=True, fwd=-15, up=6, fov=66),
         "aurion": dict(view="aurion", fwd=-20, fov=64),
         "campo": dict(view="campo", fwd=-25, up=10, fov=64),
@@ -705,10 +704,8 @@ def shots_lancio():
              flashes=[(2.0, 0.55, (1, 1, 1))], slash=2.0, title=("COLPISCI LA NUCA!", "GothamBlack", GOLD)),
         Shot("isola", 3.5, key="isola", cam=move({"fov": 52}, {"fwd": 40, "right": 50, "up": -10, "fov": 50, "follow": 0.2}),
              caption=("5 isole. Un arcipelago tutto da esplorare.", "GothamBlack", None)),
-        Shot("strada", 2.5, key="strada", cam=move({"fov": 56}, {"fwd": 5, "up": 0.3, "fov": 54}),
-             caption=("Città vive: mercati, cavalli e barche", "GothamBlack", None)),
         Shot("case_notte", 2.5, key="case_notte", cam=move({"fov": 56, "right": -3}, {"right": 4, "fov": 54, "follow": 0.6}), fx=[("lucciole", {"n": 70})],
-             caption=("Giorno, notte, pioggia e temporali", "GothamBlack", None)),
+             caption=("Città vive, di giorno e di notte", "GothamBlack", None)),
         Shot("campo", 2.5, key="campo", cam=move({"fov": 56}, {"up": 6, "fwd": 6, "fov": 54}),
              caption=("Storia in 4 stagioni, missioni e raid", "GothamBlack", None)),
         Shot("colosso", 3.5, key="colosso", cam=move({"fov": 48, "tup": -5}, {"fwd": 6, "tup": 1, "fov": 44}), fx=[("vapore", {"n": 14})], shake=0.8,
@@ -728,9 +725,7 @@ def shots_halloween():
              flashes=[(0.05, 0.7, (0.7, 0.55, 1.0))], title=("🎃 AGGIORNAMENTO DI HALLOWEEN", "Creepster", ORANGE)),
         Shot("case_notte", 3.0, key="case_notte", cam=move({"fov": 56, "right": -3}, {"right": 4, "fov": 54, "follow": 0.6}),
              fx=[("pipistrelli", {"n": 10}), ("fantasmi", {"dove": [(28, -6, 7), (40, 10, 9)], "alto": 4.5}), ("lucciole", {"n": 50, "colore": (0.6, 1.0, 0.45)})],
-             caption=("Case e giardini infestati", "GothamBlack", ORANGE)),
-        Shot("strada", 2.5, key="strada", cam=move({"fov": 56}, {"fwd": 5, "up": 0.3, "fov": 54}), fx=[("foglie", {"n": 140})],
-             caption=("Zucche, lapidi, ragnatele e candele", "GothamBlack", None)),
+             caption=("Case e giardini infestati: zucche, lapidi e ragnatele", "GothamBlack", ORANGE)),
         Shot("giganti", 3.5, key="giganti", cam=move({"fov": 52, "right": -4}, {"right": 4, "fwd": 3, "fov": 50, "follow": 0.7}), fx=[("nebbia", {"colore": (0.7, 0.55, 0.6)}), ("foglie", {"n": 80})],
              title=("I GIGANTI SI TRAVESTONO!", "Creepster", ORANGE)),
         Shot("zucca", 3.0, key="zucca", cam=move({"fov": 52}, {"fwd": 3, "up": 0.6, "fov": 46}), shake=0.4, flashes=[(0.15, 0.6, (1.0, 0.6, 0.2))],
@@ -1288,11 +1283,11 @@ def cmd_music(theme, path):
             pad(x, [c + 12 for c in chord] + [chord[0] + 24], d, 0.4)
             for b in range(int(round(d / 0.5))):
                 taiko(x + b * 0.5, 0.75 if b % 2 == 0 else 0.45, 1.0 if b % 2 == 0 else 1.4)
-                if x > S["citta" if "citta" in S else "strada"]:
+                if x > S["isola"]:
                     taiko(x + b * 0.5 + 0.25, 0.35, 1.6)
             k += 1
             x += 2.0
-        for name in ("nuca", "isola", "strada", "colosso"):
+        for name in ("nuca", "isola", "case_notte", "colosso"):
             whoosh(S[name], 0.6, 0.5)
             braam(S[name], 38, 2.0, 0.6)
         braam(S["nuca"] + 2.0, 41, 1.5, 0.9)
