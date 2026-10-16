@@ -7,6 +7,8 @@ raid a ondate, negozio premium e — dal prossimo aggiornamento — gli 8 poteri
 
 Tutti i nomi, i luoghi, gli stemmi e la storia sono **originali** (nessun nome o simbolo di opere protette).
 
+📖 **Guida completa del giocatore** (comandi, combattimento, missioni, oggetti, isole, boss, raid, tesori, premi, eventi): [`docs/GUIDA_COMPLETA.md`](docs/GUIDA_COMPLETA.md).
+
 ---
 
 ## 1. Aprire il gioco in Roblox Studio

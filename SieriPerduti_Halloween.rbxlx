@@ -8606,7 +8606,7 @@ Story.Chapters = {
 				Objective = "Parla con Tobias",
 				Dialogue = {
 					L("Tobias", "Volevo solo... che nessuno dovesse più avere paura delle mura."),
-					L("Tobias", "Ma Vael mi ha preceduto. Ha già iniettato il Siero Primordiale. La Grande Marcia è cominciato."),
+					L("Tobias", "Ma Vael mi ha preceduto. Ha già iniettato il Siero Primordiale. La Grande Marcia è cominciata."),
 					L("Tobias", "Vai al fronte. Io ti coprirò le spalle. Un'ultima volta, come al campo di addestramento."),
 				},
 				Reward = { XP = 2, Gold = 1500000 },
