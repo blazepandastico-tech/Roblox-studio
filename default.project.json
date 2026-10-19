@@ -1,0 +1,120 @@
+{
+  "name": "SieriPerduti",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "ModelliGiganti": {
+        "$className": "Folder"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$properties": {
+        "EnableMouseLockOption": false,
+        "CameraMaxZoomDistance": 45,
+        "CameraMinZoomDistance": 6,
+        "CharacterWalkSpeed": 20,
+        "CharacterUseJumpPower": false,
+        "CharacterJumpHeight": 8,
+        "GameSettingsAvatar": "R15"
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/client"
+        }
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "$path": "src/character"
+      }
+    },
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "CharacterAutoLoads": false,
+        "RespawnTime": 4
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "Future",
+        "Brightness": 2.6,
+        "ClockTime": 14.5,
+        "GeographicLatitude": 38,
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.18,
+        "EnvironmentDiffuseScale": 1,
+        "EnvironmentSpecularScale": 1,
+        "Ambient": [
+          0.27,
+          0.25,
+          0.23
+        ],
+        "OutdoorAmbient": [
+          0.52,
+          0.5,
+          0.47
+        ],
+        "ExposureCompensation": 0.1
+      }
+    },
+    "MaterialService": {
+      "$className": "MaterialService",
+      "$properties": {
+        "Use2022Materials": true
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "StreamingEnabled": true,
+        "StreamingIntegrityMode": "MinimumRadiusPause",
+        "StreamingTargetRadius": 1600,
+        "FallenPartsDestroyHeight": -1200,
+        "Gravity": 196.2,
+        "GlobalWind": [
+          10,
+          0,
+          5
+        ]
+      },
+      "Terrain": {
+        "$className": "Terrain",
+        "$properties": {
+          "Decoration": true,
+          "GrassLength": 0.85
+        }
+      }
+    },
+    "SoundService": {
+      "$className": "SoundService",
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    },
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$properties": {
+        "ResetPlayerGuiOnSpawn": false
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "LEGGIMI_GuidaStoria": {
+        "$path": "studio/LEGGIMI_GuidaStoria.lua"
+      }
+    }
+  }
+}
