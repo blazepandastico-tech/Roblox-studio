@@ -29,7 +29,7 @@ import tempfile
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SCENES = ("titolo", "admin", "admin_programma", "evento", "striscione", "negozio", "negozio_monete", "negozio_pass")
+SCENES = ("titolo", "admin", "admin_programma", "evento", "striscione", "negozio", "negozio_speciali", "negozio_monete", "negozio_gemme", "negozio_pass")
 EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
 DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 DEJAVU_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -750,10 +750,10 @@ def main():
     for scene in args.schermate or SCENES:
         if scene not in SCENES:
             sys.exit("Schermata sconosciuta: " + scene)
-        base = "admin" if scene == "admin_programma" else scene
+        base = "admin" if scene == "admin_programma" else "negozio" if scene == "negozio_speciali" else scene
         if base not in cache:
             cache[base] = dump(base, tema, args.evento)
-        scroll = "📅 Programma un evento" if scene == "admin_programma" else None
+        scroll = "📅 Programma un evento" if scene == "admin_programma" else "⏳ OFFERTE A TEMPO" if scene == "negozio_speciali" else None
         background = args.sfondo if scene != "titolo" else None
         img = render_scene(cache[base], fonts, background, scroll)
         if args.larghezza and args.larghezza != img.width:

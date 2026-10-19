@@ -115,6 +115,53 @@ local camp = Zones.Get("CampoAddestramento")
 if camp then
 	view("campo", camp.Center + Vector3.new(140, 60, 140), camp.Center + Vector3.new(0, 12, 0))
 end
+-- la bancarella della Bottega Reale al Campo (con un mercante semplificato, solo per la foto:
+-- nel gioco Aurelio è un personaggio vero)
+do
+	local okN, NPCService = pcall(require, SERVER.Services.NPCService)
+	local NPCs = require(SHARED.Data.NPCs)
+	local stalls = Instance.new("Folder")
+	stalls.Name = "Bancarelle"
+	stalls.Parent = workspace:FindFirstChild(Config.Folders.Map) or workspace
+	if okN and NPCService.BuildStalls then
+		local okB, errB = pcall(NPCService.BuildStalls, stalls)
+		if not okB then
+			LOG("bancarelle: " .. tostring(errB))
+		end
+	end
+	for _, npc in NPCs.List do
+		if npc.Id == "BottegaCampo" and camp then
+			local counter = stalls:FindFirstChild("BottegaCampo_Bancarella")
+			local ground = if counter and counter:FindFirstChild("Bancone") then (counter :: any).Bancone.Position.Y - 1.6 else camp.Center.Y
+			local pos = Vector3.new(camp.Center.X + npc.Offset.X, ground, camp.Center.Z + npc.Offset.Z)
+			local base = CFrame.new(pos) * CFrame.Angles(0, math.rad(-npc.Facing), 0)
+			local function piece(size: Vector3, offset: CFrame, color: Color3, material: Enum.Material)
+				local p = Instance.new("Part")
+				p.Anchored = true
+				p.Size = size
+				p.CFrame = base * offset
+				p.Color = color
+				p.Material = material
+				p.Parent = stalls
+			end
+			local skin = Color3.fromRGB(226, 186, 150)
+			local coat = Color3.fromRGB(90, 30, 60)
+			piece(Vector3.new(0.9, 2.2, 0.9), CFrame.new(-0.5, 1.1, 0), Color3.fromRGB(40, 32, 30), Enum.Material.Fabric)
+			piece(Vector3.new(0.9, 2.2, 0.9), CFrame.new(0.5, 1.1, 0), Color3.fromRGB(40, 32, 30), Enum.Material.Fabric)
+			piece(Vector3.new(2.1, 2.3, 1.1), CFrame.new(0, 3.35, 0), coat, Enum.Material.Fabric)
+			piece(Vector3.new(0.7, 2.1, 0.7), CFrame.new(-1.45, 3.4, 0), coat, Enum.Material.Fabric)
+			piece(Vector3.new(0.7, 2.1, 0.7), CFrame.new(1.45, 3.4, 0), coat, Enum.Material.Fabric)
+			piece(Vector3.new(1.25, 1.25, 1.25), CFrame.new(0, 5.15, 0), skin, Enum.Material.SmoothPlastic)
+			piece(Vector3.new(1.3, 0.5, 0.4), CFrame.new(0, 4.75, -0.5), Color3.fromRGB(60, 40, 30), Enum.Material.Fabric)
+			piece(Vector3.new(1.9, 0.15, 1.9), CFrame.new(0, 5.82, 0), Color3.fromRGB(30, 26, 40), Enum.Material.Fabric)
+			piece(Vector3.new(1.15, 0.8, 1.15), CFrame.new(0, 6.25, 0), Color3.fromRGB(30, 26, 40), Enum.Material.Fabric)
+			piece(Vector3.new(1.2, 0.18, 1.2), CFrame.new(0, 5.95, 0), Color3.fromRGB(226, 182, 74), Enum.Material.Fabric)
+			local look = base.LookVector
+			view("bottega", pos + look * 17 + base.RightVector * 6 + Vector3.new(0, 6.5, 0), pos + Vector3.new(0, 4.6, 0))
+			view("bottega_lontano", pos + look * 46 + base.RightVector * 20 + Vector3.new(0, 16, 0), pos + Vector3.new(0, 5, 0))
+		end
+	end
+end
 local aurion = Zones.Get("Aurion")
 if aurion then
 	view("aurion", aurion.Center + Vector3.new(-150, 70, 160), aurion.Center + Vector3.new(0, 30, 0))

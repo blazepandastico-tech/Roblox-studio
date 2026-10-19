@@ -158,7 +158,7 @@ local function getTemplate(): Model?
 end
 
 -- Bancarella della Bottega Reale: bancone, quattro pali, tendone a strisce, forziere di gemme e insegna
-local function buildStall(npc, pos: Vector3)
+local function buildStall(npc, pos: Vector3, parent: Instance?)
 	local model = Instance.new("Model")
 	model.Name = npc.Id .. "_Bancarella"
 	local base = CFrame.new(pos) * CFrame.Angles(0, math.rad(-(npc.Facing or 0)), 0)
@@ -221,7 +221,19 @@ local function buildStall(npc, pos: Vector3)
 	label.TextColor3 = gold
 	label.Text = "💎 BOTTEGA REALE 💎"
 	label.Parent = gui
-	model.Parent = folder
+	model.Parent = parent or folder
+end
+
+-- Costruisce solo le bancarelle (per le foto del mondo: tools/tests/world_dump.luau)
+function NPCService.BuildStalls(parent: Instance)
+	for _, npc in NPCs.List do
+		local pos = npc.Stall and npcPosition(npc)
+		if pos then
+			local zone = Zones.Get(npc.Zone)
+			local okY, y = pcall(groundAt, pos, zone ~= nil and zone.Underground == true, false)
+			buildStall(npc, Vector3.new(pos.X, if okY and type(y) == "number" then y else pos.Y, pos.Z), parent)
+		end
+	end
 end
 
 local function spawnNpc(npc)
