@@ -19,6 +19,7 @@ local Config = require(Shared.Config)
 local Util = require(Shared.Lib.Util)
 local Net = require(Shared.Lib.Net)
 local Items = require(Shared.Data.Items)
+local Monetization = require(Shared.Data.Monetization)
 local Skills = require(Shared.Data.Skills)
 local Bloodlines = require(Shared.Data.Bloodlines)
 local Poses = require(Shared.Anim.Poses)
@@ -83,6 +84,11 @@ local function addMastery(player: Player, amount: number)
 	local blade = profile.Equipped.Blade
 	if blade and blade ~= "" then
 		local current = profile.WeaponMastery[blade] or 0
+		-- pass "Maestria Rapida": la maestria sale il doppio
+		local pass = Monetization.Pass("MaestriaRapida")
+		if pass and profile.Passes[pass.Id] then
+			amount *= pass.MasteryMult or 1
+		end
 		if current < Config.Serums.MaxMastery then
 			profile.WeaponMastery[blade] = math.min(Config.Serums.MaxMastery, current + amount)
 			if math.floor(current / 25) ~= math.floor(profile.WeaponMastery[blade] / 25) then

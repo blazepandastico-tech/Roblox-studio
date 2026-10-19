@@ -1,7 +1,8 @@
 --[[
 	NPCs - personaggi non giocanti
 	Offset = posizione relativa al centro della zona (la Y viene calcolata sul terreno).
-	Role: Story | Quest | Shop | Lab | Dealer | Travel | Ship | Lift | Genealogist | Object | Tavern | Duel
+	Role: Story | Quest | Shop | Lab | Dealer | Travel | Ship | Lift | Genealogist | Object | Tavern | Duel | Premium
+	Stall = true: il PNG sta dietro una bancarella (la Bottega Reale del negozio con Robux)
 	Indoor = true: il PNG sta dentro un edificio (il pavimento si cerca sotto il soffitto)
 	Character: lo stesso personaggio può apparire in più luoghi durante la storia.
 ]]
@@ -354,6 +355,23 @@ local NPCList = {
 		Name = "Custode dell'Arena", Title = "Arena dei Raid",
 		Look = { Skin = Color3.fromRGB(220, 182, 150), Hair = Color3.fromRGB(200, 200, 200), HairStyle = "Lungo", Uniform = "Civile", Beard = true },
 		Greeting = { "Benvenuto nell'Arena. Quando il raid comincia, resta dentro le mura." } },
+	-- BOTTEGA REALE (negozio con Robux: apre il negozio premium sulle offerte) --------------------
+	{ Id = "BottegaCampo", Zone = "CampoAddestramento", Offset = Vector3.new(16, 0, 40), Facing = 338, Role = "Premium", Stall = true,
+		Name = "Aurelio", Title = "Bottega Reale (offerte)",
+		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
+		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
+	{ Id = "BottegaQG", Zone = "QuartierGenerale", Offset = Vector3.new(-24, 0, 34), Facing = 35, Role = "Premium", Stall = true,
+		Name = "Aurelio", Title = "Bottega Reale (offerte)",
+		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
+		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
+	{ Id = "BottegaAurion", Zone = "Aurion", Offset = Vector3.new(42, 0, 178), Facing = 200, Role = "Premium", Stall = true,
+		Name = "Aurelio", Title = "Bottega Reale (offerte)",
+		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
+		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
+	{ Id = "BottegaRevelia", Zone = "PortoRevelia", Offset = Vector3.new(20, 0, 38), Facing = 332, Role = "Premium", Stall = true,
+		Name = "Aurelio", Title = "Bottega Reale (offerte)",
+		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
+		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
 }
 
 NPCs.List = NPCList

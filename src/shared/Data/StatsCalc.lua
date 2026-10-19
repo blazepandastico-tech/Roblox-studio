@@ -37,6 +37,7 @@ local BONUS_KEYS = {
 	"DropLuck",
 	"ODMSpeed",
 	"ExplosiveResist",
+	"BladeLife",
 }
 
 function StatsCalc.Bonuses(profile)
@@ -107,7 +108,7 @@ function StatsCalc.Compute(profile)
 		local mastery = profile.WeaponMastery and profile.WeaponMastery[blade.Id] or 0
 		result.BladeId = blade.Id
 		result.BladeDamage = blade.Damage * (1 + forza * 0.0055) * (1 + b.BladeDamage + b.AllDamage) * StatsCalc.MasteryMult(mastery)
-		result.BladeDurability = blade.Durability
+		result.BladeDurability = math.floor(blade.Durability * (1 + b.BladeLife))
 		result.BladeSpares = blade.Spares
 		result.BladeMastery = mastery
 	else

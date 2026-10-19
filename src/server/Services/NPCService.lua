@@ -82,6 +82,7 @@ local function addPrompt(parent: BasePart, npc, name: string)
 		elseif npc.Role == "Shop" then "Commercia"
 		elseif npc.Role == "Ferry" then "Salpa"
 		elseif npc.Role == "Raid" or npc.Role == "RaidArena" then "Raid"
+		elseif npc.Role == "Premium" then "Offerte"
 		else "Parla"
 	prompt.ObjectText = name
 	prompt.KeyboardKeyCode = Enum.KeyCode.F
@@ -156,6 +157,73 @@ local function getTemplate(): Model?
 	return nil
 end
 
+-- Bancarella della Bottega Reale: bancone, quattro pali, tendone a strisce, forziere di gemme e insegna
+local function buildStall(npc, pos: Vector3)
+	local model = Instance.new("Model")
+	model.Name = npc.Id .. "_Bancarella"
+	local base = CFrame.new(pos) * CFrame.Angles(0, math.rad(-(npc.Facing or 0)), 0)
+	local function part(name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material, collide: boolean?)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Anchored = true
+		p.Size = size
+		p.CFrame = base * offset
+		p.Color = color
+		p.Material = material
+		p.CanCollide = collide == true
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = model
+		return p
+	end
+	local wood = Color3.fromRGB(104, 70, 44)
+	local gold = Color3.fromRGB(226, 182, 74)
+	local blue = Color3.fromRGB(40, 64, 128)
+	-- bancone davanti al mercante (il davanti è -Z)
+	part("Bancone", Vector3.new(9, 3.2, 2.2), CFrame.new(0, 1.6, -3.4), wood, Enum.Material.WoodPlanks, true)
+	part("Piano", Vector3.new(9.4, 0.3, 2.6), CFrame.new(0, 3.35, -3.4), gold, Enum.Material.Wood)
+	for _, x in { -4.4, 4.4 } do
+		for _, z in { -4.4, 1.8 } do
+			part("Palo", Vector3.new(0.5, 9, 0.5), CFrame.new(x, 4.5, z), wood, Enum.Material.Wood)
+		end
+	end
+	-- tendone a strisce blu e oro, un po' inclinato verso chi compra
+	for i = 0, 5 do
+		part("Tendone", Vector3.new(1.6, 0.2, 7.6), CFrame.new(-4.25 + i * 1.7, 9.2, -1.3) * CFrame.Angles(math.rad(-8), 0, 0), if i % 2 == 0 then blue else gold, Enum.Material.Fabric)
+	end
+	-- forziere aperto pieno di gemme che brillano
+	part("Forziere", Vector3.new(2.2, 1.2, 1.4), CFrame.new(-2.6, 4.1, -3.4), Color3.fromRGB(120, 72, 36), Enum.Material.Wood)
+	for i, color in { Color3.fromRGB(120, 210, 255), Color3.fromRGB(255, 120, 200), Color3.fromRGB(140, 255, 160), Color3.fromRGB(255, 220, 90) } do
+		local gem = part("Gemma", Vector3.new(0.5, 0.5, 0.5), CFrame.new(-3.2 + i * 0.32, 4.85, -3.4 + (i % 2) * 0.3) * CFrame.Angles(math.rad(45), math.rad(45), 0), color, Enum.Material.Neon)
+		gem.Transparency = 0.15
+	end
+	local glow = Instance.new("PointLight")
+	glow.Color = Color3.fromRGB(150, 210, 255)
+	glow.Range = 14
+	glow.Brightness = 1.4
+	glow.Parent = model:FindFirstChild("Forziere")
+	-- sacchi di monete sul bancone
+	for i = 0, 2 do
+		part("Sacco", Vector3.new(0.9, 1, 0.9), CFrame.new(1.4 + i * 1.1, 4, -3.5), Color3.fromRGB(170, 140, 90), Enum.Material.Fabric)
+	end
+	-- insegna
+	local sign = part("Insegna", Vector3.new(7, 1.6, 0.25), CFrame.new(0, 7.6, -4.6), blue, Enum.Material.Wood)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(700, 160)
+	gui.LightInfluence = 0.3
+	gui.Parent = sign
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.Garamond
+	label.TextScaled = true
+	label.TextColor3 = gold
+	label.Text = "💎 BOTTEGA REALE 💎"
+	label.Parent = gui
+	model.Parent = folder
+end
+
 local function spawnNpc(npc)
 	local zone = Zones.Get(npc.Zone)
 	local pos = npcPosition(npc)
@@ -216,6 +284,9 @@ local function spawnNpc(npc)
 	addPrompt(model.PrimaryPart :: BasePart, npc, name)
 	model.Parent = folder
 	CollectionService:AddTag(model, Config.Tags.NPC)
+	if npc.Stall then
+		buildStall(npc, pos)
+	end
 end
 
 -- DIALOGHI -----------------------------------------------------------------------------------
@@ -287,6 +358,11 @@ function NPCService.Interact(player: Player, npcId: string)
 	local role = npc.Role
 	if role == "Shop" then
 		S.ShopService.OpenShop(player, npc.Shop)
+	elseif role == "Premium" then
+		send(player, npc, { greeting(npc) }, {
+			{ Id = "premium", Text = "🔥 Mostrami le offerte" },
+			{ Id = "close", Text = "Più tardi" },
+		})
 	elseif role == "Lab" then
 		send(player, npc, { greeting(npc) }, {
 			{ Id = "lab", Text = "🧪 Apri il Laboratorio" },
@@ -426,6 +502,8 @@ local function onChoice(player: Player, npcId: any, choiceId: any)
 		end
 	elseif choiceId == "abandon" then
 		S.QuestService.Abandon(player)
+	elseif choiceId == "premium" and npc.Role == "Premium" then
+		Net.Event("OpenPremium"):FireClient(player, "Offerte")
 	elseif choiceId == "lab" and npc.Role == "Lab" then
 		S.ShopService.OpenLab(player)
 	elseif choiceId == "dealer" and npc.Role == "Dealer" then

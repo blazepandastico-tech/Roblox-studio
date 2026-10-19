@@ -237,10 +237,16 @@ ACTIONS.RemovePasses = function(_, target)
 	local profile = S.DataService.Get(target)
 	if profile then
 		profile.Passes = {}
+		profile.GrantedPasses = {}
 		target:SetAttribute("VIP", nil)
 		refresh(target)
 	end
 	return target.DisplayName .. ": game pass rimossi"
+end
+-- fa partire subito un'offerta lampo nel server (per provarla)
+ACTIONS.FlashOffer = function()
+	S.MonetizationService.StartFlash()
+	return "Offerta lampo avviata in questo server"
 end
 
 -- SIERI (si ottengono solo qui) ------------------------------------------------------------------

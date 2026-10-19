@@ -3,7 +3,7 @@
 	Le schermate si costruiscono con il codice vero del gioco nel Roblox finto delle prove; le
 	animazioni (Tween) arrivano subito alla fine e un orologio finto fa scattare task.delay e task.wait
 	in ordine fino al momento della foto (es. 6,5 s dopo l'inizio del titolo di un evento).
-	Ingresso: UI_SCENE = "titolo" | "admin" | "evento" | "striscione"
+	Ingresso: UI_SCENE = "titolo" | "admin" | "evento" | "striscione" | "negozio" | "negozio_monete" | "negozio_pass"
 	Uscita: una riga per ogni elemento (O), testo (T), angoli (C), sfumature (G), bordi (S),
 	proporzioni (A), scale (K), liste (L), griglie (R), margini (P) e limiti del testo (M).
 ]]
@@ -237,6 +237,19 @@ elseif SCENE == "evento" or SCENE == "striscione" then
 		C.UIController.Layers.HUD.Visible = true
 		runUntil(2)
 	end
+elseif SCENE == "negozio" or SCENE == "negozio_monete" or SCENE == "negozio_pass" then
+	-- il negozio con Robux: un giocatore di livello 320, nessun acquisto, offerta lampo in corso
+	load("UI", "Premium")
+	C.ClientData.Profile = { Level = 320, Story = { Chapter = 6, Step = 1, Done = false }, Settings = {}, Gems = 340, Gold = 1250000, Passes = {}, OfferBuys = {}, FirstPurchase = false, Inventory = {}, CreatedAt = os.time() - 86400 * 10 }
+	local t = workspace:GetServerTimeNow()
+	ReplicatedStorage:SetAttribute("Lampo", "LampoMateriali")
+	ReplicatedStorage:SetAttribute("LampoFine", t + 7 * 60 + 42)
+	ReplicatedStorage:SetAttribute("LampoScorte", 6)
+	ReplicatedStorage:SetAttribute("LampoTotale", 10)
+	ReplicatedStorage:SetAttribute("LampoUid", "foto")
+	start({ "Premium" })
+	C.Premium.Open(if SCENE == "negozio" then "Offerte" elseif SCENE == "negozio_monete" then "Monete" else "Permanenti")
+	runUntil(1)
 end
 
 -- ESPORTAZIONE ----------------------------------------------------------------------------------------------

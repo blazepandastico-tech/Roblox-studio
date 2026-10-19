@@ -17,9 +17,20 @@ local Serums = require(Shared.Data.Serums)
 local NPCs = require(Shared.Data.NPCs)
 local Zones = require(Shared.Data.Zones)
 local Bloodlines = require(Shared.Data.Bloodlines)
+local Monetization = require(Shared.Data.Monetization)
 
 local ShopService = {}
 local S
+
+-- Prezzo in oro con lo sconto del pass "Amico dei Mercanti"
+local function price(player: Player, base: number): number
+	local profile = S.DataService.Get(player)
+	local pass = Monetization.Pass("ScontoMercante")
+	if profile and pass and profile.Passes[pass.Id] then
+		return math.floor(base * (1 - (pass.ShopDiscount or 0)))
+	end
+	return base
+end
 
 local MAX_DISTANCE = 40
 
@@ -53,7 +64,7 @@ function ShopService.OpenShop(player: Player, shopId: string)
 	for _, id in shop.Items do
 		local def = Items.Get(id)
 		if def then
-			table.insert(list, { Id = id, Price = def.Price or 0, LevelReq = def.LevelReq or 1, Owned = Items.IsEquipment(id) and (profile.Inventory[id] or 0) > 0 })
+			table.insert(list, { Id = id, Price = price(player, def.Price or 0), LevelReq = def.LevelReq or 1, Owned = Items.IsEquipment(id) and (profile.Inventory[id] or 0) > 0 })
 		end
 	end
 	Net.Event("ShopOpen"):FireClient(player, { Kind = "Shop", ShopId = shopId, Name = shop.Name, Items = list })
@@ -62,7 +73,7 @@ end
 function ShopService.OpenLab(player: Player)
 	local list = {}
 	for _, recipe in Shops.Recipes do
-		table.insert(list, { Id = recipe.Id, Result = recipe.Result, Serum = recipe.Serum == true, Gold = recipe.Gold, LevelReq = recipe.LevelReq, Materials = recipe.Materials, Locked = recipe.Serum == true and not S.SerumService.IsAvailable() })
+		table.insert(list, { Id = recipe.Id, Result = recipe.Result, Serum = recipe.Serum == true, Gold = price(player, recipe.Gold), LevelReq = recipe.LevelReq, Materials = recipe.Materials, Locked = recipe.Serum == true and not S.SerumService.IsAvailable() })
 	end
 	Net.Event("ShopOpen"):FireClient(player, { Kind = "Lab", Name = "Laboratorio della Dott.ssa Morrow", Recipes = list })
 end
@@ -117,8 +128,9 @@ local function buy(player: Player, shopId: any, itemId: any)
 		S.EventService.Notify(player, "Lo possiedi già.", "Info", 2)
 		return
 	end
-	if not S.PlayerService.SpendGold(player, def.Price or 0) then
-		S.EventService.Notify(player, ("Oro insufficiente: servono %s."):format(Util.FormatNumber(def.Price or 0)), "Errore", 3)
+	local cost = price(player, def.Price or 0)
+	if not S.PlayerService.SpendGold(player, cost) then
+		S.EventService.Notify(player, ("Oro insufficiente: servono %s."):format(Util.FormatNumber(cost)), "Errore", 3)
 		return
 	end
 	S.InventoryService.Give(player, itemId, 1)
@@ -166,11 +178,12 @@ local function craft(player: Player, recipeId: any)
 		S.EventService.Notify(player, "Possiedi già questo oggetto.", "Info", 2)
 		return
 	end
-	if profile.Gold < recipe.Gold then
-		S.EventService.Notify(player, ("Servono %s oro."):format(Util.FormatNumber(recipe.Gold)), "Errore", 3)
+	local cost = price(player, recipe.Gold)
+	if profile.Gold < cost then
+		S.EventService.Notify(player, ("Servono %s oro."):format(Util.FormatNumber(cost)), "Errore", 3)
 		return
 	end
-	S.PlayerService.SpendGold(player, recipe.Gold)
+	S.PlayerService.SpendGold(player, cost)
 	for id, count in recipe.Materials do
 		S.InventoryService.Take(player, id, count)
 	end

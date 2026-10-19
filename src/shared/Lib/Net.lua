@@ -54,6 +54,7 @@ Net.EventNames = {
 	"Leaderboards",
 	"Achievement",
 	"DataSync",
+	"OpenPremium",
 	"Notify",
 	"Announce",
 	"Effect",

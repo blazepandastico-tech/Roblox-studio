@@ -29,7 +29,7 @@ import tempfile
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-SCENES = ("titolo", "admin", "admin_programma", "evento", "striscione")
+SCENES = ("titolo", "admin", "admin_programma", "evento", "striscione", "negozio", "negozio_monete", "negozio_pass")
 EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
 DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 DEJAVU_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"

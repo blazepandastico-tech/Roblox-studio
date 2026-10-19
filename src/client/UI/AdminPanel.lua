@@ -158,6 +158,9 @@ local function showItems()
 	button(r, "Rimuovi game pass", RED, function()
 		send("RemovePasses")
 	end)
+	button(r, "⚡ Offerta lampo ora", PURPLE, function()
+		send("FlashOffer")
+	end)
 	for _, category in Items.CategoryOrder do
 		local list = {}
 		for _, def in Items.List do

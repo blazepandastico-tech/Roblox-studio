@@ -228,12 +228,26 @@ Serums = {
 Quando sono attivi si ottengono (con enorme fatica) da casse rarissime nel mondo, drop dei boss,
 il Mercante Velato ad Aurion e il Laboratorio (centinaia di frammenti).
 
-## 6. Negozio premium (gemme, monete, game pass)
+## 6. Bottega Reale: il negozio con Robux
 
-Tasto **N** o pulsante 💎. Contiene:
-- **Gemme** (valuta premium) e **Monete d'oro** con Robux;
-- **Game Pass**: Oro Doppio, Esperienza Doppia, Bombole Rinforzate, Fortuna del Cacciatore, Viaggiatore (viaggio rapido), VIP dell'Arcipelago (nome dorato, [VIP] in chat, mantello, gemme giornaliere);
-- **Negozio delle Gemme**: Sigilli del Raid, pozioni dell'oro, pergamene dell'esperienza, adrenalina, cambio stirpe, azzera statistiche, mantelli cosmetici.
+Tasto **N**, pulsante 💎 oppure il mercante **Aurelio** con la sua bancarella blu e oro (Campo di
+Addestramento, Quartier Generale, Aurion, Porto di Revelia). Schede:
+- **🔥 Offerte**:
+  - **offerta lampo del server** (ogni 40 minuti, 10 minuti, solo 10 pezzi per server, con il
+    cartellino ⚡ accanto al pulsante 💎);
+  - 3 **offerte a tempo** che cambiano ogni 6 ore;
+  - Pacchetto della Recluta;
+  - **Pacchetto Leggendario** (tutti i pass);
+  - bonus del **primo acquisto** (gemme raddoppiate).
+- **💰 Monete**: 6 pacchetti che crescono con il livello del giocatore.
+- **💎 Gemme**: 6 pacchetti, da 49 a 4.999 R$.
+- **♾️ Permanenti**: 9 Game Pass, tra cui i nuovi Maestria Rapida, Lame Eterne e Amico dei Mercanti.
+- **🛒 Negozio delle Gemme**: Sigilli del Raid, pozioni dell'oro, pergamene dell'esperienza, adrenalina,
+  cambio stirpe, azzera statistiche, mantelli cosmetici.
+- **🧭 Viaggio** rapido (pass Viaggiatore).
+
+Tre mantelli esclusivi (Alba, Tempesta, Leggenda) si ottengono solo con le offerte. Prezzi, contenuti
+e come attivarli: [`docs/NEGOZIO_ROBUX.md`](docs/NEGOZIO_ROBUX.md).
 
 Le gemme si guadagnano anche giocando (accesso giornaliero, primo boss di ogni tipo, raid, codici).
 

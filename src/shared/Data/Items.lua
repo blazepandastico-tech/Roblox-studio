@@ -690,6 +690,58 @@ add({
 	Description = "Il mantello dorato dei membri VIP dell'Arcipelago. +5% oro ed esperienza.",
 })
 
+-- Esclusivi del negozio con Robux: solo nelle offerte a tempo, nelle offerte lampo e nel Pacchetto Leggendario
+add({
+	Id = "MantelloAlba",
+	Name = "Mantello dell'Alba",
+	Category = "Accessorio",
+	Rarity = "Leggendario",
+	LevelReq = 1,
+	XPBonus = 0.07,
+	GoldBonus = 0.07,
+	Visual = "Mantello",
+	CloakColor = Color3.fromRGB(214, 112, 36),
+	CloakTrim = Color3.fromRGB(255, 226, 140),
+	Emblem = "Falco",
+	Premium = true,
+	Exclusive = true,
+	Description = "Arancio come il primo sole sulle Mura. Esclusivo delle offerte a tempo: +7% esperienza e +7% oro.",
+})
+
+add({
+	Id = "MantelloTempesta",
+	Name = "Mantello della Tempesta",
+	Category = "Accessorio",
+	Rarity = "Mitico",
+	LevelReq = 1,
+	AllDamage = 0.06,
+	Visual = "Mantello",
+	CloakColor = Color3.fromRGB(26, 64, 78),
+	CloakTrim = Color3.fromRGB(200, 226, 240),
+	Emblem = "Torre",
+	Premium = true,
+	Exclusive = true,
+	Description = "Grigio-azzurro come il cielo prima del temporale. Esclusivo delle offerte lampo: +6% a tutti i danni.",
+})
+
+add({
+	Id = "MantelloLeggenda",
+	Name = "Mantello della Leggenda",
+	Category = "Accessorio",
+	Rarity = "Divino",
+	LevelReq = 1,
+	XPBonus = 0.08,
+	GoldBonus = 0.08,
+	AllDamage = 0.03,
+	Visual = "Mantello",
+	CloakColor = Color3.fromRGB(18, 16, 20),
+	CloakTrim = Color3.fromRGB(240, 196, 70),
+	Emblem = "Corona",
+	Premium = true,
+	Exclusive = true,
+	Description = "Nero e oro, per chi ha tutti i pass dell'Arcipelago. Esclusivo del Pacchetto Leggendario: +8% esperienza, +8% oro, +3% danni.",
+})
+
 -- Collezione di Halloween: premi degli eventi dell'Admin Abuse di Halloween (non si comprano)
 add({
 	Id = "CappelloStrega",

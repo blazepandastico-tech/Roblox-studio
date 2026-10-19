@@ -281,6 +281,35 @@ local function buildMenuButtons()
 		if entry.Hint then
 			New("TextLabel", { BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -3, 1, -1), Size = UDim2.fromOffset(16, 14), Font = Theme.Fonts.Bold, TextSize = 11, TextColor3 = Colors.Gold, Text = entry.Hint, Parent = button })
 		end
+		if entry.Tab == "Premium" then
+			-- offerta lampo nel server: cartellino con il tempo che resta accanto al pulsante 💎
+			local badge = Theme.Label("", {
+				Name = "Lampo",
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(0, -6, 0.5, 0),
+				Size = UDim2.fromOffset(92, 26),
+				BackgroundTransparency = 0,
+				BackgroundColor3 = Color3.fromRGB(200, 120, 20),
+				TextXAlignment = Enum.TextXAlignment.Center,
+				Font = Theme.Fonts.Bold,
+				TextSize = 14,
+				TextColor3 = Colors.White,
+				Visible = false,
+				Parent = button,
+			})
+			Theme.Corner(badge, 8)
+			Theme.Stroke(badge, Colors.GoldBright, 1.5, 0)
+			task.spawn(function()
+				while badge.Parent do
+					local left = C.Premium and C.Premium.FlashEndsIn and C.Premium.FlashEndsIn()
+					badge.Visible = left ~= nil and left > 0
+					if badge.Visible then
+						badge.Text = "⚡ " .. Util.FormatTime(left :: number)
+					end
+					task.wait(1)
+				end
+			end)
+		end
 	end
 end
 

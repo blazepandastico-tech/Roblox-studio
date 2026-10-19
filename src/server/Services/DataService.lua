@@ -77,6 +77,10 @@ local TEMPLATE = {
 	FreeSpinAt = 0,
 	Achievements = {},
 	StarterBought = false,
+	-- negozio con Robux: pass ricevuti col Pacchetto Leggendario, offerte già prese, primo acquisto
+	GrantedPasses = {},
+	OfferBuys = {},
+	FirstPurchase = false,
 	GroupRewarded = false,
 	FavoritePrompted = false,
 	FriendsSeen = 0,

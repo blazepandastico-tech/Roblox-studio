@@ -718,18 +718,65 @@ end
 
 -- NEGOZIO PREMIUM ------------------------------------------------------------------------------
 local seen = {}
-for _, p in Monetization.Products do
+for _, p in Monetization.AllProducts do
 	check(not seen[p.Id], "Prodotto duplicato %s", p.Id)
 	seen[p.Id] = true
-	check(p.Kind == "Gems" or p.Kind == "Gold" or p.Kind == "Spins" or p.Kind == "Starter", "Prodotto %s: tipo non valido", p.Id)
-	if p.Kind == "Starter" then
-		check(type(p.Bundle) == "table" and isNumber(p.Robux), "Prodotto %s: pacchetto non valido", p.Id)
-		for id in (p.Bundle and p.Bundle.Items or {}) do
+	check(Monetization.Product(p.Id) == p, "Prodotto %s: non si trova con Monetization.Product", p.Id)
+	check(isNumber(p.Robux) and p.Robux > 0 and p.Robux == math.floor(p.Robux), "Prodotto %s: prezzo in Robux non valido", p.Id)
+	check(p.Kind == "Gems" or p.Kind == "Gold" or p.Kind == "Spins" or p.Kind == "Starter" or p.Kind == "PassBundle" or p.Kind == "Offer" or p.Kind == "Flash", "Prodotto %s: tipo non valido", p.Id)
+	if p.Bundle then
+		for id, count in (p.Bundle.Items or {}) do
 			check(Items.Get(id) ~= nil, "Prodotto %s: oggetto inesistente %s", p.Id, id)
+			check(isNumber(count) and count > 0, "Prodotto %s: quantità non valida per %s", p.Id, id)
+			local def = Items.Get(id)
+			if def and def.Exclusive then
+				check(Monetization.ItemGems(id) == nil, "Prodotto %s: l'esclusivo %s non deve avere un valore in gemme", p.Id, id)
+			elseif def then
+				check(Monetization.ItemGems(id) ~= nil or def.Premium, "Prodotto %s: manca il valore in gemme di %s (ItemGemValue)", p.Id, id)
+			end
 		end
-	else
-		check(isNumber(p.Amount) and p.Amount > 0 and isNumber(p.Robux), "Prodotto %s: valori non validi", p.Id)
+		if p.Bundle.GoldPack then
+			local pack = Monetization.Product(p.Bundle.GoldPack)
+			check(pack ~= nil and pack.Kind == "Gold", "Prodotto %s: GoldPack '%s' non è un pacchetto di monete", p.Id, tostring(p.Bundle.GoldPack))
+		end
+		check(p.Bundle.Spins == nil or p.Kind == "Starter", "Prodotto %s: i giri (premi casuali) non vanno nelle offerte", p.Id)
 	end
+	if p.Kind == "Offer" or p.Kind == "Flash" then
+		check(type(p.Bundle) == "table", "Offerta %s senza contenuto", p.Id)
+		-- ogni offerta deve convenire davvero rispetto ai pacchetti normali
+		for _, level in { 1, 100, 1000, 2000 } do
+			local value = Monetization.BundleValue(p, level)
+			check(p.Exclusive ~= nil or value > p.Robux * 1.15, "Offerta %s al livello %d: vale R$ %d, non conviene (costa R$ %d)", p.Id, level, value, p.Robux)
+		end
+	elseif p.Kind == "Starter" or p.Kind == "PassBundle" then
+		check(type(p.Bundle) == "table", "Prodotto %s: pacchetto non valido", p.Id)
+	else
+		check(isNumber(p.Amount) and p.Amount > 0, "Prodotto %s: valori non validi", p.Id)
+	end
+	if p.Kind == "Gold" then
+		check(Monetization.GoldAmount(p, 1000) > Monetization.GoldAmount(p, 1), "Monete %s: devono crescere con il livello", p.Id)
+	end
+end
+-- i pacchetti più grandi devono convenire di più
+for _, kind in { "Gems", "Gold" } do
+	local last, lastExtra = nil, -1
+	for _, p in Monetization.Products do
+		if p.Kind == kind then
+			local extra = Monetization.ExtraValue(p, 500)
+			if last then
+				check(p.Robux > last.Robux and extra > lastExtra, "Pacchetto %s: deve costare e convenire più di %s", p.Id, last.Id)
+			end
+			last, lastExtra = p, extra
+		end
+	end
+end
+do
+	local slot, ends, chosen = Monetization.OfferRotation(1800000000)
+	check(#chosen == Monetization.OfferSlots and ends > 1800000000 and slot > 0, "Turno delle offerte a tempo non valido")
+	local again = select(3, Monetization.OfferRotation(1800000000 + 60))
+	check(table.concat(chosen, ",") == table.concat(again, ","), "Le offerte a tempo devono restare uguali per tutto il turno")
+	local bundle = Monetization.Product("PacchettoLeggendario")
+	check(bundle ~= nil and Monetization.BundleValue(bundle, 1) > bundle.Robux * 1.5, "Pacchetto Leggendario: deve valere molto più del prezzo")
 end
 for _, pass in Monetization.GamePasses do
 	check(type(pass.Bonuses) == "table", "Pass %s senza Bonuses", pass.Id)

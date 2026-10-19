@@ -13,6 +13,7 @@ local Util = require(Shared.Lib.Util)
 local Rewards = require(Shared.Data.Rewards)
 local Leveling = require(Shared.Data.Leveling)
 local Items = require(Shared.Data.Items)
+local Monetization = require(Shared.Data.Monetization)
 
 local RewardsService = {}
 local S
@@ -38,6 +39,10 @@ function RewardsService.Apply(player: Player, bundle): ((() -> ())?, string)
 	if bundle.GoldQuests then
 		gold += Leveling.QuestGold(profile.Level) * bundle.GoldQuests
 	end
+	if bundle.GoldPack then
+		-- le monete di un pacchetto del negozio, al livello del giocatore
+		gold += Monetization.BundleGold({ GoldPack = bundle.GoldPack }, profile.Level)
+	end
 	gold = math.floor(gold)
 	local gems = bundle.Gems or 0
 	local spins = bundle.Spins or 0
@@ -47,6 +52,9 @@ function RewardsService.Apply(player: Player, bundle): ((() -> ())?, string)
 			if Items.Get(id) then
 				if bundle.UniqueItem == id and (profile.Inventory[id] or 0) > 0 then
 					gems += bundle.FallbackGems or 0
+				elseif Items.Get(id).Category == "Accessorio" and (profile.Inventory[id] or 0) > 0 then
+					-- un accessorio che hai già non si raddoppia: diventa gemme
+					gems += bundle.FallbackGems or Monetization.FirstPurchaseGems
 				else
 					items[id] = count
 				end

@@ -58,6 +58,7 @@ local ROLE_ICONS = {
 	Dealer = "💉",
 	Genealogist = "🧬",
 	Lift = "🛗",
+	Premium = "💎",
 }
 
 local ROLE_NAMES = {
@@ -69,6 +70,7 @@ local ROLE_NAMES = {
 	Raid = "Raid",
 	Duel = "Arena dei Duelli",
 	Lab = "Laboratorio",
+	Premium = "Bottega Reale (offerte)",
 }
 
 type Canvas = {

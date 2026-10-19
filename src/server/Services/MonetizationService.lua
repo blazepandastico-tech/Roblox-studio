@@ -75,6 +75,39 @@ function MonetizationService.StarterAvailable(player: Player): boolean
 	return os.time() - (profile.CreatedAt or 0) < Monetization.StarterHours * 3600
 end
 
+-- Offerta lampo in corso in questo server
+local flash = { Id = "", Ends = 0, Stock = 0, Uid = "" }
+
+local function publishFlash()
+	ReplicatedStorage:SetAttribute("Lampo", flash.Id)
+	ReplicatedStorage:SetAttribute("LampoFine", flash.Ends)
+	ReplicatedStorage:SetAttribute("LampoScorte", flash.Stock)
+	ReplicatedStorage:SetAttribute("LampoTotale", Monetization.FlashStock)
+	ReplicatedStorage:SetAttribute("LampoUid", flash.Uid)
+end
+
+local function flashActive(): boolean
+	return flash.Id ~= "" and os.time() < flash.Ends
+end
+
+-- L'offerta a tempo è nel turno attuale?
+local function offerActive(id: string): (boolean, number)
+	local slot, _, chosen = Monetization.OfferRotation(os.time())
+	return table.find(chosen, id) ~= nil, slot
+end
+
+-- Pass posseduti (comprati su Roblox o ricevuti col Pacchetto Leggendario)
+local function ownsAnyPass(profile): boolean
+	for _, pass in Monetization.GamePasses do
+		if profile.Passes[pass.Id] then
+			return true
+		end
+	end
+	return false
+end
+
+local grantPass
+
 -- Consegna un prodotto. Restituisce una funzione per annullarlo (nil se non consegnato)
 local function grantProduct(player: Player, product): (() -> ())?
 	local profile = S.DataService.Get(player)
@@ -88,13 +121,14 @@ local function grantProduct(player: Player, product): (() -> ())?
 		undo = function()
 			profile.Gems -= product.Amount
 		end
-		text = ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
+		text = ("%s %s: +%s gemme"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
 	elseif product.Kind == "Gold" then
-		profile.Gold += product.Amount
+		local amount = Monetization.GoldAmount(product, profile.Level)
+		profile.Gold += amount
 		undo = function()
-			profile.Gold -= product.Amount
+			profile.Gold -= amount
 		end
-		text = ("%s %s: +%s"):format(product.Icon, product.Name, Util.FormatNumber(product.Amount))
+		text = ("%s %s: +%s monete"):format(product.Icon, product.Name, Util.FormatNumber(amount))
 	elseif product.Kind == "Spins" then
 		profile.Spins = (profile.Spins or 0) + product.Amount
 		undo = function()
@@ -112,8 +146,70 @@ local function grantProduct(player: Player, product): (() -> ())?
 			profile.StarterBought = false
 		end
 		text = product.Name .. ": " .. summary
+	elseif product.Kind == "Offer" or product.Kind == "Flash" then
+		local bundleUndo, summary = S.RewardsService.Apply(player, product.Bundle)
+		if not bundleUndo then
+			return nil
+		end
+		local key = if product.Kind == "Flash" then "Lampo" else product.Id
+		local before = profile.OfferBuys[key]
+		local _, slot = offerActive(product.Id)
+		profile.OfferBuys[key] = if product.Kind == "Flash" then flash.Uid else slot
+		local tookStock = false
+		if product.Kind == "Flash" and flash.Id == product.Id and flash.Stock > 0 then
+			flash.Stock -= 1
+			tookStock = true
+			publishFlash()
+			S.EventService.NotifyAll(("⚡ %s ha preso l'offerta lampo! %s"):format(player.DisplayName, if flash.Stock > 0 then ("Ne restano %d."):format(flash.Stock) else "Esaurita!"), "Ricompensa", 4)
+		end
+		undo = function()
+			bundleUndo()
+			profile.OfferBuys[key] = before
+			if tookStock then
+				flash.Stock += 1
+				publishFlash()
+			end
+		end
+		text = product.Name .. ": " .. summary
+	elseif product.Kind == "PassBundle" then
+		local added = {}
+		for _, pass in Monetization.GamePasses do
+			if not profile.Passes[pass.Id] then
+				table.insert(added, pass.Id)
+				profile.GrantedPasses[pass.Id] = true
+				grantPass(player, pass, true)
+			end
+		end
+		local bundleUndo, summary = S.RewardsService.Apply(player, product.Bundle)
+		if not bundleUndo then
+			return nil
+		end
+		undo = function()
+			bundleUndo()
+			for _, id in added do
+				profile.GrantedPasses[id] = nil
+				profile.Passes[id] = nil
+			end
+			S.PlayerService.Refresh(player, true)
+		end
+		text = ("%s: tutti i pass sbloccati per sempre • %s"):format(product.Name, summary)
 	else
 		return nil
+	end
+	-- primo acquisto con Robux: gemme raddoppiate (pacchetti di gemme) o gemme in regalo
+	if not profile.FirstPurchase then
+		local extra = if product.Kind == "Gems" then product.Amount else Monetization.FirstPurchaseGems
+		profile.Gems += extra
+		profile.FirstPurchase = true
+		local baseUndo = undo
+		undo = function()
+			if baseUndo then
+				baseUndo()
+			end
+			profile.Gems -= extra
+			profile.FirstPurchase = false
+		end
+		text ..= ("\n🎁 Bonus primo acquisto: +%s gemme!"):format(Util.FormatNumber(extra))
 	end
 	S.DataService.MarkDirty(player)
 	S.EventService.AnnounceTo(player, "Grazie per il tuo supporto!", text, "Raro")
@@ -124,7 +220,7 @@ local function grantProduct(player: Player, product): (() -> ())?
 	return undo
 end
 
-local function grantPass(player: Player, pass)
+function grantPass(player: Player, pass, silent: boolean?)
 	local profile = S.DataService.Get(player)
 	if not profile then
 		return
@@ -139,7 +235,7 @@ local function grantPass(player: Player, pass)
 	end
 	S.DataService.MarkDirty(player)
 	S.PlayerService.Refresh(player, true)
-	if isNew then
+	if isNew and not silent then
 		S.EventService.AnnounceTo(player, "Pass sbloccato: " .. pass.Name, pass.Description, "Raro")
 	end
 end
@@ -198,11 +294,14 @@ local function refreshPasses(player: Player)
 			if ok then
 				if owns then
 					grantPass(player, pass)
-				elseif not isStudio() then
+				elseif not isStudio() and not profile.GrantedPasses[pass.Id] then
 					profile.Passes[pass.Id] = nil
 				end
 			end
 		end
+	end
+	for id in profile.GrantedPasses do
+		profile.Passes[id] = true
 	end
 	if profile.Passes.VIP then
 		player:SetAttribute("VIP", true)
@@ -279,6 +378,37 @@ local function onBuy(player: Player, kind: any, id: any)
 		end
 		if product.Kind == "Starter" and not MonetizationService.StarterAvailable(player) then
 			S.EventService.Notify(player, "Questa offerta non è più disponibile.", "Info", 3)
+			return
+		end
+		local profile = S.DataService.Get(player)
+		if not profile then
+			return
+		end
+		if product.Kind == "Offer" then
+			local active, slot = offerActive(product.Id)
+			if not active then
+				S.EventService.Notify(player, "Questa offerta è scaduta: guarda quelle nuove!", "Info", 3)
+				return
+			end
+			if profile.OfferBuys[product.Id] == slot then
+				S.EventService.Notify(player, "Hai già preso questa offerta: torna al prossimo turno.", "Info", 3)
+				return
+			end
+		elseif product.Kind == "Flash" then
+			if not flashActive() or flash.Id ~= product.Id then
+				S.EventService.Notify(player, "L'offerta lampo è finita.", "Info", 3)
+				return
+			end
+			if flash.Stock <= 0 then
+				S.EventService.Notify(player, "Esaurita! Aspetta la prossima offerta lampo.", "Info", 3)
+				return
+			end
+			if profile.OfferBuys.Lampo == flash.Uid then
+				S.EventService.Notify(player, "Hai già preso questa offerta lampo.", "Info", 3)
+				return
+			end
+		elseif product.Kind == "PassBundle" and ownsAnyPass(profile) then
+			S.EventService.Notify(player, "Hai già dei pass: il Pacchetto Leggendario è per chi non ne ha ancora.", "Info", 4)
 			return
 		end
 		if product.Kind == "Spins" and not S.RewardsService.PaidRandomAllowed(player) then
@@ -359,6 +489,66 @@ local function onFastTravel(player: Player, islandId: any)
 	end
 end
 
+-- OFFERTE A TEMPO E OFFERTE LAMPO ---------------------------------------------------------------------
+
+local function publishRotation()
+	local _, ends, chosen = Monetization.OfferRotation(os.time())
+	ReplicatedStorage:SetAttribute("OfferteAttive", table.concat(chosen, ","))
+	ReplicatedStorage:SetAttribute("OfferteFine", ends)
+end
+
+local lastFlash = ""
+local function startFlash()
+	local pool = {}
+	for _, offer in Monetization.FlashOffers do
+		if offer.Id ~= lastFlash and Monetization.IsAvailable(offer) then
+			table.insert(pool, offer)
+		end
+	end
+	if #pool == 0 then
+		return
+	end
+	local offer = pool[math.random(1, #pool)]
+	lastFlash = offer.Id
+	flash.Id = offer.Id
+	flash.Ends = os.time() + Monetization.FlashMinutes * 60
+	flash.Stock = Monetization.FlashStock
+	flash.Uid = ("%s-%d"):format(string.sub(game.JobId, 1, 8), os.time())
+	publishFlash()
+	S.EventService.NotifyAll(("⚡ OFFERTA LAMPO nel server: %s %s a R$ %d! Solo %d pezzi per %d minuti (tasto N)."):format(offer.Icon, offer.Name, offer.Robux, flash.Stock, Monetization.FlashMinutes), "Ricompensa", 7)
+end
+
+-- Fa partire subito un'offerta lampo (Pannello Admin)
+function MonetizationService.StartFlash()
+	startFlash()
+end
+
+local function offersLoop()
+	publishRotation()
+	publishFlash()
+	local nextFlash = os.time() + Monetization.FlashFirstMinutes * 60
+	ReplicatedStorage:SetAttribute("LampoProssima", nextFlash)
+	while true do
+		task.wait(5)
+		local now = os.time()
+		if now >= (ReplicatedStorage:GetAttribute("OfferteFine") or 0) then
+			publishRotation()
+		end
+		if flash.Id ~= "" and now >= flash.Ends then
+			flash.Id = ""
+			flash.Stock = 0
+			publishFlash()
+		end
+		if now >= nextFlash then
+			nextFlash = now + Monetization.FlashEveryMinutes * 60
+			ReplicatedStorage:SetAttribute("LampoProssima", nextFlash)
+			if #Players:GetPlayers() > 0 then
+				startFlash()
+			end
+		end
+	end
+end
+
 function MonetizationService.Init(services)
 	S = services
 end
@@ -399,6 +589,7 @@ function MonetizationService.Start()
 		end
 	end)
 	Net.Event("PremiumBuy").OnServerEvent:Connect(onBuy)
+	task.spawn(offersLoop)
 	Net.Event("FastTravel").OnServerEvent:Connect(onFastTravel)
 end
 

@@ -19,7 +19,7 @@ Apri `SieriPerduti.rbxlx` → **Play**. Controlla in quest'ordine:
 | 6 | Pulsanti a sinistra | 🎁 Premi (calendario, regali a tempo, ruota), 🏆 Classifiche, 👥 Invita |
 | 7 | Ruota | Scrivi `/giri 5` in chat, apri 🎁 → Ruota → GIRA |
 | 8 | Menu (M) | Schede Traguardi e Classifiche |
-| 9 | Negozio (N) | Gemme, monete, pass (in Studio gli acquisti sono simulati gratis) |
+| 9 | Negozio (N) o Aurelio della Bottega Reale | Offerte (lampo e a tempo), monete, gemme, pass (in Studio gli acquisti sono simulati gratis) |
 | 10 | Storia | `/livello 200` poi `/capitolo 6` → traghettatore per Edenia |
 | 11 | Mura | Vola fino alle mura di Vermiglia: torri, cannoni, porte con stendardi |
 
@@ -38,10 +38,12 @@ Se qualcosa non va: copia l'**Output** (Visualizza → Output) e mandalo.
 
 Su create.roblox.com → il tuo gioco → **Monetizzazione**:
 
-1. **Passes**: crea Oro Doppio (349), Esperienza Doppia (399), Bombole Rinforzate (199),
-   Fortuna del Cacciatore (449), Viaggiatore (249), VIP dell'Arcipelago (499).
-2. **Developer Products**: crea i pacchetti di gemme (49 / 249 / 499 / 999 / 2499), di monete
-   (49 / 249 / 799), i giri della ruota (79 / 229) e il **Pacchetto della Recluta** (99).
+1. **Passes**: crea i 9 pass (Oro Doppio 349, Esperienza Doppia 399, Maestria Rapida 299,
+   Lame Eterne 249, Bombole Rinforzate 199, Fortuna del Cacciatore 449, Amico dei Mercanti 199,
+   Viaggiatore 249, VIP dell'Arcipelago 499).
+2. **Developer Products**: crea i 29 prodotti della Bottega Reale (pacchetti di gemme e di monete,
+   giri della ruota, Pacchetto della Recluta, Pacchetto Leggendario, 8 offerte a tempo e 5 offerte
+   lampo). L'elenco completo con i prezzi è in [`NEGOZIO_ROBUX.md`](NEGOZIO_ROBUX.md).
 3. Copia ogni ID numerico in `src/shared/Data/Monetization.lua` (campi `ProductId` / `PassId`),
    oppure in Studio dentro `ReplicatedStorage → Shared → Data → Monetization`.
 4. **Server privati**: nelle impostazioni del gioco attivali a pagamento (es. 100 Robux al mese):

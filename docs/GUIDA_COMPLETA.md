@@ -306,6 +306,9 @@ Si equipaggia da **Menu (M) → Equipaggiamento**. Ogni oggetto ha un **livello 
 | Mantello Cremisi | — | +5% oro | 400 gemme, oppure jackpot della Ruota |
 | Mantello della Notte | — | +5% XP | 400 gemme, oppure Pacchetto della Recluta |
 | Mantello Reale VIP | — | +5% oro e XP | pass VIP |
+| Mantello dell'Alba | — | +7% XP e oro | esclusivo: offerta a tempo della Bottega Reale |
+| Mantello della Tempesta | — | +6% a tutti i danni | esclusivo: offerta lampo del server |
+| Mantello della Leggenda | — | +8% XP e oro, +3% danni | esclusivo: Pacchetto Leggendario |
 | Collezione di Halloween | — | Lanterna +3% danni, Cappello +5% XP, Maschera +5% oro, Mantello Spettrale +5% oro e XP | premio finale degli eventi Admin Abuse di Halloween (almeno 3 giganti abbattuti) |
 
 ### Consumabili
@@ -936,7 +939,12 @@ Si inseriscono in **Menu (M) → Codici**. Ogni codice vale una volta per giocat
 
 ## 22. Gemme, negozio premium e pass
 
-Il negozio premium si apre con il tasto **N** o il pulsante 💎.
+Il negozio (la **Bottega Reale**) si apre in tre modi:
+- con il tasto **N**;
+- con il pulsante 💎;
+- parlando con il mercante **Aurelio**: ha una bancarella blu e oro al Campo di Addestramento, al Quartier Generale, ad Aurion e al Porto di Revelia (💎 sulla mappa).
+
+Tutti i dettagli e i prezzi sono in [`NEGOZIO_ROBUX.md`](NEGOZIO_ROBUX.md).
 
 ### Come guadagnare gemme senza spendere
 - accesso giornaliero (10 al giorno + calendario);
@@ -948,6 +956,18 @@ Il negozio premium si apre con il tasto **N** o il pulsante 💎.
 - Ruota;
 - regali a tempo;
 - eventi.
+
+### Le offerte (scheda 🔥 Offerte)
+- **Primo acquisto**: il primo acquisto con Robux raddoppia le gemme dei pacchetti di gemme, oppure regala 150 gemme con qualsiasi altro prodotto.
+- **Offerta lampo del server** ⚡:
+  - in ogni server ne parte una ogni 40 minuti e dura 10 minuti;
+  - ha solo **10 pezzi per server**, molto scontati;
+  - quando è attiva, accanto al pulsante 💎 compare un cartellino arancione con il tempo che resta;
+  - ogni giocatore la può prendere una volta.
+- **Offerte a tempo** ⏳: ogni 6 ore escono 3 nuove offerte, uguali in tutti i server. Ognuna si prende una volta per turno.
+- Dentro le offerte trovi gemme, materiali per il Laboratorio (Cristalli, Frammenti, Midollo), Pergamene degli Antenati, Sigilli del Raid e pozioni.
+- Ci sono anche **mantelli esclusivi** che si ottengono solo qui: Mantello dell'Alba (+7% XP e oro), Mantello della Tempesta (+6% danni) e Mantello della Leggenda (+8% XP e oro, +3% danni). Se ne hai già uno, ricevi 150 gemme al suo posto.
+- Ogni offerta mostra il suo **valore** calcolato con i prezzi del negozio.
 
 ### Negozio delle gemme
 | Oggetto | Gemme |
@@ -961,27 +981,29 @@ Il negozio premium si apre con il tasto **N** o il pulsante 💎.
 | Mantello Cremisi (+5% oro) | 400 |
 | Mantello della Notte (+5% XP) | 400 |
 
-### Game Pass (Robux, per sempre)
+### Pass permanenti (Robux, per sempre)
 | Pass | Robux | Effetto |
 |---|---|---|
 | 💰 Oro Doppio | 349 | oro ×2 da giganti, missioni e raid |
 | 📈 Esperienza Doppia | 399 | XP ×2 |
+| ⚔️ Maestria Rapida | 299 | la maestria delle armi sale il doppio |
+| 🗡️ Lame Eterne | 249 | le lame durano il doppio |
 | 💨 Bombole Rinforzate | 199 | +50% efficienza del gas |
 | 🍀 Fortuna del Cacciatore | 449 | +50% probabilità di Frammenti e oggetti rari |
+| 🏷️ Amico dei Mercanti | 199 | −20% sui prezzi in oro di armerie, empori e Laboratorio |
 | 🧭 Viaggiatore | 249 | viaggio rapido dal menu, ovunque |
 | 👑 VIP dell'Arcipelago | 499 | nome dorato, Mantello Reale VIP, +10% oro e XP, 100 gemme al giorno |
+| 🏆 Pacchetto Leggendario | 1.499 | tutti i pass + 1.000 gemme + Mantello della Leggenda (solo per chi non ha ancora nessun pass) |
 
-### Prodotti
+### Monete e gemme
+- **Monete d'oro**: 6 pacchetti da 49 a 1.999 R$. La quantità **cresce con il tuo livello**: la Borsa da 49 R$ dà 42.500 monete al livello 1 e 2,5 milioni al livello 1000.
 - **Gemme**:
   - 100 per 49 R$;
-  - 550 per 249 R$;
-  - 1.200 per 499 R$;
-  - 2.600 per 999 R$;
-  - 7.000 per 2.499 R$.
-- **Monete d'oro**:
-  - 50.000 per 49 R$;
-  - 400.000 per 249 R$;
-  - 2.000.000 per 799 R$.
+  - 600 per 249 R$;
+  - 1.300 per 499 R$;
+  - 2.800 per 999 R$;
+  - 7.500 per 2.499 R$;
+  - 16.000 per 4.999 R$.
 - **Giri della Ruota**: 3 per 79 R$, 10 per 229 R$.
 - **Pacchetto della Recluta** (99 R$, disponibile solo nelle prime **72 ore**):
   - 300 gemme;
