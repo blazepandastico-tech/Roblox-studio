@@ -7258,7 +7258,7 @@ local NPCList = {
 		Look = { Skin = Color3.fromRGB(220, 182, 150), Hair = Color3.fromRGB(200, 200, 200), HairStyle = "Lungo", Uniform = "Civile", Beard = true },
 		Greeting = { "Benvenuto nell'Arena. Quando il raid comincia, resta dentro le mura." } },
 	-- BOTTEGA REALE (negozio con Robux: apre il negozio premium sulle offerte) --------------------
-	{ Id = "BottegaCampo", Zone = "CampoAddestramento", Offset = Vector3.new(16, 0, 40), Facing = 338, Role = "Premium", Stall = true,
+	{ Id = "BottegaCampo", Zone = "CampoAddestramento", Offset = Vector3.new(12, 0, 50), Facing = 346, Role = "Premium", Stall = true,
 		Name = "Aurelio", Title = "Bottega Reale (offerte)",
 		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
 		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
@@ -7270,7 +7270,7 @@ local NPCList = {
 		Name = "Aurelio", Title = "Bottega Reale (offerte)",
 		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
 		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
-	{ Id = "BottegaRevelia", Zone = "PortoRevelia", Offset = Vector3.new(20, 0, 38), Facing = 332, Role = "Premium", Stall = true,
+	{ Id = "BottegaRevelia", Zone = "PortoRevelia", Offset = Vector3.new(10, 0, 42), Facing = 347, Role = "Premium", Stall = true,
 		Name = "Aurelio", Title = "Bottega Reale (offerte)",
 		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
 		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
@@ -19088,7 +19088,7 @@ local function getTemplate(): Model?
 end
 
 -- Bancarella della Bottega Reale: bancone, quattro pali, tendone a strisce, forziere di gemme e insegna
-local function buildStall(npc, pos: Vector3)
+local function buildStall(npc, pos: Vector3, parent: Instance?)
 	local model = Instance.new("Model")
 	model.Name = npc.Id .. "_Bancarella"
 	local base = CFrame.new(pos) * CFrame.Angles(0, math.rad(-(npc.Facing or 0)), 0)
@@ -19151,7 +19151,19 @@ local function buildStall(npc, pos: Vector3)
 	label.TextColor3 = gold
 	label.Text = "💎 BOTTEGA REALE 💎"
 	label.Parent = gui
-	model.Parent = folder
+	model.Parent = parent or folder
+end
+
+-- Costruisce solo le bancarelle (per le foto del mondo: tools/tests/world_dump.luau)
+function NPCService.BuildStalls(parent: Instance)
+	for _, npc in NPCs.List do
+		local pos = npc.Stall and npcPosition(npc)
+		if pos then
+			local zone = Zones.Get(npc.Zone)
+			local okY, y = pcall(groundAt, pos, zone ~= nil and zone.Underground == true, false)
+			buildStall(npc, Vector3.new(pos.X, if okY and type(y) == "number" then y else pos.Y, pos.Z), parent)
+		end
+	end
 end
 
 local function spawnNpc(npc)

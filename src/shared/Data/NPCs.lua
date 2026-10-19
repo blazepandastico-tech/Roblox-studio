@@ -356,7 +356,7 @@ local NPCList = {
 		Look = { Skin = Color3.fromRGB(220, 182, 150), Hair = Color3.fromRGB(200, 200, 200), HairStyle = "Lungo", Uniform = "Civile", Beard = true },
 		Greeting = { "Benvenuto nell'Arena. Quando il raid comincia, resta dentro le mura." } },
 	-- BOTTEGA REALE (negozio con Robux: apre il negozio premium sulle offerte) --------------------
-	{ Id = "BottegaCampo", Zone = "CampoAddestramento", Offset = Vector3.new(16, 0, 40), Facing = 338, Role = "Premium", Stall = true,
+	{ Id = "BottegaCampo", Zone = "CampoAddestramento", Offset = Vector3.new(12, 0, 50), Facing = 346, Role = "Premium", Stall = true,
 		Name = "Aurelio", Title = "Bottega Reale (offerte)",
 		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
 		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
@@ -368,7 +368,7 @@ local NPCList = {
 		Name = "Aurelio", Title = "Bottega Reale (offerte)",
 		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
 		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },
-	{ Id = "BottegaRevelia", Zone = "PortoRevelia", Offset = Vector3.new(20, 0, 38), Facing = 332, Role = "Premium", Stall = true,
+	{ Id = "BottegaRevelia", Zone = "PortoRevelia", Offset = Vector3.new(10, 0, 42), Facing = 347, Role = "Premium", Stall = true,
 		Name = "Aurelio", Title = "Bottega Reale (offerte)",
 		Look = { Skin = Color3.fromRGB(226, 186, 150), Hair = Color3.fromRGB(60, 40, 30), HairStyle = "Corto", Uniform = "Nobile", Beard = true, Hat = true },
 		Greeting = { "Benvenuto alla Bottega Reale! Offerte a tempo, monete, gemme e pass che durano per sempre.", "Hai visto l'offerta lampo? I pezzi sono pochi e finiscono in fretta!" } },

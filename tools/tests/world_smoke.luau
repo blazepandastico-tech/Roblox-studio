@@ -48,6 +48,45 @@ local docks = MOCK_TAGGED(Config.Tags.BoatDock)
 check(#docks >= 5 + #W.Islets, "pontili delle barche mancanti: " .. #docks)
 LOG(("Pontili per le barche: %d"):format(#docks))
 
+-- BANCARELLE DELLA BOTTEGA REALE: niente case, depositi o altri personaggi dove sta la bancarella ---------
+do
+	local NPCs = require(SHARED.Data.NPCs)
+	local Zones = require(SHARED.Data.Zones)
+	local boxes = {}
+	for _, d in workspace:GetDescendants() do
+		if d:IsA("BasePart") and d.ClassName ~= "Terrain" then
+			local cf, s = d.CFrame, d.Size
+			local R = { cf:GetComponents() }
+			local hx = math.abs(R[4]) * s.X / 2 + math.abs(R[5]) * s.Y / 2 + math.abs(R[6]) * s.Z / 2
+			local hy = math.abs(R[7]) * s.X / 2 + math.abs(R[8]) * s.Y / 2 + math.abs(R[9]) * s.Z / 2
+			local hz = math.abs(R[10]) * s.X / 2 + math.abs(R[11]) * s.Y / 2 + math.abs(R[12]) * s.Z / 2
+			if hx < 150 and hz < 150 then
+				table.insert(boxes, { cf.X - hx, cf.X + hx, cf.Y - hy, cf.Y + hy, cf.Z - hz, cf.Z + hz, (if d.Parent then d.Parent.Name else "?") .. "/" .. d.Name })
+			end
+		end
+	end
+	local stalls = 0
+	for _, npc in NPCs.List do
+		if npc.Stall then
+			stalls += 1
+			local zone = Zones.Get(npc.Zone)
+			local p = zone.Center + npc.Offset
+			local G = zone.Center.Y
+			for _, b in boxes do
+				if b[1] < p.X + 7 and b[2] > p.X - 7 and b[5] < p.Z + 7 and b[6] > p.Z - 7 and b[3] < G + 12 and b[4] > G + 0.4 then
+					check(false, ("bancarella %s sopra %s"):format(npc.Id, b[7]))
+				end
+			end
+			for _, other in NPCs.List do
+				if other ~= npc and other.Zone == npc.Zone and other.Offset then
+					check((other.Offset - npc.Offset).Magnitude > 11, ("bancarella %s troppo vicina a %s"):format(npc.Id, other.Id))
+				end
+			end
+		end
+	end
+	LOG(("Bancarelle della Bottega Reale in posti liberi: %d"):format(stalls))
+end
+
 -- GIOCATORE FINTO --------------------------------------------------------------------------------------
 local player = Instance.new("Player")
 player.Name = "Prova"
