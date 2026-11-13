@@ -1,0 +1,86 @@
+{
+ "name": "puppy",
+ "title": "Puppy",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  11,
+  13,
+  13
+ ],
+ "size_studs": [
+  2.75,
+  3.25,
+  3.25
+ ],
+ "parts": 9,
+ "clips": [
+  "idle",
+  "walk",
+  "bark"
+ ],
+ "palette": [
+  {
+   "name": "light_brown",
+   "hex": "#B57B45",
+   "material": "matte"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_brown",
+   "hex": "#5B3720",
+   "material": "matte"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "pink",
+   "hex": "#FF9BC8",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 539,
+ "studs": 104,
+ "render_tris": 1322,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 4,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "bark",
+    "frame": 7,
+    "file": "renders/pose_bark.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "puppy.rbxmx",
+  "luau": "puppy.luau"
+ }
+}

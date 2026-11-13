@@ -1,0 +1,86 @@
+{
+ "name": "cat",
+ "title": "Ginger Kitten",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  9,
+  14,
+  14
+ ],
+ "size_studs": [
+  2.25,
+  3.5,
+  3.5
+ ],
+ "parts": 7,
+ "clips": [
+  "idle",
+  "walk",
+  "pounce"
+ ],
+ "palette": [
+  {
+   "name": "orange",
+   "hex": "#FF8A1C",
+   "material": "plastic"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_orange",
+   "hex": "#D9601A",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "lime",
+   "hex": "#A6DE3A",
+   "material": "plastic"
+  },
+  {
+   "name": "pink",
+   "hex": "#FF9BC8",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 461,
+ "studs": 95,
+ "render_tris": 1434,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 4,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "pounce",
+    "frame": 9,
+    "file": "renders/pose_pounce.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "cat.rbxmx",
+  "luau": "cat.luau"
+ }
+}

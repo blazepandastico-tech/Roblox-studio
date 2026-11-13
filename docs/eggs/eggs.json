@@ -1,0 +1,1262 @@
+{
+ "sprout_egg": {
+  "name": "Sprout Egg",
+  "biome": "meadow",
+  "rarity": "common",
+  "base_income": 4.0,
+  "base_weight": 1.2,
+  "hatch_seconds": 10,
+  "spawn_chance": 38.0
+ },
+ "clover_egg": {
+  "name": "Clover Egg",
+  "biome": "meadow",
+  "rarity": "uncommon",
+  "base_income": 7.2,
+  "base_weight": 1.8,
+  "hatch_seconds": 20,
+  "spawn_chance": 25.0
+ },
+ "daisy_egg": {
+  "name": "Daisy Egg",
+  "biome": "meadow",
+  "rarity": "rare",
+  "base_income": 12.8,
+  "base_weight": 2.6,
+  "hatch_seconds": 40,
+  "spawn_chance": 15.0
+ },
+ "ladybug_egg": {
+  "name": "Ladybug Egg",
+  "biome": "meadow",
+  "rarity": "epic",
+  "base_income": 23.2,
+  "base_weight": 3.8,
+  "hatch_seconds": 75,
+  "spawn_chance": 9.0
+ },
+ "honeycomb_egg": {
+  "name": "Honeycomb Egg",
+  "biome": "meadow",
+  "rarity": "legendary",
+  "base_income": 42.0,
+  "base_weight": 5.5,
+  "hatch_seconds": 120,
+  "spawn_chance": 5.5
+ },
+ "toadstool_egg": {
+  "name": "Toadstool Egg",
+  "biome": "meadow",
+  "rarity": "mythic",
+  "base_income": 76.0,
+  "base_weight": 8.0,
+  "hatch_seconds": 180,
+  "spawn_chance": 3.6
+ },
+ "firefly_egg": {
+  "name": "Firefly Egg",
+  "biome": "meadow",
+  "rarity": "celestial",
+  "base_income": 136.0,
+  "base_weight": 12.0,
+  "hatch_seconds": 270,
+  "spawn_chance": 2.0
+ },
+ "thornheart_egg": {
+  "name": "Thornheart Egg",
+  "biome": "meadow",
+  "rarity": "secret",
+  "base_income": 244.0,
+  "base_weight": 18.0,
+  "hatch_seconds": 420,
+  "spawn_chance": 1.0
+ },
+ "evergreen_egg": {
+  "name": "Evergreen Egg",
+  "biome": "meadow",
+  "rarity": "eternal",
+  "base_income": 440.0,
+  "base_weight": 26.0,
+  "hatch_seconds": 600,
+  "spawn_chance": 0.6
+ },
+ "sunpetal_egg": {
+  "name": "Sunpetal Egg",
+  "biome": "meadow",
+  "rarity": "divine",
+  "base_income": 800.0,
+  "base_weight": 40.0,
+  "hatch_seconds": 900,
+  "spawn_chance": 0.3
+ },
+ "puddle_egg": {
+  "name": "Puddle Egg",
+  "biome": "pond",
+  "rarity": "common",
+  "base_income": 20.0,
+  "base_weight": 1.38,
+  "hatch_seconds": 15,
+  "spawn_chance": 38.0
+ },
+ "pebble_egg": {
+  "name": "Pebble Egg",
+  "biome": "pond",
+  "rarity": "uncommon",
+  "base_income": 36.0,
+  "base_weight": 2.07,
+  "hatch_seconds": 30,
+  "spawn_chance": 25.0
+ },
+ "lilypad_egg": {
+  "name": "Lilypad Egg",
+  "biome": "pond",
+  "rarity": "rare",
+  "base_income": 64.0,
+  "base_weight": 2.99,
+  "hatch_seconds": 55,
+  "spawn_chance": 15.0
+ },
+ "jelly_spawn_egg": {
+  "name": "Jelly Spawn Egg",
+  "biome": "pond",
+  "rarity": "epic",
+  "base_income": 116.0,
+  "base_weight": 4.37,
+  "hatch_seconds": 95,
+  "spawn_chance": 9.0
+ },
+ "dragonfly_egg": {
+  "name": "Dragonfly Egg",
+  "biome": "pond",
+  "rarity": "legendary",
+  "base_income": 210.0,
+  "base_weight": 6.32,
+  "hatch_seconds": 145,
+  "spawn_chance": 5.5
+ },
+ "moonpool_egg": {
+  "name": "Moonpool Egg",
+  "biome": "pond",
+  "rarity": "mythic",
+  "base_income": 380.0,
+  "base_weight": 9.2,
+  "hatch_seconds": 210,
+  "spawn_chance": 3.6
+ },
+ "bogwisp_egg": {
+  "name": "Bogwisp Egg",
+  "biome": "pond",
+  "rarity": "celestial",
+  "base_income": 680.0,
+  "base_weight": 13.8,
+  "hatch_seconds": 305,
+  "spawn_chance": 2.0
+ },
+ "murkfang_egg": {
+  "name": "Murkfang Egg",
+  "biome": "pond",
+  "rarity": "secret",
+  "base_income": 1220.0,
+  "base_weight": 20.7,
+  "hatch_seconds": 460,
+  "spawn_chance": 1.0
+ },
+ "moonstone_egg": {
+  "name": "Moonstone Egg",
+  "biome": "pond",
+  "rarity": "eternal",
+  "base_income": 2200.0,
+  "base_weight": 29.9,
+  "hatch_seconds": 645,
+  "spawn_chance": 0.6
+ },
+ "tidecrown_egg": {
+  "name": "Tidecrown Egg",
+  "biome": "pond",
+  "rarity": "divine",
+  "base_income": 4000.0,
+  "base_weight": 46.0,
+  "hatch_seconds": 950,
+  "spawn_chance": 0.3
+ },
+ "sandy_egg": {
+  "name": "Sandy Egg",
+  "biome": "dunes",
+  "rarity": "common",
+  "base_income": 100.0,
+  "base_weight": 1.59,
+  "hatch_seconds": 20,
+  "spawn_chance": 38.0
+ },
+ "cactus_egg": {
+  "name": "Cactus Egg",
+  "biome": "dunes",
+  "rarity": "uncommon",
+  "base_income": 180.0,
+  "base_weight": 2.38,
+  "hatch_seconds": 40,
+  "spawn_chance": 25.0
+ },
+ "terracotta_egg": {
+  "name": "Terracotta Egg",
+  "biome": "dunes",
+  "rarity": "rare",
+  "base_income": 320.0,
+  "base_weight": 3.44,
+  "hatch_seconds": 70,
+  "spawn_chance": 15.0
+ },
+ "scarab_egg": {
+  "name": "Scarab Egg",
+  "biome": "dunes",
+  "rarity": "epic",
+  "base_income": 580.0,
+  "base_weight": 5.03,
+  "hatch_seconds": 115,
+  "spawn_chance": 9.0
+ },
+ "oasis_egg": {
+  "name": "Oasis Egg",
+  "biome": "dunes",
+  "rarity": "legendary",
+  "base_income": 1050.0,
+  "base_weight": 7.27,
+  "hatch_seconds": 170,
+  "spawn_chance": 5.5
+ },
+ "sunstone_egg": {
+  "name": "Sunstone Egg",
+  "biome": "dunes",
+  "rarity": "mythic",
+  "base_income": 1900.0,
+  "base_weight": 10.58,
+  "hatch_seconds": 240,
+  "spawn_chance": 3.6
+ },
+ "mirage_egg": {
+  "name": "Mirage Egg",
+  "biome": "dunes",
+  "rarity": "celestial",
+  "base_income": 3400.0,
+  "base_weight": 15.87,
+  "hatch_seconds": 340,
+  "spawn_chance": 2.0
+ },
+ "sandstorm_egg": {
+  "name": "Sandstorm Egg",
+  "biome": "dunes",
+  "rarity": "secret",
+  "base_income": 6100.0,
+  "base_weight": 23.8,
+  "hatch_seconds": 500,
+  "spawn_chance": 1.0
+ },
+ "pharaohs_egg": {
+  "name": "Pharaoh's Egg",
+  "biome": "dunes",
+  "rarity": "eternal",
+  "base_income": 11000.0,
+  "base_weight": 34.38,
+  "hatch_seconds": 690,
+  "spawn_chance": 0.6
+ },
+ "golden_dune_egg": {
+  "name": "Golden Dune Egg",
+  "biome": "dunes",
+  "rarity": "divine",
+  "base_income": 20000.0,
+  "base_weight": 52.9,
+  "hatch_seconds": 1000,
+  "spawn_chance": 0.3
+ },
+ "leafy_egg": {
+  "name": "Leafy Egg",
+  "biome": "jungle",
+  "rarity": "common",
+  "base_income": 500.0,
+  "base_weight": 1.83,
+  "hatch_seconds": 25,
+  "spawn_chance": 38.0
+ },
+ "banana_egg": {
+  "name": "Banana Egg",
+  "biome": "jungle",
+  "rarity": "uncommon",
+  "base_income": 900.0,
+  "base_weight": 2.74,
+  "hatch_seconds": 50,
+  "spawn_chance": 25.0
+ },
+ "orchid_egg": {
+  "name": "Orchid Egg",
+  "biome": "jungle",
+  "rarity": "rare",
+  "base_income": 1600.0,
+  "base_weight": 3.95,
+  "hatch_seconds": 85,
+  "spawn_chance": 15.0
+ },
+ "tiki_egg": {
+  "name": "Tiki Egg",
+  "biome": "jungle",
+  "rarity": "epic",
+  "base_income": 2900.0,
+  "base_weight": 5.78,
+  "hatch_seconds": 135,
+  "spawn_chance": 9.0
+ },
+ "parrot_feather_egg": {
+  "name": "Parrot Feather Egg",
+  "biome": "jungle",
+  "rarity": "legendary",
+  "base_income": 5250.0,
+  "base_weight": 8.36,
+  "hatch_seconds": 195,
+  "spawn_chance": 5.5
+ },
+ "venom_egg": {
+  "name": "Venom Egg",
+  "biome": "jungle",
+  "rarity": "mythic",
+  "base_income": 9500.0,
+  "base_weight": 12.17,
+  "hatch_seconds": 270,
+  "spawn_chance": 3.6
+ },
+ "canopy_egg": {
+  "name": "Canopy Egg",
+  "biome": "jungle",
+  "rarity": "celestial",
+  "base_income": 17000.0,
+  "base_weight": 18.25,
+  "hatch_seconds": 375,
+  "spawn_chance": 2.0
+ },
+ "temple_idol_egg": {
+  "name": "Temple Idol Egg",
+  "biome": "jungle",
+  "rarity": "secret",
+  "base_income": 30500.0,
+  "base_weight": 27.38,
+  "hatch_seconds": 540,
+  "spawn_chance": 1.0
+ },
+ "emerald_idol_egg": {
+  "name": "Emerald Idol Egg",
+  "biome": "jungle",
+  "rarity": "eternal",
+  "base_income": 55000.0,
+  "base_weight": 39.54,
+  "hatch_seconds": 735,
+  "spawn_chance": 0.6
+ },
+ "sunvine_egg": {
+  "name": "Sunvine Egg",
+  "biome": "jungle",
+  "rarity": "divine",
+  "base_income": 100000.0,
+  "base_weight": 60.83,
+  "hatch_seconds": 1050,
+  "spawn_chance": 0.3
+ },
+ "snowball_egg": {
+  "name": "Snowball Egg",
+  "biome": "tundra",
+  "rarity": "common",
+  "base_income": 2500.0,
+  "base_weight": 2.1,
+  "hatch_seconds": 30,
+  "spawn_chance": 38.0
+ },
+ "frosty_egg": {
+  "name": "Frosty Egg",
+  "biome": "tundra",
+  "rarity": "uncommon",
+  "base_income": 4500.0,
+  "base_weight": 3.15,
+  "hatch_seconds": 60,
+  "spawn_chance": 25.0
+ },
+ "icicle_egg": {
+  "name": "Icicle Egg",
+  "biome": "tundra",
+  "rarity": "rare",
+  "base_income": 8000.0,
+  "base_weight": 4.55,
+  "hatch_seconds": 100,
+  "spawn_chance": 15.0
+ },
+ "snowflake_egg": {
+  "name": "Snowflake Egg",
+  "biome": "tundra",
+  "rarity": "epic",
+  "base_income": 14500.0,
+  "base_weight": 6.65,
+  "hatch_seconds": 155,
+  "spawn_chance": 9.0
+ },
+ "igloo_egg": {
+  "name": "Igloo Egg",
+  "biome": "tundra",
+  "rarity": "legendary",
+  "base_income": 26250.0,
+  "base_weight": 9.62,
+  "hatch_seconds": 220,
+  "spawn_chance": 5.5
+ },
+ "glacier_egg": {
+  "name": "Glacier Egg",
+  "biome": "tundra",
+  "rarity": "mythic",
+  "base_income": 47500.0,
+  "base_weight": 13.99,
+  "hatch_seconds": 300,
+  "spawn_chance": 3.6
+ },
+ "aurora_egg": {
+  "name": "Aurora Egg",
+  "biome": "tundra",
+  "rarity": "celestial",
+  "base_income": 85000.0,
+  "base_weight": 20.99,
+  "hatch_seconds": 410,
+  "spawn_chance": 2.0
+ },
+ "frostbite_egg": {
+  "name": "Frostbite Egg",
+  "biome": "tundra",
+  "rarity": "secret",
+  "base_income": 152500.0,
+  "base_weight": 31.48,
+  "hatch_seconds": 580,
+  "spawn_chance": 1.0
+ },
+ "permafrost_egg": {
+  "name": "Permafrost Egg",
+  "biome": "tundra",
+  "rarity": "eternal",
+  "base_income": 275000.0,
+  "base_weight": 45.47,
+  "hatch_seconds": 780,
+  "spawn_chance": 0.6
+ },
+ "polar_crown_egg": {
+  "name": "Polar Crown Egg",
+  "biome": "tundra",
+  "rarity": "divine",
+  "base_income": 500000.0,
+  "base_weight": 69.96,
+  "hatch_seconds": 1100,
+  "spawn_chance": 0.3
+ },
+ "ash_egg": {
+  "name": "Ash Egg",
+  "biome": "caldera",
+  "rarity": "common",
+  "base_income": 12500.0,
+  "base_weight": 2.41,
+  "hatch_seconds": 35,
+  "spawn_chance": 38.0
+ },
+ "cinder_egg": {
+  "name": "Cinder Egg",
+  "biome": "caldera",
+  "rarity": "uncommon",
+  "base_income": 22500.0,
+  "base_weight": 3.62,
+  "hatch_seconds": 70,
+  "spawn_chance": 25.0
+ },
+ "basalt_egg": {
+  "name": "Basalt Egg",
+  "biome": "caldera",
+  "rarity": "rare",
+  "base_income": 40000.0,
+  "base_weight": 5.23,
+  "hatch_seconds": 115,
+  "spawn_chance": 15.0
+ },
+ "magma_egg": {
+  "name": "Magma Egg",
+  "biome": "caldera",
+  "rarity": "epic",
+  "base_income": 72500.0,
+  "base_weight": 7.64,
+  "hatch_seconds": 175,
+  "spawn_chance": 9.0
+ },
+ "ember_egg": {
+  "name": "Ember Egg",
+  "biome": "caldera",
+  "rarity": "legendary",
+  "base_income": 131250.0,
+  "base_weight": 11.06,
+  "hatch_seconds": 245,
+  "spawn_chance": 5.5
+ },
+ "inferno_egg": {
+  "name": "Inferno Egg",
+  "biome": "caldera",
+  "rarity": "mythic",
+  "base_income": 237500.0,
+  "base_weight": 16.09,
+  "hatch_seconds": 330,
+  "spawn_chance": 3.6
+ },
+ "obsidian_egg": {
+  "name": "Obsidian Egg",
+  "biome": "caldera",
+  "rarity": "celestial",
+  "base_income": 425000.0,
+  "base_weight": 24.14,
+  "hatch_seconds": 445,
+  "spawn_chance": 2.0
+ },
+ "molten_core_egg": {
+  "name": "Molten Core Egg",
+  "biome": "caldera",
+  "rarity": "secret",
+  "base_income": 762500.0,
+  "base_weight": 36.2,
+  "hatch_seconds": 620,
+  "spawn_chance": 1.0
+ },
+ "eruption_egg": {
+  "name": "Eruption Egg",
+  "biome": "caldera",
+  "rarity": "eternal",
+  "base_income": 1375000.0,
+  "base_weight": 52.3,
+  "hatch_seconds": 825,
+  "spawn_chance": 0.6
+ },
+ "solar_flare_egg": {
+  "name": "Solar Flare Egg",
+  "biome": "caldera",
+  "rarity": "divine",
+  "base_income": 2500000.0,
+  "base_weight": 80.45,
+  "hatch_seconds": 1150,
+  "spawn_chance": 0.3
+ },
+ "bubble_egg": {
+  "name": "Bubble Egg",
+  "biome": "reef",
+  "rarity": "common",
+  "base_income": 62500.0,
+  "base_weight": 2.78,
+  "hatch_seconds": 40,
+  "spawn_chance": 38.0
+ },
+ "seashell_egg": {
+  "name": "Seashell Egg",
+  "biome": "reef",
+  "rarity": "uncommon",
+  "base_income": 112500.0,
+  "base_weight": 4.16,
+  "hatch_seconds": 80,
+  "spawn_chance": 25.0
+ },
+ "starfish_egg": {
+  "name": "Starfish Egg",
+  "biome": "reef",
+  "rarity": "rare",
+  "base_income": 200000.0,
+  "base_weight": 6.01,
+  "hatch_seconds": 130,
+  "spawn_chance": 15.0
+ },
+ "coral_egg": {
+  "name": "Coral Egg",
+  "biome": "reef",
+  "rarity": "epic",
+  "base_income": 362500.0,
+  "base_weight": 8.79,
+  "hatch_seconds": 195,
+  "spawn_chance": 9.0
+ },
+ "anchor_egg": {
+  "name": "Anchor Egg",
+  "biome": "reef",
+  "rarity": "legendary",
+  "base_income": 656250.0,
+  "base_weight": 12.72,
+  "hatch_seconds": 270,
+  "spawn_chance": 5.5
+ },
+ "jellyglow_egg": {
+  "name": "Jellyglow Egg",
+  "biome": "reef",
+  "rarity": "mythic",
+  "base_income": 1187500.0,
+  "base_weight": 18.5,
+  "hatch_seconds": 360,
+  "spawn_chance": 3.6
+ },
+ "abyssal_egg": {
+  "name": "Abyssal Egg",
+  "biome": "reef",
+  "rarity": "celestial",
+  "base_income": 2125000.0,
+  "base_weight": 27.76,
+  "hatch_seconds": 480,
+  "spawn_chance": 2.0
+ },
+ "deepmaw_egg": {
+  "name": "Deepmaw Egg",
+  "biome": "reef",
+  "rarity": "secret",
+  "base_income": 3812500.0,
+  "base_weight": 41.64,
+  "hatch_seconds": 660,
+  "spawn_chance": 1.0
+ },
+ "pearl_egg": {
+  "name": "Pearl Egg",
+  "biome": "reef",
+  "rarity": "eternal",
+  "base_income": 6875000.0,
+  "base_weight": 60.14,
+  "hatch_seconds": 870,
+  "spawn_chance": 0.6
+ },
+ "trident_egg": {
+  "name": "Trident Egg",
+  "biome": "reef",
+  "rarity": "divine",
+  "base_income": 12500000.0,
+  "base_weight": 92.52,
+  "hatch_seconds": 1200,
+  "spawn_chance": 0.3
+ },
+ "fossil_egg": {
+  "name": "Fossil Egg",
+  "biome": "fossil",
+  "rarity": "common",
+  "base_income": 312500.0,
+  "base_weight": 3.19,
+  "hatch_seconds": 45,
+  "spawn_chance": 38.0
+ },
+ "dino_spot_egg": {
+  "name": "Dino Spot Egg",
+  "biome": "fossil",
+  "rarity": "uncommon",
+  "base_income": 562500.0,
+  "base_weight": 4.79,
+  "hatch_seconds": 90,
+  "spawn_chance": 25.0
+ },
+ "scaly_egg": {
+  "name": "Scaly Egg",
+  "biome": "fossil",
+  "rarity": "rare",
+  "base_income": 1000000.0,
+  "base_weight": 6.92,
+  "hatch_seconds": 145,
+  "spawn_chance": 15.0
+ },
+ "spiky_egg": {
+  "name": "Spiky Egg",
+  "biome": "fossil",
+  "rarity": "epic",
+  "base_income": 1812500.0,
+  "base_weight": 10.11,
+  "hatch_seconds": 215,
+  "spawn_chance": 9.0
+ },
+ "bone_egg": {
+  "name": "Bone Egg",
+  "biome": "fossil",
+  "rarity": "legendary",
+  "base_income": 3281250.0,
+  "base_weight": 14.63,
+  "hatch_seconds": 295,
+  "spawn_chance": 5.5
+ },
+ "amber_egg": {
+  "name": "Amber Egg",
+  "biome": "fossil",
+  "rarity": "mythic",
+  "base_income": 5937500.0,
+  "base_weight": 21.28,
+  "hatch_seconds": 390,
+  "spawn_chance": 3.6
+ },
+ "meteor_egg": {
+  "name": "Meteor Egg",
+  "biome": "fossil",
+  "rarity": "celestial",
+  "base_income": 10625000.0,
+  "base_weight": 31.92,
+  "hatch_seconds": 515,
+  "spawn_chance": 2.0
+ },
+ "tar_pit_egg": {
+  "name": "Tar Pit Egg",
+  "biome": "fossil",
+  "rarity": "secret",
+  "base_income": 19062500.0,
+  "base_weight": 47.88,
+  "hatch_seconds": 700,
+  "spawn_chance": 1.0
+ },
+ "primeval_egg": {
+  "name": "Primeval Egg",
+  "biome": "fossil",
+  "rarity": "eternal",
+  "base_income": 34375000.0,
+  "base_weight": 69.16,
+  "hatch_seconds": 915,
+  "spawn_chance": 0.6
+ },
+ "dawnstone_egg": {
+  "name": "Dawnstone Egg",
+  "biome": "fossil",
+  "rarity": "divine",
+  "base_income": 62500000.0,
+  "base_weight": 106.4,
+  "hatch_seconds": 1250,
+  "spawn_chance": 0.3
+ },
+ "gumdrop_egg": {
+  "name": "Gumdrop Egg",
+  "biome": "candy",
+  "rarity": "common",
+  "base_income": 1562500.0,
+  "base_weight": 3.67,
+  "hatch_seconds": 50,
+  "spawn_chance": 38.0
+ },
+ "sprinkle_egg": {
+  "name": "Sprinkle Egg",
+  "biome": "candy",
+  "rarity": "uncommon",
+  "base_income": 2812500.0,
+  "base_weight": 5.51,
+  "hatch_seconds": 100,
+  "spawn_chance": 25.0
+ },
+ "lollipop_egg": {
+  "name": "Lollipop Egg",
+  "biome": "candy",
+  "rarity": "rare",
+  "base_income": 5000000.0,
+  "base_weight": 7.95,
+  "hatch_seconds": 160,
+  "spawn_chance": 15.0
+ },
+ "cupcake_egg": {
+  "name": "Cupcake Egg",
+  "biome": "candy",
+  "rarity": "epic",
+  "base_income": 9062500.0,
+  "base_weight": 11.62,
+  "hatch_seconds": 235,
+  "spawn_chance": 9.0
+ },
+ "candy_cane_egg": {
+  "name": "Candy Cane Egg",
+  "biome": "candy",
+  "rarity": "legendary",
+  "base_income": 16406250.0,
+  "base_weight": 16.82,
+  "hatch_seconds": 320,
+  "spawn_chance": 5.5
+ },
+ "chocolate_egg": {
+  "name": "Chocolate Egg",
+  "biome": "candy",
+  "rarity": "mythic",
+  "base_income": 29687500.0,
+  "base_weight": 24.47,
+  "hatch_seconds": 420,
+  "spawn_chance": 3.6
+ },
+ "sugar_swirl_egg": {
+  "name": "Sugar Swirl Egg",
+  "biome": "candy",
+  "rarity": "celestial",
+  "base_income": 53125000.0,
+  "base_weight": 36.71,
+  "hatch_seconds": 550,
+  "spawn_chance": 2.0
+ },
+ "sour_egg": {
+  "name": "Sour Egg",
+  "biome": "candy",
+  "rarity": "secret",
+  "base_income": 95312500.0,
+  "base_weight": 55.06,
+  "hatch_seconds": 740,
+  "spawn_chance": 1.0
+ },
+ "sugar_crystal_egg": {
+  "name": "Sugar Crystal Egg",
+  "biome": "candy",
+  "rarity": "eternal",
+  "base_income": 171875000.0,
+  "base_weight": 79.53,
+  "hatch_seconds": 960,
+  "spawn_chance": 0.6
+ },
+ "sweet_crown_egg": {
+  "name": "Sweet Crown Egg",
+  "biome": "candy",
+  "rarity": "divine",
+  "base_income": 312500000.0,
+  "base_weight": 122.36,
+  "hatch_seconds": 1300,
+  "spawn_chance": 0.3
+ },
+ "bolt_egg": {
+  "name": "Bolt Egg",
+  "biome": "clockwork",
+  "rarity": "common",
+  "base_income": 7812500.0,
+  "base_weight": 4.22,
+  "hatch_seconds": 55,
+  "spawn_chance": 38.0
+ },
+ "copper_egg": {
+  "name": "Copper Egg",
+  "biome": "clockwork",
+  "rarity": "uncommon",
+  "base_income": 14062500.0,
+  "base_weight": 6.33,
+  "hatch_seconds": 110,
+  "spawn_chance": 25.0
+ },
+ "gear_egg": {
+  "name": "Gear Egg",
+  "biome": "clockwork",
+  "rarity": "rare",
+  "base_income": 25000000.0,
+  "base_weight": 9.15,
+  "hatch_seconds": 175,
+  "spawn_chance": 15.0
+ },
+ "steam_egg": {
+  "name": "Steam Egg",
+  "biome": "clockwork",
+  "rarity": "epic",
+  "base_income": 45312500.0,
+  "base_weight": 13.37,
+  "hatch_seconds": 255,
+  "spawn_chance": 9.0
+ },
+ "pocketwatch_egg": {
+  "name": "Pocketwatch Egg",
+  "biome": "clockwork",
+  "rarity": "legendary",
+  "base_income": 82031250.0,
+  "base_weight": 19.35,
+  "hatch_seconds": 345,
+  "spawn_chance": 5.5
+ },
+ "tesla_egg": {
+  "name": "Tesla Egg",
+  "biome": "clockwork",
+  "rarity": "mythic",
+  "base_income": 148437500.0,
+  "base_weight": 28.14,
+  "hatch_seconds": 450,
+  "spawn_chance": 3.6
+ },
+ "automaton_egg": {
+  "name": "Automaton Egg",
+  "biome": "clockwork",
+  "rarity": "celestial",
+  "base_income": 265625000.0,
+  "base_weight": 42.21,
+  "hatch_seconds": 585,
+  "spawn_chance": 2.0
+ },
+ "glitch_egg": {
+  "name": "Glitch Egg",
+  "biome": "clockwork",
+  "rarity": "secret",
+  "base_income": 476562500.0,
+  "base_weight": 63.32,
+  "hatch_seconds": 780,
+  "spawn_chance": 1.0
+ },
+ "chrono_egg": {
+  "name": "Chrono Egg",
+  "biome": "clockwork",
+  "rarity": "eternal",
+  "base_income": 859375000.0,
+  "base_weight": 91.46,
+  "hatch_seconds": 1005,
+  "spawn_chance": 0.6
+ },
+ "brass_crown_egg": {
+  "name": "Brass Crown Egg",
+  "biome": "clockwork",
+  "rarity": "divine",
+  "base_income": 1562500000.0,
+  "base_weight": 140.72,
+  "hatch_seconds": 1350,
+  "spawn_chance": 0.3
+ },
+ "pumpkin_egg": {
+  "name": "Pumpkin Egg",
+  "biome": "haunted",
+  "rarity": "common",
+  "base_income": 39062500.0,
+  "base_weight": 4.85,
+  "hatch_seconds": 60,
+  "spawn_chance": 38.0
+ },
+ "candle_egg": {
+  "name": "Candle Egg",
+  "biome": "haunted",
+  "rarity": "uncommon",
+  "base_income": 70312500.0,
+  "base_weight": 7.28,
+  "hatch_seconds": 120,
+  "spawn_chance": 25.0
+ },
+ "cobweb_egg": {
+  "name": "Cobweb Egg",
+  "biome": "haunted",
+  "rarity": "rare",
+  "base_income": 125000000.0,
+  "base_weight": 10.52,
+  "hatch_seconds": 190,
+  "spawn_chance": 15.0
+ },
+ "batwing_egg": {
+  "name": "Batwing Egg",
+  "biome": "haunted",
+  "rarity": "epic",
+  "base_income": 226562500.0,
+  "base_weight": 15.37,
+  "hatch_seconds": 275,
+  "spawn_chance": 9.0
+ },
+ "ghostly_egg": {
+  "name": "Ghostly Egg",
+  "biome": "haunted",
+  "rarity": "legendary",
+  "base_income": 410156250.0,
+  "base_weight": 22.25,
+  "hatch_seconds": 370,
+  "spawn_chance": 5.5
+ },
+ "cursed_egg": {
+  "name": "Cursed Egg",
+  "biome": "haunted",
+  "rarity": "mythic",
+  "base_income": 742187500.0,
+  "base_weight": 32.36,
+  "hatch_seconds": 480,
+  "spawn_chance": 3.6
+ },
+ "witch_hat_egg": {
+  "name": "Witch Hat Egg",
+  "biome": "haunted",
+  "rarity": "celestial",
+  "base_income": 1328125000.0,
+  "base_weight": 48.55,
+  "hatch_seconds": 620,
+  "spawn_chance": 2.0
+ },
+ "shadow_eye_egg": {
+  "name": "Shadow Eye Egg",
+  "biome": "haunted",
+  "rarity": "secret",
+  "base_income": 2382812500.0,
+  "base_weight": 72.82,
+  "hatch_seconds": 820,
+  "spawn_chance": 1.0
+ },
+ "soul_lantern_egg": {
+  "name": "Soul Lantern Egg",
+  "biome": "haunted",
+  "rarity": "eternal",
+  "base_income": 4296875000.0,
+  "base_weight": 105.18,
+  "hatch_seconds": 1050,
+  "spawn_chance": 0.6
+ },
+ "wraith_crown_egg": {
+  "name": "Wraith Crown Egg",
+  "biome": "haunted",
+  "rarity": "divine",
+  "base_income": 7812500000.0,
+  "base_weight": 161.82,
+  "hatch_seconds": 1400,
+  "spawn_chance": 0.3
+ },
+ "petal_egg": {
+  "name": "Petal Egg",
+  "biome": "blossom",
+  "rarity": "common",
+  "base_income": 195312500.0,
+  "base_weight": 5.58,
+  "hatch_seconds": 65,
+  "spawn_chance": 38.0
+ },
+ "bamboo_egg": {
+  "name": "Bamboo Egg",
+  "biome": "blossom",
+  "rarity": "uncommon",
+  "base_income": 351562500.0,
+  "base_weight": 8.37,
+  "hatch_seconds": 130,
+  "spawn_chance": 25.0
+ },
+ "paper_lantern_egg": {
+  "name": "Paper Lantern Egg",
+  "biome": "blossom",
+  "rarity": "rare",
+  "base_income": 625000000.0,
+  "base_weight": 12.1,
+  "hatch_seconds": 205,
+  "spawn_chance": 15.0
+ },
+ "origami_egg": {
+  "name": "Origami Egg",
+  "biome": "blossom",
+  "rarity": "epic",
+  "base_income": 1132812500.0,
+  "base_weight": 17.68,
+  "hatch_seconds": 295,
+  "spawn_chance": 9.0
+ },
+ "sakura_branch_egg": {
+  "name": "Sakura Branch Egg",
+  "biome": "blossom",
+  "rarity": "legendary",
+  "base_income": 2050781250.0,
+  "base_weight": 25.59,
+  "hatch_seconds": 395,
+  "spawn_chance": 5.5
+ },
+ "moon_blossom_egg": {
+  "name": "Moon Blossom Egg",
+  "biome": "blossom",
+  "rarity": "mythic",
+  "base_income": 3710937500.0,
+  "base_weight": 37.22,
+  "hatch_seconds": 510,
+  "spawn_chance": 3.6
+ },
+ "spirit_petal_egg": {
+  "name": "Spirit Petal Egg",
+  "biome": "blossom",
+  "rarity": "celestial",
+  "base_income": 6640625000.0,
+  "base_weight": 55.83,
+  "hatch_seconds": 655,
+  "spawn_chance": 2.0
+ },
+ "shadow_petal_egg": {
+  "name": "Shadow Petal Egg",
+  "biome": "blossom",
+  "rarity": "secret",
+  "base_income": 11914062500.0,
+  "base_weight": 83.74,
+  "hatch_seconds": 860,
+  "spawn_chance": 1.0
+ },
+ "jade_egg": {
+  "name": "Jade Egg",
+  "biome": "blossom",
+  "rarity": "eternal",
+  "base_income": 21484375000.0,
+  "base_weight": 120.96,
+  "hatch_seconds": 1095,
+  "spawn_chance": 0.6
+ },
+ "sakura_crown_egg": {
+  "name": "Sakura Crown Egg",
+  "biome": "blossom",
+  "rarity": "divine",
+  "base_income": 39062500000.0,
+  "base_weight": 186.1,
+  "hatch_seconds": 1450,
+  "spawn_chance": 0.3
+ },
+ "stardust_egg": {
+  "name": "Stardust Egg",
+  "biome": "starlight",
+  "rarity": "common",
+  "base_income": 976562500.0,
+  "base_weight": 6.42,
+  "hatch_seconds": 70,
+  "spawn_chance": 38.0
+ },
+ "moon_egg": {
+  "name": "Moon Egg",
+  "biome": "starlight",
+  "rarity": "uncommon",
+  "base_income": 1757812500.0,
+  "base_weight": 9.63,
+  "hatch_seconds": 140,
+  "spawn_chance": 25.0
+ },
+ "comet_egg": {
+  "name": "Comet Egg",
+  "biome": "starlight",
+  "rarity": "rare",
+  "base_income": 3125000000.0,
+  "base_weight": 13.91,
+  "hatch_seconds": 220,
+  "spawn_chance": 15.0
+ },
+ "ringed_egg": {
+  "name": "Ringed Egg",
+  "biome": "starlight",
+  "rarity": "epic",
+  "base_income": 5664062500.0,
+  "base_weight": 20.33,
+  "hatch_seconds": 315,
+  "spawn_chance": 9.0
+ },
+ "rocket_egg": {
+  "name": "Rocket Egg",
+  "biome": "starlight",
+  "rarity": "legendary",
+  "base_income": 10253906250.0,
+  "base_weight": 29.43,
+  "hatch_seconds": 420,
+  "spawn_chance": 5.5
+ },
+ "nebula_egg": {
+  "name": "Nebula Egg",
+  "biome": "starlight",
+  "rarity": "mythic",
+  "base_income": 18554687500.0,
+  "base_weight": 42.8,
+  "hatch_seconds": 540,
+  "spawn_chance": 3.6
+ },
+ "galaxy_egg": {
+  "name": "Galaxy Egg",
+  "biome": "starlight",
+  "rarity": "celestial",
+  "base_income": 33203125000.0,
+  "base_weight": 64.2,
+  "hatch_seconds": 690,
+  "spawn_chance": 2.0
+ },
+ "black_hole_egg": {
+  "name": "Black Hole Egg",
+  "biome": "starlight",
+  "rarity": "secret",
+  "base_income": 59570312500.0,
+  "base_weight": 96.3,
+  "hatch_seconds": 900,
+  "spawn_chance": 1.0
+ },
+ "supernova_egg": {
+  "name": "Supernova Egg",
+  "biome": "starlight",
+  "rarity": "eternal",
+  "base_income": 107421875000.0,
+  "base_weight": 139.11,
+  "hatch_seconds": 1140,
+  "spawn_chance": 0.6
+ },
+ "starcrown_egg": {
+  "name": "Starcrown Egg",
+  "biome": "starlight",
+  "rarity": "divine",
+  "base_income": 195312500000.0,
+  "base_weight": 214.01,
+  "hatch_seconds": 1500,
+  "spawn_chance": 0.3
+ },
+ "cloud_egg": {
+  "name": "Cloud Egg",
+  "biome": "sky",
+  "rarity": "common",
+  "base_income": 4882812500.0,
+  "base_weight": 7.38,
+  "hatch_seconds": 75,
+  "spawn_chance": 38.0
+ },
+ "breeze_egg": {
+  "name": "Breeze Egg",
+  "biome": "sky",
+  "rarity": "uncommon",
+  "base_income": 8789062500.0,
+  "base_weight": 11.08,
+  "hatch_seconds": 150,
+  "spawn_chance": 25.0
+ },
+ "feather_egg": {
+  "name": "Feather Egg",
+  "biome": "sky",
+  "rarity": "rare",
+  "base_income": 15625000000.0,
+  "base_weight": 16.0,
+  "hatch_seconds": 235,
+  "spawn_chance": 15.0
+ },
+ "kite_egg": {
+  "name": "Kite Egg",
+  "biome": "sky",
+  "rarity": "epic",
+  "base_income": 28320312500.0,
+  "base_weight": 23.38,
+  "hatch_seconds": 335,
+  "spawn_chance": 9.0
+ },
+ "sunbeam_egg": {
+  "name": "Sunbeam Egg",
+  "biome": "sky",
+  "rarity": "legendary",
+  "base_income": 51269531250.0,
+  "base_weight": 33.84,
+  "hatch_seconds": 445,
+  "spawn_chance": 5.5
+ },
+ "thunder_egg": {
+  "name": "Thunder Egg",
+  "biome": "sky",
+  "rarity": "mythic",
+  "base_income": 92773437500.0,
+  "base_weight": 49.22,
+  "hatch_seconds": 570,
+  "spawn_chance": 3.6
+ },
+ "halo_egg": {
+  "name": "Halo Egg",
+  "biome": "sky",
+  "rarity": "celestial",
+  "base_income": 166015625000.0,
+  "base_weight": 73.83,
+  "hatch_seconds": 725,
+  "spawn_chance": 2.0
+ },
+ "storm_eye_egg": {
+  "name": "Storm Eye Egg",
+  "biome": "sky",
+  "rarity": "secret",
+  "base_income": 297851562500.0,
+  "base_weight": 110.75,
+  "hatch_seconds": 940,
+  "spawn_chance": 1.0
+ },
+ "seraph_egg": {
+  "name": "Seraph Egg",
+  "biome": "sky",
+  "rarity": "eternal",
+  "base_income": 537109375000.0,
+  "base_weight": 159.97,
+  "hatch_seconds": 1185,
+  "spawn_chance": 0.6
+ },
+ "heavenly_egg": {
+  "name": "Heavenly Egg",
+  "biome": "sky",
+  "rarity": "divine",
+  "base_income": 976562500000.0,
+  "base_weight": 246.11,
+  "hatch_seconds": 1550,
+  "spawn_chance": 0.3
+ }
+}

@@ -1,0 +1,96 @@
+{
+ "name": "hydra",
+ "title": "Hydra",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  17,
+  28,
+  39
+ ],
+ "size_studs": [
+  17.0,
+  28.0,
+  39.0
+ ],
+ "parts": 11,
+ "clips": [
+  "idle",
+  "walk",
+  "bite"
+ ],
+ "palette": [
+  {
+   "name": "dark_green",
+   "hex": "#22803A",
+   "material": "plastic"
+  },
+  {
+   "name": "green",
+   "hex": "#3DAE4A",
+   "material": "plastic"
+  },
+  {
+   "name": "light_green",
+   "hex": "#7BD45A",
+   "material": "plastic"
+  },
+  {
+   "name": "lime",
+   "hex": "#A6DE3A",
+   "material": "plastic"
+  },
+  {
+   "name": "forest",
+   "hex": "#1A5A30",
+   "material": "plastic"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_yellow",
+   "hex": "#FFF24A",
+   "material": "glow"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 3615,
+ "studs": 472,
+ "render_tris": 7632,
+ "outline_render": 0.18719999999999998,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 9,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "bite",
+    "frame": 13,
+    "file": "renders/pose_bite.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "hydra.rbxmx",
+  "luau": "hydra.luau"
+ }
+}

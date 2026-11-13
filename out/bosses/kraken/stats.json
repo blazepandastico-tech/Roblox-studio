@@ -1,0 +1,96 @@
+{
+ "name": "kraken",
+ "title": "Kraken",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  33,
+  25,
+  33
+ ],
+ "size_studs": [
+  33.0,
+  25.0,
+  33.0
+ ],
+ "parts": 26,
+ "clips": [
+  "idle",
+  "walk",
+  "slam"
+ ],
+ "palette": [
+  {
+   "name": "purple",
+   "hex": "#7C4DD6",
+   "material": "plastic"
+  },
+  {
+   "name": "water",
+   "hex": "#3D9DF0",
+   "material": "water"
+  },
+  {
+   "name": "lavender",
+   "hex": "#BDA6F7",
+   "material": "plastic"
+  },
+  {
+   "name": "violet",
+   "hex": "#A23FD6",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_purple",
+   "hex": "#472783",
+   "material": "plastic"
+  },
+  {
+   "name": "foam",
+   "hex": "#E8F7FF",
+   "material": "matte"
+  },
+  {
+   "name": "neon_yellow",
+   "hex": "#FFF24A",
+   "material": "glow"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 4709,
+ "studs": 557,
+ "render_tris": 10780,
+ "outline_render": 0.15839999999999999,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 12,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "slam",
+    "frame": 14,
+    "file": "renders/pose_slam.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "kraken.rbxmx",
+  "luau": "kraken.luau"
+ }
+}

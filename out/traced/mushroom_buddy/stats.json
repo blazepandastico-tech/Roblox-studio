@@ -1,0 +1,97 @@
+{
+ "name": "mushroom_buddy",
+ "title": "Mushroom Buddy",
+ "category": "traced",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  28,
+  30,
+  13
+ ],
+ "size_studs": [
+  7.0,
+  7.5,
+  3.25
+ ],
+ "parts": 1,
+ "clips": [
+  "idle",
+  "hop"
+ ],
+ "palette": [
+  {
+   "name": "red",
+   "hex": "#E2312E",
+   "material": "plastic"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "snow",
+   "hex": "#F3F8FF",
+   "material": "matte"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "pink",
+   "hex": "#FF9BC8",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 6107,
+ "studs": 272,
+ "render_tris": 2702,
+ "outline_render": 0.144,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "hop",
+    "frame": 5,
+    "file": "renders/pose_hop.png"
+   }
+  ]
+ },
+ "exports": {
+  "fbx": "mushroom_buddy.fbx",
+  "anim_fbx": {
+   "idle": "anims/mushroom_buddy_idle.fbx",
+   "hop": "anims/mushroom_buddy_hop.fbx"
+  },
+  "glb": "mushroom_buddy.glb",
+  "obj": "mushroom_buddy.obj",
+  "palette": "mushroom_buddy_palette.png"
+ },
+ "export_tris": 3282,
+ "export_meshes": [
+  "body",
+  "body_outline"
+ ],
+ "export_tris_by_part": {
+  "body": 2230
+ },
+ "export_outline_tris_by_part": {
+  "body": 1052
+ },
+ "bones": 1,
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "mushroom_buddy.rbxmx",
+  "luau": "mushroom_buddy.luau"
+ }
+}

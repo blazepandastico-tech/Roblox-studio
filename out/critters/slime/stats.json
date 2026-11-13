@@ -1,0 +1,81 @@
+{
+ "name": "slime",
+ "title": "Jelly Slime",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  11,
+  10,
+  11
+ ],
+ "size_studs": [
+  2.75,
+  2.5,
+  2.75
+ ],
+ "parts": 2,
+ "clips": [
+  "idle",
+  "walk",
+  "splat"
+ ],
+ "palette": [
+  {
+   "name": "jelly",
+   "hex": "#5EE07A",
+   "material": "plastic"
+  },
+  {
+   "name": "jelly_dark",
+   "hex": "#2FB457",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "pink",
+   "hex": "#FF9BC8",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 566,
+ "studs": 115,
+ "render_tris": 1040,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 9,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 4,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "splat",
+    "frame": 7,
+    "file": "renders/pose_splat.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "slime.rbxmx",
+  "luau": "slime.luau"
+ }
+}

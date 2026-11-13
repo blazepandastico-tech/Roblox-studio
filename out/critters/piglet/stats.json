@@ -1,0 +1,86 @@
+{
+ "name": "piglet",
+ "title": "Piglet",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  9,
+  12,
+  14
+ ],
+ "size_studs": [
+  2.25,
+  3.0,
+  3.5
+ ],
+ "parts": 9,
+ "clips": [
+  "idle",
+  "walk",
+  "roll"
+ ],
+ "palette": [
+  {
+   "name": "pink",
+   "hex": "#FF9BC8",
+   "material": "plastic"
+  },
+  {
+   "name": "hot_pink",
+   "hex": "#F2489B",
+   "material": "plastic"
+  },
+  {
+   "name": "blush",
+   "hex": "#FFC1CF",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_brown",
+   "hex": "#5B3720",
+   "material": "matte"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "magenta",
+   "hex": "#C21E78",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 510,
+ "studs": 102,
+ "render_tris": 1202,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 4,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "roll",
+    "frame": 10,
+    "file": "renders/pose_roll.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "piglet.rbxmx",
+  "luau": "piglet.luau"
+ }
+}

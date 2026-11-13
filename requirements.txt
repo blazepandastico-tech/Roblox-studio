@@ -1,0 +1,5 @@
+# StudVox core (model specs, Roblox exports, concept sheets, tracing)
+numpy>=1.26
+pillow>=10.0
+# Rendering and FBX/GLB/OBJ export need Blender 4.2+ (blender on PATH, STUDVOX_BLENDER, or the bpy module:
+# see scripts/setup.sh)

@@ -1,0 +1,71 @@
+{
+ "name": "fox",
+ "title": "Fox Kit",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  7,
+  14,
+  22
+ ],
+ "size_studs": [
+  1.75,
+  3.5,
+  5.5
+ ],
+ "parts": 8,
+ "clips": [
+  "idle",
+  "walk",
+  "leap"
+ ],
+ "palette": [
+  {
+   "name": "dark_orange",
+   "hex": "#D9601A",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 429,
+ "studs": 105,
+ "render_tris": 1294,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 4,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "leap",
+    "frame": 8,
+    "file": "renders/pose_leap.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "fox.rbxmx",
+  "luau": "fox.luau"
+ }
+}

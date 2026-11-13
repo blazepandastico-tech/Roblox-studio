@@ -1,0 +1,116 @@
+{
+ "name": "lich",
+ "title": "Lich King",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  16,
+  24,
+  11
+ ],
+ "size_studs": [
+  16.0,
+  24.0,
+  11.0
+ ],
+ "parts": 6,
+ "clips": [
+  "idle",
+  "walk",
+  "cast"
+ ],
+ "palette": [
+  {
+   "name": "dark_purple",
+   "hex": "#472783",
+   "material": "plastic"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "navy",
+   "hex": "#16264F",
+   "material": "plastic"
+  },
+  {
+   "name": "purple",
+   "hex": "#7C4DD6",
+   "material": "plastic"
+  },
+  {
+   "name": "gold",
+   "hex": "#E8A82A",
+   "material": "metal"
+  },
+  {
+   "name": "neon_purple",
+   "hex": "#B45CFF",
+   "material": "glow"
+  },
+  {
+   "name": "dark_brown",
+   "hex": "#5B3720",
+   "material": "matte"
+  },
+  {
+   "name": "silver",
+   "hex": "#C9D0D8",
+   "material": "metal"
+  },
+  {
+   "name": "neon_cyan",
+   "hex": "#3FF2FF",
+   "material": "glow"
+  },
+  {
+   "name": "charcoal",
+   "hex": "#3A3E45",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_red",
+   "hex": "#FF3B30",
+   "material": "glow"
+  }
+ ],
+ "voxels": 1360,
+ "studs": 167,
+ "render_tris": 2558,
+ "outline_render": 0.1152,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 12,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "cast",
+    "frame": 16,
+    "file": "renders/pose_cast.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "lich.rbxmx",
+  "luau": "lich.luau"
+ }
+}

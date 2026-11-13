@@ -1,0 +1,96 @@
+{
+ "name": "t_rex",
+ "title": "T-Rex",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  15,
+  28,
+  43
+ ],
+ "size_studs": [
+  15.0,
+  28.0,
+  43.0
+ ],
+ "parts": 11,
+ "clips": [
+  "idle",
+  "walk",
+  "roar"
+ ],
+ "palette": [
+  {
+   "name": "olive",
+   "hex": "#7E8B2E",
+   "material": "plastic"
+  },
+  {
+   "name": "sand",
+   "hex": "#E4C994",
+   "material": "matte"
+  },
+  {
+   "name": "moss",
+   "hex": "#5F8F3A",
+   "material": "matte"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "yellow",
+   "hex": "#FFD321",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_brown",
+   "hex": "#5B3720",
+   "material": "matte"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 3284,
+ "studs": 379,
+ "render_tris": 5946,
+ "outline_render": 0.20639999999999997,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 8,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "roar",
+    "frame": 13,
+    "file": "renders/pose_roar.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "t_rex.rbxmx",
+  "luau": "t_rex.luau"
+ }
+}

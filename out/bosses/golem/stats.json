@@ -1,0 +1,86 @@
+{
+ "name": "golem",
+ "title": "Stone Golem",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  25,
+  28,
+  10
+ ],
+ "size_studs": [
+  25.0,
+  28.0,
+  10.0
+ ],
+ "parts": 6,
+ "clips": [
+  "idle",
+  "walk",
+  "pound"
+ ],
+ "palette": [
+  {
+   "name": "stone",
+   "hex": "#A7A39C",
+   "material": "matte"
+  },
+  {
+   "name": "dark_stone",
+   "hex": "#76736E",
+   "material": "matte"
+  },
+  {
+   "name": "moss",
+   "hex": "#5F8F3A",
+   "material": "matte"
+  },
+  {
+   "name": "slate",
+   "hex": "#5B6470",
+   "material": "matte"
+  },
+  {
+   "name": "gray",
+   "hex": "#9298A0",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_cyan",
+   "hex": "#3FF2FF",
+   "material": "glow"
+  }
+ ],
+ "voxels": 1911,
+ "studs": 282,
+ "render_tris": 5412,
+ "outline_render": 0.1344,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 9,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "pound",
+    "frame": 14,
+    "file": "renders/pose_pound.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "golem.rbxmx",
+  "luau": "golem.luau"
+ }
+}

@@ -1,0 +1,86 @@
+{
+ "name": "turtle",
+ "title": "Turtle",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  9,
+  7,
+  15
+ ],
+ "size_studs": [
+  2.25,
+  1.75,
+  3.75
+ ],
+ "parts": 7,
+ "clips": [
+  "idle",
+  "walk",
+  "hide"
+ ],
+ "palette": [
+  {
+   "name": "green",
+   "hex": "#3DAE4A",
+   "material": "plastic"
+  },
+  {
+   "name": "light_brown",
+   "hex": "#B57B45",
+   "material": "matte"
+  },
+  {
+   "name": "olive",
+   "hex": "#7E8B2E",
+   "material": "plastic"
+  },
+  {
+   "name": "lime",
+   "hex": "#A6DE3A",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_green",
+   "hex": "#22803A",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 438,
+ "studs": 109,
+ "render_tris": 1354,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 7,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "hide",
+    "frame": 11,
+    "file": "renders/pose_hide.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "turtle.rbxmx",
+  "luau": "turtle.luau"
+ }
+}

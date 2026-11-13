@@ -1,0 +1,76 @@
+{
+ "name": "bunny",
+ "title": "Bunny",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  9,
+  19,
+  10
+ ],
+ "size_studs": [
+  2.25,
+  4.75,
+  2.5
+ ],
+ "parts": 4,
+ "clips": [
+  "idle",
+  "walk",
+  "happy"
+ ],
+ "palette": [
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "pink",
+   "hex": "#FF9BC8",
+   "material": "plastic"
+  },
+  {
+   "name": "light_gray",
+   "hex": "#C5C9CF",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 481,
+ "studs": 91,
+ "render_tris": 1494,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 3,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "happy",
+    "frame": 9,
+    "file": "renders/pose_happy.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "bunny.rbxmx",
+  "luau": "bunny.luau"
+ }
+}

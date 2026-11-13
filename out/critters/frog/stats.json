@@ -1,0 +1,91 @@
+{
+ "name": "frog",
+ "title": "Froggy",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  11,
+  8,
+  9
+ ],
+ "size_studs": [
+  2.75,
+  2.0,
+  2.25
+ ],
+ "parts": 4,
+ "clips": [
+  "idle",
+  "walk",
+  "snap"
+ ],
+ "palette": [
+  {
+   "name": "green",
+   "hex": "#3DAE4A",
+   "material": "plastic"
+  },
+  {
+   "name": "lime",
+   "hex": "#A6DE3A",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_green",
+   "hex": "#22803A",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "light_yellow",
+   "hex": "#FFED8A",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "hot_pink",
+   "hex": "#F2489B",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 333,
+ "studs": 91,
+ "render_tris": 1148,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 5,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "snap",
+    "frame": 6,
+    "file": "renders/pose_snap.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "frog.rbxmx",
+  "luau": "frog.luau"
+ }
+}

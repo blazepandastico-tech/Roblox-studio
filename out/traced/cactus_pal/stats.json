@@ -1,0 +1,102 @@
+{
+ "name": "cactus_pal",
+ "title": "Cactus Pal",
+ "category": "traced",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  24,
+  30,
+  11
+ ],
+ "size_studs": [
+  6.0,
+  7.5,
+  2.75
+ ],
+ "parts": 1,
+ "clips": [
+  "idle",
+  "hop"
+ ],
+ "palette": [
+  {
+   "name": "green",
+   "hex": "#3DAE4A",
+   "material": "plastic"
+  },
+  {
+   "name": "copper",
+   "hex": "#C7673A",
+   "material": "metal"
+  },
+  {
+   "name": "trace_2",
+   "hex": "#DE824C",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "trace_3",
+   "hex": "#FF78BE",
+   "material": "plastic"
+  },
+  {
+   "name": "yellow",
+   "hex": "#FFD321",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 4239,
+ "studs": 263,
+ "render_tris": 2548,
+ "outline_render": 0.144,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "hop",
+    "frame": 5,
+    "file": "renders/pose_hop.png"
+   }
+  ]
+ },
+ "exports": {
+  "fbx": "cactus_pal.fbx",
+  "anim_fbx": {
+   "idle": "anims/cactus_pal_idle.fbx",
+   "hop": "anims/cactus_pal_hop.fbx"
+  },
+  "glb": "cactus_pal.glb",
+  "obj": "cactus_pal.obj",
+  "palette": "cactus_pal_palette.png"
+ },
+ "export_tris": 3170,
+ "export_meshes": [
+  "body",
+  "body_outline"
+ ],
+ "export_tris_by_part": {
+  "body": 2110
+ },
+ "export_outline_tris_by_part": {
+  "body": 1060
+ },
+ "bones": 1,
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "cactus_pal.rbxmx",
+  "luau": "cactus_pal.luau"
+ }
+}

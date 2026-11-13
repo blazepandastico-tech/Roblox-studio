@@ -1,0 +1,76 @@
+{
+ "name": "penguin",
+ "title": "Penguin",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  11,
+  13,
+  8
+ ],
+ "size_studs": [
+  2.75,
+  3.25,
+  2.0
+ ],
+ "parts": 5,
+ "clips": [
+  "idle",
+  "walk",
+  "slide"
+ ],
+ "palette": [
+  {
+   "name": "navy",
+   "hex": "#16264F",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "orange",
+   "hex": "#FF8A1C",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 422,
+ "studs": 74,
+ "render_tris": 970,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 4,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "slide",
+    "frame": 10,
+    "file": "renders/pose_slide.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "penguin.rbxmx",
+  "luau": "penguin.luau"
+ }
+}

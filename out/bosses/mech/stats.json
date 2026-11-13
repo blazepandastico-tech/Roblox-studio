@@ -1,0 +1,101 @@
+{
+ "name": "mech",
+ "title": "Titan Mech",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  21,
+  32,
+  12
+ ],
+ "size_studs": [
+  21.0,
+  32.0,
+  12.0
+ ],
+ "parts": 9,
+ "clips": [
+  "idle",
+  "walk",
+  "barrage"
+ ],
+ "palette": [
+  {
+   "name": "steel",
+   "hex": "#8A949F",
+   "material": "metal"
+  },
+  {
+   "name": "gunmetal",
+   "hex": "#454C55",
+   "material": "metal"
+  },
+  {
+   "name": "dark_gray",
+   "hex": "#5C626B",
+   "material": "plastic"
+  },
+  {
+   "name": "light_gray",
+   "hex": "#C5C9CF",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "yellow",
+   "hex": "#FFD321",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_cyan",
+   "hex": "#3FF2FF",
+   "material": "glow"
+  },
+  {
+   "name": "neon_red",
+   "hex": "#FF3B30",
+   "material": "glow"
+  },
+  {
+   "name": "fire",
+   "hex": "#FF8A1A",
+   "material": "glow"
+  }
+ ],
+ "voxels": 3053,
+ "studs": 288,
+ "render_tris": 1044,
+ "outline_render": 0.1536,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 8,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "barrage",
+    "frame": 14,
+    "file": "renders/pose_barrage.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "mech.rbxmx",
+  "luau": "mech.luau"
+ }
+}

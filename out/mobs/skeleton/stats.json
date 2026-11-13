@@ -1,0 +1,101 @@
+{
+ "name": "skeleton",
+ "title": "Skeleton Warrior",
+ "category": "mobs",
+ "voxel_size": 0.5,
+ "voxels_dims": [
+  12,
+  22,
+  15
+ ],
+ "size_studs": [
+  6.0,
+  11.0,
+  7.5
+ ],
+ "parts": 8,
+ "clips": [
+  "idle",
+  "walk",
+  "slash"
+ ],
+ "palette": [
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "steel",
+   "hex": "#8A949F",
+   "material": "metal"
+  },
+  {
+   "name": "brown",
+   "hex": "#8A5530",
+   "material": "matte"
+  },
+  {
+   "name": "copper",
+   "hex": "#C7673A",
+   "material": "metal"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_gray",
+   "hex": "#5C626B",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_red",
+   "hex": "#FF3B30",
+   "material": "glow"
+  },
+  {
+   "name": "dark_brown",
+   "hex": "#5B3720",
+   "material": "matte"
+  }
+ ],
+ "voxels": 431,
+ "studs": 113,
+ "render_tris": 1086,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 9,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 6,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "slash",
+    "frame": 7,
+    "file": "renders/pose_slash.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "skeleton.rbxmx",
+  "luau": "skeleton.luau"
+ }
+}

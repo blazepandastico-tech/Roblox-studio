@@ -1,0 +1,1237 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<Meta name="ExplicitAutoJoints">true</Meta>
+<Item class="Model" referent="RBX00000001"><Properties>
+<string name="Name">Jelly Slime</string>
+<Ref name="PrimaryPart">RBX00000002</Ref>
+</Properties>
+<Item class="Part" referent="RBX00000002"><Properties>
+<string name="Name">Root</string>
+<bool name="Anchored">true</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="CastShadow">false</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4294967295</Color3uint8>
+<token name="Material">272</token>
+<float name="Transparency">1</float>
+<Vector3 name="size"><X>2.75</X><Y>2.5</Y><Z>2.75</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">0</token>
+<CoordinateFrame name="PivotOffset"><X>0</X><Y>-1.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+<Item class="Model" referent="RBX00000005"><Properties>
+<string name="Name">body</string>
+</Properties>
+<Item class="Part" referent="RBX00000003"><Properties>
+<string name="Name">bodyJoint</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="CanQuery">false</bool>
+<bool name="CastShadow">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>-0.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4294967295</Color3uint8>
+<token name="Material">272</token>
+<float name="Transparency">1</float>
+<Vector3 name="size"><X>0.2</X><Y>0.2</Y><Z>0.2</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">0</token>
+</Properties>
+<Item class="Motor6D" referent="RBX00000006"><Properties>
+<string name="Name">body</string>
+<Ref name="Part0">RBX00000002</Ref>
+<Ref name="Part1">RBX00000003</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>-1.375</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000007"><Properties>
+<string name="Name">jelly_dark</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4281316439</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>0.25</Y><Z>2.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000008"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000007</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000009"><Properties>
+<string name="Name">jelly_dark</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>1.25</X><Y>0.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4281316439</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>1.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000000A"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000009</Ref>
+<CoordinateFrame name="C0"><X>1.25</X><Y>0.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000000B"><Properties>
+<string name="Name">jelly_dark</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-1.25</X><Y>0.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4281316439</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>1.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000000C"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000000B</Ref>
+<CoordinateFrame name="C0"><X>-1.25</X><Y>0.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000000D"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>1.25</X><Y>1.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000000E"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000000D</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000000F"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.75</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>1.75</X><Y>1</Y><Z>1.75</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000010"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000000F</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.875</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000011"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>1.25</Y><Z>1</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000012"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000011</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000013"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.75</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>1</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000014"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000013</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.875</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000015"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.375</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>1.25</X><Y>0.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000016"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000015</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.5</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000017"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.75</X><Y>0.75</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.5</Y><Z>2.25</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000018"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000017</Ref>
+<CoordinateFrame name="C0"><X>0.75</X><Y>0.875</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000019"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.75</X><Y>0.75</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.5</Y><Z>2.25</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000001A"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000019</Ref>
+<CoordinateFrame name="C0"><X>-0.75</X><Y>0.875</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000001B"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>0.75</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000001C"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000001B</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000001D"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.75</X><Y>0.75</Y><Z>0.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000001E"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000001D</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000001F"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.75</Y><Z>-0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>0.5</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000020"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000001F</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.875</Y><Z>-0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000021"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.5</X><Y>1</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>1</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000022"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000021</Ref>
+<CoordinateFrame name="C0"><X>0.5</X><Y>1.125</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000023"><Properties>
+<string name="Name">black</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.625</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4280098338</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.75</X><Y>0.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000024"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000023</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.75</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000025"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.5</X><Y>1</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>1</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000026"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000025</Ref>
+<CoordinateFrame name="C0"><X>-0.5</X><Y>1.125</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000027"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>2.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000028"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000027</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000029"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.75</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000002A"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000029</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000002B"><Properties>
+<string name="Name">pink</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>0.875</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4294941640</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.75</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000002C"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000002B</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000002D"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1.125</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.75</X><Y>0.75</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000002E"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000002D</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.25</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000002F"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.75</X><Y>1.125</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000030"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000002F</Ref>
+<CoordinateFrame name="C0"><X>0.75</X><Y>1.25</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000031"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.75</X><Y>1.125</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000032"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000031</Ref>
+<CoordinateFrame name="C0"><X>-0.75</X><Y>1.25</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000033"><Properties>
+<string name="Name">black</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1.125</Y><Z>-0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4280098338</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000034"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000033</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.25</Y><Z>-0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000035"><Properties>
+<string name="Name">black</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.75</X><Y>1.125</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4280098338</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000036"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000035</Ref>
+<CoordinateFrame name="C0"><X>0.75</X><Y>1.25</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000037"><Properties>
+<string name="Name">black</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.75</X><Y>1.125</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4280098338</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>2</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000038"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000037</Ref>
+<CoordinateFrame name="C0"><X>-0.75</X><Y>1.25</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000039"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>1.75</X><Y>1</Y><Z>1.5</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000003A"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000039</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.125</Y><Z>0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000003B"><Properties>
+<string name="Name">black</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1.375</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4280098338</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>2.25</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000003C"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000003B</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.5</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000003D"><Properties>
+<string name="Name">black</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4280098338</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>1.75</X><Y>1</Y><Z>1.5</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000003E"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000003D</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.125</Y><Z>-0.125</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000003F"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>1.25</X><Y>1.5</Y><Z>1.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000040"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000003F</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000041"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.75</X><Y>1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>1.5</Y><Z>1.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000042"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000041</Ref>
+<CoordinateFrame name="C0"><X>0.75</X><Y>1.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000043"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.75</X><Y>1</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>1.5</Y><Z>1.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000044"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000043</Ref>
+<CoordinateFrame name="C0"><X>-0.75</X><Y>1.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000045"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>1</X><Y>1.625</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>0.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000046"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000045</Ref>
+<CoordinateFrame name="C0"><X>1</X><Y>1.75</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000047"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-1</X><Y>1.625</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>0.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000048"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000047</Ref>
+<CoordinateFrame name="C0"><X>-1</X><Y>1.75</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000049"><Properties>
+<string name="Name">white</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.75</X><Y>1.625</Y><Z>-0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4294243570</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000004A"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000049</Ref>
+<CoordinateFrame name="C0"><X>0.75</X><Y>1.75</Y><Z>-0.75</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000004B"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.75</X><Y>1.75</Y><Z>1.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000004C"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000004B</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>1.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000004D"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.5</X><Y>1.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>1.75</Y><Z>0.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX0000004E"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000004D</Ref>
+<CoordinateFrame name="C0"><X>0.5</X><Y>1.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX0000004F"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.5</X><Y>1.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>1.75</Y><Z>0.75</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000050"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX0000004F</Ref>
+<CoordinateFrame name="C0"><X>-0.5</X><Y>1.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000051"><Properties>
+<string name="Name">white</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0.625</X><Y>1.875</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4294243570</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.5</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000052"><Properties>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000051</Ref>
+<CoordinateFrame name="C0"><X>0.625</X><Y>2</Y><Z>-0.5</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+</Item>
+<Item class="Model" referent="RBX00000053"><Properties>
+<string name="Name">drip</string>
+</Properties>
+<Item class="Part" referent="RBX00000004"><Properties>
+<string name="Name">dripJoint</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="CanQuery">false</bool>
+<bool name="CastShadow">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>1.875</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4294967295</Color3uint8>
+<token name="Material">272</token>
+<float name="Transparency">1</float>
+<Vector3 name="size"><X>0.2</X><Y>0.2</Y><Z>0.2</Z></Vector3>
+<token name="TopSurface">0</token>
+<token name="BottomSurface">0</token>
+</Properties>
+<Item class="Motor6D" referent="RBX00000054"><Properties>
+<string name="Name">drip</string>
+<Ref name="Part0">RBX00000003</Ref>
+<Ref name="Part1">RBX00000004</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>2</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000055"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>-0.125</X><Y>2.125</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.5</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000056"><Properties>
+<Ref name="Part0">RBX00000004</Ref>
+<Ref name="Part1">RBX00000055</Ref>
+<CoordinateFrame name="C0"><X>-0.125</X><Y>0.25</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+<Item class="Part" referent="RBX00000057"><Properties>
+<string name="Name">jelly</string>
+<bool name="Anchored">false</bool>
+<bool name="CanCollide">false</bool>
+<bool name="CanTouch">false</bool>
+<bool name="Massless">true</bool>
+<CoordinateFrame name="CFrame"><X>0</X><Y>2.375</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+<Color3uint8 name="Color3uint8">4284407930</Color3uint8>
+<token name="Material">256</token>
+<Vector3 name="size"><X>0.25</X><Y>0.25</Y><Z>0.25</Z></Vector3>
+<token name="TopSurface">3</token>
+<token name="BottomSurface">4</token>
+</Properties>
+<Item class="Weld" referent="RBX00000058"><Properties>
+<Ref name="Part0">RBX00000004</Ref>
+<Ref name="Part1">RBX00000057</Ref>
+<CoordinateFrame name="C0"><X>0</X><Y>0.5</Y><Z>0</Z><R00>1</R00><R01>0</R01><R02>0</R02><R10>0</R10><R11>1</R11><R12>0</R12><R20>0</R20><R21>0</R21><R22>1</R22></CoordinateFrame>
+</Properties>
+</Item>
+</Item>
+</Item>
+<Item class="ModuleScript" referent="RBX00000059"><Properties>
+<string name="Name">StudVoxelAnimator</string>
+<ProtectedString name="Source"><![CDATA[--!strict
+--[[
+	StudVoxelAnimator
+	Plays StudVox clips on a model's Motor6D joints. Nothing to upload:
+	clips are plain data (Motor6D.Transform per frame), generated by
+	`python -m studvox make`.
+
+	local Animator = require(path.to.StudVoxelAnimator)
+	local anim = Animator.new(model, require(model.Clips))
+	anim:Start()                   -- step every frame (RunService.PreSimulation)
+	anim:Play("walk", 0.2)         -- cross-fade to a looping clip
+	anim:Play("attack")            -- one-shot clips return to the previous loop
+	anim.Finished.Event:Connect(function(clipName) end)
+	anim:Stop(0.3)                 -- fade back to the rest pose
+	anim:Destroy()
+
+	Motor6D.Transform does not replicate, so run this on the client (the
+	generated "Animate" Script uses RunContext = Client). Drive which clip
+	plays from the server by changing the model's "Clip" StringValue.
+]]
+
+local RunService = game:GetService("RunService")
+
+export type ClipData = {
+	length: number,
+	loop: boolean,
+	fps: number,
+	frames: number,
+	tracks: { [string]: { number } },
+}
+
+type PlayState = {
+	name: string,
+	clip: ClipData,
+	time: number,
+	speed: number,
+}
+
+local Animator = {}
+Animator.__index = Animator
+
+export type Animator = typeof(setmetatable(
+	{} :: {
+		model: Instance,
+		clips: { [string]: ClipData },
+		motors: { [string]: Motor6D },
+		current: PlayState?,
+		previous: PlayState?,
+		fade: number,
+		fadeTime: number,
+		returnTo: string?,
+		connection: RBXScriptConnection?,
+		Finished: BindableEvent,
+	},
+	Animator
+))
+
+local IDENTITY = CFrame.identity
+
+local function frameCFrame(track: { number }, i: number): CFrame
+	local b = i * 7
+	return CFrame.new(track[b + 1], track[b + 2], track[b + 3], track[b + 4], track[b + 5], track[b + 6], track[b + 7])
+end
+
+local function sample(state: PlayState, motorName: string): CFrame
+	local clip = state.clip
+	local track = clip.tracks[motorName]
+	if not track then
+		return IDENTITY
+	end
+	local last = clip.frames - 1
+	local f = math.clamp(state.time * clip.fps, 0, last)
+	local i0 = math.floor(f)
+	local a = f - i0
+	if i0 >= last then
+		return frameCFrame(track, last)
+	end
+	local c0 = frameCFrame(track, i0)
+	if a <= 1e-4 then
+		return c0
+	end
+	return c0:Lerp(frameCFrame(track, i0 + 1), a)
+end
+
+function Animator.new(model: Instance, clips: { [string]: ClipData }): Animator
+	local motors: { [string]: Motor6D } = {}
+	for _, d in model:GetDescendants() do
+		if d:IsA("Motor6D") then
+			motors[d.Name] = d
+		end
+	end
+	local self = setmetatable({
+		model = model,
+		clips = clips,
+		motors = motors,
+		current = nil,
+		previous = nil,
+		fade = 0,
+		fadeTime = 0,
+		returnTo = nil,
+		connection = nil,
+		Finished = Instance.new("BindableEvent"),
+	}, Animator)
+	return self
+end
+
+function Animator.GetClipNames(self: Animator): { string }
+	local names = {}
+	for name in self.clips do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	return names
+end
+
+function Animator.IsPlaying(self: Animator, name: string?): boolean
+	local cur = self.current
+	if cur == nil then
+		return false
+	end
+	return name == nil or cur.name == name
+end
+
+function Animator.Play(self: Animator, name: string, fadeTime: number?, speed: number?)
+	local clip = self.clips[name]
+	if clip == nil then
+		warn(`StudVoxelAnimator: no clip named "{name}"`)
+		return
+	end
+	local cur = self.current
+	if cur and cur.name == name and clip.loop then
+		cur.speed = speed or cur.speed
+		return
+	end
+	if not clip.loop then
+		-- one-shot: remember the loop we came from so we can go back to it
+		if cur and cur.clip.loop then
+			self.returnTo = cur.name
+		end
+	else
+		self.returnTo = nil
+	end
+	self.previous = cur
+	self.current = { name = name, clip = clip, time = 0, speed = speed or 1 }
+	self.fade = 0
+	self.fadeTime = fadeTime or 0.15
+end
+
+function Animator.Stop(self: Animator, fadeTime: number?)
+	self.previous = self.current
+	self.current = nil
+	self.returnTo = nil
+	self.fade = 0
+	self.fadeTime = fadeTime or 0.15
+end
+
+local function advance(state: PlayState, dt: number): boolean
+	-- returns true when a one-shot clip just finished
+	state.time += dt * state.speed
+	local len = state.clip.length
+	if state.clip.loop then
+		if len > 0 then
+			state.time %= len
+		end
+		return false
+	end
+	if state.time >= len then
+		state.time = len
+		return true
+	end
+	return false
+end
+
+function Animator.Step(self: Animator, dt: number)
+	local cur = self.current
+	local prev = self.previous
+	if cur then
+		local finished = advance(cur, dt)
+		if finished then
+			self.Finished:Fire(cur.name)
+			local back = self.returnTo
+			if back then
+				self.returnTo = nil
+				self:Play(back, 0.2)
+				cur = self.current
+				prev = self.previous
+			end
+		end
+	end
+	if prev then
+		advance(prev, dt)
+	end
+	self.fade += dt
+	local alpha = if self.fadeTime > 0 then math.clamp(self.fade / self.fadeTime, 0, 1) else 1
+	if alpha >= 1 then
+		self.previous = nil
+		prev = nil
+	end
+	for name, motor in self.motors do
+		local target = if cur then sample(cur, name) else IDENTITY
+		if prev then
+			target = sample(prev, name):Lerp(target, alpha)
+		elseif cur == nil and alpha < 1 then
+			target = motor.Transform:Lerp(IDENTITY, alpha)
+		end
+		motor.Transform = target
+	end
+end
+
+function Animator.Start(self: Animator)
+	if self.connection then
+		return
+	end
+	self.connection = RunService.PreSimulation:Connect(function(dt: number)
+		self:Step(dt)
+	end)
+end
+
+function Animator.Destroy(self: Animator)
+	if self.connection then
+		self.connection:Disconnect()
+		self.connection = nil
+	end
+	for _, motor in self.motors do
+		motor.Transform = IDENTITY
+	end
+	self.Finished:Destroy()
+end
+
+return Animator
+]]></ProtectedString>
+</Properties>
+</Item>
+<Item class="ModuleScript" referent="RBX0000005A"><Properties>
+<string name="Name">Clips</string>
+<ProtectedString name="Source"><![CDATA[-- StudVox clip data (Motor6D transforms per frame: px, py, pz, qx, qy, qz, qw)
+return {
+	idle = {
+		length = 1.6,
+		loop = true,
+		fps = 24,
+		frames = 39,
+		tracks = {
+			body = {
+				0, 0, 0, 0, 0, 0, 1, 0, 0.0201, 0, 0, 0, -0.0057, 1, 0, 0.0381, 0, 0, 0, -0.0112, 0.9999, 0, 0.052, 0, 0, 0, -0.0165, 0.9999,
+				0, 0.0604, 0, 0, 0, -0.0212, 0.9998, 0, 0.0624, 0, 0, 0, -0.0255, 0.9997, 0, 0.0578, 0, 0, 0, -0.029, 0.9996, 0, 0.047, 0, 0, 0, -0.0318, 0.9995,
+				0, 0.0312, 0, 0, 0, -0.0337, 0.9994, 0, 0.0122, 0, 0, 0, -0.0347, 0.9994, 0, -0.0081, 0, 0, 0, -0.0348, 0.9994, 0, -0.0277, 0, 0, 0, -0.034, 0.9994,
+				0, -0.0442, 0, 0, 0, -0.0322, 0.9995, 0, -0.0561, 0, 0, 0, -0.0296, 0.9996, 0, -0.062, 0, 0, 0, -0.0262, 0.9997, 0, -0.0613, 0, 0, 0, -0.0221, 0.9998,
+				0, -0.0541, 0, 0, 0, -0.0175, 0.9998, 0, -0.0412, 0, 0, 0, -0.0123, 0.9999, 0, -0.0239, 0, 0, 0, -0.0068, 1, 0, -0.0041, 0, 0, 0, -0.0011, 1,
+				0, 0.0162, 0, 0, 0, 0.0046, 1, 0, 0.0347, 0, 0, 0, 0.0101, 0.9999, 0, 0.0496, 0, 0, 0, 0.0154, 0.9999, 0, 0.0592, 0, 0, 0, 0.0203, 0.9998,
+				0, 0.0625, 0, 0, 0, 0.0247, 0.9997, 0, 0.0592, 0, 0, 0, 0.0284, 0.9996, 0, 0.0496, 0, 0, 0, 0.0313, 0.9995, 0, 0.0347, 0, 0, 0, 0.0334, 0.9994,
+				0, 0.0162, 0, 0, 0, 0.0346, 0.9994, 0, -0.0041, 0, 0, 0, 0.0349, 0.9994, 0, -0.0239, 0, 0, 0, 0.0342, 0.9994, 0, -0.0412, 0, 0, 0, 0.0327, 0.9995,
+				0, -0.0541, 0, 0, 0, 0.0302, 0.9995, 0, -0.0613, 0, 0, 0, 0.027, 0.9996, 0, -0.062, 0, 0, 0, 0.023, 0.9997, 0, -0.0561, 0, 0, 0, 0.0184, 0.9998,
+				0, -0.0442, 0, 0, 0, 0.0134, 0.9999, 0, -0.0277, 0, 0, 0, 0.0079, 1, 0, -0.0081, 0, 0, 0, 0.0023, 1,
+			},
+			drip = {
+				0, 0, 0, 0, 0, -0.1652, 0.9863, 0, 0, 0, 0, 0, -0.1736, 0.9848, 0, 0, 0, 0, 0, -0.1638, 0.9865, 0, 0, 0, 0, 0, -0.1366, 0.9906,
+				0, 0, 0, 0, 0, -0.0949, 0.9955, 0, 0, 0, 0, 0, -0.0429, 0.9991, 0, 0, 0, 0, 0, 0.0137, 0.9999, 0, 0, 0, 0, 0, 0.0688, 0.9976,
+				0, 0, 0, 0, 0, 0.1165, 0.9932, 0, 0, 0, 0, 0, 0.1517, 0.9884, 0, 0, 0, 0, 0, 0.1708, 0.9853, 0, 0, 0, 0, 0, 0.1719, 0.9851,
+				0, 0, 0, 0, 0, 0.1549, 0.9879, 0, 0, 0, 0, 0, 0.1215, 0.9926, 0, 0, 0, 0, 0, 0.0751, 0.9972, 0, 0, 0, 0, 0, 0.0205, 0.9998,
+				0, 0, 0, 0, 0, -0.0363, 0.9993, 0, 0, 0, 0, 0, -0.0891, 0.996, 0, 0, 0, 0, 0, -0.1323, 0.9912, 0, 0, 0, 0, 0, -0.1614, 0.9869,
+				0, 0, 0, 0, 0, -0.1734, 0.9848, 0, 0, 0, 0, 0, -0.1672, 0.9859, 0, 0, 0, 0, 0, -0.1433, 0.9897, 0, 0, 0, 0, 0, -0.1042, 0.9946,
+				0, 0, 0, 0, 0, -0.0539, 0.9985, 0, 0, 0, 0, 0, 0.0023, 1, 0, 0, 0, 0, 0, 0.0582, 0.9983, 0, 0, 0, 0, 0, 0.1078, 0.9942,
+				0, 0, 0, 0, 0, 0.1459, 0.9893, 0, 0, 0, 0, 0, 0.1684, 0.9857, 0, 0, 0, 0, 0, 0.1731, 0.9849, 0, 0, 0, 0, 0, 0.1597, 0.9872,
+				0, 0, 0, 0, 0, 0.1293, 0.9916, 0, 0, 0, 0, 0, 0.0852, 0.9964, 0, 0, 0, 0, 0, 0.0318, 0.9995, 0, 0, 0, 0, 0, -0.025, 0.9997,
+				0, 0, 0, 0, 0, -0.0792, 0.9969, 0, 0, 0, 0, 0, -0.1247, 0.9922, 0, 0, 0, 0, 0, -0.1569, 0.9876,
+			},
+		},
+	},
+	walk = {
+		length = 0.7,
+		loop = true,
+		fps = 24,
+		frames = 18,
+		tracks = {
+			body = {
+				0, 0, 0, 0, 0, 0, 1, 0, 0.1394, 0, -0.0255, 0, 0, 0.9997, 0, 0.274, 0, -0.0475, 0, 0, 0.9989, 0, 0.399, 0, -0.0629, 0, 0, 0.998,
+				0, 0.5101, 0, -0.0696, 0, 0, 0.9976, 0, 0.6035, 0, -0.0667, 0, 0, 0.9978, 0, 0.6757, 0, -0.0546, 0, 0, 0.9985, 0, 0.7245, 0, -0.0349, 0, 0, 0.9994,
+				0, 0.7479, 0, -0.0104, 0, 0, 0.9999, 0, 0.7453, 0, 0.0155, 0, 0, 0.9999, 0, 0.7167, 0, 0.0393, 0, 0, 0.9992, 0, 0.6631, 0, 0.0577, 0, 0, 0.9983,
+				0, 0.5864, 0, 0.068, 0, 0, 0.9977, 0, 0.4892, 0, 0.069, 0, 0, 0.9976, 0, 0.375, 0, 0.0604, 0, 0, 0.9982, 0, 0.2477, 0, 0.0435, 0, 0, 0.9991,
+				0, 0.1118, 0, 0.0206, 0, 0, 0.9998, 0, 0, 0, 0, 0, 0, 1,
+			},
+			drip = {
+				0, 0, 0, 0.1756, 0, 0, 0.9845, 0, 0, 0, 0.2096, 0, 0, 0.9778, 0, 0, 0, 0.2149, 0, 0, 0.9766, 0, 0, 0, 0.1909, 0, 0, 0.9816,
+				0, 0, 0, 0.1406, 0, 0, 0.9901, 0, 0, 0, 0.0705, 0, 0, 0.9975, 0, 0, 0, -0.0098, 0, 0, 1, 0, 0, 0, -0.0886, 0, 0, 0.9961,
+				0, 0, 0, -0.1548, 0, 0, 0.9879, 0, 0, 0, -0.1993, 0, 0, 0.9799, 0, 0, 0, -0.2163, 0, 0, 0.9763, 0, 0, 0, -0.2039, 0, 0, 0.979,
+				0, 0, 0, -0.1636, 0, 0, 0.9865, 0, 0, 0, -0.1003, 0, 0, 0.995, 0, 0, 0, -0.0228, 0, 0, 0.9997, 0, 0, 0, 0.058, 0, 0, 0.9983,
+				0, 0, 0, 0.1305, 0, 0, 0.9914, 0, 0, 0, 0.1756, 0, 0, 0.9845,
+			},
+		},
+	},
+	splat = {
+		length = 1,
+		loop = false,
+		fps = 24,
+		frames = 25,
+		tracks = {
+			body = {
+				0, 0, 0, 0, 0, 0, 1, 0, 0.3877, 0, 0, 0, 0, 1, 0, 0.7176, 0, 0, 0, 0, 1, 0, 0.9896, 0, 0, 0, 0, 1,
+				0, 1.2037, 0, 0, 0, 0, 1, 0, 1.3599, 0, 0, 0, 0, 1, 0, 1.4583, 0, 0, 0, 0, 1, 0, 1.4989, 0, 0, 0, 0, 1,
+				0, 1.4479, 0, 0, 0, 0, 1, 0, 1.2363, 0, 0, 0, 0, 1, 0, 0.862, 0, 0, 0, 0, 1, 0, 0.3249, 0, 0, 0, 0, 1,
+				0, -0.375, 0, 0, 0, 0, 1, 0, -0.3161, 0, 0, 0, 0, 1, 0, -0.1775, 0, 0, 0, 0, 1, 0, -0.0161, 0, 0, 0, 0, 1,
+				0, 0.1111, 0, 0, 0, 0, 1, 0, 0.1497, 0, 0, 0, 0, 1, 0, 0.1389, 0, 0, 0, 0, 1, 0, 0.1166, 0, 0, 0, 0, 1,
+				0, 0.0874, 0, 0, 0, 0, 1, 0, 0.0564, 0, 0, 0, 0, 1, 0, 0.0283, 0, 0, 0, 0, 1, 0, 0.0079, 0, 0, 0, 0, 1,
+				0, 0, 0, 0, 0, 0, 1,
+			},
+		},
+	},
+}
+]]></ProtectedString>
+</Properties>
+</Item>
+<Item class="Script" referent="RBX0000005B"><Properties>
+<string name="Name">Animate</string>
+<token name="RunContext">2</token>
+<bool name="Disabled">false</bool>
+<ProtectedString name="Source"><![CDATA[-- StudVox: plays the clip named in the "Clip" StringValue on every client.
+-- Change Clip.Value from a server Script to switch clips (it replicates).
+if not script:IsDescendantOf(workspace) then
+	return -- templates in ReplicatedStorage stay idle; clones in workspace animate
+end
+local model = script.Parent
+local Animator = require(model:WaitForChild("StudVoxelAnimator"))
+local clips = require(model:WaitForChild("Clips"))
+local clipValue = model:WaitForChild("Clip") :: StringValue
+
+local anim = Animator.new(model, clips)
+anim:Start()
+local function apply()
+	if clipValue.Value ~= "" then
+		anim:Play(clipValue.Value, 0.2)
+	else
+		anim:Stop(0.2)
+	end
+end
+clipValue:GetPropertyChangedSignal("Value"):Connect(apply)
+apply()
+]]></ProtectedString>
+</Properties>
+</Item>
+<Item class="StringValue" referent="RBX0000005C"><Properties>
+<string name="Name">Clip</string>
+<string name="Value">idle</string>
+</Properties>
+</Item>
+<Item class="Highlight" referent="RBX0000005D"><Properties>
+<string name="Name">Outline</string>
+<float name="FillTransparency">1</float>
+<float name="OutlineTransparency">0</float>
+<Color3 name="OutlineColor"><R>0.07</R><G>0.07</G><B>0.08</B></Color3>
+<Color3 name="FillColor"><R>1</R><G>1</G><B>1</B></Color3>
+<token name="DepthMode">1</token>
+<bool name="Enabled">true</bool>
+</Properties>
+</Item>
+</Item>
+</roblox>

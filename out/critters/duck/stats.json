@@ -1,0 +1,138 @@
+{
+ "name": "duck",
+ "title": "Duckling",
+ "category": "critters",
+ "voxel_size": 0.25,
+ "voxels_dims": [
+  9,
+  15,
+  13
+ ],
+ "size_studs": [
+  2.25,
+  3.75,
+  3.25
+ ],
+ "parts": 7,
+ "clips": [
+  "idle",
+  "walk",
+  "quack"
+ ],
+ "palette": [
+  {
+   "name": "yellow",
+   "hex": "#FFD321",
+   "material": "plastic"
+  },
+  {
+   "name": "mustard",
+   "hex": "#D9A21B",
+   "material": "plastic"
+  },
+  {
+   "name": "light_yellow",
+   "hex": "#FFED8A",
+   "material": "plastic"
+  },
+  {
+   "name": "orange",
+   "hex": "#FF8A1C",
+   "material": "plastic"
+  },
+  {
+   "name": "dark_orange",
+   "hex": "#D9601A",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 498,
+ "studs": 94,
+ "render_tris": 1520,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 5,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "quack",
+    "frame": 9,
+    "file": "renders/pose_quack.png"
+   }
+  ]
+ },
+ "exports": {
+  "fbx": "duck.fbx",
+  "anim_fbx": {
+   "idle": "anims/duck_idle.fbx",
+   "walk": "anims/duck_walk.fbx",
+   "quack": "anims/duck_quack.fbx"
+  },
+  "glb": "duck.glb",
+  "obj": "duck.obj",
+  "palette": "duck_palette.png"
+ },
+ "export_tris": 1650,
+ "export_meshes": [
+  "body",
+  "head",
+  "beak",
+  "wing_l",
+  "wing_r",
+  "foot_l",
+  "foot_r",
+  "body_outline",
+  "head_outline",
+  "beak_outline",
+  "wing_l_outline",
+  "wing_r_outline",
+  "foot_l_outline",
+  "foot_r_outline"
+ ],
+ "export_tris_by_part": {
+  "body": 320,
+  "head": 420,
+  "beak": 44,
+  "wing_l": 44,
+  "wing_r": 44,
+  "foot_l": 30,
+  "foot_r": 30
+ },
+ "export_outline_tris_by_part": {
+  "body": 262,
+  "head": 340,
+  "beak": 20,
+  "wing_l": 36,
+  "wing_r": 36,
+  "foot_l": 12,
+  "foot_r": 12
+ },
+ "bones": 7,
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "duck.rbxmx",
+  "luau": "duck.luau"
+ }
+}

@@ -1,0 +1,96 @@
+{
+ "name": "mimic_chest",
+ "title": "Mimic Chest",
+ "category": "mobs",
+ "voxel_size": 0.5,
+ "voxels_dims": [
+  13,
+  10,
+  11
+ ],
+ "size_studs": [
+  6.5,
+  5.0,
+  5.5
+ ],
+ "parts": 3,
+ "clips": [
+  "idle",
+  "walk",
+  "bite"
+ ],
+ "palette": [
+  {
+   "name": "brown",
+   "hex": "#8A5530",
+   "material": "matte"
+  },
+  {
+   "name": "gold",
+   "hex": "#E8A82A",
+   "material": "metal"
+  },
+  {
+   "name": "dark_brown",
+   "hex": "#5B3720",
+   "material": "matte"
+  },
+  {
+   "name": "maroon",
+   "hex": "#5E1418",
+   "material": "plastic"
+  },
+  {
+   "name": "hot_pink",
+   "hex": "#F2489B",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_yellow",
+   "hex": "#FFF24A",
+   "material": "glow"
+  },
+  {
+   "name": "dark_gray",
+   "hex": "#5C626B",
+   "material": "plastic"
+  }
+ ],
+ "voxels": 1091,
+ "studs": 183,
+ "render_tris": 574,
+ "outline_render": 0.11,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 12,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 3,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "bite",
+    "frame": 7,
+    "file": "renders/pose_bite.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "mimic_chest.rbxmx",
+  "luau": "mimic_chest.luau"
+ }
+}

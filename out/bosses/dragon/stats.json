@@ -1,0 +1,96 @@
+{
+ "name": "dragon",
+ "title": "Ember Dragon",
+ "category": "bosses",
+ "voxel_size": 1.0,
+ "voxels_dims": [
+  45,
+  32,
+  53
+ ],
+ "size_studs": [
+  45.0,
+  32.0,
+  53.0
+ ],
+ "parts": 14,
+ "clips": [
+  "idle",
+  "walk",
+  "roar"
+ ],
+ "palette": [
+  {
+   "name": "red",
+   "hex": "#E2312E",
+   "material": "plastic"
+  },
+  {
+   "name": "tan",
+   "hex": "#D2A86E",
+   "material": "matte"
+  },
+  {
+   "name": "dark_red",
+   "hex": "#9A1C1F",
+   "material": "plastic"
+  },
+  {
+   "name": "sand",
+   "hex": "#E4C994",
+   "material": "matte"
+  },
+  {
+   "name": "cream",
+   "hex": "#FFF1D6",
+   "material": "plastic"
+  },
+  {
+   "name": "white",
+   "hex": "#F4F4F2",
+   "material": "plastic"
+  },
+  {
+   "name": "black",
+   "hex": "#1D1E22",
+   "material": "plastic"
+  },
+  {
+   "name": "neon_yellow",
+   "hex": "#FFF24A",
+   "material": "glow"
+  }
+ ],
+ "voxels": 3683,
+ "studs": 505,
+ "render_tris": 8644,
+ "outline_render": 0.25439999999999996,
+ "renders": {
+  "hero": "renders/hero.png",
+  "front": "renders/front.png",
+  "side": "renders/side.png",
+  "back": "renders/back.png",
+  "poses": [
+   {
+    "clip": "idle",
+    "frame": 18,
+    "file": "renders/pose_idle.png"
+   },
+   {
+    "clip": "walk",
+    "frame": 7,
+    "file": "renders/pose_walk.png"
+   },
+   {
+    "clip": "roar",
+    "frame": 14,
+    "file": "renders/pose_roar.png"
+   }
+  ]
+ },
+ "blender_version": "5.3.0",
+ "roblox": {
+  "rbxmx": "dragon.rbxmx",
+  "luau": "dragon.luau"
+ }
+}
